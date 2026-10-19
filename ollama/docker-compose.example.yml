@@ -1,0 +1,84 @@
+# =============================================================================
+# Ollama + keep-alive watchdog - example Docker Compose file
+# =============================================================================
+# An EXAMPLE to adapt, not a drop-in: change the network name, volume paths and
+# GPU settings to match your host. Written for an NVIDIA GPU with the NVIDIA
+# Container Toolkit installed.
+#
+# What it gives you
+#   ollama            the model server, set to keep models loaded forever
+#   ollama-watchdog   a tiny container that checks every INTERVAL seconds that
+#                     the Lena model is loaded, and loads it again if not
+#
+# Why a watchdog at all
+#   OLLAMA_KEEP_ALIVE=-1 keeps models in memory by default, but any client that
+#   sends its own keep_alive value (Open WebUI and Home Assistant can) replaces
+#   that. The watchdog is a safety net so the first voice command is not slow.
+#   Also set "keep alive" to -1 in those clients if you can.
+#
+# Notes
+#   - A dollar sign in a command must be written $$ inside a compose file,
+#     otherwise Compose tries to substitute it itself.
+#   - The warm-up request has no prompt, so the model loads without generating
+#     any text.
+#   - Test the watchdog: run `docker exec ollama ollama stop lena`, then watch
+#     `docker logs -f ollama-watchdog`.
+# =============================================================================
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    networks:
+      - llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama-data:/root/.ollama       # downloaded models live here
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1              # never unload models
+      - OLLAMA_FLASH_ATTENTION=1          # less VRAM per token of context
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Lets the watchdog (and Compose) wait until Ollama really answers.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  ollama-watchdog:
+    image: curlimages/curl:latest
+    container_name: ollama-watchdog
+    restart: unless-stopped
+    networks:
+      - llm
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - MODEL=lena                        # the model name you used in `ollama create`
+      - INTERVAL=60                       # seconds between checks
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          # Is the model listed as loaded? (-q = quiet, just the exit code)
+          if ! curl -sf --max-time 5 http://ollama:11434/api/ps | grep -q "\"name\":\"$$MODEL"; then
+            echo "$$(date) $$MODEL not loaded, warming up"
+            # A request with only a model name and keep_alive loads it and returns.
+            curl -sf --max-time 180 http://ollama:11434/api/generate \
+              -d "{\"model\":\"$$MODEL\",\"keep_alive\":-1}" > /dev/null \
+              || echo "$$(date) warm-up failed"
+          fi
+          sleep "$$INTERVAL"
+        done
+
+networks:
+  llm:
