@@ -76,8 +76,6 @@ No code in this repository was copied from another project. It builds on, and wo
 - [curl](https://curl.se/), used by the watchdog example.
 - The idea of a Jarvis-style assistant comes from the J.A.R.V.I.S. of Marvel's *Iron Man*. Lena is an original character and this project is not affiliated with Marvel.
 
-Everything else was written with help from [Claude](https://claude.ai/) by Anthropic.
-
 ## License
 
 [GPL-3.0](LICENSE). You may use, change and share this project, and anything you distribute that is based on it must stay under the same license.
