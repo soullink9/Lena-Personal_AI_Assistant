@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (2026-10-27)
+
+- Open WebUI follows your phone's dark mode again, including when you switch it while Lena is open (you stay on the same chat).
+
 ## 2.0.1 (2026-10-27)
 
 - Fixed the main screen showing blank white instead of Open WebUI.

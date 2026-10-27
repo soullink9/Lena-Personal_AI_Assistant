@@ -169,8 +169,15 @@ class MainActivity : ComponentActivity() {
         web = createWebView()
         applyShellStyle()
         setContent { LenaTheme { Shell() } }
-        handle(intent, fresh = true)
+        // Switching dark mode rebuilds the screen so the page re-themes; come back to the same chat.
+        val restored = savedInstanceState?.getString("url")?.takeIf { isServer(Uri.parse(it)) }
+        if (restored != null) web.loadUrl(restored) else handle(intent, fresh = true)
         askForNotificationsOnce()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::web.isInitialized) outState.putString("url", currentUrl.value)
     }
 
     /** "Lena finished" notifications are on by default, so ask for the permission the first time. */
