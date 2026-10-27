@@ -30,12 +30,15 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +47,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -102,7 +107,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -556,10 +564,10 @@ class MainActivity : ComponentActivity() {
                     )
                 },
             ) { padding ->
-                AndroidView(
-                    factory = { web },
-                    modifier = Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize(),
-                )
+                Box(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
+                    AndroidView(factory = { web }, modifier = Modifier.fillMaxSize())
+                    EdgeSwipe(Modifier.align(Alignment.CenterStart)) { scope.launch { drawer.open() } }
+                }
             }
         }
 
@@ -607,6 +615,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    /**
+     * A strip down the left edge that opens the menu when you swipe right from it, instead of
+     * Android's back gesture. Android lets an app take over at most 200dp of each edge, so it
+     * covers the middle of the screen; above and below it, the edge still goes back (and the
+     * right edge always does). It's as wide as the phone's own back-gesture area.
+     */
+    @Composable
+    private fun EdgeSwipe(modifier: Modifier, onOpen: () -> Unit) {
+        val inset = WindowInsets.systemGestures.asPaddingValues().calculateLeftPadding(LocalLayoutDirection.current)
+        val threshold = with(LocalDensity.current) { 24.dp.toPx() }
+        Box(
+            modifier.width(maxOf(inset, 20.dp)).height(200.dp)
+                .systemGestureExclusion()
+                .pointerInput(Unit) {
+                    var dragged = 0f
+                    detectHorizontalDragGestures(onDragStart = { dragged = 0f }) { change, amount ->
+                        change.consume()
+                        dragged += amount
+                        if (dragged > threshold) {
+                            dragged = Float.NEGATIVE_INFINITY // once per swipe
+                            onOpen()
+                        }
+                    }
+                },
+        )
+    }
 
     /** One of the icon buttons along the bottom of the drawer. */
     @Composable
