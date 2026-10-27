@@ -1,0 +1,42 @@
+# =============================================================================
+# Piper (text-to-speech) - example Docker Compose file
+# =============================================================================
+# Piper turns Lena's text replies into speech. This example uses the
+# LinuxServer.io image, whose environment variables are documented at
+# https://docs.linuxserver.io/images/docker-piper/ . Home Assistant connects
+# to it through the Wyoming integration on port 10200.
+#
+# Voice choice is a matter of ear. Change ONE setting at a time and listen to
+# a few real Lena lines (a joke and a plain confirmation) before keeping it.
+# See wiki: Voice-Piper
+# =============================================================================
+services:
+  piper:
+    image: lscr.io/linuxserver/piper:latest
+    container_name: piper
+    restart: unless-stopped
+    ports:
+      - "10200:10200"                     # Wyoming port Home Assistant connects to
+    volumes:
+      - ./piper-data:/config              # downloaded voices are stored here
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York               # your time zone
+      # Voice name, in the form language-name-quality.
+      # libritts-high is a multi-speaker voice; quality varies by speaker.
+      - PIPER_VOICE=en_US-libritts-high
+      # Which speaker to use, for multi-speaker voices only. Try several.
+      - PIPER_SPEAKER=0
+      # Speaking rate. Below 1.0 is faster, above 1.0 is slower.
+      - PIPER_LENGTH=1.0
+      # Voice variability. Lower can reduce hiss on some voices; above 1 degrades audio.
+      - PIPER_NOISE=0.667
+      # Cadence variability. Above 1 causes stutters and pauses.
+      - PIPER_NOISEW=0.333
+      # Set to any value to use only voices already downloaded (no internet fetch).
+      # Download the voice once first, then enable this.
+      # - LOCAL_ONLY=true
+      # Set to any value to turn OFF sentence-by-sentence streaming. Leave it
+      # unset: streaming lets speech start before the whole reply is ready.
+      # - NO_STREAMING=true

@@ -1,0 +1,527 @@
+# =============================================================================
+# AI Persona Engine (Mood, Energy, Communication Style)
+# =============================================================================
+# A Home Assistant automation blueprint that gives an AI persona a "state of
+# mind" that drifts through the day. It writes to five input_select helpers;
+# the prompt in home_assistant/lena_prompt.txt reads them back, so the
+# persona sounds a little different from hour to hour.
+#
+# WHAT IT DOES (one automation, five jobs, chosen by trigger id)
+#   bedtime              -> force energy to Exhausted for the night
+#   morning_start        -> roll a fresh energy level when the day starts
+#   energy_shuffle       -> every few hours, re-roll energy (time-of-day weighted)
+#   mood_shuffle         -> every few hours, re-roll mood (energy + time weighted)
+#   communication_update -> whenever mood, energy or reaction changes, derive
+#                           the Delivery and Flavor helpers from them
+#   reaction_reset       -> return Reaction to neutral after it sits unchanged
+#
+# WHAT YOU MUST CREATE FIRST (Settings > Devices & services > Helpers > Dropdown)
+#   Five input_select helpers: mood, energy, reaction, delivery, delivery flavor.
+#   This blueprint does not create helpers. Option names are case-sensitive;
+#   the lists are in the wiki page "Helpers". Any option a helper lacks is
+#   skipped quietly instead of causing an error.
+#
+# HOW A ROLL WORKS
+#   Weighted random: values are repeated in a list, so a value that appears
+#   more often is more likely. The current value is removed first so the
+#   persona never "changes" to what it already is. If nothing is left to
+#   pick, the current value is kept.
+#
+# TO CHANGE THE PERSONALITY OF THE DRIFT
+#   Edit the pools (the lists of quoted words) in the actions section.
+#   Add more copies of a word to make it more common, fewer to make it rarer.
+# =============================================================================
+
+blueprint:
+  name: AI Persona Engine (Mood, Energy, Communication Style)
+  description: >-
+    Combines cooperating automations that drive a simulated AI companion's
+    emotional state: energy level (time-based, with momentum), mood
+    (periodic weighted drift), communication style / delivery flavor
+    (derived from mood + energy + reaction, recomputed whenever any of
+    those change), and an automatic reaction reset. Originally built for
+    "Lena"; works for any persona built on matching input_select helpers.
+    Every value written is checked against the helper's option list, so an
+    option missing from a helper is skipped instead of causing an error.
+  domain: automation
+  # Lets Home Assistant offer "re-import" so users can pick up updates from GitHub.
+  source_url: https://github.com/soullink9/HomeAssistant-AI_Personality/blob/main/home_assistant/blueprints/automation/soullink9/ai_persona_engine.yaml
+  # The plural "triggers:" / "actions:" and "trigger:" / "action:" keys used
+  # below need Home Assistant 2024.10 or newer.
+  homeassistant:
+    min_version: 2024.10.0
+  input:
+    # ---- The five helpers this blueprint reads and writes --------------------
+    mood_entity:
+      name: Mood input_select
+      description: input_select holding the persona's current mood.
+      selector:
+        entity:
+          domain: input_select
+    energy_entity:
+      name: Energy Level input_select
+      description: >-
+        input_select holding the persona's current energy level. Expected
+        values: Exhausted, Lazy, Caffeinated, Hyperactive.
+      selector:
+        entity:
+          domain: input_select
+    reaction_entity:
+      name: Reaction input_select
+      description: input_select holding the persona's most recent reaction.
+      selector:
+        entity:
+          domain: input_select
+    delivery_entity:
+      name: Delivery input_select
+      description: >-
+        input_select that receives the derived delivery style
+        (Deadpan, Dry, Witty, Sharp, Smug, Playful, Warm, Subtle, Dramatic).
+      selector:
+        entity:
+          domain: input_select
+    delivery_flavor_entity:
+      name: Delivery Flavor input_select
+      description: >-
+        input_select that receives the derived personality flavor
+        (Mischievous, Observational, Curious, Philosophical, Protective,
+        Playful, Dramatic, Subtle).
+      selector:
+        entity:
+          domain: input_select
+
+    # ---- Daily schedule ------------------------------------------------------
+    bedtime:
+      name: Bedtime
+      description: Time the persona is forced to "Exhausted" energy for the night.
+      default: "22:00:00"
+      selector:
+        time: {}
+    morning_start:
+      name: Morning start
+      description: Time the persona wakes and rolls a fresh starting energy.
+      default: "06:00:00"
+      selector:
+        time: {}
+
+    # ---- How often things change ---------------------------------------------
+    energy_shuffle_interval:
+      name: Energy re-roll interval
+      description: >-
+        Home Assistant time_pattern syntax for how often energy re-rolls,
+        e.g. "/3" for every 3 hours.
+      default: "/3"
+      selector:
+        text: {}
+    mood_shuffle_interval:
+      name: Mood re-roll interval
+      description: >-
+        Home Assistant time_pattern syntax for how often mood re-rolls,
+        e.g. "/4" for every 4 hours.
+      default: "/4"
+      selector:
+        text: {}
+
+    # ---- Momentum: how often a re-roll is skipped ----------------------------
+    energy_persistence_chance:
+      name: Energy persistence chance (%)
+      description: Chance (0-100) the current energy level is kept unchanged on a re-roll.
+      default: 35
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: slider
+    mood_persistence_chance:
+      name: Mood persistence chance (%)
+      description: Chance (0-100) the current mood is kept unchanged on a re-roll.
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: slider
+
+    # ---- Reaction reset ------------------------------------------------------
+    # Nothing in this blueprint sets Reaction; something else (a script, an
+    # automation, a voice intent) does. Without a reset it would stay on its
+    # last value forever, so it returns to neutral after a quiet period.
+    reaction_reset_minutes:
+      name: Reaction reset (minutes)
+      description: >-
+        How long the Reaction helper can sit unchanged before it is reset
+        to the neutral option below.
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 240
+          mode: box
+    reaction_neutral_option:
+      name: Neutral reaction option
+      description: >-
+        The Reaction option to reset to. It must exist in the Reaction
+        helper, otherwise the reset is skipped.
+      default: Neutral
+      selector:
+        text: {}
+
+# Copies of the inputs as variables, so the templates below can use them by name.
+variables:
+  mood_entity: !input mood_entity
+  energy_entity: !input energy_entity
+  reaction_entity: !input reaction_entity
+  delivery_entity: !input delivery_entity
+  delivery_flavor_entity: !input delivery_flavor_entity
+  energy_persistence_chance: !input energy_persistence_chance
+  mood_persistence_chance: !input mood_persistence_chance
+  reaction_neutral_option: !input reaction_neutral_option
+
+# Each trigger has an id; the choose block in "actions" picks its branch by id.
+triggers:
+  - trigger: time
+    at: !input bedtime
+    id: bedtime
+  - trigger: time
+    at: !input morning_start
+    id: morning_start
+  - trigger: time_pattern
+    hours: !input energy_shuffle_interval
+    id: energy_shuffle
+  - trigger: time_pattern
+    hours: !input mood_shuffle_interval
+    id: mood_shuffle
+  # Fires when mood, energy or reaction changes. The branch it runs only
+  # writes Delivery and Flavor, which are NOT in this list, so it cannot
+  # trigger itself in a loop.
+  - trigger: state
+    entity_id:
+      - !input mood_entity
+      - !input energy_entity
+      - !input reaction_entity
+    id: communication_update
+  # Fires after Reaction has sat unchanged for the configured number of minutes.
+  - trigger: state
+    entity_id: !input reaction_entity
+    for:
+      minutes: !input reaction_reset_minutes
+    id: reaction_reset
+
+conditions: []
+
+actions:
+  - choose:
+      # ---- Bedtime: force Exhausted ------------------------------------------
+      # Only runs if the energy helper actually has an "Exhausted" option.
+      - conditions:
+          - condition: trigger
+            id: bedtime
+          - condition: template
+            value_template: "{{ 'Exhausted' in (state_attr(energy_entity, 'options') or []) }}"
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: !input energy_entity
+            data:
+              option: Exhausted
+
+      # ---- Morning: fresh roll -----------------------------------------------
+      # Wake up Lazy or Caffeinated (never Exhausted or Hyperactive).
+      # "select('in', options)" drops any word the helper does not offer.
+      - conditions:
+          - condition: trigger
+            id: morning_start
+        sequence:
+          - variables:
+              morning_pool: >-
+                {{ ['Lazy','Lazy','Caffeinated','Caffeinated']
+                   | select('in', state_attr(energy_entity, 'options') or [])
+                   | list }}
+          - if:
+              - condition: template
+                value_template: "{{ morning_pool | count > 0 }}"
+            then:
+              - action: input_select.select_option
+                target:
+                  entity_id: !input energy_entity
+                data:
+                  option: "{{ morning_pool | random }}"
+
+      # ---- Periodic energy re-roll -------------------------------------------
+      # 1. Roll 1-100; if it is within the persistence chance, stop (keep energy).
+      # 2. Pick a pool of choices that matches the time of day.
+      # 3. Remove the current value and anything the helper lacks.
+      # 4. Pick one at random. An empty pool (for example overnight when
+      #    already Exhausted) means "keep what we have".
+      - conditions:
+          - condition: trigger
+            id: energy_shuffle
+        sequence:
+          - variables:
+              current_energy: "{{ states(energy_entity) }}"
+              current_hour: "{{ now().hour }}"
+              persistence_roll: "{{ range(1,101) | random }}"
+              energy_options: "{{ state_attr(energy_entity, 'options') or [] }}"
+          - if:
+              - condition: template
+                value_template: "{{ persistence_roll <= energy_persistence_chance | int }}"
+            then:
+              - stop: Energy persists this cycle.
+          - variables:
+              # Time-of-day pools: 06-10 groggy, 10-18 busy, 18-22 winding down, otherwise asleep.
+              energy_pool: >-
+                {% if current_hour >= 6 and current_hour < 10 %}
+                  {{ ['Lazy','Lazy','Lazy','Caffeinated','Caffeinated','Hyperactive','Exhausted'] }}
+                {% elif current_hour >= 10 and current_hour < 18 %}
+                  {{ ['Caffeinated','Caffeinated','Caffeinated','Hyperactive','Hyperactive','Lazy','Lazy'] }}
+                {% elif current_hour >= 18 and current_hour < 22 %}
+                  {{ ['Lazy','Lazy','Caffeinated','Exhausted','Exhausted'] }}
+                {% else %}
+                  {{ ['Exhausted'] }}
+                {% endif %}
+          - variables:
+              # Drop the current value and anything the helper does not offer.
+              available_energy: >-
+                {{ energy_pool | reject('equalto', current_energy)
+                   | select('in', energy_options) | list }}
+          - if:
+              - condition: template
+                value_template: "{{ available_energy | count > 0 }}"
+            then:
+              - action: input_select.select_option
+                target:
+                  entity_id: !input energy_entity
+                data:
+                  option: "{{ available_energy | random }}"
+
+      # ---- Periodic mood re-roll ---------------------------------------------
+      # Same shape as the energy re-roll, but the pool is built in three layers:
+      #   base pool  -> overall mood tendencies (mostly Content / Confident)
+      #   + energy   -> tired leans sad, wired leans joyful
+      #   + time     -> mornings curious, evenings mellow, nights a bit low
+      - conditions:
+          - condition: trigger
+            id: mood_shuffle
+        sequence:
+          - variables:
+              current_mood: "{{ states(mood_entity) }}"
+              current_energy: "{{ states(energy_entity) }}"
+              current_hour: "{{ now().hour }}"
+              mood_change_roll: "{{ range(1,101) | random }}"
+              mood_options: "{{ state_attr(mood_entity, 'options') or [] }}"
+          - if:
+              - condition: template
+                value_template: "{{ mood_change_roll <= mood_persistence_chance | int }}"
+            then:
+              - stop: Mood persists this cycle.
+          - variables:
+              # Repeated entries = higher odds. 22 entries; Content is the most common.
+              base_mood_pool:
+                - Content
+                - Content
+                - Content
+                - Content
+                - Content
+                - Confident
+                - Confident
+                - Confident
+                - Confident
+                - Interested
+                - Interested
+                - Interested
+                - Appreciative
+                - Appreciative
+                - Appreciative
+                - Joyful
+                - Joyful
+                - Surprised
+                - Disgusted
+                - Anxious
+                - Angry
+                - Sad
+          - variables:
+              energy_adjusted_pool: >-
+                {% set pool = base_mood_pool %}
+                {% if current_energy == 'Exhausted' %}
+                  {{ pool + ['Content','Content','Sad','Disgusted'] }}
+                {% elif current_energy == 'Lazy' %}
+                  {{ pool + ['Content','Content','Confident','Disgusted'] }}
+                {% elif current_energy == 'Caffeinated' %}
+                  {{ pool + ['Interested','Interested','Joyful','Confident','Surprised'] }}
+                {% elif current_energy == 'Hyperactive' %}
+                  {{ pool + ['Joyful','Joyful','Interested','Surprised','Confident'] }}
+                {% else %}
+                  {{ pool }}
+                {% endif %}
+          - variables:
+              time_adjusted_pool: >-
+                {% set pool = energy_adjusted_pool %}
+                {% if current_hour >= 6 and current_hour < 12 %}
+                  {{ pool + ['Interested','Appreciative','Content'] }}
+                {% elif current_hour >= 12 and current_hour < 18 %}
+                  {{ pool + ['Confident','Content','Interested'] }}
+                {% elif current_hour >= 18 and current_hour < 22 %}
+                  {{ pool + ['Content','Appreciative','Disgusted'] }}
+                {% else %}
+                  {{ pool + ['Content','Sad','Anxious'] }}
+                {% endif %}
+          - variables:
+              available_moods: >-
+                {{ time_adjusted_pool | reject('equalto', current_mood)
+                   | select('in', mood_options) | list }}
+          - if:
+              - condition: template
+                value_template: "{{ available_moods | count > 0 }}"
+            then:
+              - action: input_select.select_option
+                target:
+                  entity_id: !input mood_entity
+                data:
+                  option: "{{ available_moods | random }}"
+
+      # ---- Communication style: recompute on any mood/energy/reaction change --
+      # Delivery (how she phrases things) and Flavor (what extra she adds) are
+      # derived, not random on their own: each of energy, mood and reaction
+      # adds candidate words to a pool, then one is picked. The pool starts
+      # empty and falls back to a safe default if no rule matched, so an
+      # unexpected value (for example "unavailable") cannot break the pick.
+      - conditions:
+          - condition: trigger
+            id: communication_update
+        sequence:
+          - variables:
+              mood: "{{ states(mood_entity) }}"
+              energy: "{{ states(energy_entity) }}"
+              reaction: "{{ states(reaction_entity) }}"
+              delivery_options: "{{ state_attr(delivery_entity, 'options') or [] }}"
+              flavor_options: "{{ state_attr(delivery_flavor_entity, 'options') or [] }}"
+          - variables:
+              delivery_pool: >-
+                {% set pool = [] %}
+                {# Energy sets the baseline delivery #}
+                {% if energy == 'Exhausted' %}
+                  {% set pool = pool + ['Deadpan','Deadpan','Subtle','Dry'] %}
+                {% elif energy == 'Lazy' %}
+                  {% set pool = pool + ['Dry','Deadpan','Smug','Subtle'] %}
+                {% elif energy == 'Caffeinated' %}
+                  {% set pool = pool + ['Witty','Sharp','Smug','Playful'] %}
+                {% elif energy == 'Hyperactive' %}
+                  {% set pool = pool + ['Playful','Witty','Sharp','Dramatic'] %}
+                {% endif %}
+                {# Mood adds its own flavor of delivery #}
+                {% if mood == 'Confident' %}
+                  {% set pool = pool + ['Smug','Sharp','Dry'] %}
+                {% elif mood == 'Appreciative' %}
+                  {% set pool = pool + ['Warm','Playful','Subtle'] %}
+                {% elif mood == 'Interested' %}
+                  {% set pool = pool + ['Witty','Subtle','Warm'] %}
+                {% elif mood == 'Disgusted' %}
+                  {% set pool = pool + ['Deadpan','Sharp','Dry'] %}
+                {% elif mood == 'Joyful' %}
+                  {% set pool = pool + ['Playful','Witty','Warm'] %}
+                {% elif mood == 'Content' %}
+                  {% set pool = pool + ['Dry','Subtle','Warm'] %}
+                {% elif mood == 'Surprised' %}
+                  {% set pool = pool + ['Dramatic','Witty','Playful'] %}
+                {% elif mood == 'Anxious' %}
+                  {% set pool = pool + ['Subtle','Dry','Sharp'] %}
+                {% elif mood == 'Angry' %}
+                  {% set pool = pool + ['Sharp','Deadpan','Dry'] %}
+                {% elif mood == 'Sad' %}
+                  {% set pool = pool + ['Subtle','Deadpan','Warm'] %}
+                {% endif %}
+                {# The latest reaction nudges delivery last #}
+                {% if reaction == 'Irritated' or reaction == 'Frustrated' %}
+                  {% set pool = pool + ['Sharp','Dry','Deadpan'] %}
+                {% elif reaction == 'Impressed' %}
+                  {% set pool = pool + ['Warm','Smug','Playful'] %}
+                {% elif reaction == 'Curious' %}
+                  {% set pool = pool + ['Witty','Subtle'] %}
+                {% endif %}
+                {# Safety net: never hand an empty list to "random" #}
+                {% set pool = pool if pool | count > 0 else ['Dry','Witty'] %}
+                {{ pool | select('in', delivery_options) | list }}
+          - if:
+              - condition: template
+                value_template: "{{ delivery_pool | count > 0 }}"
+            then:
+              - action: input_select.select_option
+                target:
+                  entity_id: !input delivery_entity
+                data:
+                  option: "{{ delivery_pool | random }}"
+          - variables:
+              flavor_pool: >-
+                {% set pool = [] %}
+                {# Mood picks the main flavors #}
+                {% if mood == 'Confident' %}
+                  {% set pool = pool + ['Mischievous','Observational','Playful'] %}
+                {% elif mood == 'Interested' %}
+                  {% set pool = pool + ['Curious','Observational','Philosophical'] %}
+                {% elif mood == 'Appreciative' %}
+                  {% set pool = pool + ['Protective','Playful','Subtle'] %}
+                {% elif mood == 'Disgusted' %}
+                  {% set pool = pool + ['Observational','Dramatic','Subtle'] %}
+                {% elif mood == 'Content' %}
+                  {% set pool = pool + ['Observational','Subtle','Playful'] %}
+                {% elif mood == 'Joyful' %}
+                  {% set pool = pool + ['Playful','Mischievous','Curious'] %}
+                {% elif mood == 'Surprised' %}
+                  {% set pool = pool + ['Curious','Dramatic','Observational'] %}
+                {% elif mood == 'Anxious' %}
+                  {% set pool = pool + ['Protective','Observational','Subtle'] %}
+                {% elif mood == 'Angry' %}
+                  {% set pool = pool + ['Observational','Dramatic'] %}
+                {% elif mood == 'Sad' %}
+                  {% set pool = pool + ['Philosophical','Subtle','Protective'] %}
+                {% endif %}
+                {# Extreme energy levels push flavor toward their own style #}
+                {% if energy == 'Exhausted' %}
+                  {% set pool = pool + ['Subtle','Dramatic','Observational'] %}
+                {% elif energy == 'Hyperactive' %}
+                  {% set pool = pool + ['Playful','Mischievous','Dramatic'] %}
+                {% endif %}
+                {# The latest reaction adds a final nudge #}
+                {% if reaction == 'Protective' %}
+                  {% set pool = pool + ['Protective'] %}
+                {% elif reaction == 'Curious' %}
+                  {% set pool = pool + ['Curious','Observational'] %}
+                {% elif reaction == 'Impressed' %}
+                  {% set pool = pool + ['Playful','Observational'] %}
+                {% elif reaction == 'Irritated' or reaction == 'Frustrated' %}
+                  {% set pool = pool + ['Dramatic','Observational'] %}
+                {% endif %}
+                {# Safety net: never hand an empty list to "random" #}
+                {% set pool = pool if pool | count > 0 else ['Observational','Subtle'] %}
+                {{ pool | select('in', flavor_options) | list }}
+          - if:
+              - condition: template
+                value_template: "{{ flavor_pool | count > 0 }}"
+            then:
+              - action: input_select.select_option
+                target:
+                  entity_id: !input delivery_flavor_entity
+                data:
+                  option: "{{ flavor_pool | random }}"
+
+      # ---- Reaction reset: return to neutral after it has sat unchanged ------
+      # Skipped if Reaction is already neutral, or if the neutral option does
+      # not exist in the helper.
+      - conditions:
+          - condition: trigger
+            id: reaction_reset
+          - condition: template
+            value_template: >-
+              {{ states(reaction_entity) != reaction_neutral_option
+                 and reaction_neutral_option in (state_attr(reaction_entity, 'options') or []) }}
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: !input reaction_entity
+            data:
+              option: "{{ reaction_neutral_option }}"
+
+# "queued" lets overlapping triggers run one after another instead of being
+# dropped; "max" caps how many can wait.
+mode: queued
+max: 10

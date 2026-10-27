@@ -1,0 +1,63 @@
+# =============================================================================
+# Lena's memory sensor
+# =============================================================================
+# Lena's memory is a to-do list (see wiki: Memory). Home Assistant's prompt
+# cannot read a to-do list directly, so this trigger-based template sensor
+# copies the open items into an attribute that the prompt can read.
+#
+#   sensor.lenas_memory_content
+#     state                 = number of open memories
+#     attribute "memories"  = every open item joined into one text line
+#
+# Why an attribute: a sensor's state is limited to 255 characters, an
+# attribute is not. Memory text would be cut off in the state.
+#
+# WHERE THIS GOES
+#   This file is a LIST (it starts with "- triggers:"). Include it from
+#   configuration.yaml in a way that expects a list, for example:
+#       template: !include_dir_merge_list templates/
+#   or a single file:
+#       template lena: !include lena_memory_sensor.yaml
+#   Do not wrap it in a "template:" key of its own, and do not use the
+#   "_named" include variants; both cause "invalid option" config errors.
+#
+# BEFORE YOU USE IT
+#   Replace todo.lena_s_memory (appears four times) with the entity ID of
+#   YOUR memory to-do list. Find it in Developer tools > States. A list named
+#   "Lena's Memory" usually becomes todo.lena_s_memory, because Home Assistant
+#   turns the apostrophe into an underscore.
+#   Delete any older sensor named "Lenas Memory Content" first, or the two
+#   will conflict.
+#
+# WHEN IT REFRESHES
+#   Whenever the list changes, when Home Assistant starts, and when template
+#   entities are reloaded. A new memory therefore appears from the NEXT
+#   request onward, not in the same turn that saved it.
+# =============================================================================
+- triggers:
+    - trigger: state
+      entity_id: todo.lena_s_memory
+    - trigger: homeassistant
+      event: start
+    - trigger: event
+      event_type: event_template_reloaded
+  actions:
+    # On startup the list may not be ready yet; wait up to a minute for it.
+    - wait_template: "{{ states('todo.lena_s_memory') not in ['unknown', 'unavailable'] }}"
+      timeout: "00:01:00"
+      continue_on_timeout: false
+    # Read the open items (completed ones are ignored, so you can tick off
+    # old memories instead of deleting them).
+    - action: todo.get_items
+      target:
+        entity_id: todo.lena_s_memory
+      data:
+        status: needs_action
+      response_variable: mem
+  sensor:
+    - name: Lenas Memory Content
+      unique_id: lenas_memory_content
+      state: "{{ mem['todo.lena_s_memory']['items'] | count }}"
+      attributes:
+        memories: >-
+          {{ mem['todo.lena_s_memory']['items'] | map(attribute='summary') | join('. ') }}

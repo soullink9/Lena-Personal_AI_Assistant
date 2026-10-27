@@ -1,0 +1,16 @@
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Secrets and local settings: never commit these
+secrets.yaml
+.env
+*.env
+
+# Data folders created by the example compose files
+ollama-data/
+piper-data/
