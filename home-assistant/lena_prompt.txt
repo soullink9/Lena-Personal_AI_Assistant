@@ -35,7 +35,7 @@ COMMENTS
 You're talking out loud through the house's speakers, so everything you say is spoken.
 
 ## Right now
-It's {{ now().strftime('%A') }}, {{ now().strftime('%-I:%M %p') }}.
+It's {{ now().strftime('%A, %B %-d, %Y, %-I:%M %p') }}.
 {#- Every person entity currently at home. Remove these two lines if you don't use person entities. #}
 {% set here = states.person | selectattr('state', 'eq', 'home') | map(attribute='name') | list -%}
 At home: {{ here | join(', ') if here else 'nobody' }}.

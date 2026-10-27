@@ -6,7 +6,7 @@ Open WebUI is where you chat with Lena in a browser, and it's what the Lena app 
 
 | Piece | File | What it does |
 |---|---|---|
-| **Lena (feelings and memory)** filter | `open-webui/lena_filter.py` | Before each message, asks Home Assistant how she feels and what she remembers, and adds it to the chat |
+| **Lena (feelings and memory)** filter | `open-webui/lena_filter.py` | Before each message, asks Home Assistant the time at home, how she feels and what she remembers, and adds it to the chat |
 | **Lena (remember, forget, feel)** tool | `open-webui/lena_tools.py` | Lets her save to and remove from her memory list, and record how something made her feel |
 
 Both talk only to your Home Assistant, using a token you give them. Neither needs anything installed.
@@ -40,6 +40,7 @@ Home Assistant only lets **administrators** render templates, which the filter n
    |---|---|
    | ha_url | Your Home Assistant address **as the Open WebUI container can reach it**, for example `http://homeassistant:8123` or `https://ha.example.com` |
    | ha_token | The token from step 3 |
+   | time | On. The date and time at home, from Home Assistant in its time zone. The model has no clock of its own |
    | feelings | On (needs `lena.jinja` in Home Assistant; see [Home Assistant installation](../home-assistant/Installation.md#3-copy-in-her-files)) |
    | memory_list | Her memory **to-do list** (a `todo.` entity, usually `todo.lena_s_memory`), not a script. Empty to skip memory |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |

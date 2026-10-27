@@ -1,9 +1,9 @@
 """
 title: Lena (feelings and memory)
 author: soullink9
-version: 1.0.0
+version: 1.1.0
 license: GPL-3.0
-description: Adds Lena's current feelings and her Home Assistant memory to every chat with her, so she's the same Lena in Open WebUI and the Lena app as in the kitchen.
+description: Adds the time at home, Lena's current feelings and her Home Assistant memory to every chat with her, so she's the same Lena in Open WebUI and the Lena app as in the kitchen.
 """
 
 # =============================================================================
@@ -18,6 +18,8 @@ description: Adds Lena's current feelings and her Home Assistant memory to every
 #
 # WHAT IT DOES
 #   Before each message reaches the model, it asks Home Assistant:
+#     - the date and time, in the house's time zone (the model has no clock,
+#       and Open WebUI's server is often on UTC);
 #     - how she feels: Home Assistant renders feelings() from
 #       custom_templates/lena.jinja, the same text her voice prompt uses;
 #     - what she remembers: the open items on her memory to-do list.
@@ -45,6 +47,8 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 FEELINGS_TEMPLATE = "{%- from 'lena.jinja' import feelings -%}{{ feelings() }}"
+# Rendered by Home Assistant, so it's in the house's time zone. Same wording as her voice prompt.
+TIME_TEMPLATE = "## Right now\nIt's {{ now().strftime('%A, %B %-d, %Y, %-I:%M %p') }}."
 
 
 def _post(url: str, token: str, payload: dict, timeout: float) -> str:
@@ -68,6 +72,10 @@ class Filter:
         ha_token: str = Field(
             default="",
             description="A long-lived access token from a Home Assistant admin user.",
+        )
+        time: bool = Field(
+            default=True,
+            description="Tell her the date and time at home (rendered by Home Assistant, in its time zone).",
         )
         feelings: bool = Field(
             default=True,
@@ -95,6 +103,9 @@ class Filter:
         """Ask Home Assistant how she feels and what she remembers."""
         parts = []
         jobs = []
+        # Separate requests, so a problem with one (say, lena.jinja missing) doesn't lose the others.
+        if self.valves.time:
+            jobs.append(self._ha("/api/template", {"template": TIME_TEMPLATE}))
         if self.valves.feelings:
             jobs.append(self._ha("/api/template", {"template": FEELINGS_TEMPLATE}))
         if self.valves.memory_list:
@@ -120,7 +131,7 @@ class Filter:
         return "\n\n".join(p for p in parts if p)
 
     async def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
-        if not self.valves.ha_token or not (self.valves.feelings or self.valves.memory_list):
+        if not self.valves.ha_token or not (self.valves.time or self.valves.feelings or self.valves.memory_list):
             return body
 
         cached_at, text = self._cache

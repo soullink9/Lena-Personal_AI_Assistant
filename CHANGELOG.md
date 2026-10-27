@@ -80,6 +80,11 @@ First release.
 
 ## Personality
 
+### 2.0.1 (2026-10-27)
+
+- Open WebUI and the app now tell her the date and time at home. The filter asks Home Assistant, so it's in your house's time zone; before, she had no clock in chats and guessed. Update the filter in Open WebUI by pasting the new `lena_filter.py` over the old one.
+- Her Home Assistant prompt now includes the date as well as the time.
+
 ### 2.0.0 (2026-10-27)
 
 A rebuild of how she's set up. Nothing from 1.x carries over: create the new helpers, and remove the old five helpers, the persona engine automation and the memory sensor if you had them.
