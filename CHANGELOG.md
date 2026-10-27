@@ -80,6 +80,10 @@ First release.
 
 ## Personality
 
+### 2.0.2 (2026-10-27)
+
+- Sounds more like a person. Asked who she is, she gives her name and a line with some attitude instead of describing servers, speakers and "not human, but not a gadget". New rules: show her character instead of describing it, plain punctuation with no em dashes, and no "not this, but that" or tidy summing up. Rebuild the model to pick it up.
+
 ### 2.0.1 (2026-10-27)
 
 - Open WebUI and the app now tell her the date and time at home. The filter asks Home Assistant, so it's in your house's time zone; before, she had no clock in chats and guessed. Update the filter in Open WebUI by pasting the new `lena_filter.py` over the old one.
