@@ -227,14 +227,9 @@ class LenaCore:
     @callback
     def forget(self, fact: str) -> str | None:
         """Removes the saved memory that best matches, and returns it."""
-        wanted = fact.strip().lower()
         open_items = [m for m in self.memory if m.get("status") != "completed"]
-        match = next((m for m in open_items if wanted and wanted in m["summary"].lower()), None)
-        if match is None:
-            import difflib  # noqa: PLC0415
-
-            close = difflib.get_close_matches(fact.strip(), [m["summary"] for m in open_items], n=1, cutoff=0.5)
-            match = next((m for m in open_items if close and m["summary"] == close[0]), None)
+        match = brain.best_match(fact, [m["summary"] for m in open_items])
+        match = next((m for m in open_items if m["summary"] == match), None)
         if match is None:
             return None
         self.memory.remove(match)

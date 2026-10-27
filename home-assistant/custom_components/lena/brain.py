@@ -291,6 +291,27 @@ def fade(f: Feelings, worries_left: int) -> Change:
     return Change(moment=NOTHING)
 
 
+def best_match(wanted: str, items: list[str]) -> str | None:
+    """The saved memory someone most likely means by "forget ...": a direct quote first, then
+    the one sharing the most meaningful words (four letters or more, compared by their first
+    five letters, so "allergy" finds "allergic")."""
+    text = wanted.strip().lower()
+    if not text:
+        return None
+    for item in items:
+        if text in item.lower():
+            return item
+
+    def words(s: str) -> set[str]:
+        cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
+        return {w[:5] for w in cleaned if len(w) >= 4}
+
+    want = words(text)
+    scored = [(len(want & words(item)), item) for item in items]
+    best = max(scored, default=(0, None), key=lambda pair: pair[0])
+    return best[1] if best[0] > 0 else None
+
+
 # ---- What she's told ------------------------------------------------------------------------
 
 def describe(f: Feelings, cat: Catalog, with_reasons: bool = True) -> str:
