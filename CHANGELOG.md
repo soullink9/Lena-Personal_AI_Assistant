@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-10-27)
+
+- Fixed the main screen showing blank white instead of Open WebUI.
+
 ## 2.0.0 (2026-10-27)
 
 A native app around your Open WebUI. Needs Android 16.

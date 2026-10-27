@@ -7,9 +7,10 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
+
 import android.net.Uri
 import android.os.Bundle
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -231,7 +232,10 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView = WebView(this).apply {
-        setBackgroundColor(Color.TRANSPARENT)
+        // Fill the space Compose gives it. Without this the web view sizes itself to the page,
+        // and Open WebUI (a full-height app) ends up laid out off screen.
+        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        setBackgroundColor(getColor(R.color.bg))
         settings.apply {
             javaScriptEnabled = true                 // Open WebUI is a JavaScript app
             domStorageEnabled = true                 // keeps you signed in

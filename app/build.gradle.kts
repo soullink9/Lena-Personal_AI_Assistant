@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.soullink9.lena"
         minSdk = 36
         targetSdk = 36
-        versionCode = 3
-        versionName = "2.0.0"
+        versionCode = 4
+        versionName = "2.0.1"
     }
 
     // The release key comes from CI secrets (see docs/Installation.md). Without it the APK is debug-signed.
