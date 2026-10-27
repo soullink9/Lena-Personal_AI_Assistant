@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lena</string>
+    <string name="shortcut_call">Call</string>
+    <string name="shortcut_settings">Settings</string>
+</resources>

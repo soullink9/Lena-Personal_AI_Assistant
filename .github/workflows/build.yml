@@ -1,0 +1,56 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      GRADLE_VERSION: "8.14.3"
+    steps:
+      - uses: actions/checkout@v5
+
+      # Plain Gradle download, checked against Gradle's published SHA-256. No third-party setup actions.
+      - name: Install Gradle
+        run: |
+          cd "$RUNNER_TEMP"
+          zip="gradle-${GRADLE_VERSION}-bin.zip"
+          curl -fsSLO "https://services.gradle.org/distributions/${zip}"
+          echo "$(curl -fsSL "https://services.gradle.org/distributions/${zip}.sha256")  ${zip}" | sha256sum -c -
+          unzip -q "$zip"
+          echo "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Load signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/lena.jks"
+            echo "LENA_KEYSTORE=$RUNNER_TEMP/lena.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No KEYSTORE_B64 secret. The APK is debug-signed and won't install over a previous build."
+          fi
+
+      # Uses the JDK and Android SDK already on GitHub's Ubuntu runner.
+      - name: Build
+        env:
+          LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
+          gradle --no-daemon assembleRelease
+          cd app/build/outputs/apk/release
+          sha256sum *.apk | tee SHA256SUMS
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: lena-apk
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/SHA256SUMS
+          if-no-files-found: error
