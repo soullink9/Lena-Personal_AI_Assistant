@@ -13,6 +13,12 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The newest Home Assistant, and the oldest the integration supports.
+        home-assistant: ["latest", "2026.9"]
+    name: test (Home Assistant ${{ matrix.home-assistant }})
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -21,7 +27,24 @@ jobs:
       - name: Install Home Assistant's test harness
         run: |
           python -m pip install --upgrade pip
-          pip install pytest-homeassistant-custom-component
+          if [ "${{ matrix.home-assistant }}" = "latest" ]; then
+            pip install pytest-homeassistant-custom-component
+          else
+            # The test harness is released once per Home Assistant version; find the newest one for this release.
+            harness=$(python - "${{ matrix.home-assistant }}" <<'PY'
+          import json, sys, urllib.request
+          want = sys.argv[1] + "."
+          info = json.load(urllib.request.urlopen("https://pypi.org/pypi/pytest-homeassistant-custom-component/json"))
+          for version in sorted(info["releases"], key=lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")], reverse=True):
+              meta = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/pytest-homeassistant-custom-component/{version}/json"))
+              if any(r.replace(" ", "").startswith("homeassistant==" + want) for r in meta["info"].get("requires_dist") or []):
+                  print(version)
+                  break
+          PY
+            )
+            echo "Test harness $harness"
+            pip install "pytest-homeassistant-custom-component==$harness"
+          fi
           # Her tools are called through the conversation integration; install what it needs, at the
           # versions this Home Assistant pins.
           reqs=$(python -c "import json, pathlib, homeassistant; m = pathlib.Path(homeassistant.__file__).parent / 'components' / 'conversation' / 'manifest.json'; print(' '.join(json.loads(m.read_text())['requirements']))")
@@ -39,4 +62,5 @@ jobs:
             echo "::error title=Tests failed::${msg:-see the log}"
             exit 1
           fi
-          echo "::notice title=Tests passed::$(tail -1 "$RUNNER_TEMP/pytest.log")"
+          ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
+          echo "::notice title=Home Assistant $ha::$(tail -1 "$RUNNER_TEMP/pytest.log")"
