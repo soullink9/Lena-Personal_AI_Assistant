@@ -44,15 +44,14 @@ data class Settings(
     val ongoing: Boolean = true,
     val contextTokens: Int = 32_768,
     val haServer: String = "",
-    val haMemoryList: String = DEFAULT_MEMORY_LIST,
     val moodVoice: Boolean = false,
     val widgetMood: Boolean = false,
     val lockScreen: Boolean = false,
     val openWebUiMenus: Boolean = false,
 )
 
-/** Her shared memory to-do list in Home Assistant, as in docs/home-assistant/Helpers.md. */
-const val DEFAULT_MEMORY_LIST = "todo.lena_s_memory"
+/** Her memory to-do list, created by the Lena integration in Home Assistant. */
+const val DEFAULT_MEMORY_LIST = "todo.lena_memory"
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
 object Prefs {
@@ -87,8 +86,6 @@ object Prefs {
 
     /** Your Home Assistant, for Lena's feelings and shared memory. Null when not set. */
     fun haServer(c: Context): String? = p(c).getString("ha_server", "")?.ifBlank { null }
-    fun haMemoryList(c: Context): String =
-        p(c).getString("ha_memory_list", DEFAULT_MEMORY_LIST)?.ifBlank { null } ?: DEFAULT_MEMORY_LIST
     fun signIn(c: Context): String = p(c).getString("sign_in", "") ?: ""
     fun notifyReplies(c: Context): Boolean = p(c).getBoolean("notify_replies", true)
 
@@ -150,7 +147,6 @@ object Prefs {
         ongoing = ongoing(c),
         contextTokens = contextTokens(c),
         haServer = haServer(c) ?: "",
-        haMemoryList = haMemoryList(c),
         moodVoice = moodVoice(c),
         widgetMood = widgetMood(c),
         lockScreen = lockScreen(c),
@@ -179,7 +175,6 @@ object Prefs {
             .putBoolean("ongoing", s.ongoing)
             .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
             .putString("ha_server", s.haServer)
-            .putString("ha_memory_list", s.haMemoryList.trim().ifBlank { DEFAULT_MEMORY_LIST })
             .putBoolean("mood_voice", s.moodVoice)
             .putBoolean("widget_mood", s.widgetMood)
             .putBoolean("lock_screen", s.lockScreen)

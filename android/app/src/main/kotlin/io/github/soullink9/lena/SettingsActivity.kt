@@ -259,7 +259,7 @@ class SettingsActivity : ComponentActivity() {
             val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = rowModifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                modifier = rowModifier().padding(horizontal = 20.dp, vertical = 16.dp),
             ) {
                 LenaAvatar(32.dp)
                 Spacer(Modifier.width(18.dp))
@@ -306,7 +306,7 @@ class SettingsActivity : ComponentActivity() {
         var token by remember { mutableStateOf("") }
         var tokenSaved by remember { mutableStateOf(Secrets.has(this, Secrets.HA_TOKEN)) }
         var check by remember { mutableStateOf<String?>(null) }
-        Footnote("Optional. Where her feelings and shared memory live, so Lena can show how she feels and let you edit her memory.")
+        Footnote("Optional. With the Lena integration in your Home Assistant, the app shows how she feels and lets you see and edit her memory.")
         Group {
             FieldItem {
                 val bad = s.haServer.isNotBlank() && Prefs.normalize(s.haServer) == null
@@ -345,14 +345,7 @@ class SettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            FieldItem {
-                OutlinedTextField(
-                    value = s.haMemoryList, onValueChange = { set(s.copy(haMemoryList = it)) },
-                    label = { Text("Her memory list") }, supportingText = { Text("The to-do list entity, e.g. $DEFAULT_MEMORY_LIST") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Item(null, "Test connection", check ?: "Checks the address, the token and her feelings helpers") {
+            Item(null, "Test connection", check ?: "Checks the address, the token and the Lena integration") {
                 val url = Prefs.normalize(s.haServer)
                 val saved = Secrets.get(this@SettingsActivity, Secrets.HA_TOKEN)
                 if (url == null || saved == null) check = "Add the address and token first."
@@ -361,7 +354,7 @@ class SettingsActivity : ComponentActivity() {
                     val house = HomeAssistant(url, saved)
                     check = if (!house.check()) "Couldn't connect. Check the address and token."
                     else when (val f = runCatching { house.feelings() }.getOrNull()) {
-                        null -> "Connected. Her feelings helpers weren't found."
+                        null -> "Connected, but the Lena integration isn't set up in Home Assistant."
                         else -> "Connected. She's ${f.mood.lowercase()}."
                     }
                 }
@@ -480,7 +473,7 @@ class SettingsActivity : ComponentActivity() {
         Footnote("One tap from the sheet, the widget and the app icon's long-press menu. Up to six.")
         if (s.quickPrompts.isNotEmpty()) Group {
             s.quickPrompts.forEachIndexed { i, p ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = rowModifier.padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = rowModifier().padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)) {
                     Text(p, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                     IconButton(onClick = { set(s.copy(quickPrompts = s.quickPrompts.filterIndexed { j, _ -> j != i })) }) {
                         Icon(Icons.Outlined.Delete, "Remove")
@@ -510,7 +503,7 @@ class SettingsActivity : ComponentActivity() {
         Footnote("Lena asks these on her own every day and notifies you with the answer. They're saved as chats.")
         s.schedules.forEachIndexed { i, sch ->
             Group {
-                Column(rowModifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Column(rowModifier().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = {
                             TimePickerDialog(
@@ -555,88 +548,6 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, call, type, new chat and your quick prompts") { addWidget() }
             Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Start a voice call from the notification shade") { addTile() }
         }
-    }
-
-    // ---- Building blocks: rows in rounded groups, like a phone's own settings ---------------
-
-    private val rowModifier: Modifier
-        @Composable get() = Modifier.fillMaxWidth().heightIn(min = 64.dp).background(MaterialTheme.colorScheme.surfaceContainer)
-
-    /** Rows that belong together: rounded as a whole, with a thin gap between rows. */
-    @Composable
-    private fun Group(content: @Composable ColumnScope.() -> Unit) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp), content = content)
-    }
-
-    @Composable
-    private fun Item(icon: ImageVector?, title: String, summary: String?, onClick: () -> Unit) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = rowModifier.clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
-        ) {
-            if (icon != null) {
-                Icon(icon, null, Modifier.size(26.dp))
-                Spacer(Modifier.width(20.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (summary != null) Text(summary, style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-
-    @Composable
-    private fun SwitchItem(icon: ImageVector?, title: String, summary: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = rowModifier.clickable { onChange(!checked) }.padding(horizontal = 20.dp, vertical = 14.dp),
-        ) {
-            if (icon != null) {
-                Icon(icon, null, Modifier.size(26.dp))
-                Spacer(Modifier.width(20.dp))
-            }
-            Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (summary != null) Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = checked, onCheckedChange = onChange)
-        }
-    }
-
-    @Composable
-    private fun ChoiceItem(title: String, summary: String?, selected: Boolean, onSelect: () -> Unit) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = rowModifier.clickable(onClick = onSelect).padding(horizontal = 20.dp, vertical = 12.dp),
-        ) {
-            Column(Modifier.weight(1f).padding(end = 16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (summary != null) Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            RadioButton(selected = selected, onClick = null)
-        }
-    }
-
-    @Composable
-    private fun FieldItem(content: @Composable () -> Unit) {
-        Box(rowModifier.padding(horizontal = 16.dp, vertical = 12.dp)) { content() }
-    }
-
-    /** A titled group, for pages with several kinds of choice. */
-    @Composable
-    private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 20.dp, top = 4.dp))
-            Group(content)
-        }
-    }
-
-    @Composable
-    private fun Footnote(text: String) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp))
     }
 
     // ---- Words for the list -----------------------------------------------------------------

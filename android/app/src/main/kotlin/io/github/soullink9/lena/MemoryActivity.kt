@@ -9,43 +9,44 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,12 +58,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * What Lena knows: her shared memory in Home Assistant (if you've connected it), the memories
+ * What Lena knows: her own memory in Home Assistant (if you've connected it), the memories
  * Open WebUI keeps about you, and your knowledge collections. Fix or forget a memory, or take a
  * document out of a collection, when something went in by mistake.
  */
@@ -74,19 +76,19 @@ class MemoryActivity : ComponentActivity() {
     /** One list of memories: where they come from and how to change them. */
     private class Store(
         val intro: String,
-        val load: suspend () -> List<Item>,
+        val load: suspend () -> List<Entry>,
         val add: suspend (String) -> Unit,
-        val update: suspend (Item, String) -> Unit,
-        val delete: suspend (Item) -> Unit,
+        val update: suspend (Entry, String) -> Unit,
+        val delete: suspend (Entry) -> Unit,
         val problem: (Throwable) -> String,
     )
 
-    private data class Item(val id: String, val content: String, val detail: String)
+    private data class Entry(val id: String, val content: String, val detail: String)
 
     private val openWebUi by lazy {
         Store(
             intro = "Things Open WebUI remembers about you. Tap one to fix it.",
-            load = { api.memories().map { m -> Item(m.id, m.content, listOfNotNull(m.path, ago(m.updatedMillis).ifBlank { null }).joinToString(" · ")) } },
+            load = { api.memories().map { m -> Entry(m.id, m.content, listOfNotNull(m.path, ago(m.updatedMillis).ifBlank { null }).joinToString(" · ")) } },
             add = { api.addMemory(it) },
             update = { item, text -> api.updateMemory(item.id, text) },
             delete = { api.deleteMemory(it.id) },
@@ -94,20 +96,20 @@ class MemoryActivity : ComponentActivity() {
         )
     }
 
-    private val shared by lazy {
+    private val hers by lazy {
         val h = house!!
-        val list = Prefs.haMemoryList(this)
+        val list = DEFAULT_MEMORY_LIST
         var current = emptyList<HouseMemory>()
         Store(
-            intro = "Lena's shared memory, kept in Home Assistant. She uses it in the house, in Open WebUI and here. Tap one to fix it.",
-            load = { h.memories(list).also { current = it }.map { Item(it.uid, it.text, "") } },
+            intro = "Her own memory, kept by the Lena integration in Home Assistant. She uses it in the house, in Open WebUI and here. Tap one to fix it.",
+            load = { h.memories(list).also { current = it }.map { Entry(it.uid, it.text, "") } },
             add = { h.addMemory(list, it) },
             update = { item, text -> h.updateMemory(list, current.first { it.uid == item.id }, text) },
             delete = { item -> h.removeMemory(list, current.first { it.uid == item.id }) },
             problem = {
                 when (it) {
                     is HaAuthException -> "Home Assistant turned down the token. Check it in settings."
-                    else -> "Couldn't reach Home Assistant, or $list doesn't exist. Check settings."
+                    else -> "Couldn't reach her memory. Check Home Assistant in settings, and that the Lena integration is set up."
                 }
             },
         )
@@ -134,44 +136,50 @@ class MemoryActivity : ComponentActivity() {
 
     @Composable
     private fun Screen() {
-        // Shared (Home Assistant) first when it's connected, then Open WebUI's memories, then knowledge.
-        val tabs = remember { listOfNotNull(if (house != null) "Shared" else null, if (house != null) "Open WebUI" else "Memories", "Knowledge") }
+        // Hers (Home Assistant) first when it's connected, then Open WebUI's memories, then knowledge.
+        val tabs = remember { listOfNotNull(if (house != null) "Hers" else null, if (house != null) "Open WebUI" else "Memories", "Knowledge") }
         var tab by remember { mutableIntStateOf(0) }
         val knowledgeTab = tabs.size - 1
         var openKnowledge by remember { mutableStateOf<Api.Knowledge?>(null) }
-        var adding by remember { mutableStateOf(false) }
 
         BackHandler(enabled = openKnowledge != null) { openKnowledge = null }
 
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
+                CenterAlignedTopAppBar(
                     title = { Text(openKnowledge?.name ?: "Memory & knowledge", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = {
                         IconButton(onClick = { if (openKnowledge != null) openKnowledge = null else finish() }) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                         }
                     },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
             },
-            floatingActionButton = {
-                if (tab != knowledgeTab && openKnowledge == null) {
-                    FloatingActionButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, "Add a memory") }
-                }
-            },
         ) { padding ->
-            Column(Modifier.padding(padding).fillMaxSize()) {
+            Column(
+                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 if (openKnowledge == null) {
-                    PrimaryTabRow(selectedTabIndex = tab) {
-                        tabs.forEachIndexed { i, name -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(name) }) }
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        tabs.forEachIndexed { i, name ->
+                            SegmentedButton(
+                                selected = tab == i,
+                                onClick = { tab = i },
+                                shape = SegmentedButtonDefaults.itemShape(index = i, count = tabs.size),
+                            ) { Text(name, maxLines = 1) }
+                        }
                     }
                 }
                 when {
                     openKnowledge != null -> Files(openKnowledge!!)
                     tab == knowledgeTab -> Collections { openKnowledge = it }
                     else -> {
-                        val store = if (house != null && tab == 0) shared else openWebUi
-                        key(store) { Memories(store, adding, onAddDone = { adding = false }) }
+                        val store = if (house != null && tab == 0) hers else openWebUi
+                        key(store) { Memories(store) }
                     }
                 }
             }
@@ -181,13 +189,14 @@ class MemoryActivity : ComponentActivity() {
     // ---- Memories ---------------------------------------------------------------------------
 
     @Composable
-    private fun Memories(store: Store, adding: Boolean, onAddDone: () -> Unit) {
+    private fun Memories(store: Store) {
         val scope = rememberCoroutineScope()
-        var memories by remember { mutableStateOf<List<Item>?>(null) }
+        var memories by remember { mutableStateOf<List<Entry>?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") }
-        var editing by remember { mutableStateOf<Item?>(null) }
-        var deleting by remember { mutableStateOf<Item?>(null) }
+        var adding by remember { mutableStateOf(false) }
+        var editing by remember { mutableStateOf<Entry?>(null) }
+        var deleting by remember { mutableStateOf<Entry?>(null) }
         var refresh by remember { mutableIntStateOf(0) }
 
         LaunchedEffect(refresh) {
@@ -196,41 +205,25 @@ class MemoryActivity : ComponentActivity() {
                 .onFailure { error = store.problem(it) }
         }
 
-        Column(Modifier.fillMaxSize()) {
-            Text(
-                store.intro,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Search memories") },
-                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            val shown = memories?.filter { query.isBlank() || it.content.contains(query.trim(), ignoreCase = true) }
-            when {
-                error != null -> Hint(error!!)
-                shown == null -> Loading()
-                shown.isEmpty() -> Hint(if (query.isBlank()) "Lena hasn't saved any memories yet." else "No matching memories.")
-                else -> LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(shown, key = { it.id }) { m ->
-                        Card(Modifier.fillMaxWidth().clickable { editing = m }) {
-                            Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(m.content, style = MaterialTheme.typography.bodyLarge)
-                                    if (m.detail.isNotBlank()) {
-                                        Text(m.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                                IconButton(onClick = { deleting = m }) { Icon(Icons.Outlined.Delete, "Forget") }
-                            }
-                        }
-                    }
+        SearchField(query, "Search memories") { query = it }
+        Footnote(store.intro)
+        val shown = memories?.filter { query.isBlank() || it.content.contains(query.trim(), ignoreCase = true) }
+        when {
+            error != null -> Footnote(error!!)
+            shown == null -> Loading()
+            else -> Group {
+                if (query.isBlank()) Item(Icons.Outlined.Add, "Add a memory", null) { adding = true }
+                if (shown.isEmpty()) {
+                    Item(null, if (query.isBlank()) "Nothing saved yet" else "No matching memories", null) {}
+                }
+                shown.forEach { m ->
+                    Item(
+                        icon = null,
+                        title = m.content,
+                        summary = m.detail.ifBlank { null },
+                        maxTitleLines = 6,
+                        trailing = { IconButton(onClick = { deleting = m }) { Icon(Icons.Outlined.Delete, "Forget") } },
+                    ) { editing = m }
                 }
             }
         }
@@ -239,23 +232,21 @@ class MemoryActivity : ComponentActivity() {
             val current = editing
             var text by remember(current?.id, adding) { mutableStateOf(current?.content ?: "") }
             AlertDialog(
-                onDismissRequest = { editing = null; onAddDone() },
+                onDismissRequest = { editing = null; adding = false },
                 title = { Text(if (current == null) "New memory" else "Edit memory") },
                 text = { OutlinedTextField(value = text, onValueChange = { text = it }, minLines = 2, modifier = Modifier.fillMaxWidth()) },
                 confirmButton = {
                     TextButton(enabled = text.isNotBlank(), onClick = {
                         val content = text.trim()
                         editing = null
-                        onAddDone()
+                        adding = false
                         scope.launch {
-                            val r = runCatching {
-                                if (current == null) store.add(content) else store.update(current, content)
-                            }
+                            val r = runCatching { if (current == null) store.add(content) else store.update(current, content) }
                             if (r.isFailure) toast(store.problem(r.exceptionOrNull()!!)) else refresh++
                         }
                     }) { Text("Save") }
                 },
-                dismissButton = { TextButton(onClick = { editing = null; onAddDone() }) { Text("Cancel") } },
+                dismissButton = { TextButton(onClick = { editing = null; adding = false }) { Text("Cancel") } },
             )
         }
 
@@ -292,21 +283,15 @@ class MemoryActivity : ComponentActivity() {
                 .onSuccess { bases = it }
                 .onFailure { error = problem(it, "Knowledge") }
         }
+        Footnote("Your knowledge collections. Open one to see its documents.")
         when {
-            error != null -> Hint(error!!)
+            error != null -> Footnote(error!!)
             bases == null -> Loading()
-            bases!!.isEmpty() -> Hint("You don't have any knowledge collections.")
-            else -> LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-                items(bases!!, key = { it.id }) { k ->
-                    ListItem(
-                        headlineContent = { Text(k.name) },
-                        supportingContent = {
-                            val detail = listOfNotNull(k.description.ifBlank { null }, if (k.canEdit) null else "View only")
-                            if (detail.isNotEmpty()) Text(detail.joinToString(" · "), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        },
-                        leadingContent = { Icon(Icons.Outlined.Folder, null) },
-                        modifier = Modifier.clickable { onOpen(k) },
-                    )
+            bases!!.isEmpty() -> Footnote("You don't have any knowledge collections.")
+            else -> Group {
+                bases!!.forEach { k ->
+                    val detail = listOfNotNull(k.description.ifBlank { null }, if (k.canEdit) null else "View only").joinToString(" · ")
+                    Item(Icons.Outlined.Folder, k.name, detail.ifBlank { null }) { onOpen(k) }
                 }
             }
         }
@@ -336,31 +321,28 @@ class MemoryActivity : ComponentActivity() {
         LaunchedEffect(k.id) { load(1) }
 
         when {
-            error != null -> Hint(error!!)
+            error != null -> Footnote(error!!)
             files == null -> Loading()
-            files!!.isEmpty() -> Hint("This collection is empty.")
-            else -> LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
-                item {
-                    Text(
-                        if (k.canEdit) "$total documents. Remove one if it was added by mistake."
-                        else "$total documents. This collection is view only for you.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
+            files!!.isEmpty() -> Footnote("This collection is empty.")
+            else -> {
+                Footnote(
+                    if (k.canEdit) "$total documents. Remove one if it was added by mistake."
+                    else "$total documents. This collection is view only for you."
+                )
+                Group {
+                    files!!.forEach { f ->
+                        Item(
+                            icon = Icons.Outlined.Description,
+                            title = f.name,
+                            summary = ago(f.addedMillis).ifBlank { null }?.let { "Added $it" },
+                            trailing = if (k.canEdit) {
+                                { IconButton(onClick = { removing = f }) { Icon(Icons.Outlined.Delete, "Remove") } }
+                            } else null,
+                        ) {}
+                    }
                 }
-                items(files!!, key = { it.id }) { f ->
-                    ListItem(
-                        headlineContent = { Text(f.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { ago(f.addedMillis).ifBlank { null }?.let { Text("Added $it") } },
-                        leadingContent = { Icon(Icons.Outlined.Description, null) },
-                        trailingContent = {
-                            if (k.canEdit) IconButton(onClick = { removing = f }) { Icon(Icons.Outlined.Delete, "Remove") }
-                        },
-                    )
-                }
-                if (files!!.size < total) item {
-                    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                if (files!!.size < total) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         if (loadingMore) CircularProgressIndicator(Modifier.size(24.dp))
                         else OutlinedButton(onClick = {
                             loadingMore = true
@@ -394,17 +376,28 @@ class MemoryActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Hint(text: String) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-        )
-    }
-
-    @Composable
     private fun Loading() {
         Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     }
+}
+
+/** The rounded, filled search box used in the drawer and Memory & knowledge. */
+@Composable
+fun SearchField(value: String, placeholder: String, modifier: Modifier = Modifier, onChange: (String) -> Unit) {
+    TextField(
+        value = value,
+        onValueChange = onChange,
+        placeholder = { Text(placeholder) },
+        leadingIcon = { Icon(Icons.Outlined.Search, null) },
+        trailingIcon = { if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Icons.Outlined.Close, "Clear") } },
+        singleLine = true,
+        shape = RoundedCornerShape(28.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+        modifier = modifier.fillMaxWidth(),
+    )
 }

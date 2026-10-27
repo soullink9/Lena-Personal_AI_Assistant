@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,12 +44,7 @@ class HomeAssistant(server: String, private val token: String) {
     private val base = server.trimEnd('/')
 
     companion object {
-        // The helpers from docs/home-assistant/Helpers.md.
-        const val MOOD = "input_select.lena_mood"
-        const val ENERGY = "input_select.lena_energy"
-        const val MOMENT = "input_select.lena_moment"
-        const val MOOD_REASON = "input_text.lena_mood_reason"
-        const val MOMENT_REASON = "input_text.lena_moment_reason"
+        /** The neutral moment, when nothing in particular just happened. */
         const val NO_MOMENT = "Nothing"
 
         /** Null until both an address and a token are set. */
@@ -91,25 +84,24 @@ class HomeAssistant(server: String, private val token: String) {
     /** True when the address and token work. */
     suspend fun check(): Boolean = runCatching { call("GET", "/api/") }.isSuccess
 
-    /** An entity's state, or null if it doesn't exist or isn't available. */
-    private suspend fun state(entityId: String): String? = try {
-        JSONObject(call("GET", "/api/states/${enc(entityId)}")).optString("state")
-            .takeIf { it.isNotBlank() && it !in setOf("unknown", "unavailable") }
-    } catch (e: IOException) {
-        if (e.message == "HTTP 404") null else throw e
-    }
-
-    /** How she feels, or null if her feelings helpers aren't set up. */
-    suspend fun feelings(): Feelings? = coroutineScope {
-        val parts = listOf(MOOD, ENERGY, MOMENT, MOOD_REASON, MOMENT_REASON).map { async { state(it) } }
-        val (mood, energy, moment, moodWhy, momentWhy) = parts.map { it.await() }
-        if (mood == null) return@coroutineScope null
-        Feelings(
+    /**
+     * How she feels, from the Lena integration's /api/lena/context, or null if the integration
+     * isn't set up.
+     */
+    suspend fun feelings(): Feelings? {
+        val body = try {
+            JSONObject(call("GET", "/api/lena/context?memory=0"))
+        } catch (e: IOException) {
+            if (e.message == "HTTP 404") return null else throw e
+        }
+        val f = body.optJSONObject("feelings") ?: return null
+        val mood = f.optString("mood").ifBlank { return null }
+        return Feelings(
             mood = mood,
-            moodWhy = moodWhy ?: "",
-            energy = energy ?: "",
-            moment = moment?.takeIf { it != NO_MOMENT },
-            momentWhy = momentWhy ?: "",
+            moodWhy = f.optString("mood_reason"),
+            energy = f.optString("energy"),
+            moment = f.optString("moment").takeIf { it.isNotBlank() && it != NO_MOMENT },
+            momentWhy = f.optString("moment_reason"),
         )
     }
 

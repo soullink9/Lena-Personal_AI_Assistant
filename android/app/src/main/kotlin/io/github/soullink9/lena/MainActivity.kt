@@ -33,6 +33,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -485,24 +486,7 @@ class MainActivity : ComponentActivity() {
                         feelings?.let { FeelingsLine(it, Modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp)) }
 
                         // Search, then your chats
-                        TextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            placeholder = { Text("Search chats") },
-                            leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                            trailingIcon = {
-                                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, "Clear") }
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(28.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-                        )
+                        SearchField(query, "Search chats", Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) { query = it }
                         ChatList(
                             chats, chatsError, query.isNotBlank(), chatId, Modifier.weight(1f),
                             onOpen = { id -> closeThen { openChat(id) } },
@@ -658,7 +642,7 @@ class MainActivity : ComponentActivity() {
         onRename: (ChatItem) -> Unit,
         onDelete: (ChatItem) -> Unit,
     ) {
-        LazyColumn(modifier) {
+        LazyColumn(modifier, contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp)) {
             when {
                 error != null -> item { Hint(error) }
                 chats == null -> item { Hint("Loading…") }
@@ -666,16 +650,14 @@ class MainActivity : ComponentActivity() {
                 else -> {
                     val groups = if (searching) listOf("Results" to chats) else group(chats)
                     groups.forEach { (label, list) ->
-                        item(key = "h-$label") {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 28.dp, top = 12.dp, bottom = 4.dp),
-                            )
-                        }
-                        items(list, key = { it.id }) { c ->
-                            ChatRow(c, c.id == currentId, { onOpen(c.id) }, { onRename(c) }, { onDelete(c) })
+                        // One rounded group per day, like the rest of the app.
+                        item(key = "g-$label") {
+                            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionTitle(label, Modifier.padding(start = 4.dp))
+                                Group {
+                                    list.forEach { c -> ChatRow(c, c.id == currentId, { onOpen(c.id) }, { onRename(c) }, { onDelete(c) }) }
+                                }
+                            }
                         }
                     }
                 }
@@ -688,30 +670,23 @@ class MainActivity : ComponentActivity() {
     private fun ChatRow(c: ChatItem, selected: Boolean, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
         var menu by remember { mutableStateOf(false) }
         val haptics = LocalHapticFeedback.current
-        Box(Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().height(48.dp).clip(CircleShape)
-                    .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .combinedClickable(
-                        onClick = onOpen,
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menu = true
-                        },
-                    )
-                    .padding(horizontal = 16.dp),
-            ) {
-                Text(
-                    c.title,
-                    Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (c.active) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-            }
+        Box {
+            Item(
+                icon = null,
+                title = c.title,
+                summary = null,
+                selected = selected,
+                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                maxTitleLines = 1,
+                trailing = if (c.active) {
+                    { CircularProgressIndicator(Modifier.padding(end = 12.dp).size(14.dp), strokeWidth = 2.dp) }
+                } else null,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu = true
+                },
+                onClick = onOpen,
+            )
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
                     text = { Text("Rename") },
@@ -733,7 +708,7 @@ class MainActivity : ComponentActivity() {
             text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }
 

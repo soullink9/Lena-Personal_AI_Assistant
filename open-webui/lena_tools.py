@@ -1,7 +1,7 @@
 """
 title: Lena (remember, forget, feel)
 author: soullink9
-version: 1.0.0
+version: 2.0.0
 license: GPL-3.0
 description: Lets Lena save to and remove from her Home Assistant memory list, and record how something made her feel, from Open WebUI and the Lena app.
 """
@@ -15,20 +15,19 @@ description: Lets Lena save to and remove from her Home Assistant memory list, a
 #   Tools > tick "Lena (remember, forget, feel)". The Lena app uses the
 #   model's tools automatically.
 #   Fill in the settings (the gear icon next to the tool): the same Home
-#   Assistant address and token as the Lena filter.
+#   Assistant address and token as the Lena filter. Any user's token works.
 #
 # WHAT IT DOES
-#   remember / forget  add to or remove from her memory to-do list, the same
-#                      list she uses in Home Assistant, so the memory is shared.
-#   feel               runs the "Lena feel" script in Home Assistant, the same
-#                      way her voice does, so her reaction carries everywhere.
+#   remember / forget  add to or remove from her memory list (todo.lena_memory),
+#                      the same list she uses in Home Assistant.
+#   feel               runs the lena.feel action, the same way her voice does,
+#                      so her reaction carries everywhere.
 #
-# The moment names must match the "Lena feel" script blueprint and
-# custom_templates/lena.jinja. tools/check.py checks that.
+# The moment names must match feelings.yaml in the Lena integration.
+# tools/check.py checks that.
 # =============================================================================
 
 import asyncio
-import difflib
 import json
 import urllib.request
 from typing import Literal
@@ -48,6 +47,26 @@ def _post(url: str, token: str, payload: dict) -> dict | list:
         return json.loads(reply.read().decode() or "null")
 
 
+def _best_match(wanted: str, items: list[str]) -> str | None:
+    """The saved memory someone most likely means: a direct quote first, then the one sharing the
+    most meaningful words (compared by their first five letters). Same rule as the integration."""
+    text = wanted.strip().lower()
+    if not text:
+        return None
+    for item in items:
+        if text in item.lower():
+            return item
+
+    def words(s: str) -> set[str]:
+        cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
+        return {w[:5] for w in cleaned if len(w) >= 4}
+
+    want = words(text)
+    scored = [(len(want & words(item)), item) for item in items]
+    best = max(scored, default=(0, None), key=lambda pair: pair[0])
+    return best[1] if best[0] > 0 else None
+
+
 class Tools:
     class Valves(BaseModel):
         ha_url: str = Field(
@@ -55,8 +74,7 @@ class Tools:
             description="Your Home Assistant address, as Open WebUI's server can reach it.",
         )
         ha_token: str = Field(default="", description="A long-lived access token from Home Assistant.")
-        memory_list: str = Field(default="todo.lena_s_memory", description="Her memory to-do list.")
-        feel_script: str = Field(default="script.lena_feel", description="The Lena feel script.")
+        memory_list: str = Field(default="todo.lena_memory", description="Her memory to-do list.")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -98,11 +116,7 @@ class Tools:
                 i.get("summary", "")
                 for i in found.get("service_response", {}).get(self.valves.memory_list, {}).get("items", [])
             ]
-            wanted = fact.strip().lower()
-            match = next((i for i in items if wanted and wanted in i.lower()), None)
-            if match is None:
-                close = difflib.get_close_matches(fact.strip(), items, n=1, cutoff=0.4)
-                match = close[0] if close else None
+            match = _best_match(fact, items)
             if match is None:
                 return "Nothing like that is saved, so there was nothing to forget."
             await self._call("todo", "remove_item", {"entity_id": self.valves.memory_list, "item": match})
@@ -125,9 +139,8 @@ class Tools:
         """
         if not self.valves.ha_token:
             return "Not set up."
-        script = self.valves.feel_script.split(".", 1)[-1]
         try:
-            await self._call("script", script, {"moment": moment, "reason": reason.strip()})
+            await self._call("lena", "feel", {"moment": moment, "reason": reason.strip()})
         except Exception as error:
             return f"Couldn't record it: {error}"
         return "Noted."
