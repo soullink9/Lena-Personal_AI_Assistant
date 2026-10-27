@@ -49,6 +49,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,16 +62,61 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * What Lena knows: the memories Open WebUI keeps about you, and your knowledge collections.
- * Fix or forget a memory, or take a document out of a collection, when something went in by mistake.
+ * What Lena knows: her shared memory in Home Assistant (if you've connected it), the memories
+ * Open WebUI keeps about you, and your knowledge collections. Fix or forget a memory, or take a
+ * document out of a collection, when something went in by mistake.
  */
 class MemoryActivity : ComponentActivity() {
 
     private lateinit var api: Api
+    private var house: HomeAssistant? = null
+
+    /** One list of memories: where they come from and how to change them. */
+    private class Store(
+        val intro: String,
+        val load: suspend () -> List<Item>,
+        val add: suspend (String) -> Unit,
+        val update: suspend (Item, String) -> Unit,
+        val delete: suspend (Item) -> Unit,
+        val problem: (Throwable) -> String,
+    )
+
+    private data class Item(val id: String, val content: String, val detail: String)
+
+    private val openWebUi by lazy {
+        Store(
+            intro = "Things Open WebUI remembers about you. Tap one to fix it.",
+            load = { api.memories().map { m -> Item(m.id, m.content, listOfNotNull(m.path, ago(m.updatedMillis).ifBlank { null }).joinToString(" · ")) } },
+            add = { api.addMemory(it) },
+            update = { item, text -> api.updateMemory(item.id, text) },
+            delete = { api.deleteMemory(it.id) },
+            problem = { problem(it, "Memory") },
+        )
+    }
+
+    private val shared by lazy {
+        val h = house!!
+        val list = Prefs.haMemoryList(this)
+        var current = emptyList<HouseMemory>()
+        Store(
+            intro = "Lena's shared memory, kept in Home Assistant. She uses it in the house, in Open WebUI and here. Tap one to fix it.",
+            load = { h.memories(list).also { current = it }.map { Item(it.uid, it.text, "") } },
+            add = { h.addMemory(list, it) },
+            update = { item, text -> h.updateMemory(list, current.first { it.uid == item.id }, text) },
+            delete = { item -> h.removeMemory(list, current.first { it.uid == item.id }) },
+            problem = {
+                when (it) {
+                    is HaAuthException -> "Home Assistant turned down the token. Check it in settings."
+                    else -> "Couldn't reach Home Assistant, or $list doesn't exist. Check settings."
+                }
+            },
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         api = Api.from(this) ?: run { finish(); return }
+        house = HomeAssistant.from(this)
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }
     }
@@ -88,7 +134,10 @@ class MemoryActivity : ComponentActivity() {
 
     @Composable
     private fun Screen() {
+        // Shared (Home Assistant) first when it's connected, then Open WebUI's memories, then knowledge.
+        val tabs = remember { listOfNotNull(if (house != null) "Shared" else null, if (house != null) "Open WebUI" else "Memories", "Knowledge") }
         var tab by remember { mutableIntStateOf(0) }
+        val knowledgeTab = tabs.size - 1
         var openKnowledge by remember { mutableStateOf<Api.Knowledge?>(null) }
         var adding by remember { mutableStateOf(false) }
 
@@ -106,7 +155,7 @@ class MemoryActivity : ComponentActivity() {
                 )
             },
             floatingActionButton = {
-                if (tab == 0 && openKnowledge == null) {
+                if (tab != knowledgeTab && openKnowledge == null) {
                     FloatingActionButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, "Add a memory") }
                 }
             },
@@ -114,14 +163,16 @@ class MemoryActivity : ComponentActivity() {
             Column(Modifier.padding(padding).fillMaxSize()) {
                 if (openKnowledge == null) {
                     PrimaryTabRow(selectedTabIndex = tab) {
-                        Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Memories") })
-                        Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Knowledge") })
+                        tabs.forEachIndexed { i, name -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(name) }) }
                     }
                 }
                 when {
                     openKnowledge != null -> Files(openKnowledge!!)
-                    tab == 0 -> Memories(adding, onAddDone = { adding = false })
-                    else -> Collections { openKnowledge = it }
+                    tab == knowledgeTab -> Collections { openKnowledge = it }
+                    else -> {
+                        val store = if (house != null && tab == 0) shared else openWebUi
+                        key(store) { Memories(store, adding, onAddDone = { adding = false }) }
+                    }
                 }
             }
         }
@@ -130,24 +181,24 @@ class MemoryActivity : ComponentActivity() {
     // ---- Memories ---------------------------------------------------------------------------
 
     @Composable
-    private fun Memories(adding: Boolean, onAddDone: () -> Unit) {
+    private fun Memories(store: Store, adding: Boolean, onAddDone: () -> Unit) {
         val scope = rememberCoroutineScope()
-        var memories by remember { mutableStateOf<List<Api.Memory>?>(null) }
+        var memories by remember { mutableStateOf<List<Item>?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") }
-        var editing by remember { mutableStateOf<Api.Memory?>(null) }
-        var deleting by remember { mutableStateOf<Api.Memory?>(null) }
+        var editing by remember { mutableStateOf<Item?>(null) }
+        var deleting by remember { mutableStateOf<Item?>(null) }
         var refresh by remember { mutableIntStateOf(0) }
 
         LaunchedEffect(refresh) {
-            runCatching { api.memories() }
+            runCatching { store.load() }
                 .onSuccess { memories = it; error = null }
-                .onFailure { error = problem(it, "Memory") }
+                .onFailure { error = store.problem(it) }
         }
 
         Column(Modifier.fillMaxSize()) {
             Text(
-                "Things Lena remembers about you. Tap one to fix it.",
+                store.intro,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
@@ -172,9 +223,8 @@ class MemoryActivity : ComponentActivity() {
                             Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text(m.content, style = MaterialTheme.typography.bodyLarge)
-                                    val detail = listOfNotNull(m.path, ago(m.updatedMillis).ifBlank { null }).joinToString(" · ")
-                                    if (detail.isNotBlank()) {
-                                        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (m.detail.isNotBlank()) {
+                                        Text(m.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                                 IconButton(onClick = { deleting = m }) { Icon(Icons.Outlined.Delete, "Forget") }
@@ -199,9 +249,9 @@ class MemoryActivity : ComponentActivity() {
                         onAddDone()
                         scope.launch {
                             val r = runCatching {
-                                if (current == null) api.addMemory(content) else api.updateMemory(current.id, content)
+                                if (current == null) store.add(content) else store.update(current, content)
                             }
-                            if (r.isFailure) toast(problem(r.exceptionOrNull()!!, "Memory")) else refresh++
+                            if (r.isFailure) toast(store.problem(r.exceptionOrNull()!!)) else refresh++
                         }
                     }) { Text("Save") }
                 },
@@ -220,8 +270,8 @@ class MemoryActivity : ComponentActivity() {
                         onClick = {
                             deleting = null
                             scope.launch {
-                                val r = runCatching { api.deleteMemory(m.id) }
-                                if (r.isFailure) toast(problem(r.exceptionOrNull()!!, "Memory")) else refresh++
+                                val r = runCatching { store.delete(m) }
+                                if (r.isFailure) toast(store.problem(r.exceptionOrNull()!!)) else refresh++
                             }
                         },
                     ) { Text("Forget") }

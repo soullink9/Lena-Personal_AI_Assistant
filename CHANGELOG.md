@@ -7,6 +7,14 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.4.0 (2026-10-27)
+
+- **Lena by default:** with no model chosen, new chats, the sheet and scheduled prompts use `lena` (the model built from the Modelfile) when your server has it.
+- **Spoken replies sound spoken:** when you talk to her in the sheet, Lena tells her the reply will be read aloud, so she keeps it short and plain, with no lists or formatting. Typed chats are unchanged.
+- **Home Assistant, optional:** a new settings section for your Home Assistant address and a long-lived access token (stored encrypted with a keystore key, HTTPS only), with a **Test** button.
+- **How she feels** shows under her name in the sheet and in the drawer, with the reason, and refreshes after each reply.
+- **Her shared memory** gets its own **Shared** tab in Memory & knowledge, next to Open WebUI's memories and your knowledge: search, fix, forget or add.
+
 ### 2.3.1 (2026-10-27)
 
 - Fixed the Lena chat showing only her last reply when you opened it in the full app. Open WebUI 0.12 needs the question sent with each answer to keep the conversation linked; Lena now sends it.

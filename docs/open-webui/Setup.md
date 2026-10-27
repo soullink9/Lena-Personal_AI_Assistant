@@ -60,7 +60,7 @@ The Lena app uses the model's tools and filters automatically, so there's nothin
 
 ## 6. Open WebUI's own memory
 
-Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory & knowledge** screen shows Open WebUI's memories and your knowledge collections, not her shared list; see her list in Home Assistant.
+Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory & knowledge** screen shows both: connect Home Assistant in the app's settings and a **Shared** tab shows her shared list next to Open WebUI's memories and your knowledge.
 
 ## 7. Test it
 

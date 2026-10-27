@@ -54,7 +54,7 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 
 ## Privacy
 
-Everything runs on your own hardware. The model is on your Ollama server, her feelings and memory are in your Home Assistant, Open WebUI talks only to your Home Assistant to fetch them, and the app talks only to your Open WebUI address and your sign-in page, with no analytics and no backups of your sign-in. Her memory is shared with everyone who talks to her and added to her prompts, so don't store passwords, door codes or similar secrets in it. See [App privacy and security](docs/app/Privacy-and-Security.md) and [Memory](docs/home-assistant/Memory.md).
+Everything runs on your own hardware. The model is on your Ollama server, her feelings and memory are in your Home Assistant, Open WebUI talks only to your Home Assistant to fetch them, and the app talks only to your Open WebUI address, your sign-in page and, if you add it, your Home Assistant, with no analytics and no backups of your sign-in. Her memory is shared with everyone who talks to her and added to her prompts, so don't store passwords, door codes or similar secrets in it. See [App privacy and security](docs/app/Privacy-and-Security.md) and [Memory](docs/home-assistant/Memory.md).
 
 ## Contributing
 

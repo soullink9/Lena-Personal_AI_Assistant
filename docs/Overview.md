@@ -21,7 +21,7 @@ Lena is one character reached three ways: by voice through Home Assistant, by ty
 - **Ollama** runs the `lena` model. Her whole character is built into it, so every app gets the same Lena.
 - **Home Assistant** listens with Whisper, adds the time, who's home and how she feels to her prompt, sends it to `lena`, carries out device actions and speaks the reply with Piper. It also keeps her **feelings** (the mood engine and five helpers) and her **memory** (a to-do list).
 - **Open WebUI** uses the same `lena` model with your tools and knowledge. The **Lena filter** brings her current feelings and memory over from Home Assistant, and the **Lena tool** lets her save memories and react, so she's the same Lena in a chat as in the kitchen.
-- **The Lena app** is a native Android shell around your Open WebUI, plus what a web page can't do: being your phone's assistant, a voice sheet, a widget, a Quick Settings tile, Share to Lena, notifications and scheduled prompts. It goes through Open WebUI, so the filter and tool work there too.
+- **The Lena app** is a native Android shell around your Open WebUI, plus what a web page can't do: being your phone's assistant, a voice sheet, a widget, a Quick Settings tile, Share to Lena, notifications and scheduled prompts. It goes through Open WebUI, so the filter and tool work there too. Connect Home Assistant in its settings and it also shows how she feels and lets you edit her shared memory.
 - **The voice bridge** lets Open WebUI (and so the app) use the same Piper voice and Whisper as Home Assistant. Without it, Open WebUI uses its own speech engines.
 
 ## Who decides what
@@ -39,7 +39,7 @@ More: [Her personality](personality/Personality.md) and [Her feelings](personali
 
 Her memory is one Home Assistant to-do list, **Lena's Memory**, shared everywhere. In Home Assistant she reads it with the Lena recall script; in Open WebUI and the app the filter adds it to every chat, and the tool saves and forgets. See [Memory](home-assistant/Memory.md).
 
-Open WebUI's own memory feature is separate; turn it off for a single shared memory. The app's **Memory & knowledge** screen shows Open WebUI's memories and knowledge, not her shared list.
+Open WebUI's own memory feature is separate; turn it off for a single shared memory. The app's **Memory & knowledge** screen shows her shared list (once Home Assistant is connected in the app), Open WebUI's memories and your knowledge.
 
 ## One context size
 

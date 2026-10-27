@@ -6,7 +6,7 @@ Lena is built so that your conversations go to your server and nowhere else.
 
 ## What Lena connects to
 
-Your Open WebUI address, any sign-in addresses you add (such as Authentik), and whatever those pages themselves load. Nothing else: no analytics, no crash reporting, no update checks, and no server run by anyone else.
+Your Open WebUI address, any sign-in addresses you add (such as Authentik), your Home Assistant address if you add one, and whatever those pages themselves load. Nothing else: no analytics, no crash reporting, no update checks, and no server run by anyone else.
 
 Links to other sites open in your normal browser, not in Lena, so those sites never see Lena's storage or your sign-in.
 
@@ -18,12 +18,22 @@ When you sign in inside Lena, Open WebUI stores your session in a cookie for you
 - Signing out of Open WebUI (through **Open WebUI menus** in the drawer) signs out the native features too.
 - If a request is redirected to a sign-in page, Lena stops and asks you to sign in again rather than following it.
 
+## Home Assistant (optional)
+
+If you add your Home Assistant under **Settings → Home Assistant**, Lena uses a long-lived access token you create there to read her feelings helpers and her shared memory list, and to change that list when you edit it.
+
+- The token is encrypted with a key kept in the phone's keystore, which can't be copied off the phone, and is sent only to the Home Assistant address you entered (HTTPS only).
+- Lena never shows the saved token again. Paste a new one to replace it, or remove it with the bin icon.
+- A token can do anything its Home Assistant user can, so consider a dedicated non-admin user for Lena. Reading her feelings and memory doesn't need admin rights.
+- Revoke it any time in Home Assistant (your profile → Security), and Lena simply stops showing her feelings and shared memory.
+
 ## What Lena stores
 
 | What | Where |
 |---|---|
 | Your addresses, model, gesture choice, quick prompts and scheduled prompts | Lena's private app settings |
 | Your Open WebUI sign-in, and anything Open WebUI keeps in the browser | Lena's private web view storage |
+| Your Home Assistant token, if you add one | Lena's private storage, encrypted with a keystore key |
 | Pending background checks | Lena's private WorkManager database |
 
 All of it stays on the phone. Lena turns off Android backups and phone-to-phone transfer for all of its data, so your sign-in never reaches Google's cloud or a new phone. Uninstalling Lena deletes everything.

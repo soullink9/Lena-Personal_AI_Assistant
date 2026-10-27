@@ -14,7 +14,8 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `AskActivity.kt` | The talk/type sheet, the assistant gesture and Share to Lena. |
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's). |
 | `SettingsActivity.kt` | The settings screen. |
-| `MemoryActivity.kt` | Memory & knowledge: your memories and knowledge collections. |
+| `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories and knowledge collections. |
+| `HomeAssistant.kt` | The optional Home Assistant link: her feelings and shared memory list, the encrypted token store, and the feelings line. |
 | `Api.kt` | Open WebUI's API, using the page's sign-in: models, chats, search, running tasks, and starting and following a chat. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, daily alarms, and quick prompt shortcuts. |
 | `Widgets.kt` | The Quick Settings tile and the home screen widget. |
@@ -65,6 +66,14 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | `GET /api/v1/auths/` | Telling a deleted chat apart from an expired sign-in (Open WebUI answers both the same way) |
 | `DELETE /api/v1/chats/{id}` | Deleting a chat |
 | `POST /api/v1/audio/transcriptions`, `POST /api/v1/audio/speech` | Your server's speech-to-text and voice for the sheet |
+
+And, only if you add it, your Home Assistant, with the token you give it:
+
+| Call | What for |
+|---|---|
+| `GET /api/` | **Test** in settings |
+| `GET /api/states/{entity}` | Her five feelings helpers |
+| `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list |
 
 ## Building locally
 

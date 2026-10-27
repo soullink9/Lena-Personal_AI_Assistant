@@ -18,7 +18,8 @@ Lena is two things working together:
 - **New chat**, **Temporary chat** (one Open WebUI doesn't save) and **Voice call**.
 - **Search** and your **recent chats**, grouped by day. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
 - **Server status**: whether your server is reachable, and its Open WebUI version.
-- **Memory & knowledge**: see what Lena remembers about you and what's in your knowledge collections (more below).
+- **Memory & knowledge**: see what Lena remembers and what's in your knowledge collections (more below).
+- **How she feels**, under the server status, if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
 - **Open WebUI menus**: shows Open WebUI's own header again, for things the shell doesn't cover, such as chat controls, switching models mid-chat, your Open WebUI settings and signing out.
 - **Reload** and **Settings**.
 
@@ -33,7 +34,7 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 The assistant gesture opens a sheet over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
 
 1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
-2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her.
+2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her. When you talk (rather than type), Lena tells her the reply will be read aloud, so she answers the way she would in the kitchen: short, plain sentences, no lists or formatting.
 3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk.
 
 **One ongoing conversation.** Every time you talk to Lena, she continues the same chat, titled **Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later. The sheet opens on the whole conversation, scrolled to the latest.
@@ -66,10 +67,15 @@ Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu
 
 Open it from the drawer. It shows what Lena draws on beyond the conversation, so you can fix anything that went in by mistake.
 
-- **Memories**: the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
+- **Shared** (only if you've connected Home Assistant): Lena's own memory, the to-do list in Home Assistant she uses in the house, in Open WebUI and here. Search, correct, forget or add, the same as below.
+- **Memories** (called **Open WebUI** when Shared is there): the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
 - **Knowledge**: your knowledge collections and the documents in each. Remove a document from a collection you can edit (by default, Open WebUI also deletes the file).
 
-Talking to Lena uses your memories when Open WebUI's memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page.
+Talking to Lena uses Open WebUI's memories when its memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page. Her shared memory reaches her through the Lena filter in Open WebUI; see [Lena in Open WebUI](../open-webui/Setup.md).
+
+## How she feels
+
+Connect Home Assistant under **Settings → Home Assistant**: its address, a long-lived access token (your Home Assistant profile → Security), and her memory list. **Test** checks it. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too. It reads the five helpers from [Helpers](../home-assistant/Helpers.md) with their default names.
 
 ## Share to Lena
 

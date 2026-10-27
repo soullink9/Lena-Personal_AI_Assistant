@@ -224,7 +224,7 @@ class MainActivity : ComponentActivity() {
 
     private fun openNew(model: String? = null, call: Boolean = false, temporary: Boolean = false, text: String? = null) {
         val b = server.buildUpon()
-        (model ?: Prefs.model(this))?.let { b.appendQueryParameter("model", it) }
+        (model ?: Prefs.effectiveModel(this))?.let { b.appendQueryParameter("model", it) }
         if (call) b.appendQueryParameter("call", "true")
         if (temporary) b.appendQueryParameter("temporary-chat", "true")
         if (!text.isNullOrBlank()) b.appendQueryParameter("q", text) // fills the box; never sends by itself
@@ -404,6 +404,7 @@ class MainActivity : ComponentActivity() {
         var chatsError by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") }
         var version by remember { mutableStateOf<String?>(null) }
+        var feelings by remember { mutableStateOf<Feelings?>(null) }
         var checked by remember { mutableStateOf(false) }
         var title by remember { mutableStateOf("Lena") }
         var modelMenu by remember { mutableStateOf(false) }
@@ -415,12 +416,13 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             models = runCatching { api.models() }.getOrDefault(emptyList())
+            if (models.isNotEmpty()) Prefs.rememberLena(this@MainActivity, models)
         }
 
         // Title: the current chat's model, or the model a new chat will use.
         LaunchedEffect(chatId, url, models) {
             val id = if (chatId != null) runCatching { api.chatModel(chatId) }.getOrNull()
-            else Uri.parse(url).getQueryParameter("model") ?: Prefs.model(this@MainActivity)
+            else Uri.parse(url).getQueryParameter("model") ?: Prefs.effectiveModel(this@MainActivity)
             title = models.firstOrNull { it.id == id }?.name ?: id ?: "Lena"
         }
 
@@ -430,6 +432,7 @@ class MainActivity : ComponentActivity() {
             if (query.isNotBlank()) delay(300)
             version = api.version()
             checked = true
+            feelings = HomeAssistant.from(this@MainActivity)?.let { runCatching { it.feelings() }.getOrNull() }
             try {
                 chats = if (query.isBlank()) api.chats() else api.search(query.trim())
                 chatsError = null
@@ -460,6 +463,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(start = 28.dp, top = 20.dp, end = 16.dp),
                         )
                         Status(checked, version)
+                        feelings?.let { FeelingsLine(it, Modifier.padding(start = 28.dp, end = 16.dp, top = 4.dp)) }
                         Spacer(Modifier.height(8.dp))
                         DrawerItem("New chat", Icons.Outlined.AddComment) { closeThen { openNew() } }
                         DrawerItem("Temporary chat", Icons.Outlined.VisibilityOff) { closeThen { openNew(temporary = true) } }

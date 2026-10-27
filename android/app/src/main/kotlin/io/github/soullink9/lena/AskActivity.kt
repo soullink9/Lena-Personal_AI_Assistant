@@ -220,6 +220,8 @@ class AskActivity : ComponentActivity() {
         var level by remember { mutableStateOf(0f) }
         var note by remember { mutableStateOf<String?>(null) }
         var model by remember { mutableStateOf<Model?>(null) }
+        var feelings by remember { mutableStateOf<Feelings?>(null) }
+        val house = remember { HomeAssistant.from(this) }
         var chatId by remember { mutableStateOf<String?>(null) }
         var lastReplyId by remember { mutableStateOf<String?>(null) }
         var job by remember { mutableStateOf<Job?>(null) }
@@ -280,6 +282,7 @@ class AskActivity : ComponentActivity() {
                         newTitle = if (ongoing) "Lena" else null,
                         pinNew = ongoing,
                         contextTokens = Prefs.contextTokens(this@AskActivity),
+                        spoken = spoken,
                     )
                     running = started
                     working = true
@@ -289,6 +292,8 @@ class AskActivity : ComponentActivity() {
                     lastReplyId = started.messageId
                     turn.done = true
                     working = false
+                    // She may have reacted to what you said; show how she feels now.
+                    if (house != null) launch { feelings = runCatching { house.feelings() }.getOrNull() ?: feelings }
                     if (spoken) speakThenMaybeListen(turn.answer) else phase = Phase.IDLE
                 } catch (e: CancellationException) {
                     throw e
@@ -430,6 +435,9 @@ class AskActivity : ComponentActivity() {
             }
             model = runCatching { api.defaultModel(this@AskActivity) }.getOrNull()
         }
+        LaunchedEffect(Unit) {
+            if (house != null) feelings = runCatching { house.feelings() }.getOrNull()
+        }
         LaunchedEffect(restart.intValue) {
             when {
                 restart.intValue == 0 && autoPrompt != null -> send(autoPrompt, spoken = false)
@@ -464,7 +472,9 @@ class AskActivity : ComponentActivity() {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Lena", style = MaterialTheme.typography.titleMedium)
-                            model?.let {
+                            val f = feelings
+                            if (f != null) FeelingsLine(f)
+                            else model?.let {
                                 Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }

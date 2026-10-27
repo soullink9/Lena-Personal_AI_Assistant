@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.launch
@@ -89,10 +90,17 @@ class SettingsActivity : ComponentActivity() {
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
         var modelMenu by remember { mutableStateOf(false) }
         var newPrompt by remember { mutableStateOf("") }
+        var haError by remember { mutableStateOf<String?>(null) }
+        var haToken by remember { mutableStateOf("") } // a new token to save; the saved one is never shown
+        var haTokenSaved by remember { mutableStateOf(Secrets.has(this, Secrets.HA_TOKEN)) }
+        var haCheck by remember { mutableStateOf<String?>(null) }
         val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
         LaunchedEffect(Unit) {
-            Api.from(this@SettingsActivity)?.let { api -> models = runCatching { api.models() }.getOrDefault(emptyList()) }
+            Api.from(this@SettingsActivity)?.let { api ->
+                models = runCatching { api.models() }.getOrDefault(emptyList())
+                if (models.isNotEmpty()) Prefs.rememberLena(this@SettingsActivity, models)
+            }
         }
 
         fun askForNotifications() {
@@ -104,11 +112,14 @@ class SettingsActivity : ComponentActivity() {
         fun save() {
             val server = Prefs.normalize(s.server)
             val signIn = Prefs.normalizeSignIn(s.signIn)
+            val ha = if (s.haServer.isBlank()) "" else Prefs.normalize(s.haServer)
             serverError = if (server == null) "Use your https:// address" else null
             signInError = if (signIn == null) "Use https:// addresses" else null
-            if (server == null || signIn == null) return
-            val saved = s.copy(server = server, signIn = signIn)
+            haError = if (ha == null) "Use your https:// address" else null
+            if (server == null || signIn == null || ha == null) return
+            val saved = s.copy(server = server, signIn = signIn, haServer = ha)
             Prefs.save(this, saved)
+            if (haToken.isNotBlank()) Secrets.put(this, Secrets.HA_TOKEN, haToken.trim())
             Schedules.rescheduleAll(this)
             Shortcuts.update(this)
             if (saved.notifyReplies || saved.schedules.any { it.enabled }) askForNotifications()
@@ -171,9 +182,10 @@ class SettingsActivity : ComponentActivity() {
                         value = s.model,
                         onValueChange = { s = s.copy(model = it) },
                         label = { Text("Model for new chats (optional)") },
-                        placeholder = { Text("Open WebUI's default") },
+                        placeholder = { Text("Lena, if your server has her") },
                         supportingText = {
-                            Text(models.firstOrNull { it.id == s.model }?.name ?: "The model's ID in Open WebUI, e.g. lena")
+                            Text(models.firstOrNull { it.id == s.model }?.name
+                                ?: "Leave empty to use Lena (the model built from the Modelfile), or Open WebUI's default if there isn't one.")
                         },
                         singleLine = true,
                         trailingIcon = {
@@ -182,11 +194,80 @@ class SettingsActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth(),
                     )
                     DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                        DropdownMenuItem(text = { Text("Open WebUI's default") }, onClick = { s = s.copy(model = ""); modelMenu = false })
+                        DropdownMenuItem(text = { Text("Lena, if your server has her") }, onClick = { s = s.copy(model = ""); modelMenu = false })
                         models.forEach { m ->
                             DropdownMenuItem(text = { Text(m.name) }, onClick = { s = s.copy(model = m.id); modelMenu = false })
                         }
                     }
+                }
+
+                Section("Home Assistant (optional)")
+                Text(
+                    "Where Lena's feelings and shared memory live. Lena shows how she's feeling and lets you see " +
+                        "and edit her shared memory. Leave empty if you don't use them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = s.haServer,
+                    onValueChange = { s = s.copy(haServer = it); haCheck = null },
+                    label = { Text("Home Assistant address") },
+                    placeholder = { Text("https://ha.example.com") },
+                    isError = haError != null,
+                    supportingText = if (haError != null) {
+                        { Text(haError ?: "") }
+                    } else null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = haToken,
+                    onValueChange = { haToken = it; haCheck = null },
+                    label = { Text(if (haTokenSaved) "Access token (saved)" else "Long-lived access token") },
+                    placeholder = { Text(if (haTokenSaved) "Paste a new one to replace it" else "From your Home Assistant profile → Security") },
+                    supportingText = { Text("Stored encrypted on this phone and sent only to your Home Assistant.") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        if (haTokenSaved) IconButton(onClick = {
+                            Secrets.put(this@SettingsActivity, Secrets.HA_TOKEN, null)
+                            haTokenSaved = false
+                            haToken = ""
+                            haCheck = null
+                        }) { Icon(Icons.Outlined.Delete, "Remove the saved token") }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = s.haMemoryList,
+                    onValueChange = { s = s.copy(haMemoryList = it) },
+                    label = { Text("Her memory list") },
+                    supportingText = { Text("The to-do list entity, e.g. $DEFAULT_MEMORY_LIST") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        enabled = s.haServer.isNotBlank() && (haToken.isNotBlank() || haTokenSaved),
+                        onClick = {
+                            val url = Prefs.normalize(s.haServer)
+                            val token = haToken.trim().ifBlank { Secrets.get(this@SettingsActivity, Secrets.HA_TOKEN) ?: "" }
+                            if (url == null) haError = "Use your https:// address"
+                            else scope.launch {
+                                haError = null
+                                haCheck = "Checking…"
+                                val house = HomeAssistant(url, token)
+                                haCheck = if (!house.check()) "Couldn't connect. Check the address and token."
+                                else when (val f = runCatching { house.feelings() }.getOrNull()) {
+                                    null -> "Connected. Her feelings helpers weren't found."
+                                    else -> "Connected. She's ${f.mood.lowercase()}."
+                                }
+                            }
+                        },
+                    ) { Text("Test") }
+                    haCheck?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)) }
                 }
 
                 Section("Assistant gesture")

@@ -43,7 +43,12 @@ data class Settings(
     val followUp: FollowUp = FollowUp.ALWAYS,
     val ongoing: Boolean = true,
     val contextTokens: Int = 32_768,
+    val haServer: String = "",
+    val haMemoryList: String = DEFAULT_MEMORY_LIST,
 )
+
+/** Her shared memory to-do list in Home Assistant, as in docs/home-assistant/Helpers.md. */
+const val DEFAULT_MEMORY_LIST = "todo.lena_s_memory"
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
 object Prefs {
@@ -52,6 +57,25 @@ object Prefs {
 
     fun server(c: Context): String? = p(c).getString("server", null)
     fun model(c: Context): String? = p(c).getString("model", "")?.ifBlank { null }
+
+    /** Your chosen model, or the Lena model found on your server when you haven't chosen one. */
+    fun effectiveModel(c: Context): String? = model(c) ?: p(c).getString("found_lena", null)
+
+    /** Remembers which of your server's models is Lena, for when no model is chosen. */
+    fun rememberLena(c: Context, models: List<Model>) {
+        val lena = lenaIn(models)?.id
+        if (lena != p(c).getString("found_lena", null)) p(c).edit().putString("found_lena", lena).apply()
+    }
+
+    /** The model built from the Modelfile: "lena" (Ollama shows it as "lena:latest"), or one named Lena. */
+    fun lenaIn(models: List<Model>): Model? =
+        models.firstOrNull { it.id == "lena" || it.id.startsWith("lena:") }
+            ?: models.firstOrNull { it.name.equals("lena", ignoreCase = true) }
+
+    /** Your Home Assistant, for Lena's feelings and shared memory. Null when not set. */
+    fun haServer(c: Context): String? = p(c).getString("ha_server", "")?.ifBlank { null }
+    fun haMemoryList(c: Context): String =
+        p(c).getString("ha_memory_list", DEFAULT_MEMORY_LIST)?.ifBlank { null } ?: DEFAULT_MEMORY_LIST
     fun signIn(c: Context): String = p(c).getString("sign_in", "") ?: ""
     fun notifyReplies(c: Context): Boolean = p(c).getBoolean("notify_replies", true)
 
@@ -112,6 +136,8 @@ object Prefs {
         followUp = followUp(c),
         ongoing = ongoing(c),
         contextTokens = contextTokens(c),
+        haServer = haServer(c) ?: "",
+        haMemoryList = haMemoryList(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -135,6 +161,8 @@ object Prefs {
             .putString("follow_up", s.followUp.name)
             .putBoolean("ongoing", s.ongoing)
             .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
+            .putString("ha_server", s.haServer)
+            .putString("ha_memory_list", s.haMemoryList.trim().ifBlank { DEFAULT_MEMORY_LIST })
             .apply()
     }
 

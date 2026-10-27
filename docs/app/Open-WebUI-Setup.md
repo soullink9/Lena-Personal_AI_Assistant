@@ -35,7 +35,7 @@ Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but 
 
 ## Picking a model
 
-**Settings → Chats → Model for new chats** decides which model new chats, calls, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in), or type its ID. Leave it blank to use Open WebUI's default; the Ask sheet and scheduled prompts then use the first model on your list.
+**Settings → Chats → Model for new chats** decides which model new chats, calls, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in), or type its ID. Leave it blank to use Lena: the model built from the Modelfile (`lena`), or one named Lena. If your server has neither, new chats use Open WebUI's default and the Ask sheet and scheduled prompts use the first model on your list.
 
 You can still start a chat with any model by tapping the title in the top bar.
 

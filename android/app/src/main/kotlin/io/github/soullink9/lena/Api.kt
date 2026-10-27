@@ -148,11 +148,12 @@ class Api(server: String) {
         }
     }
 
-    /** The model to use for Lena's own prompts: your chosen default, or the first one available. */
+    /** The model to use for Lena's own prompts: your chosen default, then Lena herself, then the first one available. */
     suspend fun defaultModel(c: Context): Model? {
         val all = models()
+        Prefs.rememberLena(c, all)
         val wanted = Prefs.model(c)
-        return all.firstOrNull { it.id == wanted } ?: all.firstOrNull()
+        return all.firstOrNull { it.id == wanted } ?: Prefs.lenaIn(all) ?: all.firstOrNull()
     }
 
     suspend fun chats(): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/?page=1"))
@@ -250,6 +251,7 @@ class Api(server: String) {
         newTitle: String? = null,
         pinNew: Boolean = false,
         contextTokens: Int = 32_768,
+        spoken: Boolean = false,
     ): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
@@ -266,7 +268,7 @@ class Api(server: String) {
             .put("done", false).put("timestamp", now)
 
         val id: String
-        val conversation: JSONArray
+        var conversation: JSONArray
         // Continue the chat if it still exists; if it was deleted, start a new one.
         val existing = chatId?.let { chatOrNull(it) }
         if (existing == null) {
@@ -312,6 +314,15 @@ class Api(server: String) {
                 cursor = if (m.isNull("parentId")) null else m.optString("parentId")
             }
             conversation = JSONArray(fitToBudget(thread, contextTokens))
+        }
+
+        // Spoken turns: tell her the reply will be read aloud, so she uses her spoken style (no lists or
+        // formatting, short). Sent with this request only; it isn't saved in the chat.
+        if (spoken) {
+            val withHint = JSONArray().put(JSONObject().put("role", "system").put("content",
+                "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken."))
+            for (i in 0 until conversation.length()) withHint.put(conversation.get(i))
+            conversation = withHint
         }
 
         val features = JSONObject()
