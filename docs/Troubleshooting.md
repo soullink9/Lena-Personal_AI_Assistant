@@ -1,0 +1,46 @@
+# Troubleshooting
+
+[← Back to README](../README.md)
+
+## The page won't load
+
+- **Check the address** in Lena's settings (long-press the icon → Settings). It must start with `https://` and match how you reach Open WebUI in a browser, including any port.
+- **Certificate errors** show as a blank page. Make sure the certificate is valid for that name, or that your certificate authority is installed on the phone. See [Open WebUI Setup](Open-WebUI-Setup.md#https).
+- **Away from home**, the phone needs a route to your server, such as your VPN or Tailscale.
+
+## Call mode opens but doesn't hear me
+
+- **Microphone permission:** Settings → Apps → Lena → Permissions → Microphone → Allow while using the app.
+- **Speech-to-text engine:** must be a server engine, not "Web API". See [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines).
+- **Another app has the microphone**, such as a phone call or a voice recorder. Close it and try again.
+
+## Call mode hears me but doesn't answer out loud
+
+- **Text-to-speech engine:** must be a server engine, not "Web API".
+- **Media volume:** call replies play at media volume, not call volume.
+
+## The assistant gesture opens something else
+
+- Check **Settings → Apps → Default apps → Digital assistant app** is set to Lena.
+- Some phones also bind the power button to their own assistant. Look under **Settings → System → Gestures** (or your phone's button settings) for a "press and hold power button" option.
+
+## Lena isn't listed as a digital assistant
+
+Restart the phone after installing, then look again. A few phone makers hide this setting or limit it to their own assistant; the Call shortcut on your home screen works everywhere.
+
+## Sign-in opens my browser
+
+Your Open WebUI uses sign-in through another website (SSO or OAuth). Lena only opens your Open WebUI address, so this can't complete inside it. Use a username and password account. See [Open WebUI Setup](Open-WebUI-Setup.md#sign-in).
+
+## An update won't install
+
+"App not installed" or "conflicts with an existing package" means the new APK was signed with a different key from the one on your phone. This happens when going between a debug-signed test build and a properly signed one, or after changing keys.
+
+Uninstall Lena, install the new APK, and sign in again. Check that both secrets are set (see [Installation](Installation.md#2-add-the-secrets)) so future builds use the same key.
+
+## The build fails
+
+Open the failed run under **Actions** and expand the red step.
+
+- **Load signing key** or **Build** failing right after you changed secrets usually means `KEYSTORE_B64` isn't the complete one-line text from `lena.jks.b64`, or `KEYSTORE_PASSWORD` doesn't match. Make the `.b64` file again with `base64 -w0` (no line breaks) and paste it again.
+- Anything else, open an issue with the log.

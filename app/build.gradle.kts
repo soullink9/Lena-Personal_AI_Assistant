@@ -13,7 +13,7 @@ android {
         minSdk = 30 // Android 11
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
     }
 
     // The release key comes from CI secrets (see README). Without it the APK is debug-signed.

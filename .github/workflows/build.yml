@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -42,10 +43,18 @@ jobs:
         env:
           LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="$GITHUB_REF_NAME"
+            grep -q "versionName = \"${version#v}\"" app/build.gradle.kts || {
+              echo "::error::Tag $version doesn't match versionName in app/build.gradle.kts"; exit 1; }
+          else
+            version="${GITHUB_SHA::7}"
+          fi
           export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
           gradle --no-daemon assembleRelease
           cd app/build/outputs/apk/release
-          sha256sum *.apk | tee SHA256SUMS
+          mv app-release.apk "lena-${version}.apk"
+          sha256sum lena-*.apk | tee SHA256SUMS
 
       - uses: actions/upload-artifact@v7
         with:
@@ -54,3 +63,20 @@ jobs:
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/release/SHA256SUMS
           if-no-files-found: error
+
+  # Version tags only. Kept apart from the build so only this step can write to the repo.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n lena-apk -D apk
+          gh release create "$GITHUB_REF_NAME" apk/* -R "$GITHUB_REPOSITORY" \
+            --title "Lena ${GITHUB_REF_NAME#v}" --generate-notes
