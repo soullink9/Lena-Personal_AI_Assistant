@@ -29,6 +29,7 @@ All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
 | `res/xml/shortcuts.xml` | The app icon's long-press shortcuts. |
 | `res/xml/lena_widget_info.xml` | The widget's size and description. |
 | `.github/workflows/build.yml` | Builds, signs and publishes the APK. |
+| `voice-bridge/` | The optional Wyoming voice bridge for Open WebUI (see [Voice Bridge](Voice-Bridge.md)). |
 
 ## Versions
 

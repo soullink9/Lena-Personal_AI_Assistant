@@ -38,6 +38,7 @@ Building your own copy, with your own signing key, is covered in [Installation](
 | [How It Works](docs/How-It-Works.md) | The shell, the Ask sheet, sharing, the tile, the widget, notifications and scheduled prompts. |
 | [Privacy and Security](docs/Privacy-and-Security.md) | What the app stores, what it sends, and what it blocks. |
 | [Troubleshooting](docs/Troubleshooting.md) | Sign-in, mic and voice, notifications, the header coming back, updates that won't install. |
+| [Voice Bridge](docs/Voice-Bridge.md) | Use your Home Assistant Piper and Whisper (Wyoming) containers as Open WebUI's voice. |
 | [Development](docs/Development.md) | The file map, versions, building locally and making a release. |
 
 ## Privacy
