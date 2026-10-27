@@ -15,15 +15,19 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.glance.appwidget.updateAll
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
+import java.util.concurrent.TimeUnit
 
 /** Lena's notifications. Content stays hidden on a locked screen unless you allow it in Android's settings. */
 object Notify {
@@ -206,6 +210,33 @@ class ScheduleReceiver : BroadcastReceiver() {
 }
 
 /** Alarms don't survive a restart or an update; this sets them again. */
+/** Redraws the widget every half hour while it shows her mood, so it keeps up with her day. */
+class WidgetMoodWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+    companion object {
+        private const val NAME = "widget-mood"
+
+        /** Starts or stops the refresh to match the "Her mood on the widget" setting. */
+        fun sync(c: Context) {
+            val wm = WorkManager.getInstance(c)
+            if (Prefs.widgetMood(c) && HomeAssistant.from(c) != null) {
+                wm.enqueueUniquePeriodicWork(
+                    NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    PeriodicWorkRequestBuilder<WidgetMoodWorker>(30, TimeUnit.MINUTES).setConstraints(online).build(),
+                )
+            } else {
+                wm.cancelUniqueWork(NAME)
+            }
+        }
+    }
+
+    override suspend fun doWork(): Result {
+        runCatching { LenaWidget().updateAll(applicationContext) }
+        return Result.success()
+    }
+}
+
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {

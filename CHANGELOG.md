@@ -7,6 +7,13 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.6.0 (2026-10-27)
+
+- **Show her a photo:** a camera button in the sheet takes or chooses a photo to ask about, by typing or by voice. It's saved in the chat. Uses Android's photo picker, so Lena never gets access to your gallery, and asks for no new permissions.
+- **Her voice follows her mood** (off by default): a little slower and lower when she's groggy or wistful, quicker and brighter when she's wired or cheerful. Needs Home Assistant.
+- **Her mood on the widget** (off by default): under her name, updated every half hour and after you talk to her. Mood only, never the reasons.
+- **Talk to Lena on the lock screen** (off by default): the gesture opens her without unlocking, in a private mode: a fresh conversation with your history hidden, no reasons, no photos, nothing opens until you unlock, and she's asked not to unlock, open or share anything personal.
+
 ### 2.5.0 (2026-10-27)
 
 - **New icon:** Lena's logo, on its own dark background, with a silhouette for Android's themed icons. The launch screen uses it too.

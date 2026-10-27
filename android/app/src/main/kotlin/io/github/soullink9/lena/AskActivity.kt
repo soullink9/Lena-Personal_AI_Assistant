@@ -3,6 +3,7 @@
 package io.github.soullink9.lena
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -14,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -21,6 +23,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,7 +51,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.AddComment
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.OpenInFull
@@ -57,6 +62,8 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,12 +86,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -113,7 +123,7 @@ class AskActivity : ComponentActivity() {
 
     private enum class Phase { IDLE, LISTENING, THINKING, SPEAKING }
 
-    private class Turn(val question: String) {
+    private class Turn(val question: String, val image: ImageBitmap? = null) {
         var answer by mutableStateOf("")
         var done by mutableStateOf(false)
     }
@@ -126,6 +136,10 @@ class AskActivity : ComponentActivity() {
     private var working = false
     private val restart = mutableIntStateOf(0) // bumped when the gesture is used again while the sheet is open
     private var startTalking = false
+
+    /** Opened over the lock screen and still locked: private mode (see [unlockThen]). */
+    private val locked = mutableStateOf(false)
+    private val keyguard by lazy { getSystemService(KeyguardManager::class.java) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -147,6 +161,10 @@ class AskActivity : ComponentActivity() {
         }
         startTalking = wantsTalk(intent)
 
+        // Over the lock screen only if you turned it on; otherwise Android asks you to unlock first.
+        if (Prefs.lockScreen(this) && intent.action != Intent.ACTION_SEND) setShowWhenLocked(true)
+        locked.value = Prefs.lockScreen(this) && keyguard.isKeyguardLocked
+
         // Shared text only fills the box. A prompt is sent automatically only with Lena's own key.
         val shared = if (intent.action == Intent.ACTION_SEND) {
             listOfNotNull(intent.getStringExtra(Intent.EXTRA_SUBJECT), intent.getStringExtra(Intent.EXTRA_TEXT))
@@ -167,12 +185,30 @@ class AskActivity : ComponentActivity() {
         if (wantsTalk(intent)) restart.intValue++
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (locked.value) locked.value = keyguard.isKeyguardLocked
+    }
+
+    /** Runs [action] now, or once you've unlocked the phone if the sheet is on the lock screen. */
+    private fun unlockThen(action: () -> Unit) {
+        if (!keyguard.isKeyguardLocked) return action()
+        keyguard.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+            override fun onDismissSucceeded() {
+                locked.value = false
+                action()
+            }
+        })
+    }
+
     private fun forward(action: String) {
+        if (locked.value) return unlockThen { forward(action) }
         startActivity(Intent(this, MainActivity::class.java).setAction(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
     }
 
     private fun openChat(chatId: String) {
+        if (locked.value) return unlockThen { openChat(chatId) }
         startActivity(
             Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_CHAT)
                 .putExtra(MainActivity.EXTRA_CHAT_ID, chatId).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -226,7 +262,11 @@ class AskActivity : ComponentActivity() {
         var lastReplyId by remember { mutableStateOf<String?>(null) }
         var job by remember { mutableStateOf<Job?>(null) }
         val prompts = remember { Prefs.quickPrompts(this) }
-        val ongoing = remember { Prefs.ongoing(this) }
+        // Locked: a fresh, private conversation; the ongoing one (and its history) stays hidden.
+        val startedLocked = remember { locked.value }
+        val ongoing = remember { Prefs.ongoing(this) && !startedLocked }
+        var photo by remember { mutableStateOf<Photo?>(null) }
+        var photoMenu by remember { mutableStateOf(false) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
@@ -248,6 +288,8 @@ class AskActivity : ComponentActivity() {
                 return
             }
             phase = Phase.SPEAKING
+            val tone = if (Prefs.moodVoice(this@AskActivity)) VoiceTone.of(feelings) else VoiceTone()
+            voice.tone = tone
             job = scope.launch {
                 try {
                     withSpeechFocus(this@AskActivity) { voice.say(plain) }
@@ -256,7 +298,7 @@ class AskActivity : ComponentActivity() {
                 } catch (_: Exception) {
                     // Your server's voice failed (for example, no text-to-speech engine set): use the phone's.
                     if (voice is ServerMouth) runCatching {
-                        val phone = PhoneMouth(this@AskActivity).also { mouth = it }
+                        val phone = PhoneMouth(this@AskActivity).also { mouth = it; it.tone = tone }
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
                     }
                 }
@@ -265,8 +307,10 @@ class AskActivity : ComponentActivity() {
         }
 
         fun send(q: String, spoken: Boolean) {
-            if (q.isBlank()) return
-            val turn = Turn(q.trim())
+            val image = photo
+            if (q.isBlank() && image == null) return
+            val turn = Turn(q.trim().ifBlank { "What's in this photo?" }, image?.preview)
+            photo = null
             turns += turn
             text = ""
             note = null
@@ -279,10 +323,12 @@ class AskActivity : ComponentActivity() {
                         ?: throw IllegalStateException("No models on your server.")
                     val started = api.ask(
                         turn.question, m, chatId, lastReplyId,
-                        newTitle = if (ongoing) "Lena" else null,
+                        newTitle = if (ongoing) "Lena" else if (startedLocked) "Lena (lock screen)" else null,
                         pinNew = ongoing,
                         contextTokens = Prefs.contextTokens(this@AskActivity),
                         spoken = spoken,
+                        image = image?.dataUrl,
+                        locked = locked.value,
                     )
                     running = started
                     working = true
@@ -293,7 +339,10 @@ class AskActivity : ComponentActivity() {
                     turn.done = true
                     working = false
                     // She may have reacted to what you said; show how she feels now.
-                    if (house != null) launch { feelings = runCatching { house.feelings() }.getOrNull() ?: feelings }
+                    if (house != null) launch {
+                        feelings = runCatching { house.feelings() }.getOrNull() ?: feelings
+                        if (Prefs.widgetMood(this@AskActivity)) runCatching { LenaWidget().updateAll(this@AskActivity) }
+                    }
                     if (spoken) speakThenMaybeListen(turn.answer) else phase = Phase.IDLE
                 } catch (e: CancellationException) {
                     throw e
@@ -318,6 +367,15 @@ class AskActivity : ComponentActivity() {
             if (granted) listen(false) else {
                 note = "Lena needs the microphone to hear you."
                 typing = true
+            }
+        }
+
+        val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) scope.launch { photo = Photos.load(this@AskActivity, uri) ?: run { note = "Couldn't open that photo."; null } }
+        }
+        val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+            if (taken) scope.launch {
+                photo = Photos.load(this@AskActivity, Photos.cameraUri(this@AskActivity)) ?: run { note = "Couldn't read the photo."; null }
             }
         }
 
@@ -474,7 +532,8 @@ class AskActivity : ComponentActivity() {
                         Column(Modifier.weight(1f)) {
                             Text("Lena", style = MaterialTheme.typography.titleMedium)
                             val f = feelings
-                            if (f != null) FeelingsLine(f)
+                            // Locked: her mood, but not the reasons (they can mention people and the house).
+                            if (f != null) FeelingsLine(if (locked.value) f.copy(moodWhy = "", momentWhy = "") else f)
                             else model?.let {
                                 Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -493,6 +552,20 @@ class AskActivity : ComponentActivity() {
                             phase = Phase.IDLE
                             if (!typing) listen(false)
                         }) { Icon(Icons.Outlined.AddComment, "New conversation") }
+                        if (!locked.value) Box {
+                            IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.AddAPhoto, "Show Lena a photo") }
+                            DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                                DropdownMenuItem(text = { Text("Take a photo") }, onClick = {
+                                    photoMenu = false
+                                    runCatching { takePhoto.launch(Photos.cameraUri(this@AskActivity)) }
+                                        .onFailure { note = "No camera app to take a photo with." }
+                                })
+                                DropdownMenuItem(text = { Text("Choose a photo") }, onClick = {
+                                    photoMenu = false
+                                    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                })
+                            }
+                        }
                         IconButton(onClick = {
                             if (typing) listen(false) else {
                                 job?.takeIf { phase == Phase.LISTENING }?.cancel()
@@ -507,11 +580,20 @@ class AskActivity : ComponentActivity() {
                         IconButton(onClick = { forward(MainActivity.ACTION_CALL) }) { Icon(Icons.Rounded.GraphicEq, "Voice call") }
                         IconButton(onClick = {
                             val id = chatId
-                            if (id != null) openChat(id) else {
+                            if (id != null) openChat(id) else unlockThen {
                                 startActivity(Intent(this@AskActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                                 finish()
                             }
                         }) { Icon(Icons.Outlined.OpenInFull, "Open Lena") }
+                    }
+
+                    if (startedLocked && turns.isEmpty()) {
+                        Text(
+                            "Your phone is locked, so earlier conversations stay hidden and she won't open or unlock anything. Unlock to see everything.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, end = 8.dp),
+                        )
                     }
 
                     // The conversation so far
@@ -519,6 +601,10 @@ class AskActivity : ComponentActivity() {
                         Column(Modifier.weight(1f, fill = false).verticalScroll(scroll).padding(end = 8.dp)) {
                             turns.forEachIndexed { i, t ->
                                 Spacer(Modifier.height(if (i == 0) 8.dp else 16.dp))
+                                t.image?.let {
+                                    Image(it, "Your photo", contentScale = ContentScale.Crop,
+                                        modifier = Modifier.padding(bottom = 6.dp).size(width = 160.dp, height = 120.dp).clip(RoundedCornerShape(12.dp)))
+                                }
                                 Text(t.question, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
                                 val shown = Markdown.clean(t.answer)
@@ -559,6 +645,20 @@ class AskActivity : ComponentActivity() {
                         }
                     }
 
+                    photo?.let { p ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                            Image(p.preview, null, contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
+                            Text(
+                                if (typing) "Photo attached. Ask about it, or just send." else "Photo attached. Tap the mic and ask about it.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                            )
+                            IconButton(onClick = { photo = null }) { Icon(Icons.Outlined.Close, "Remove the photo") }
+                        }
+                    }
+
                     if (typing) {
                         if (turns.isEmpty() && prompts.isNotEmpty()) {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp, end = 8.dp)) {
@@ -574,7 +674,7 @@ class AskActivity : ComponentActivity() {
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { if (phase == Phase.IDLE) send(text, spoken = false) }),
                             trailingIcon = {
-                                IconButton(onClick = { send(text, spoken = false) }, enabled = text.isNotBlank() && phase == Phase.IDLE) {
+                                IconButton(onClick = { send(text, spoken = false) }, enabled = (text.isNotBlank() || photo != null) && phase == Phase.IDLE) {
                                     Icon(Icons.AutoMirrored.Rounded.Send, "Send")
                                 }
                             },

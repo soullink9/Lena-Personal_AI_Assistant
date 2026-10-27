@@ -252,15 +252,20 @@ class Api(server: String) {
         pinNew: Boolean = false,
         contextTokens: Int = 32_768,
         spoken: Boolean = false,
+        image: String? = null,
+        locked: Boolean = false,
     ): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis() / 1000
 
+        // A photo goes into the chat as an image file (so Open WebUI shows it) and to the model as an image part.
+        val files = image?.let { JSONArray().put(JSONObject().put("type", "image").put("url", it)) }
         val user = JSONObject()
             .put("id", userId).put("childrenIds", JSONArray().put(replyId))
             .put("role", "user").put("content", prompt).put("timestamp", now)
             .put("models", JSONArray().put(model.id))
+        if (files != null) user.put("files", files)
         val reply = JSONObject()
             .put("id", replyId).put("parentId", userId).put("childrenIds", JSONArray())
             .put("role", "assistant").put("content", "")
@@ -316,11 +321,25 @@ class Api(server: String) {
             conversation = JSONArray(fitToBudget(thread, contextTokens))
         }
 
+        if (image != null && conversation.length() > 0) {
+            val last = conversation.getJSONObject(conversation.length() - 1)
+            last.put("content", JSONArray()
+                .put(JSONObject().put("type", "text").put("text", prompt))
+                .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", image))))
+        }
+
         // Spoken turns: tell her the reply will be read aloud, so she uses her spoken style (no lists or
         // formatting, short). Sent with this request only; it isn't saved in the chat.
-        if (spoken) {
-            val withHint = JSONArray().put(JSONObject().put("role", "system").put("content",
-                "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken."))
+        // On the lock screen the person may not be the phone's owner. This asks her to be careful; it
+        // isn't a lock, which is why lock-screen mode is off unless you turn it on.
+        val hints = listOfNotNull(
+            if (spoken) "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken." else null,
+            if (locked) "The phone is locked, so this may not be its owner. Don't unlock, open or disarm anything, " +
+                "and don't share personal details, earlier conversations or what you remember about people. " +
+                "If asked, say it needs the phone unlocked." else null,
+        )
+        if (hints.isNotEmpty()) {
+            val withHint = JSONArray().put(JSONObject().put("role", "system").put("content", hints.joinToString("\n")))
             for (i in 0 until conversation.length()) withHint.put(conversation.get(i))
             conversation = withHint
         }
@@ -340,7 +359,8 @@ class Api(server: String) {
             .put("user_message", JSONObject()
                 .put("id", userId).put("parentId", user.opt("parentId") ?: JSONObject.NULL)
                 .put("role", "user").put("content", prompt)
-                .put("models", JSONArray().put(model.id)).put("timestamp", now))
+                .put("models", JSONArray().put(model.id)).put("timestamp", now)
+                .apply { if (files != null) put("files", files) })
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)

@@ -9,6 +9,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -244,7 +245,37 @@ class ServerEar(private val api: Api) : Ear {
 }
 
 /** Reads replies aloud. */
+/**
+ * How her voice sounds right now: a touch slower and lower when she's groggy or wistful, quicker
+ * and brighter when she's wired or cheerful. Small changes on purpose; she should sound like
+ * herself in a mood, not like a different voice.
+ */
+data class VoiceTone(val speed: Float = 1f, val pitch: Float = 1f) {
+    val neutral get() = speed == 1f && pitch == 1f
+
+    companion object {
+        private val energy = mapOf(
+            "Groggy" to (0.93f to 0.97f), "Wired" to (1.08f to 1.03f), "Drained" to (0.88f to 0.95f),
+        )
+        private val mood = mapOf(
+            "Cheerful" to (1.03f to 1.03f), "Playful" to (1.04f to 1.03f), "Smug" to (0.98f to 1f),
+            "Curious" to (1.02f to 1.02f), "Focused" to (1.03f to 1f), "Restless" to (1.05f to 1f),
+            "Wistful" to (0.94f to 0.97f), "Grumpy" to (0.98f to 0.96f), "Uneasy" to (1.04f to 1.01f),
+            "Fond" to (0.97f to 1.01f),
+        )
+
+        fun of(f: Feelings?): VoiceTone {
+            if (f == null) return VoiceTone()
+            val (es, ep) = energy[f.energy] ?: (1f to 1f)
+            val (ms, mp) = mood[f.mood] ?: (1f to 1f)
+            return VoiceTone((es * ms).coerceIn(0.85f, 1.15f), (ep * mp).coerceIn(0.92f, 1.08f))
+        }
+    }
+}
+
 interface Mouth {
+    /** Set before [say]; neutral unless "Her voice follows her mood" is on. */
+    var tone: VoiceTone
     suspend fun say(text: String)
     fun stop()
     fun release()
@@ -277,6 +308,7 @@ private fun pieces(text: String): List<String> {
 class ServerMouth(private val context: Context, private val api: Api) : Mouth {
 
     private var player: MediaPlayer? = null
+    override var tone = VoiceTone()
 
     override suspend fun say(text: String) = coroutineScope {
         val parts = pieces(text)
@@ -303,6 +335,7 @@ class ServerMouth(private val context: Context, private val api: Api) : Mouth {
                     p.setOnErrorListener { _, _, _ -> if (cont.isActive) cont.resume(Unit); true }
                     p.prepare()
                     p.start()
+                    if (!tone.neutral) runCatching { p.playbackParams = PlaybackParams().setSpeed(tone.speed).setPitch(tone.pitch) }
                     cont.invokeOnCancellation { runCatching { p.stop() } }
                 }
             }
@@ -327,6 +360,7 @@ class ServerMouth(private val context: Context, private val api: Api) : Mouth {
 class PhoneMouth(context: Context) : Mouth {
 
     private val ready = CompletableDeferred<Boolean>()
+    override var tone = VoiceTone()
     private val tts = TextToSpeech(context.applicationContext) { status -> ready.complete(status == TextToSpeech.SUCCESS) }
 
     init {
@@ -335,6 +369,8 @@ class PhoneMouth(context: Context) : Mouth {
 
     override suspend fun say(text: String) {
         if (!ready.await()) return
+        tts.setSpeechRate(tone.speed)
+        tts.setPitch(tone.pitch)
         for (part in pieces(text)) {
             suspendCancellableCoroutine { cont ->
                 val id = UUID.randomUUID().toString()

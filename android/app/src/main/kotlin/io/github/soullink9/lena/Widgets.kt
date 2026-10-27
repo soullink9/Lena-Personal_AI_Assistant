@@ -35,6 +35,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Quick Settings tile: start a voice call from the pull-down shade. */
 class LenaTile : TileService() {
@@ -55,16 +56,22 @@ class LenaTile : TileService() {
     }
 }
 
-/** Home screen widget: Talk, Call, Type and New chat, plus your first three quick prompts. */
+/**
+ * Home screen widget: Talk, Call, Type and New chat, plus your first three quick prompts, and
+ * (if you turn it on) how Lena feels. Only her mood shows here, never the reasons, since anyone
+ * can see your home screen.
+ */
 class LenaWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val prompts = Prefs.quickPrompts(context).take(3)
-        provideContent { GlanceTheme { Content(context, prompts) } }
+        val feelings = if (!Prefs.widgetMood(context)) null
+        else HomeAssistant.from(context)?.let { house -> withTimeoutOrNull(8_000) { runCatching { house.feelings() }.getOrNull() } }
+        provideContent { GlanceTheme { Content(context, prompts, feelings) } }
     }
 
     @Composable
-    private fun Content(c: Context, prompts: List<String>) {
+    private fun Content(c: Context, prompts: List<String>, feelings: Feelings?) {
         Column(
             GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(24.dp).padding(12.dp),
         ) {
@@ -75,11 +82,17 @@ class LenaWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.size(28.dp).cornerRadius(14.dp),
                 )
                 Spacer(GlanceModifier.width(8.dp))
-                Text(
-                    "Lena",
-                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium),
-                    modifier = GlanceModifier.defaultWeight(),
-                )
+                Column(GlanceModifier.defaultWeight()) {
+                    Text(
+                        "Lena",
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium),
+                    )
+                    if (feelings != null) Text(
+                        listOfNotNull(feelings.mood, feelings.energy.ifBlank { null }, feelings.moment).joinToString(" · "),
+                        maxLines = 1,
+                        style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 12.sp),
+                    )
+                }
                 Action(R.drawable.ic_glyph_call, "Talk to Lena", AskActivity.intent(c, talk = true))
                 Spacer(GlanceModifier.width(8.dp))
                 Action(R.drawable.ic_stat_lena, "Voice call", Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_CALL))

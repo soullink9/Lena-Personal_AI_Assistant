@@ -20,6 +20,7 @@ Admin Panel → Settings → Connections → **Ollama API**: add your Ollama add
 Workspace → Models → `lena` (edit it; if it isn't listed, create a model with `lena` as its base).
 
 - **Profile image:** upload `docs/assets/lena-avatar.png`, so her chats show her logo.
+- **Capabilities:** tick **Vision**, so you can show her photos in the browser as well as in the app.
 - **System Prompt:** leave it **empty**. Her character is built into the model and reaches her anyway; a system prompt here would only add to it, and any personality you write here could contradict hers.
 - **Advanced Params → Function Calling:** **Native**. Gemma 4 supports tool calling natively, and this lets her use the Lena tool and Open WebUI's built-in tools.
 - **Advanced Params → Keep Alive:** `-1`, so the model stays loaded between chats.

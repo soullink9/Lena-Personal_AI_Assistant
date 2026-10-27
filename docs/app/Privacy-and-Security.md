@@ -59,6 +59,14 @@ Notifications show the start of a reply. On a locked screen, Android hides the t
 - **Plain `http://`.** All traffic, the page and the native features alike, must be encrypted.
 - **Third-party cookies, file access, location and pop-up windows** in the page.
 
+## The lock screen
+
+Off by default. With it off, Android asks you to unlock before the sheet opens. With **Talk to Lena on the lock screen** on, the sheet opens over the lock screen in a private mode: a fresh conversation with your history hidden, no reasons behind her mood, no photos, and nothing opens without unlocking. She's also told the person may not be you and not to unlock, open or disarm anything or share personal details. That's an instruction to the model, not a lock, so anyone holding your phone can still ask her things. Leave it off if she can control locks, doors or alarms.
+
+## Photos
+
+Photos you show her are shrunk, sent to your Open WebUI with your question, and saved in that chat. Taking one hands the camera app a single file in Lena's private storage, deleted as soon as Lena has read it. Choosing one uses Android's photo picker, so Lena has no access to your gallery, only to the photo you pick. Lena asks for no camera or storage permission.
+
 ## The microphone
 
 When you talk to Lena in the sheet:

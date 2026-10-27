@@ -63,6 +63,19 @@ If the phone's speech model isn't installed yet, Android starts downloading it a
 
 Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu, and **Type to Lena** for the keyboard version.
 
+**Show her a photo.** The camera button in the sheet takes a photo or lets you choose one ("What's this plant?", "Read this label"). Ask about it by typing or by tapping the mic, or just send it. The photo is shrunk to a sensible size, sent with your question, and saved in the chat like any other. Lena needs a model that can see images; `gemma4:12b` can. The camera app saves the picture into Lena's private storage and it's deleted as soon as it's read; choosing a photo uses Android's photo picker, so Lena only ever sees the one you pick.
+
+**Her voice follows her mood** (Settings → Talking to Lena, off by default, needs Home Assistant). She speaks a little slower and lower when she's groggy, drained or wistful, and a little quicker and brighter when she's wired, cheerful or playful. The changes are small on purpose. It works with your server's voice and the phone's.
+
+**On the lock screen** (Settings → Assistant gesture → Talk to Lena on the lock screen, off by default). With it off, Android asks you to unlock before the sheet opens. With it on, the gesture opens her straight over the lock screen in a private mode:
+
+- She starts a fresh conversation. Your ongoing **Lena** chat and its history stay hidden.
+- Her mood shows, but not the reasons.
+- No photos, and opening the app, a chat or a call asks you to unlock first.
+- She's told the person may not be you, so she shouldn't unlock, open or disarm anything, or share personal details, earlier conversations or what she remembers.
+
+That last part is an instruction to her, not a lock: anyone holding your phone can still talk to her, and a model can be talked round. If your Home Assistant exposes locks, garage doors or alarms to her, think about that before turning this on.
+
 ## Memory & knowledge
 
 Open it from the drawer. It shows what Lena draws on beyond the conversation, so you can fix anything that went in by mistake.
@@ -97,6 +110,8 @@ Settings → On your phone → **Add Quick Settings tile**. Tapping **Call Lena*
 
 Settings → On your phone → **Add home screen widget**, or add it from your launcher's widget list. It has **Talk**, **Voice call**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
 
+Turn on **Her mood on the widget** (Settings → On your phone, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
+
 ## Quick prompts
 
 Settings → Quick prompts. Up to six. They appear as chips in the sheet when typing; the first three also appear on the widget and on the app icon's long-press menu.
@@ -128,7 +143,7 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 
 | Permission | Why |
 |---|---|
-| Internet | To reach your Open WebUI. |
+| Internet | To reach your Open WebUI (and your Home Assistant, if you add it). |
 | Microphone | Talking to Lena, call mode and voice input. Asked the first time. In the main app, only your Open WebUI address can use it. |
 | Notifications | "Lena finished" and scheduled prompts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |

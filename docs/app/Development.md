@@ -15,6 +15,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's). |
 | `SettingsActivity.kt` | The settings screen. |
 | `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories and knowledge collections. |
+| `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings and shared memory list, the encrypted token store, and the feelings line. |
 | `Api.kt` | Open WebUI's API, using the page's sign-in: models, chats, search, running tasks, and starting and following a chat. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, daily alarms, and quick prompt shortcuts. |

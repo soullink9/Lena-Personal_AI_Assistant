@@ -120,6 +120,7 @@ class SettingsActivity : ComponentActivity() {
             val saved = s.copy(server = server, signIn = signIn, haServer = ha)
             Prefs.save(this, saved)
             if (haToken.isNotBlank()) Secrets.put(this, Secrets.HA_TOKEN, haToken.trim())
+            WidgetMoodWorker.sync(this)
             Schedules.rescheduleAll(this)
             Shortcuts.update(this)
             if (saved.notifyReplies || saved.schedules.any { it.enabled }) askForNotifications()
@@ -283,6 +284,12 @@ class SettingsActivity : ComponentActivity() {
                 Choice("New chat", "Opens Lena on a new chat", s.assist == AssistAction.CHAT) {
                     s = s.copy(assist = AssistAction.CHAT)
                 }
+                Toggle(
+                    "Talk to Lena on the lock screen",
+                    "The gesture opens her without unlocking. Earlier conversations stay hidden and she's asked not to " +
+                        "open, unlock or share anything personal until you unlock, but anyone holding your phone can talk to her.",
+                    s.lockScreen,
+                ) { s = s.copy(lockScreen = it) }
                 OutlinedButton(onClick = {
                     try {
                         startActivity(Intent(AndroidSettings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
@@ -318,6 +325,11 @@ class SettingsActivity : ComponentActivity() {
                 Choice("Only when Lena asks a question", "Like Home Assistant's \"continue conversation\"",
                     s.followUp == FollowUp.QUESTIONS) { s = s.copy(followUp = FollowUp.QUESTIONS) }
                 Choice("Off", "Tap the mic to talk again", s.followUp == FollowUp.OFF) { s = s.copy(followUp = FollowUp.OFF) }
+                Toggle(
+                    "Her voice follows her mood",
+                    "A little slower when she's groggy, quicker and brighter when she's wired or cheerful. Needs Home Assistant.",
+                    s.moodVoice,
+                ) { s = s.copy(moodVoice = it) }
                 Toggle(
                     "One ongoing conversation",
                     "Talking to Lena always continues the same chat, so she remembers earlier conversations. " +
@@ -401,6 +413,11 @@ class SettingsActivity : ComponentActivity() {
                 }
 
                 Section("On your phone")
+                Toggle(
+                    "Her mood on the widget",
+                    "Shows how she feels on the home screen widget, updated every half hour. Only the mood, never the reasons. Needs Home Assistant.",
+                    s.widgetMood,
+                ) { s = s.copy(widgetMood = it) }
                 OutlinedButton(onClick = { addTile() }) { Text("Add Quick Settings tile") }
                 OutlinedButton(onClick = { addWidget() }) { Text("Add home screen widget") }
 

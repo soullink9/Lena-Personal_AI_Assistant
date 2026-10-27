@@ -45,6 +45,9 @@ data class Settings(
     val contextTokens: Int = 32_768,
     val haServer: String = "",
     val haMemoryList: String = DEFAULT_MEMORY_LIST,
+    val moodVoice: Boolean = false,
+    val widgetMood: Boolean = false,
+    val lockScreen: Boolean = false,
 )
 
 /** Her shared memory to-do list in Home Assistant, as in docs/home-assistant/Helpers.md. */
@@ -71,6 +74,15 @@ object Prefs {
     fun lenaIn(models: List<Model>): Model? =
         models.firstOrNull { it.id == "lena" || it.id.startsWith("lena:") }
             ?: models.firstOrNull { it.name.equals("lena", ignoreCase = true) }
+
+    /** Her voice gets a little slower, faster, lower or brighter with her mood (needs Home Assistant). */
+    fun moodVoice(c: Context): Boolean = p(c).getBoolean("mood_voice", false)
+
+    /** The widget shows how she feels (needs Home Assistant). */
+    fun widgetMood(c: Context): Boolean = p(c).getBoolean("widget_mood", false)
+
+    /** The assistant gesture opens the sheet over the lock screen, in its private mode. */
+    fun lockScreen(c: Context): Boolean = p(c).getBoolean("lock_screen", false)
 
     /** Your Home Assistant, for Lena's feelings and shared memory. Null when not set. */
     fun haServer(c: Context): String? = p(c).getString("ha_server", "")?.ifBlank { null }
@@ -138,6 +150,9 @@ object Prefs {
         contextTokens = contextTokens(c),
         haServer = haServer(c) ?: "",
         haMemoryList = haMemoryList(c),
+        moodVoice = moodVoice(c),
+        widgetMood = widgetMood(c),
+        lockScreen = lockScreen(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -163,6 +178,9 @@ object Prefs {
             .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
             .putString("ha_server", s.haServer)
             .putString("ha_memory_list", s.haMemoryList.trim().ifBlank { DEFAULT_MEMORY_LIST })
+            .putBoolean("mood_voice", s.moodVoice)
+            .putBoolean("widget_mood", s.widgetMood)
+            .putBoolean("lock_screen", s.lockScreen)
             .apply()
     }
 

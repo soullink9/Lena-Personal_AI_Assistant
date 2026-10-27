@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The only place the camera app may write: one picture in Lena's private cache, deleted once read. -->
+<paths>
+    <cache-path name="photos" path="photos/" />
+</paths>
