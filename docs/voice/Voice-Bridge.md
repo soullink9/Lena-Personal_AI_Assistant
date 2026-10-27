@@ -1,14 +1,14 @@
 # Voice Bridge
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Open WebUI can't use the Wyoming Piper and Whisper containers Home Assistant uses: Wyoming is Home Assistant's own protocol, and Open WebUI only talks to OpenAI-style speech servers. The voice bridge is a tiny container that sits between them, so Lena speaks with the **same Piper voice** in Open WebUI, call mode, the Lena app and Home Assistant.
 
-It lives in [`voice-bridge/`](../voice-bridge): one Python file (standard library only), a Dockerfile and a compose file. It has no ports of its own on your host; only containers on the same Docker network can reach it.
+It lives in [`voice/bridge/`](../../voice/bridge): one Python file (standard library only), a Dockerfile and a compose file. It has no ports of its own on your host; only containers on the same Docker network can reach it.
 
 ## 1. Set it up
 
-Copy the `voice-bridge` folder to your Docker host, then edit `compose.yaml`:
+Copy the `voice/bridge` folder to your Docker host, then edit `compose.yaml`:
 
 | Setting | What to put |
 |---|---|
@@ -17,7 +17,7 @@ Copy the `voice-bridge` folder to your Docker host, then edit `compose.yaml`:
 | `WHISPER_HOST`, `WHISPER_PORT` | Optional. Your Whisper container and its Wyoming port (usually `10300`). Leave them out to keep Open WebUI's built-in Whisper. |
 | `WHISPER_LANGUAGE` | Optional. For example `en`, so Whisper doesn't have to guess. |
 | `API_KEY` | Optional. If set, Open WebUI must send the same key. |
-| `networks` | The name of the Docker network Open WebUI and your Wyoming containers share. |
+| `networks` | The name of the Docker network Open WebUI and your Wyoming containers share. The example uses `llm`, the network from `ollama/docker-compose.example.yml`. |
 
 Then, in that folder:
 

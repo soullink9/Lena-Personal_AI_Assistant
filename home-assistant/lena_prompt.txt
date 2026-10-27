@@ -106,7 +106,7 @@ Time of day: {{ now().strftime('%A') }}, {{ now().strftime('%-I:%M %p') }}
 {#- "here" = every person entity currently at home. Remove these two lines if you do not use person entities. #}
 {% set here = states.person | selectattr('state', 'eq', 'home') | map(attribute='name') | list -%}
 At home right now: {{ here | join(', ') if here else 'nobody' }}
-{#- Memory text comes from the "memories" attribute of the template sensor in home_assistant/templates/. A state is limited to 255 characters, an attribute is not, which is why it is read from the attribute first. Rename the entity if yours differs. #}
+{#- Memory text comes from the "memories" attribute of the template sensor in home-assistant/templates/. A state is limited to 255 characters, an attribute is not, which is why it is read from the attribute first. Rename the entity if yours differs. #}
 
 What you know about the household (use naturally, only when relevant, and never say how you know it):
 {{ state_attr('sensor.lenas_memory_content', 'memories') or pick('sensor.lenas_memory_content', 'nothing yet') }}

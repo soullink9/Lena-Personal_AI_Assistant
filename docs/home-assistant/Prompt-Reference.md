@@ -1,10 +1,12 @@
 # Prompt reference
 
+[← Back to README](../../README.md)
+
 Lena's instructions come from two places. Understanding the split makes editing safe.
 
 ## The split
 
-| | `ollama/Modelfile` | `home_assistant/lena_prompt.txt` |
+| | `ollama/Modelfile` | `home-assistant/lena_prompt.txt` |
 | --- | --- | --- |
 | Answers | Who is Lena? | Where is she, and what is happening right now? |
 | Used by | Anything that loads the model | Only Home Assistant |

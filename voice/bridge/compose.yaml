@@ -14,9 +14,9 @@ services:
       WHISPER_PORT: "10300"
       WHISPER_LANGUAGE: en
     networks:
-      - ai
+      - llm
     # No ports: only containers on the network (Open WebUI) can reach it.
 
 networks:
-  ai:
-    external: true   # change "ai" to your existing network's name
+  llm:
+    external: true   # the network from ollama/docker-compose.example.yml; change to yours

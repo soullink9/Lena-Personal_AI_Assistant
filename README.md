@@ -4,54 +4,73 @@ This project was primarily created for personal use and for my family. While I m
 
 Note: Built with the assistance of Claude.ai. I'm putting it here now so you don't have to hunt for it below.
 
-# Lena
+# Lena: a personal AI assistant on your own hardware
 
-A native Android app for your own Open WebUI. Your real Open WebUI, with all your tools, inside a proper Android shell, plus the phone-level extras a website can't do.
+Lena is a Jarvis-style assistant that runs entirely on your own servers. She's one character everywhere you meet her: in Home Assistant's voice assistant, in Open WebUI, and in an Android app that makes her your phone's assistant. She's sharp, dryly funny and quietly caring, she controls your home, uses your Open WebUI tools, remembers what you tell her, and her mood drifts through the day.
 
-- **feels like an app**: a native top bar and side drawer with your chats, search and model picker, in your wallpaper's Material You colours
-- **your phone's assistant**: like Google Assistant or Home Assistant's Assist, the assistant gesture opens a sheet that's already listening, then Lena answers out loud in your Open WebUI voice and keeps listening if she asks you something
-- **voice calls**: one tap from the top bar, the Quick Settings tile, the widget or the app icon
-- **share to Lena** from any app; the text lands in the sheet for you to add a question
-- **manage chats** from the drawer: long-press to rename or delete
-- **"Lena finished" notifications** when you leave mid-answer
-- **scheduled prompts**: "every morning at 7, give me my briefing", answered and saved as a chat
-- **home screen widget** and **quick prompts** on the app icon's long-press menu
-- **your tools, as they are**: chats are answered on your server with your model's tools, and everything Lena starts shows up in your Open WebUI history
-- **locked down**: talks only to your server (and your Authentik, if you use it), no analytics, no backups of your sign-in
+- **One personality, everywhere.** An Ollama `Modelfile` carries her character, so she's the same Lena in every app that uses the model.
+- **Voice control for your home.** A Home Assistant prompt built for short spoken replies, honest reporting of what actually happened, and real help beyond switching lights.
+- **Moods that change.** A Home Assistant blueprint moves her mood, energy, delivery and flavour through the day, and the prompt makes the difference audible.
+- **Your phone's assistant.** The **Lena** Android app (Android 16) puts your Open WebUI, with all its tools, in a native shell. The assistant gesture opens a sheet that's already listening, she answers out loud, and it's one ongoing conversation she remembers.
+- **Your own voice stack.** Piper and Whisper speak and listen for Home Assistant, and a small bridge lets Open WebUI and the app use the same voices.
+- **Nothing leaves your network.** No cloud model, no analytics, no third-party apps holding your data.
 
-## Install
+## What's in this repository
 
-**Needs:** Android 16 or newer, and Open WebUI reachable over **HTTPS** with server-side speech-to-text and text-to-speech. See [Open WebUI Setup](docs/Open-WebUI-Setup.md).
+| Folder | What it is |
+|---|---|
+| [`ollama/`](ollama) | Lena's character and model settings (`Modelfile`), and an example Ollama setup that keeps her loaded |
+| [`home-assistant/`](home-assistant) | The voice assistant prompt, the mood blueprint and the memory sensor |
+| [`android/`](android) | The **Lena** app for Android 16, built and signed by GitHub Actions |
+| [`voice/`](voice) | An example Piper container, and the bridge that gives Open WebUI your Piper and Whisper voices |
+| [`tools/`](tools) | `check.py`, offline checks to run before committing |
+| [`docs/`](docs) | Everything in detail (see below) |
 
-1. **Get the APK.** Download `lena-<version>.apk` from the [latest release](https://github.com/soullink9/lena-android/releases/latest) and install it.
-2. **Connect.** Enter your `https://` Open WebUI address, plus your Authentik (or other sign-in) address if you use one. Sign in once.
-3. **Make it your assistant.** Settings → Apps → Default apps → **Digital assistant app** → Lena.
+You don't need every part. The model plus Home Assistant gives you a talking house; the model plus Open WebUI plus the app gives you Lena on your phone.
 
-Building your own copy, with your own signing key, is covered in [Installation](docs/Installation.md).
+## Get started
+
+You need a machine running [Ollama](https://ollama.com/) with a GPU that fits a 9B-class model. Then add the parts you want:
+
+1. **Build the model.** From the `ollama` folder: `ollama create lena -f Modelfile`. See [Home Assistant installation](docs/home-assistant/Installation.md#1-build-the-model).
+2. **Home Assistant voice.** Create the helpers in the UI, add the blueprint and paste the prompt into your Ollama agent. See [Home Assistant installation](docs/home-assistant/Installation.md).
+3. **The app.** Install `lena-<version>.apk` from the [latest release](../../releases/latest), enter your `https://` Open WebUI address, and make Lena your digital assistant app. See [App installation](docs/app/Installation.md).
+4. **Voices for Open WebUI (optional).** Run the voice bridge next to your Piper and Whisper containers. See [Voice bridge](docs/voice/Voice-Bridge.md).
 
 ## Documentation
 
-| Page | What's in it |
+Start with the [Overview](docs/Overview.md): how the pieces connect and which part does what.
+
+| Area | Pages |
 |---|---|
-| [Installation](docs/Installation.md) | Your signing key, building with GitHub Actions, installing, first run and updating. |
-| [Open WebUI Setup](docs/Open-WebUI-Setup.md) | HTTPS, speech engines, models and tools, and sign-in. |
-| [How It Works](docs/How-It-Works.md) | The shell, the Ask sheet, sharing, the tile, the widget, notifications and scheduled prompts. |
-| [Privacy and Security](docs/Privacy-and-Security.md) | What the app stores, what it sends, and what it blocks. |
-| [Troubleshooting](docs/Troubleshooting.md) | Sign-in, mic and voice, notifications, the header coming back, updates that won't install. |
-| [Voice Bridge](docs/Voice-Bridge.md) | Use your Home Assistant Piper and Whisper (Wyoming) containers as Open WebUI's voice. |
-| [Development](docs/Development.md) | The file map, versions, building locally and making a release. |
+| **Home Assistant** | [Installation](docs/home-assistant/Installation.md) · [Helpers](docs/home-assistant/Helpers.md) · [Prompt reference](docs/home-assistant/Prompt-Reference.md) · [Persona engine](docs/home-assistant/Persona-Engine.md) · [Memory](docs/home-assistant/Memory.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
+| **Android app** | [Installation](docs/app/Installation.md) · [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
+| **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
+| **Development** | [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) |
 
 ## Privacy
 
-Lena talks only to the Open WebUI address you enter, plus your sign-in page if you add one. It reuses the sign-in you made inside the app for its native features and sends it nowhere else. No analytics, no Google Safe Browsing lookups or web view usage reports, and nothing in Google backups or phone-to-phone transfers. See [Privacy and Security](docs/Privacy-and-Security.md).
+Everything runs on your own hardware. The model is on your Ollama server, her Home Assistant memory is a to-do list in your Home Assistant, and the app talks only to your Open WebUI address and your sign-in page, with no analytics and no backups of your sign-in. Her memory is added to her prompt, so don't store passwords, door codes or similar secrets in it. See [App privacy and security](docs/app/Privacy-and-Security.md) and [Memory](docs/home-assistant/Memory.md).
+
+## Contributing
+
+Issues and suggestions are welcome, with the caveat from the disclosure: updates aren't guaranteed. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
-Code from other people in this project:
-- The app is built with Google's open-source [Android Jetpack](https://developer.android.com/jetpack) libraries (Compose, Material 3, WebKit, WorkManager and Glance) and JetBrains' [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines), all Apache License 2.0.
-- The glyphs in `res/drawable` (microphone, chat, add-comment and sliders) are from Google's [Material Icons](https://github.com/google/material-design-icons) (Apache License 2.0).
+This project builds on, and wouldn't exist without:
 
-Everything else was written for this project, with help from Claude, Anthropic's AI model. Lena is an independent client and isn't affiliated with Open WebUI.
+- [Home Assistant](https://www.home-assistant.io/) and its Assist, Ollama, Wyoming and blueprint features.
+- [Ollama](https://ollama.com/) for running the model locally. The base model named in the Modelfile is a Qwen model from Alibaba Cloud; other choices are listed in the file.
+- [Open WebUI](https://openwebui.com/), which the app wraps and talks to. Lena is an independent client and isn't affiliated with Open WebUI.
+- [Piper](https://docs.linuxserver.io/images/docker-piper/) text-to-speech and [Whisper](https://github.com/openai/whisper) speech-to-text, packaged as containers by [LinuxServer.io](https://www.linuxserver.io/), and the [Wyoming protocol](https://github.com/OHF-Voice/wyoming) the bridge speaks to them.
+- [FFmpeg](https://ffmpeg.org/), which the voice bridge uses to convert audio.
+- Google's open-source [Android Jetpack](https://developer.android.com/jetpack) libraries (Compose, Material 3, WebKit, WorkManager and Glance) and JetBrains' [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines), all Apache License 2.0.
+- Glyphs from Google's [Material Icons](https://github.com/google/material-design-icons) (Apache License 2.0).
+- [curl](https://curl.se/), used by the Ollama watchdog example.
+- The idea of a Jarvis-style assistant comes from the J.A.R.V.I.S. of Marvel's *Iron Man*. Lena is an original character and this project isn't affiliated with Marvel.
+
+No code was copied from another project; everything else was written for this one, with help from Claude, Anthropic's AI model.
 
 ## License
 

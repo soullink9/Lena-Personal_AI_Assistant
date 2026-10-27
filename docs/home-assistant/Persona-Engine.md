@@ -1,5 +1,7 @@
 # Persona Engine (the blueprint)
 
+[← Back to README](../../README.md)
+
 The blueprint `ai_persona_engine.yaml` is one automation that keeps Lena's mood, energy, delivery and flavor changing in a believable way. It never talks to the model. It only writes to the five helpers; the prompt reads them.
 
 ## What fires it

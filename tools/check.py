@@ -4,13 +4,16 @@
     pip install pyyaml jinja2
     python3 tools/check.py
 
-It does NOT need Home Assistant or Ollama. It catches the mistakes that are
-easy to make when editing: broken YAML, broken Jinja, and the persona words in
-the blueprint drifting out of step with the legend in the prompt.
+It does NOT need Home Assistant, Ollama or the Android SDK. It catches the
+mistakes that are easy to make when editing: broken YAML, broken Jinja, the
+persona words in the blueprint drifting out of step with the legend in the
+prompt, the context size drifting between the Modelfile and the app, and
+private data slipping into the repository.
 
 Exit code 0 means every check passed.
 """
 import datetime
+import py_compile
 import re
 import sys
 from pathlib import Path
@@ -19,11 +22,19 @@ import jinja2
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-PROMPT = ROOT / "home_assistant" / "lena_prompt.txt"
-BLUEPRINT = ROOT / "home_assistant" / "blueprints" / "automation" / "soullink9" / "ai_persona_engine.yaml"
-SENSOR = ROOT / "home_assistant" / "templates" / "lena_memory_sensor.yaml"
-COMPOSE_FILES = [ROOT / "ollama" / "docker-compose.example.yml", ROOT / "piper" / "docker-compose.example.yml"]
+HA = ROOT / "home-assistant"
+PROMPT = HA / "lena_prompt.txt"
+BLUEPRINT = HA / "blueprints" / "automation" / "soullink9" / "ai_persona_engine.yaml"
+SENSOR = HA / "templates" / "lena_memory_sensor.yaml"
+COMPOSE_FILES = [
+    ROOT / "ollama" / "docker-compose.example.yml",
+    ROOT / "voice" / "piper" / "docker-compose.example.yml",
+    ROOT / "voice" / "bridge" / "compose.yaml",
+]
 MODELFILE = ROOT / "ollama" / "Modelfile"
+APP_PREFS = ROOT / "android" / "app" / "src" / "main" / "kotlin" / "io" / "github" / "soullink9" / "lena" / "Prefs.kt"
+BRIDGE = ROOT / "voice" / "bridge" / "bridge.py"
+WORKFLOW = ROOT / ".github" / "workflows" / "build.yml"
 
 failures = []
 
@@ -56,7 +67,7 @@ def walk_strings(node):
 
 # ---- 1. YAML files parse ----------------------------------------------------
 parsed = {}
-for path in [BLUEPRINT, SENSOR, *COMPOSE_FILES]:
+for path in [BLUEPRINT, SENSOR, *COMPOSE_FILES, WORKFLOW]:
     try:
         parsed[path] = yaml.load(path.read_text(), HALoader)
         check(True, f"{path.relative_to(ROOT)} is valid YAML")
@@ -133,15 +144,47 @@ modelfile = MODELFILE.read_text()
 check(len(re.findall(r"^FROM ", modelfile, re.M)) == 1, "Modelfile has exactly one active FROM line")
 check(modelfile.count('"""') == 2, "Modelfile SYSTEM block opens and closes")
 
-# ---- 7. No private data left in the repository ------------------------------
-# Edit this list to match anything you must never publish.
-private_markers = ["192.168.", "10.0.0.", "api_key", "password:", "token:"]
+# ---- 7. One context size ----------------------------------------------------
+# num_ctx in the Modelfile and the app's default "Lena's context size" should match.
+ctx = re.search(r"^PARAMETER num_ctx (\d+)", modelfile, re.M)
+app_ctx = re.search(r"contextTokens: Int = ([\d_]+)", APP_PREFS.read_text()) if APP_PREFS.exists() else None
+if ctx and app_ctx:
+    check(int(ctx.group(1)) == int(app_ctx.group(1).replace("_", "")),
+          f"Modelfile num_ctx ({ctx.group(1)}) matches the app's default context size ({app_ctx.group(1)})")
+else:
+    check(False, "found num_ctx in the Modelfile and the context size default in Prefs.kt")
+
+# ---- 8. The voice bridge compiles --------------------------------------------
+try:
+    py_compile.compile(str(BRIDGE), cfile=str(ROOT / ".check-bridge.pyc"), doraise=True)
+    check(True, "voice/bridge/bridge.py compiles")
+except py_compile.PyCompileError as err:
+    check(False, f"voice/bridge/bridge.py does not compile: {err.msg}")
+finally:
+    (ROOT / ".check-bridge.pyc").unlink(missing_ok=True)
+
+# ---- 9. No private data left in the repository ------------------------------
+# Home network addresses, and anything that looks like a real secret assigned
+# to a password/token/key field. ${{ secrets.X }} references and $VARIABLES are
+# fine, since they only name a secret. Edit these to match what you must never publish.
+SKIP_DIRS = {".git", ".gradle", "build", ".idea", "__pycache__"}
+SCANNED = {".md", ".txt", ".yml", ".yaml", ".py", ".kt", ".kts", ".xml", ".properties", ".pro", ""}
+private_ip = re.compile(r"\b(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b")
+secret = re.compile(r"(password|passwd|token|api[_-]?key|secret)\s*[:=]\s*[\"']?([A-Za-z0-9_\-+/]{16,})", re.I)
 hits = []
 for path in ROOT.rglob("*"):
-    if path.is_file() and ".git" not in path.parts and path.suffix in {".md", ".txt", ".yml", ".yaml", ".py", ""} and path.name != "LICENSE":
-        text = path.read_text(errors="ignore").lower()
-        hits += [f"{path.relative_to(ROOT)}: {m}" for m in private_markers if m in text and path.name != "check.py"]
-check(not hits, "no obvious private data found" + (f" ({hits})" if hits else ""))
+    rel = path.relative_to(ROOT)
+    if not path.is_file() or SKIP_DIRS & set(rel.parts) or path.suffix not in SCANNED:
+        continue
+    if path.name in {"LICENSE", "check.py"}:
+        continue
+    for number, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+        if private_ip.search(line):
+            hits.append(f"{rel}:{number} (IP address)")
+        for match in secret.finditer(line):
+            if "${{" not in line and not match.group(2).isupper():
+                hits.append(f"{rel}:{number} ({match.group(1)} value)")
+check(not hits, "no obvious private data found" + (f" ({', '.join(hits[:10])})" if hits else ""))
 
 print()
 if failures:

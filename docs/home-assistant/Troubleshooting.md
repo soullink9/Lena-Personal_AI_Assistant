@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[← Back to README](../../README.md)
+
 Problems met while building this project, with their fixes.
 
 ## She replies with generic assistant phrases
@@ -7,8 +9,8 @@ Problems met while building this project, with their fixes.
 Example: "Sure thing. What's up?" That means the persona is not reaching the model, or the prompt is being cut off.
 
 1. Open the assistant's debug view (Settings > Voice assistants > your assistant > Debug) and read the system prompt that was sent. Is the full text there?
-2. Home Assistant may replace the Modelfile's system prompt with the agent's Instructions, so the Instructions must contain her character. `home_assistant/lena_prompt.txt` does.
-3. Make sure the context window is large enough (see [Performance-Tuning](Performance-Tuning)). A 4096 context can drop the start of the prompt.
+2. Home Assistant may replace the Modelfile's system prompt with the agent's Instructions, so the Instructions must contain her character. `home-assistant/lena_prompt.txt` does.
+3. Make sure the context window is large enough (see [Performance-Tuning](Performance-Tuning.md)). A 4096 context can drop the start of the prompt.
 
 ## The memory sensor does not load
 
@@ -45,8 +47,8 @@ Give every exposed entity a distinct name. Several entities called "Light Switch
 
 ## The voice has background noise
 
-See [Voice-Piper](Voice-Piper).
+See [Voice-Piper](../voice/Piper.md).
 
 ## Replies are slow
 
-See [Performance-Tuning](Performance-Tuning).
+See [Performance-Tuning](Performance-Tuning.md).

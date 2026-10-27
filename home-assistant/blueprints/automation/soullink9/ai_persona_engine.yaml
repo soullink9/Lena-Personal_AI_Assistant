@@ -3,7 +3,7 @@
 # =============================================================================
 # A Home Assistant automation blueprint that gives an AI persona a "state of
 # mind" that drifts through the day. It writes to five input_select helpers;
-# the prompt in home_assistant/lena_prompt.txt reads them back, so the
+# the prompt in home-assistant/lena_prompt.txt reads them back, so the
 # persona sounds a little different from hour to hour.
 #
 # WHAT IT DOES (one automation, five jobs, chosen by trigger id)
@@ -45,7 +45,7 @@ blueprint:
     option missing from a helper is skipped instead of causing an error.
   domain: automation
   # Lets Home Assistant offer "re-import" so users can pick up updates from GitHub.
-  source_url: https://github.com/soullink9/HomeAssistant-AI_Personality/blob/main/home_assistant/blueprints/automation/soullink9/ai_persona_engine.yaml
+  source_url: https://github.com/soullink9/Lena-Personal_AI_Assistant/blob/main/home-assistant/blueprints/automation/soullink9/ai_persona_engine.yaml
   # The plural "triggers:" / "actions:" and "trigger:" / "action:" keys used
   # below need Home Assistant 2024.10 or newer.
   homeassistant:

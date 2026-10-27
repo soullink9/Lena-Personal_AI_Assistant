@@ -7,7 +7,7 @@
 #
 # What does NOT live here: anything specific to one environment. Voice rules,
 # live home data, memory, and the mood modifiers belong in
-# home_assistant/lena_prompt.txt, which Home Assistant sends on every request.
+# home-assistant/lena_prompt.txt, which Home Assistant sends on every request.
 #
 # Build it:
 #     ollama create lena -f Modelfile
@@ -41,10 +41,13 @@ FROM qwen3.5:9b
 # the list of exposed devices PLUS tool definitions PLUS chat history, which
 # easily passes 4k. If the context is too small, Ollama silently drops the
 # start of the prompt (the persona) and Lena stops sounding like Lena.
-# 16384 is a comfortable size. Raise to 32768 if you add a lot of memory text.
-# Home Assistant's Ollama integration has its own context setting that
-# overrides this value for HA requests, so set them to the same number.
-PARAMETER num_ctx 16384
+# 32768 leaves room for Home Assistant's device list and tools AND a long
+# conversation in the Lena app. On a smaller GPU, or if `ollama ps` shows part
+# of the model on the CPU, drop to 16384.
+# Keep three numbers the same: this one, the context window in Home
+# Assistant's Ollama agent (it overrides this for HA requests), and "Lena's
+# context size" in the Lena app's settings.
+PARAMETER num_ctx 32768
 
 # Creativity. Around 0.7 keeps the humor varied without going off the rails.
 # Lower it (0.5-0.6) if tool calls or device names come out wrong.

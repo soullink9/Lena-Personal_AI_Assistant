@@ -1,5 +1,7 @@
 # Performance tuning
 
+[← Back to README](../../README.md)
+
 A voice assistant needs to answer in a few seconds. This page lists what affects speed, in the order worth checking.
 
 > **Status:** On the author's setup, a short request took about 34 seconds in Home Assistant even with a 9B-class model fully on the GPU and no reloading. The cause had not been confirmed when version 1.0.0 was published. Thinking mode was the leading suspect. Treat the checks below as a diagnosis procedure, not a guaranteed fix.
@@ -35,7 +37,8 @@ If both runs above are slow, read the eval rate. A 9B-class model fully on a mod
 
 Home Assistant sends the persona text, every exposed entity and the tool definitions with each request. A bigger context costs VRAM and time.
 
-- 16384 is a good starting point; the Modelfile uses it.
+- The Modelfile uses 32768, which leaves room for long conversations in the Lena app. If `ollama ps` shows part of the model on the CPU, drop to 16384.
+- Use the same number in the Modelfile, Home Assistant's agent and the Lena app's **Lena's context size** setting.
 - Expose fewer entities. Under about a hundred is better.
 - Keep the memory list short.
 

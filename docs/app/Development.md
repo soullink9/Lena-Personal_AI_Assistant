@@ -1,12 +1,12 @@
 # Development
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Lena is Kotlin with Jetpack Compose. The only libraries are Google's Android Jetpack libraries and JetBrains' coroutines library; network calls use Android's built-in HTTP client and JSON parser.
 
 ## Files
 
-All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
+The app is the Gradle project in `android/`. All app code is in `android/app/src/main/kotlin/io/github/soullink9/lena/`, and resources are in `android/app/src/main/res/`.
 
 | File | What it does |
 |---|---|
@@ -24,13 +24,12 @@ All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
 
 | File | What it does |
 |---|---|
-| `app/src/main/AndroidManifest.xml` | Permissions, activities, the assistant and share registrations, tile, widget and receivers. |
+| `android/app/src/main/AndroidManifest.xml` | Permissions, activities, the assistant and share registrations, tile, widget and receivers. |
 | `res/xml/network_security_config.xml` | HTTPS only; which certificate authorities to trust. |
 | `res/xml/data_extraction_rules.xml` | Keeps all app data out of backups and transfers. |
 | `res/xml/shortcuts.xml` | The app icon's long-press shortcuts. |
 | `res/xml/lena_widget_info.xml` | The widget's size and description. |
 | `.github/workflows/build.yml` | Builds, signs and publishes the APK. |
-| `voice-bridge/` | The optional Wyoming voice bridge for Open WebUI (see [Voice Bridge](Voice-Bridge.md)). |
 
 ## Versions
 
@@ -72,10 +71,11 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 There's no Gradle wrapper in the repository. Use Android Studio, or install Gradle 8.14.3, a JDK 17 or 21, and the Android SDK, then:
 
 ```sh
+cd android
 gradle assembleRelease
 ```
 
-The APK lands in `app/build/outputs/apk/release/`. To sign with your key, set these first; otherwise it's debug-signed:
+The APK lands in `android/app/build/outputs/apk/release/`. To sign with your key, set these first; otherwise it's debug-signed:
 
 ```sh
 export LENA_KEYSTORE=/path/to/lena.jks
@@ -94,8 +94,8 @@ export LENA_KEYSTORE_PASSWORD='your password'
 
 ## Making a release
 
-1. In `app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example, `1.0.1`).
-2. Add a line to `CHANGELOG.md`.
+1. In `android/app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example, `1.0.1`).
+2. Add a line under **App** in `CHANGELOG.md`.
 3. Commit and push to `main`.
 4. **Actions → Build APK → Run workflow**, tick **Publish a release**, and run it.
 

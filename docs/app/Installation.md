@@ -1,6 +1,6 @@
 # Installation
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Lena isn't on any app store. You build it in your own GitHub repository, signed with a key only you hold, and install the APK yourself.
 

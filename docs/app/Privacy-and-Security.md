@@ -1,6 +1,6 @@
 # Privacy and Security
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Lena is built so that your conversations go to your server and nowhere else.
 

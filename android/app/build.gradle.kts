@@ -14,11 +14,11 @@ android {
         applicationId = "io.github.soullink9.lena"
         minSdk = 36
         targetSdk = 36
-        versionCode = 10
-        versionName = "2.3.0"
+        versionCode = 11
+        versionName = "2.3.1"
     }
 
-    // The release key comes from CI secrets (see docs/Installation.md). Without it the APK is debug-signed.
+    // The release key comes from CI secrets (see docs/app/Installation.md). Without it the APK is debug-signed.
     val keystore = System.getenv("LENA_KEYSTORE")
     signingConfigs {
         if (keystore != null) create("release") {

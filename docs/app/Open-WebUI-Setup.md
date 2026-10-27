@@ -1,6 +1,6 @@
 # Open WebUI Setup
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Lena shows your real Open WebUI, so almost everything works as it does in a browser. A few server settings matter on a phone.
 
@@ -31,7 +31,7 @@ If either is set to "Web API", call mode will open but either won't hear you or 
 
 Talking to Lena in the sheet uses the same text-to-speech for her voice, and the same speech-to-text if you set **Hearing you** to **Your server**.
 
-Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but no good local voice. If Home Assistant already has Piper and Whisper containers, the [Voice Bridge](Voice-Bridge.md) lets Open WebUI use them, so Lena sounds the same everywhere.
+Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but no good local voice. If Home Assistant already has Piper and Whisper containers, the [Voice Bridge](../voice/Voice-Bridge.md) lets Open WebUI use them, so Lena sounds the same everywhere.
 
 ## Picking a model
 

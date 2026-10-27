@@ -1,6 +1,8 @@
 # Voice (Piper)
 
-Piper turns Lena's text into speech. The example in `piper/docker-compose.example.yml` uses the [LinuxServer.io Piper image](https://docs.linuxserver.io/images/docker-piper/) and connects to Home Assistant through the Wyoming integration (port 10200).
+[← Back to README](../../README.md)
+
+Piper turns Lena's text into speech. The example in `voice/piper/docker-compose.example.yml` uses the [LinuxServer.io Piper image](https://docs.linuxserver.io/images/docker-piper/) and connects to Home Assistant through the Wyoming integration (port 10200).
 
 Voice is largely a matter of taste. Change one setting at a time, and judge with real Lena lines: a joke and a plain confirmation.
 

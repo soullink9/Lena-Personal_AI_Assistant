@@ -1,6 +1,6 @@
 # How It Works
 
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 Lena is two things working together:
 

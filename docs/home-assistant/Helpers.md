@@ -1,5 +1,7 @@
 # Helpers
 
+[← Back to README](../../README.md)
+
 The blueprint reads and writes five dropdown helpers, and the prompt reads them back. Create them in the Home Assistant UI: Settings > Devices & services > Helpers > Create helper > **Dropdown**.
 
 Option names are **case-sensitive**. If a helper lacks an option the blueprint wants to use, that option is skipped silently, so a missing word just means she never uses it.
@@ -30,4 +32,4 @@ The prompt has a one-line meaning for every option. If you add an option, add it
 
 ## The memory list
 
-Her memory is a to-do list. Create it with Settings > Devices & services > Add integration > **Local To-do**, and name it `Lena's Memory`. Check its entity ID in Developer tools > States; you will need it for the [memory sensor](Memory).
+Her memory is a to-do list. Create it with Settings > Devices & services > Add integration > **Local To-do**, and name it `Lena's Memory`. Check its entity ID in Developer tools > States; you will need it for the [memory sensor](Memory.md).

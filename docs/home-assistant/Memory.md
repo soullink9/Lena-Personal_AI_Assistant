@@ -1,5 +1,7 @@
 # Memory
 
+[← Back to README](../../README.md)
+
 Lena's memory is a Home Assistant to-do list. It has two halves:
 
 - **Writing.** When you ask her to remember something, the model adds an item to the list using Assist's to-do tool.
@@ -7,9 +9,9 @@ Lena's memory is a Home Assistant to-do list. It has two halves:
 
 ## Setup
 
-1. Create the list: see [Helpers](Helpers). Note its entity ID.
+1. Create the list: see [Helpers](Helpers.md). Note its entity ID.
 2. Make the list visible to Assist: Settings > Voice assistants > Expose, and expose the to-do list. Without this she has no tool to write to it.
-3. Add the sensor. Copy `home_assistant/templates/lena_memory_sensor.yaml` into your configuration and replace the to-do entity ID (it appears four times). The file's header explains how to include it.
+3. Add the sensor. Copy `home-assistant/templates/lena_memory_sensor.yaml` into your configuration and replace the to-do entity ID (it appears four times). The file's header explains how to include it.
 4. Check Developer tools > States for `sensor.lenas_memory_content`. Its state should be the number of open items and its `memories` attribute should list them.
 
 ## Why an attribute
@@ -26,7 +28,7 @@ The prompt tells her to save when you ask her to remember something, or when you
 
 Try it by saying "Remember that Alex likes the office at seventy degrees." and then look at the list.
 
-**Check the list the first time.** Whether she actually saves depends on the model making a tool call. Some small models say "Saved" without calling anything. If that happens, try a different base model or lower the temperature (see [Performance-Tuning](Performance-Tuning)).
+**Check the list the first time.** Whether she actually saves depends on the model making a tool call. Some small models say "Saved" without calling anything. If that happens, try a different base model or lower the temperature (see [Performance-Tuning](Performance-Tuning.md)).
 
 A new memory appears in her context from the **next** request, not the one that saved it, because the sensor refreshes just after the list changes.
 
