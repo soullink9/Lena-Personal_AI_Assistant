@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-10-27)
+
+- The ongoing conversation now gets half of Lena's context instead of a fixed 15 exchanges: usually 50 to 80 spoken exchanges with a 32k model. New **Lena's context size** setting (32,768 by default).
+
 ## 2.2.0 (2026-10-27)
 
 - **One ongoing conversation:** talking to Lena now continues the same chat every time (titled **Lena** and pinned in Open WebUI), so she remembers earlier conversations. The sheet shows where you left off. If you delete the chat, she starts a new one next time.

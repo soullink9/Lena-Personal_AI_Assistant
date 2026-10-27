@@ -243,6 +243,23 @@ class SettingsActivity : ComponentActivity() {
                         "Start over with New conversation in the sheet.",
                     s.ongoing,
                 ) { s = s.copy(ongoing = it) }
+                if (s.ongoing) {
+                    var contextText by remember { mutableStateOf(s.contextTokens.toString()) }
+                    OutlinedTextField(
+                        value = contextText,
+                        onValueChange = { v ->
+                            contextText = v.filter { it.isDigit() }.take(7)
+                            contextText.toIntOrNull()?.let { s = s.copy(contextTokens = it) }
+                        },
+                        label = { Text("Lena's context size (tokens)") },
+                        supportingText = {
+                            Text("Half of it holds the conversation; the rest is for her prompt, tools and reply. Match your model's context length.")
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
 
                 Section("Notifications")
                 Toggle(

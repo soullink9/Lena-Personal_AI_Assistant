@@ -39,7 +39,7 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 
 - **New conversation** (the speech-bubble button in the sheet) starts over. The old chat stays in your history.
 - Delete the **Lena** chat (from the drawer or Open WebUI) and the next time you talk, she starts a fresh one.
-- A conversation that never ends would outgrow any model, so Lena sends the model the last 15 exchanges. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
+- A conversation that never ends would outgrow any model, so Lena gives it **half of the model's context** (set **Lena's context size** in settings; 32,768 by default), filled from the newest exchange back. For short spoken exchanges that's usually 50 to 80 of them. The other half stays free for her system prompt, tools, tool results and reply. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
 - Prefer a new chat every time? Turn off **Settings → Talking to Lena → One ongoing conversation**.
 
 - The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
@@ -55,6 +55,7 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 | Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
 | Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
 | One ongoing conversation | On by default. Off starts a new chat each time you open the sheet. |
+| Lena's context size | Your model's context length in tokens (32,768 by default). Half of it holds the ongoing conversation. |
 
 If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
 

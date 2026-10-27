@@ -279,6 +279,7 @@ class AskActivity : ComponentActivity() {
                         turn.question, m, chatId, lastReplyId,
                         newTitle = if (ongoing) "Lena" else null,
                         pinNew = ongoing,
+                        contextTokens = Prefs.contextTokens(this@AskActivity),
                     )
                     running = started
                     working = true

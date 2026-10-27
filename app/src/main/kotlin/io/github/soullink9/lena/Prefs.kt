@@ -42,6 +42,7 @@ data class Settings(
     val speaking: Speaking = Speaking.SERVER,
     val followUp: FollowUp = FollowUp.ALWAYS,
     val ongoing: Boolean = true,
+    val contextTokens: Int = 32_768,
 )
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
@@ -71,6 +72,9 @@ object Prefs {
 
     /** One ongoing conversation for talking to Lena, instead of a new chat each time. */
     fun ongoing(c: Context): Boolean = p(c).getBoolean("ongoing", true)
+
+    /** The model's context size in tokens; half of it holds the ongoing conversation. */
+    fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", 32_768)
 
     /** The chat that conversation lives in, once it exists. */
     fun assistChat(c: Context): String? = p(c).getString("assist_chat", null)
@@ -107,6 +111,7 @@ object Prefs {
         speaking = speaking(c),
         followUp = followUp(c),
         ongoing = ongoing(c),
+        contextTokens = contextTokens(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -129,6 +134,7 @@ object Prefs {
             .putString("speaking", s.speaking.name)
             .putString("follow_up", s.followUp.name)
             .putBoolean("ongoing", s.ongoing)
+            .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
             .apply()
     }
 

@@ -39,8 +39,25 @@ class Api(server: String) {
     companion object {
         fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it) }
 
-        /** How much of a long conversation the model sees: the last 15 exchanges. */
-        const val MAX_CONTEXT_MESSAGES = 30
+        /**
+         * A conversation that never ends outgrows any model. Lena gives it half of the model's
+         * context, filled from the newest message back; the other half stays free for the system
+         * prompt, tool definitions, tool results and the reply. About 4 characters per token.
+         */
+        fun fitToBudget(thread: List<JSONObject>, contextTokens: Int): List<JSONObject> {
+            val budgetChars = contextTokens.coerceAtLeast(2048) / 2 * 4
+            var used = 0
+            var start = thread.size
+            while (start > 0) {
+                val size = thread[start - 1].optString("content").length + 16
+                if (start < thread.size && used + size > budgetChars) break // always keep your new message
+                used += size
+                start--
+            }
+            var recent = thread.subList(start, thread.size)
+            while (recent.size > 1 && recent.first().optString("role") != "user") recent = recent.subList(1, recent.size)
+            return recent
+        }
     }
 
     private suspend fun cookies(): String? = withContext(Dispatchers.Main) {
@@ -228,6 +245,7 @@ class Api(server: String) {
         parentId: String? = null,
         newTitle: String? = null,
         pinNew: Boolean = false,
+        contextTokens: Int = 32_768,
     ): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
@@ -289,10 +307,7 @@ class Api(server: String) {
                 }
                 cursor = if (m.isNull("parentId")) null else m.optString("parentId")
             }
-            // A conversation that never ends outgrows any model, so send only its recent part.
-            var recent = thread.takeLast(MAX_CONTEXT_MESSAGES)
-            while (recent.isNotEmpty() && recent.first().optString("role") != "user") recent = recent.drop(1)
-            conversation = JSONArray(recent)
+            conversation = JSONArray(fitToBudget(thread, contextTokens))
         }
 
         val features = JSONObject()
