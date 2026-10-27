@@ -1,9 +1,9 @@
 # Changelog
 
-Lena's parts are versioned separately: the **app** has its own version (shown in its settings and on each release), and the **Home Assistant personality** (the Modelfile, prompt, blueprint and memory sensor) has another. Newest first. Versions follow [Semantic Versioning](https://semver.org/).
+Lena's parts are versioned separately: the **app** has its own version (shown in its settings and on each release), and her **personality** (the Modelfile, the Home Assistant files and the Open WebUI files) has another. Newest first. Versions follow [Semantic Versioning](https://semver.org/).
 
 - [App](#app)
-- [Home Assistant personality](#home-assistant-personality)
+- [Personality](#personality)
 
 ## App
 
@@ -78,7 +78,26 @@ First release.
 - Microphone for your server only; Android file picker for attachments
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
-## Home Assistant personality
+## Personality
+
+### 2.0.0 (2026-10-27)
+
+A rebuild of how she's set up. Nothing from 1.x carries over: create the new helpers, and remove the old five helpers, the persona engine automation and the memory sensor if you had them.
+
+- **One character, everywhere.** Her whole baseline is in the Modelfile as `MESSAGE system`, which Ollama always sends first, even when an app sends its own instructions. Before, Home Assistant and Open WebUI replaced it, which is why the Home Assistant prompt had to repeat her character. The prompt is now a few lines.
+- **Base model `gemma4:12b`**, with Google's recommended sampling.
+- **More sass, more alive:** a polished character with opinions, likes and pet peeves, a sense of living in the house, and clear rules for showing feelings without overdoing them.
+- **Feelings that change for real reasons:** a new Lena Mood Engine replaces the persona engine. Three layers (mood, energy, and short-lived moments) instead of five, each with a reason she knows. Mood drifts only to neighbouring moods; the weather, people coming and going, an empty house, special days on your calendar and worry sensors all move her.
+- **Only the current feeling reaches her:** each feeling's description lives in `custom_templates/lena.jinja`, and only the current ones are added to her prompt.
+- **She reacts to how she's treated:** the Lena feel script lets her set her own moment when thanked, insulted or asked the same thing again.
+- **One shared memory, no YAML:** her memory to-do list is read with the Lena recall script in Home Assistant, and shared with Open WebUI and the app. The YAML memory sensor is gone.
+- **Open WebUI:** a filter brings her feelings and memory into every chat, and a tool lets her remember, forget and react, in the browser and in the Lena app.
+- **Docs:** a step-by-step [Getting started](docs/Getting-Started.md) for Ollama, Open WebUI, the app and Home Assistant, and new pages on [her personality](docs/personality/Personality.md) and [her feelings](docs/personality/Moods.md).
+
+#### Known issues
+
+- Not yet tested end to end on real hardware: the templates and every mood engine branch are checked offline, and the Open WebUI files against a stand-in Home Assistant. Reply speed with Gemma 4 hasn't been measured.
+- Smaller models may call the Lena feel script too often, or claim to have saved a memory without calling the tool. See [Troubleshooting](docs/home-assistant/Troubleshooting.md).
 
 ### 1.1.0 (2026-10-27)
 

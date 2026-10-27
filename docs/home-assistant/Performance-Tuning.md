@@ -1,10 +1,10 @@
 # Performance tuning
 
-[← Back to README](../../README.md)
+[← Back to her personality](../personality/Personality.md)
 
 A voice assistant needs to answer in a few seconds. This page lists what affects speed, in the order worth checking.
 
-> **Status:** On the author's setup, a short request took about 34 seconds in Home Assistant even with a 9B-class model fully on the GPU and no reloading. The cause had not been confirmed when version 1.0.0 was published. Thinking mode was the leading suspect. Treat the checks below as a diagnosis procedure, not a guaranteed fix.
+> **Status:** With the earlier Qwen 9B model, a short request took about 34 seconds in Home Assistant on the author's setup, and thinking mode was the leading suspect. The model is now Gemma 4 12B, which only thinks when asked; speed with it hasn't been measured yet. Treat the checks below as a diagnosis procedure.
 
 ## 1. Is the model fully on the GPU?
 
@@ -27,20 +27,20 @@ ollama run lena --verbose --think=false "I need you to do me a favor. Can you do
 ollama run lena --verbose --think=true  "I need you to do me a favor. Can you do that?"
 ```
 
-Compare total duration and the eval rate (tokens per second). If the first is a couple of seconds and the second is much longer, thinking is the cause. Turn it off in the Ollama integration's agent settings if your Home Assistant version has the option. Not every model supports the flag.
+Compare total duration and the eval rate (tokens per second). If the first is a couple of seconds and the second is much longer, thinking is the cause. Turn it off in the Ollama integration's agent settings (**Think before responding**). Gemma 4 doesn't think unless asked, so this should already be fast.
 
 ## 3. Raw generation speed
 
-If both runs above are slow, read the eval rate. A 9B-class model fully on a modern 16 GB card should generate far faster than speech. A low rate points to hardware, drivers, or part of the model on the CPU.
+If both runs above are slow, read the eval rate. A 12B model fully on a modern 16 GB card should generate far faster than speech. A low rate points to hardware, drivers, or part of the model on the CPU.
 
 ## 4. Context size
 
-Home Assistant sends the persona text, every exposed entity and the tool definitions with each request. A bigger context costs VRAM and time.
+Every request carries her character, Home Assistant's list of exposed entities and the tool definitions. A bigger context costs VRAM and time.
 
 - The Modelfile uses 32768, which leaves room for long conversations in the Lena app. If `ollama ps` shows part of the model on the CPU, drop to 16384.
 - Use the same number in the Modelfile, Home Assistant's agent and the Lena app's **Lena's context size** setting.
 - Expose fewer entities. Under about a hundred is better.
-- Keep the memory list short.
+- Keep her memory list short; Open WebUI adds it to every message.
 
 ## 5. Let Home Assistant handle simple commands
 
@@ -60,11 +60,11 @@ Chat and tool calls want slightly different settings. You can create a second mo
 
 ```
 FROM lena
-PARAMETER temperature 0.6
+PARAMETER temperature 0.7
 PARAMETER num_predict 300
 ```
 
-Build it with `ollama create lena-home -f <file>`. A lower temperature tends to help tool-call accuracy and the cap keeps spoken replies short. This is an idea, not a tested recommendation.
+Build it with `ollama create lena-home -f <file>`. It inherits her character from `lena`. A lower temperature tends to help tool-call accuracy and the cap keeps spoken replies short. This is an idea, not a tested recommendation.
 
 ## 9. Share the GPU carefully
 

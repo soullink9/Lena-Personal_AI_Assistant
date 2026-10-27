@@ -1,0 +1,626 @@
+# =============================================================================
+# Lena Mood Engine
+# =============================================================================
+# Gives Lena feelings that change for real reasons. It writes her mood, energy
+# and moment (plus a short "why") to five helpers; custom_templates/lena.jinja
+# turns them into a description that Home Assistant and Open WebUI add to her
+# prompt. Only the current feelings reach her.
+#
+# WHAT MOVES HER (one automation, chosen by trigger id)
+#   morning      wakes her Groggy; a special day on your calendar cheers her up,
+#                otherwise she wakes in a mood of her own (weather can color it)
+#   bedtime      she's Drained for the night
+#   hourly       energy follows her day; her mood drifts to a NEARBY mood
+#                (Content -> Playful, not Content -> Grumpy) once it has
+#                lasted a while, pulled by her energy, the weather and the house
+#   arrived      someone comes home after a long time away: she's Delighted
+#   empty        the house has been empty for hours: she gets Restless or Wistful
+#   weather      the weather turns (rain, storm, snow, sun...): she may react
+#   worry_on/off a sensor you chose goes on (a leak, a door left open): she's
+#                Worried until it clears, then Relieved
+#   fade         a moment wears off after a few minutes (back to Nothing)
+#   mood_changed you changed her mood by hand: the old "why" is cleared
+# She can also set her own moment with the "Lena feel" script when someone
+# thanks her, insults her or asks the same thing again (see that blueprint).
+#
+# CREATE FIRST, IN THE HOME ASSISTANT UI (see docs/home-assistant/Helpers.md)
+#   Three dropdowns (Lena Mood, Lena Energy, Lena Moment) and two text
+#   helpers (Lena Mood Reason, Lena Moment Reason, max length 255).
+#   Feeling names are case-sensitive and must match custom_templates/lena.jinja.
+#   A name a dropdown doesn't offer is simply never chosen.
+#
+# TO CHANGE HOW SHE DRIFTS
+#   Edit the lists in the variables section: which moods sit next to each
+#   other, and which moods the weather, her energy and the house pull toward.
+#   Repeat a name in a list to make it more likely.
+# =============================================================================
+
+blueprint:
+  name: Lena Mood Engine
+  description: >-
+    Lena's feelings: mood, energy and short-lived moments that change with her
+    day, the weather, the people coming and going, and things in the house
+    that worry her. Writes five helpers that her prompt reads. Built for Lena;
+    see docs/personality/Moods.md in the repository.
+  domain: automation
+  source_url: https://github.com/soullink9/Lena-Personal_AI_Assistant/blob/main/home-assistant/blueprints/automation/soullink9/lena_mood_engine.yaml
+  # Needs 2025.4+ so the choices made inside each branch reach the steps
+  # that apply them at the end.
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    helpers:
+      name: Her feelings helpers
+      icon: mdi:heart-pulse
+      description: The helpers you created in the UI. Her prompt reads the same ones.
+      input:
+        mood_entity:
+          name: Mood dropdown
+          selector:
+            entity:
+              filter:
+                domain: input_select
+        energy_entity:
+          name: Energy dropdown
+          selector:
+            entity:
+              filter:
+                domain: input_select
+        moment_entity:
+          name: Moment dropdown
+          selector:
+            entity:
+              filter:
+                domain: input_select
+        mood_reason_entity:
+          name: Mood reason text
+          selector:
+            entity:
+              filter:
+                domain: input_text
+        moment_reason_entity:
+          name: Moment reason text
+          selector:
+            entity:
+              filter:
+                domain: input_text
+
+    day:
+      name: Her day
+      icon: mdi:weather-sunset
+      input:
+        morning_time:
+          name: Morning
+          description: When she wakes up.
+          default: "06:30:00"
+          selector:
+            time: {}
+        bedtime:
+          name: Bedtime
+          description: When she runs out of steam for the night.
+          default: "22:30:00"
+          selector:
+            time: {}
+        special_days:
+          name: Special days calendars (optional)
+          description: >-
+            Calendars with birthdays, anniversaries or holidays. Anything on
+            them today puts her in a good mood in the morning, and she knows why.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: calendar
+
+    house:
+      name: Her house
+      icon: mdi:home-heart
+      input:
+        people:
+          name: People (optional)
+          description: The people she misses when they're away. Leave empty to skip comings and goings.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: person
+        away_hours:
+          name: Missed after (hours)
+          description: Someone coming home after at least this long away makes her Delighted.
+          default: 4
+          selector:
+            number:
+              min: 1
+              max: 72
+              unit_of_measurement: h
+        empty_hours:
+          name: Lonely after (hours)
+          description: After the house has been empty this long she gets Restless or Wistful.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 24
+              unit_of_measurement: h
+        weather:
+          name: Weather (optional)
+          description: A weather entity, for example your forecast. The first one is used.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: weather
+        weather_chance:
+          name: Weather sensitivity
+          description: Chance she reacts when the weather turns.
+          default: 60
+          selector:
+            number:
+              min: 0
+              max: 100
+              unit_of_measurement: "%"
+        worries:
+          name: Things that worry her (optional)
+          description: >-
+            Binary sensors she frets about when they turn on: leaks, smoke, a
+            door or garage left open. Pick problem-type sensors, not everyday ones.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain: binary_sensor
+
+    timing:
+      name: Timing
+      icon: mdi:timer-sand
+      input:
+        mood_hold_hours:
+          name: Mood lasts at least (hours)
+          description: Her mood doesn't drift until it has lasted this long, so moods with a reason stick.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 12
+              unit_of_measurement: h
+        mood_change_chance:
+          name: Mood change chance per hour
+          description: Once her mood has lasted long enough, the chance each hour that it moves on.
+          default: 40
+          selector:
+            number:
+              min: 0
+              max: 100
+              unit_of_measurement: "%"
+        moment_minutes:
+          name: Moments fade after (minutes)
+          default: 20
+          selector:
+            number:
+              min: 2
+              max: 240
+              unit_of_measurement: min
+
+# The template trigger below can only see these.
+trigger_variables:
+  people: !input people
+
+triggers:
+  - trigger: time
+    at: !input morning_time
+    id: morning
+  - trigger: time
+    at: !input bedtime
+    id: bedtime
+  - trigger: time_pattern
+    minutes: 7
+    id: hourly
+  - trigger: state
+    entity_id: !input people
+    to: home
+    id: arrived
+  - trigger: template
+    value_template: >-
+      {{ people | count > 0 and people | select('is_state', 'home') | list | count == 0 }}
+    for:
+      hours: !input empty_hours
+    id: empty
+  - trigger: state
+    entity_id: !input weather
+    to: null   # state changes only, not attribute updates
+    for:
+      minutes: 15
+    id: weather
+  - trigger: state
+    entity_id: !input worries
+    to: "on"
+    for:
+      minutes: 2
+    id: worry_on
+  - trigger: state
+    entity_id: !input worries
+    from: "on"
+    to: "off"
+    id: worry_off
+  - trigger: state
+    entity_id: !input moment_entity
+    to: null   # state changes only, not attribute updates
+    for:
+      minutes: !input moment_minutes
+    id: fade
+  - trigger: state
+    entity_id: !input mood_entity
+    to: null   # state changes only, not attribute updates
+    id: mood_changed
+
+variables:
+  mood_entity: !input mood_entity
+  energy_entity: !input energy_entity
+  moment_entity: !input moment_entity
+  mood_reason_entity: !input mood_reason_entity
+  moment_reason_entity: !input moment_reason_entity
+  morning_time: !input morning_time
+  bedtime: !input bedtime
+  calendars: !input special_days
+  away_hours: !input away_hours
+  weather_entities: !input weather
+  weather_chance: !input weather_chance
+  worries: !input worries
+  mood_hold_hours: !input mood_hold_hours
+  mood_change_chance: !input mood_change_chance
+
+  # ---- What the branches decide. Empty means "leave it as it is". ----------
+  next_mood: ""
+  mood_reason: ""
+  next_energy: ""
+  next_moment: ""
+  moment_reason: ""
+
+  # ---- Where she is right now ----------------------------------------------
+  mood: "{{ states(mood_entity) }}"
+  energy: "{{ states(energy_entity) }}"
+  moment: "{{ states(moment_entity) }}"
+  home_count: "{{ people | select('is_state', 'home') | list | count }}"
+  worry_count: "{{ worries | select('is_state', 'on') | list | count }}"
+
+  # ---- Her personality in numbers. Edit these to change how she drifts. ----
+  # Moods next to each other. Drift only moves to a neighbour (plus the pulls
+  # below), so her mood changes gradually, the way a person's does.
+  neighbours:
+    Content: [Cheerful, Playful, Curious, Focused, Smug, Wistful, Fond]
+    Cheerful: [Content, Playful, Fond, Smug, Curious]
+    Playful: [Cheerful, Smug, Content, Curious, Restless]
+    Smug: [Playful, Content, Focused, Cheerful]
+    Curious: [Content, Playful, Focused, Cheerful, Restless]
+    Focused: [Content, Curious, Smug, Grumpy]
+    Restless: [Playful, Curious, Grumpy, Content, Wistful]
+    Wistful: [Content, Fond, Uneasy, Grumpy, Restless]
+    Grumpy: [Content, Focused, Restless, Wistful]
+    Uneasy: [Content, Focused, Wistful, Grumpy]
+    Fond: [Content, Cheerful, Playful, Wistful]
+  # Her baseline: where she tends to come back to.
+  baseline: [Content, Smug, Playful]
+  # How she wakes up when nothing special is happening.
+  morning_moods: [Content, Content, Grumpy, Focused, Cheerful, Smug]
+  # Pulls from her energy, with the reason she'd give.
+  energy_pull:
+    Groggy: [Grumpy, Content, Wistful]
+    Steady: []
+    Wired: [Playful, Curious, Restless, Cheerful]
+    Drained: [Grumpy, Wistful, Content]
+  energy_why:
+    Groggy: You're not properly awake yet.
+    Wired: You've got energy to burn.
+    Drained: It's late and you're worn out.
+  # Weather, grouped. Pulls, the reason while it lasts, and the reason when it starts.
+  weather_groups:
+    rainy: rain
+    pouring: rain
+    lightning: storm
+    lightning-rainy: storm
+    hail: storm
+    snowy: snow
+    snowy-rainy: snow
+    sunny: sun
+    fog: fog
+    windy: wind
+    windy-variant: wind
+  weather_pull:
+    rain: [Wistful, Content, Fond]
+    storm: [Uneasy, Restless, Curious]
+    snow: [Cheerful, Fond, Playful]
+    sun: [Cheerful, Playful, Content]
+    fog: [Wistful, Curious]
+    wind: [Restless, Uneasy]
+  weather_why:
+    rain: It's raining.
+    storm: There's a storm outside.
+    snow: It's snowing.
+    sun: It's sunny out.
+    fog: It's foggy out.
+    wind: It's blowing a gale outside.
+  weather_starts:
+    rain: It just started raining.
+    storm: A storm just rolled in.
+    snow: It just started snowing.
+    sun: The sun just came out.
+    fog: Fog just rolled in.
+    wind: The wind just picked up.
+  # What a worry sensor means, by its device class.
+  worry_words:
+    moisture: is detecting water
+    smoke: is detecting smoke
+    gas: is detecting gas
+    carbon_monoxide: is detecting carbon monoxide
+    door: is open
+    garage_door: is open
+    window: is open
+    opening: is open
+    lock: is unlocked
+    problem: is reporting a problem
+    safety: is reporting a problem
+    tamper: detected tampering
+
+  weather_now: >-
+    {% set w = weather_entities[0] if weather_entities else '' %}
+    {{ weather_groups.get(states(w), '') if w else '' }}
+  # Pulls from the house: an empty house, or everyone home together.
+  house_pull: >-
+    {% if people | count == 0 %}{{ [] }}
+    {% elif home_count | int == 0 %}{{ ['Restless', 'Wistful'] }}
+    {% elif home_count | int == people | count and people | count > 1 %}{{ ['Fond', 'Cheerful'] }}
+    {% else %}{{ [] }}{% endif %}
+  house_why: >-
+    {% if people | count == 0 %}
+    {% elif home_count | int == 0 %}The house is empty.
+    {% elif home_count | int == people | count and people | count > 1 %}Everyone's home.
+    {% endif %}
+
+actions:
+  - choose:
+      # ---- Morning: wake up Groggy, in a mood of her own ---------------------
+      - conditions:
+          - condition: trigger
+            id: morning
+        sequence:
+          - variables:
+              special: []
+          - if:
+              - condition: template
+                value_template: "{{ calendars | count > 0 }}"
+            then:
+              - action: calendar.get_events
+                target:
+                  entity_id: "{{ calendars }}"
+                data:
+                  start_date_time: "{{ today_at('00:00') }}"
+                  end_date_time: "{{ today_at('00:00') + timedelta(days=1) }}"
+                response_variable: agenda
+                continue_on_error: true
+              - variables:
+                  special: >-
+                    {{ (agenda or {}).values() | map(attribute='events') | sum(start=[])
+                       | map(attribute='summary') | unique | list }}
+          - variables:
+              next_energy: Groggy
+              next_mood: >-
+                {% if special %}Cheerful
+                {% else %}{{ (morning_moods + weather_pull.get(weather_now, [])) | random }}{% endif %}
+          - variables:
+              mood_reason: >-
+                {% if special %}It's {{ special | join(' and ') }} today.
+                {% elif next_mood in weather_pull.get(weather_now, []) %}{{ weather_why[weather_now] }}{% endif %}
+
+      # ---- Bedtime: out of steam ---------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: bedtime
+        sequence:
+          - variables:
+              next_energy: Drained
+
+      # ---- Every hour: energy follows her day, mood drifts -------------------
+      - conditions:
+          - condition: trigger
+            id: hourly
+        sequence:
+          - variables:
+              # Where she is in her day: asleep, just woken, winding down, or the day.
+              energy_pool: >-
+                {% set wake = today_at(morning_time) %}
+                {% set bed = today_at(bedtime) %}
+                {% set t = now() %}
+                {% if bed > wake %}{% set awake = t >= wake and t < bed %}
+                {% else %}{% set awake = t >= wake or t < bed %}{% endif %}
+                {% set since_wake = (t - (wake if t >= wake else wake - timedelta(days=1))).total_seconds() / 3600 %}
+                {% set to_bed = ((bed if bed > t else bed + timedelta(days=1)) - t).total_seconds() / 3600 %}
+                {% if not awake %}{{ ['Drained'] }}
+                {% elif since_wake < 1.5 %}{{ ['Groggy', 'Groggy', 'Steady'] }}
+                {% elif to_bed < 2 %}{{ ['Steady', 'Drained', 'Drained'] }}
+                {% elif 13 <= t.hour < 16 %}{{ ['Steady', 'Steady', 'Groggy', 'Wired'] }}
+                {% else %}{{ ['Steady', 'Steady', 'Steady', 'Wired', 'Wired', 'Groggy'] }}{% endif %}
+          - variables:
+              # Out of place for the time of day: always move. Otherwise sometimes.
+              next_energy: >-
+                {% set choices = energy_pool | reject('eq', energy) | list %}
+                {% if choices and (energy not in energy_pool or range(100) | random < 40) %}{{ choices | random }}{% endif %}
+          - variables:
+              mood_age_hours: >-
+                {{ ((now() - states[mood_entity].last_changed).total_seconds() / 3600) if states[mood_entity] else 99 }}
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ mood_age_hours | float >= mood_hold_hours | float
+                     and range(100) | random < mood_change_chance | int }}
+            then:
+              - variables:
+                  feeling_energy: "{{ next_energy or energy }}"
+                  pull_energy: "{{ energy_pull.get(feeling_energy, []) }}"
+                  pull_weather: "{{ weather_pull.get(weather_now, []) }}"
+                  pool: >-
+                    {{ (neighbours.get(mood, baseline) + baseline + pull_energy + pull_weather + house_pull)
+                       | reject('eq', mood) | list }}
+              - variables:
+                  next_mood: "{{ pool | random if pool else '' }}"
+              - variables:
+                  # She knows why, when something pulled her there.
+                  mood_reason: >-
+                    {% if next_mood in pull_weather %}{{ weather_why[weather_now] }}
+                    {% elif next_mood in house_pull %}{{ house_why | trim }}
+                    {% elif next_mood in pull_energy %}{{ energy_why.get(feeling_energy, '') }}{% endif %}
+
+      # ---- Someone she missed comes home -------------------------------------
+      - conditions:
+          - condition: trigger
+            id: arrived
+          - condition: template
+            value_template: >-
+              {{ trigger.from_state is not none
+                 and trigger.from_state.state not in ['home', 'unknown', 'unavailable']
+                 and (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds()
+                     >= away_hours | float * 3600 }}
+        sequence:
+          - variables:
+              away: "{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() / 3600 }}"
+              how_long: >-
+                {% set h = away | float %}
+                {% if h >= 36 %}{{ (h / 24) | round(0) | int }} days{% else %}{{ h | round(0) | int }} hours{% endif %}
+          - variables:
+              next_moment: Delighted
+              moment_reason: "{{ trigger.to_state.name }} just got home after {{ how_long }} away."
+              next_mood: "{{ 'Fond' if away | float >= 24 else '' }}"
+              mood_reason: "{{ trigger.to_state.name ~ ' was away for ' ~ how_long ~ ' and is back.' if away | float >= 24 else '' }}"
+
+      # ---- The house has been empty for hours --------------------------------
+      - conditions:
+          - condition: trigger
+            id: empty
+          - condition: template
+            value_template: "{{ mood not in ['Restless', 'Wistful'] }}"
+        sequence:
+          - variables:
+              next_mood: "{{ ['Restless', 'Restless', 'Wistful'] | random }}"
+              mood_reason: The house has been empty for hours.
+
+      # ---- The weather turns -------------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: weather
+          - condition: template
+            value_template: >-
+              {% set before = weather_groups.get(trigger.from_state.state, '') if trigger.from_state else '' %}
+              {% set after = weather_groups.get(trigger.to_state.state, '') %}
+              {{ after != '' and after != before and range(100) | random < weather_chance | int }}
+        sequence:
+          - variables:
+              turned: "{{ weather_groups[trigger.to_state.state] }}"
+          - variables:
+              next_mood: "{{ weather_pull[turned] | reject('eq', mood) | list | random }}"
+              mood_reason: "{{ weather_starts[turned] }}"
+
+      # ---- Something worries her ---------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: worry_on
+        sequence:
+          - variables:
+              next_moment: Worried
+              moment_reason: >-
+                {{ trigger.to_state.name }}
+                {{ worry_words.get(trigger.to_state.attributes.device_class, 'is on') }}.
+
+      # ---- ...and it's sorted ------------------------------------------------
+      - conditions:
+          - condition: trigger
+            id: worry_off
+          - condition: template
+            value_template: "{{ moment == 'Worried' and worry_count | int == 0 }}"
+        sequence:
+          - variables:
+              next_moment: Relieved
+              moment_reason: "{{ trigger.to_state.name }} is back to normal."
+
+      # ---- A moment wears off ------------------------------------------------
+      # Not while something she's worried about is still going on.
+      - conditions:
+          - condition: trigger
+            id: fade
+          - condition: template
+            value_template: >-
+              {{ moment not in ['Nothing', 'unknown', 'unavailable']
+                 and not (moment == 'Worried' and worry_count | int > 0) }}
+        sequence:
+          - variables:
+              next_moment: Nothing
+
+      # ---- Her mood was changed by hand: forget the old reason ---------------
+      # The engine always writes the reason just before the mood, so a reason
+      # older than the mood means someone else changed it.
+      - conditions:
+          - condition: trigger
+            id: mood_changed
+          - condition: template
+            value_template: >-
+              {{ states[mood_reason_entity] is not none and states(mood_reason_entity) != ''
+                 and (states[mood_entity].last_changed - states[mood_reason_entity].last_updated).total_seconds() > 5 }}
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: !input mood_reason_entity
+            data:
+              value: ""
+
+  # ---- Apply what was decided. Each value is checked against the helper's
+  # options, so a name you didn't add to a dropdown is never written. ---------
+  - if:
+      - condition: template
+        value_template: >-
+          {{ next_energy | trim != '' and next_energy | trim != energy
+             and next_energy | trim in (state_attr(energy_entity, 'options') or []) }}
+    then:
+      - action: input_select.select_option
+        target:
+          entity_id: !input energy_entity
+        data:
+          option: "{{ next_energy | trim }}"
+  - if:
+      - condition: template
+        value_template: >-
+          {{ next_mood | trim != '' and next_mood | trim != mood
+             and next_mood | trim in (state_attr(mood_entity, 'options') or []) }}
+    then:
+      # The reason first, so her prompt never pairs a new mood with an old reason.
+      - action: input_text.set_value
+        target:
+          entity_id: !input mood_reason_entity
+        data:
+          value: "{{ (mood_reason | trim)[:(state_attr(mood_reason_entity, 'max') or 100) | int] }}"
+      - action: input_select.select_option
+        target:
+          entity_id: !input mood_entity
+        data:
+          option: "{{ next_mood | trim }}"
+  - if:
+      - condition: template
+        value_template: >-
+          {{ next_moment | trim != ''
+             and next_moment | trim in (state_attr(moment_entity, 'options') or []) }}
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: !input moment_reason_entity
+        data:
+          value: "{{ (moment_reason | trim)[:(state_attr(moment_reason_entity, 'max') or 100) | int] }}"
+      - action: input_select.select_option
+        target:
+          entity_id: !input moment_entity
+        data:
+          option: "{{ next_moment | trim }}"
+
+# Triggers that arrive together wait their turn instead of being dropped.
+mode: queued
+max: 10

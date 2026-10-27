@@ -1,45 +1,49 @@
 # Troubleshooting
 
-[← Back to README](../../README.md)
+[← Back to Home Assistant installation](Installation.md)
 
 Problems met while building this project, with their fixes.
 
-## She replies with generic assistant phrases
+## She sounds like a generic assistant
 
-Example: "Sure thing. What's up?" That means the persona is not reaching the model, or the prompt is being cut off.
+Example: "Sure thing! How can I help you today?" Her character isn't reaching the model.
 
-1. Open the assistant's debug view (Settings > Voice assistants > your assistant > Debug) and read the system prompt that was sent. Is the full text there?
-2. Home Assistant may replace the Modelfile's system prompt with the agent's Instructions, so the Instructions must contain her character. `home-assistant/lena_prompt.txt` does.
-3. Make sure the context window is large enough (see [Performance-Tuning](Performance-Tuning.md)). A 4096 context can drop the start of the prompt.
+1. Run the test from [Getting started, part 1](../Getting-Started.md#1-her-model). If she fails it, the model was built from an older Modelfile with `SYSTEM` instead of `MESSAGE system`, or not rebuilt after editing. Run `ollama create lena -f Modelfile` again.
+2. Check the app is using the `lena` model, not its base model (`gemma4:12b`).
+3. In Open WebUI, check the `lena` model's System Prompt is empty, or at least doesn't describe a different personality.
+4. Make sure the context window is large enough (see [Performance tuning](Performance-Tuning.md)). Her character is never trimmed, but a tiny window crowds out everything else.
 
-## The memory sensor does not load
+## The prompt fails to render ("Error rendering prompt")
 
-Home Assistant config errors usually name the file and line. Common ones:
+Usually `lena.jinja` isn't where Home Assistant looks. It must be at `config/custom_templates/lena.jinja`, and you need to run **Reload custom Jinja2 templates** (Developer tools → Actions) after copying or changing it. Test with `{% from 'lena.jinja' import feelings %}{{ feelings() }}` in Developer tools → Template.
 
-| Message | Cause and fix |
-| --- | --- |
-| `'template' is an invalid option for 'template'` | The file has its own `template:` key but is already included under `template:`. Remove the first line so the file starts with `- triggers:` |
-| `'lena_memory' is an invalid option for 'template'` | You wrapped the list in a key of your own. Remove it. The `!include_dir_merge_named` variant also causes this; use `!include_dir_merge_list` |
-| `'NodeListClass' object has no attribute 'keys'` | A list file was given to an include that expects a dictionary (the `_named` includes). Use `!include_dir_merge_list templates/` or a single `!include` |
-| `Referenced entities todo.… are missing or not currently available` | The to-do entity ID in the sensor file is wrong. Look it up in Developer tools > States and replace all four occurrences |
+## Her feelings don't change
 
-If the sensor exists but has no `memories` attribute, an older sensor with the same name is still defined (look in Settings > Devices & services > Helpers and in your YAML files). Remove it, run the configuration check, then reload template entities.
+- Check the **Lena Mood Engine** automation exists, is enabled, and has the right five helpers. Open its trace.
+- Her mood only drifts once it has lasted the "Mood lasts at least" time, and then only with the hourly chance you set. Change it by hand to see her react straight away.
+- A name the engine picks but a dropdown doesn't offer is skipped. Compare the dropdown options with [Helpers](Helpers.md); they're case-sensitive.
+- Reasons cut off or not saved: set the Text helpers' maximum length to 255.
 
-The sensor stays `unknown` until a trigger fires. It fires when the list changes, on startup and on a template reload.
+## Her feelings don't show in Open WebUI or the app
+
+See [Lena in Open WebUI](../open-webui/Setup.md#if-somethings-wrong). In short: the filter must be on and ticked on the `lena` model, its Home Assistant address must work from inside the Open WebUI container, and rendering feelings needs an admin's token.
+
+## She overdoes a mood
+
+Make the description in `lena.jinja` calmer, or lower the mood engine's change chance so big moods are rarer. If she names her mood out loud a lot ("I'm feeling grumpy"), remove the mood's name from its own description.
+
+## She calls Lena feel all the time, or never
+
+- All the time: smaller models over-use tools. Lower the Modelfile's temperature, or don't expose **Lena feel** to Assist.
+- Never: check the script is exposed to Assist (in Home Assistant) or the tool is ticked on the model with Function Calling set to Native (in Open WebUI). She's told to use it only when something genuinely lands, so a plain request won't trigger it.
 
 ## She says she saved a memory but nothing is in the list
 
-The model did not make the tool call. Check that the to-do list is exposed to Assist, then try again. Some small models claim success without calling the tool; a different base model or a lower temperature can help.
+The model didn't make the tool call. Check the to-do list is exposed to Assist (Home Assistant) or the Lena tool is ticked on the model (Open WebUI), then try again. Some small models claim success without calling the tool; a lower temperature can help.
 
-## Moods never change
+## She doesn't remember things in Home Assistant
 
-- Check the automation exists and is enabled, and open its trace.
-- Test by changing the mood helper by hand: Delivery and Flavor should update.
-- If a value never appears, the helper may lack that option (names are case-sensitive).
-
-## A blueprint step fails
-
-Open the automation's trace. Errors from empty lists were fixed in 1.0.0; if you edit the pools, keep every pool non-empty.
+She reads her memory with the **Lena recall** script, which must be exposed to Assist. She checks when she thinks it matters; ask "what do you remember about Alex?" to test it directly.
 
 ## Wrong light turns on, or she cannot find a device
 
@@ -47,8 +51,8 @@ Give every exposed entity a distinct name. Several entities called "Light Switch
 
 ## The voice has background noise
 
-See [Voice-Piper](../voice/Piper.md).
+See [Piper](../voice/Piper.md).
 
 ## Replies are slow
 
-See [Performance-Tuning](Performance-Tuning.md).
+See [Performance tuning](Performance-Tuning.md).

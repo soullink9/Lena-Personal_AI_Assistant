@@ -1,81 +1,108 @@
-# Installation
+# Home Assistant installation
 
-[← Back to README](../../README.md)
+[← Back to Getting started](../Getting-Started.md)
 
-Menu names in Home Assistant change between versions. Where a path below does not match what you see, look for the closest equivalent.
+This gives Lena her voice in your house, and her feelings and shared memory everywhere. Everything is created in the Home Assistant UI; the only files you copy in are her feelings template and three blueprints. Menu names change between Home Assistant versions; if a path doesn't match, look for the closest equivalent.
 
 ## What you need
 
-- Home Assistant 2024.10 or newer with Assist set up.
-- A machine running [Ollama](https://ollama.com/). This was built on an RTX 4070 Ti Super with 16 GB of VRAM; a 9B-class model with a 32k context fits on a card that size (use 16k on a smaller card).
-- A speech-to-text and a text-to-speech service connected to Home Assistant (for example Whisper and Piper through the Wyoming integration). Not needed if you only type to her.
+- Home Assistant 2025.4 or newer with Assist.
+- Lena built in Ollama ([Getting started, part 1](../Getting-Started.md#1-her-model)).
+- For voice: speech-to-text and text-to-speech connected to Home Assistant, for example Whisper and Piper through the Wyoming integration ([Piper](../voice/Piper.md)). Not needed if you only type to her.
+- A way to copy files into your Home Assistant config folder: the File editor or Studio Code Server add-on, a Samba share, or SSH.
 
-## 1. Build the model
+## 1. Connect Ollama
 
-Copy `ollama/Modelfile` to the machine running Ollama. Open it and check the `FROM` line: it names the base model, and Ollama must be able to download it. Then run:
+1. Settings → Devices & services → Add integration → **Ollama**, with your Ollama address (`http://<server>:11434`).
+2. Add a conversation agent and choose the model `lena`. Then set:
+   - **Instructions:** leave for now; you'll paste the prompt in step 7.
+   - **Control Home Assistant:** on, with **Assist**. Without it she can talk but can't control anything or use her scripts.
+   - **Context window size:** 32768, the same as `num_ctx` in the Modelfile.
+   - **Keep alive:** -1, so the model stays loaded.
+   - **Think before responding** (if your version has it): off. Thinking adds seconds to every spoken reply.
+
+## 2. Create her helpers
+
+Settings → Devices & services → Helpers → Create helper. Three **Dropdown** helpers and two **Text** helpers hold her feelings, and an optional **Local To-do** list holds her memory. The exact names and options are on the [Helpers](Helpers.md) page. Names are case-sensitive.
+
+## 3. Copy in her files
+
+From this repository's `home-assistant` folder, copy into your Home Assistant config folder (the one with `configuration.yaml`):
+
+| Copy | To |
+|---|---|
+| `custom_templates/lena.jinja` | `config/custom_templates/lena.jinja` |
+| `blueprints/automation/soullink9/lena_mood_engine.yaml` | `config/blueprints/automation/soullink9/` |
+| `blueprints/script/soullink9/lena_feel.yaml` and `lena_recall.yaml` | `config/blueprints/script/soullink9/` |
+
+The folder layout matches what Home Assistant expects, so you can copy the whole `custom_templates` and `blueprints` folders in as they are.
+
+Then load them, from Developer tools → Actions:
+
+- **Home Assistant Core Integration: Reload custom Jinja2 templates** (`homeassistant.reload_custom_templates`).
+- **Automation: Reload** and **Script: Reload**, so the new blueprints are listed.
+
+Check her feelings template in Developer tools → Template:
 
 ```
-ollama create lena -f Modelfile
-ollama run lena
+{% from 'lena.jinja' import feelings %}{{ feelings() }}
 ```
 
-Say hello and check that she has a personality. Press Ctrl+D to leave. To change her later, edit the file and run the same `ollama create` command again.
+You should see "## How you feel right now" with her mood, energy and a description.
 
-Optional: the Docker example in `ollama/docker-compose.example.yml` runs Ollama with a watchdog that keeps the model loaded. See [Performance-Tuning](Performance-Tuning.md).
+> If this repository is public, you can import the blueprints instead: Settings → Automations & scenes → Blueprints → Import blueprint, with each file's GitHub address. Home Assistant can't import from a private repository, so copy them in.
 
-## 2. Connect Ollama to Home Assistant
+## 4. Start her mood engine
 
-1. Settings > Devices & services > Add integration > **Ollama**.
-2. Enter the URL of your Ollama server in the form `http://<server-address>:11434`, and choose the model `lena`.
-3. Open the settings for the conversation agent that was created and set:
-   - **Control Home Assistant**: enabled, using the Assist API. Without this she can talk but cannot control anything.
-   - **Context window**: 32768, the same number as `num_ctx` in the Modelfile.
-   - **Keep alive**: -1, so the model stays loaded.
-   - **Think / reasoning** (if your version has it): off, for voice. Thinking adds long delays.
+Settings → Automations & scenes → Blueprints → **Lena Mood Engine** → Create automation.
 
-## 3. Create the helpers
+- **Her feelings helpers:** the five helpers from step 2.
+- **Her day:** when she wakes and goes to bed, and optionally a calendar with birthdays and holidays.
+- **Her house:** the people she misses, a weather entity, and binary sensors that should worry her (leak, smoke, a door or garage left open). All optional.
+- **Timing:** the defaults are a good start.
 
-Create the five dropdown helpers and the to-do list. Names and options are on the [Helpers](Helpers.md) page. Create them through the UI; the blueprint does not create them.
+Save. To see it work without waiting, set her mood helper to something else by hand and watch the automation's trace. What each setting does: [Her feelings](../personality/Moods.md).
 
-## 4. Import the blueprint
+## 5. Create her scripts
 
-The blueprint is `home-assistant/blueprints/automation/soullink9/ai_persona_engine.yaml`. Either:
+Settings → Automations & scenes → Scripts → Create script → from a blueprint.
 
-- **Copy it in** (works for a private repository): copy the `home-assistant/blueprints` folder into your Home Assistant configuration folder, so the file ends up at `config/blueprints/automation/soullink9/ai_persona_engine.yaml`, then reload automations. The folder layout already matches what Home Assistant expects.
-- **Import it** (public repositories only): Settings > Automations & scenes > Blueprints > Import blueprint, and paste the file's GitHub URL. Home Assistant can't read files from a private repository.
+1. **Lena feel**: pick her Moment dropdown and Moment reason text helper. Name it `Lena feel` (so it becomes `script.lena_feel`).
+2. **Lena recall** (only if you want memory): pick her memory to-do list. Name it `Lena recall`.
 
-Then create an automation from it, choose your five helpers, and save. The defaults are fine to start. See [Persona-Engine](Persona-Engine.md) for what each setting does.
+Don't give either script a description of your own. The blueprint's description is what tells her when to use it, and one you add replaces it.
 
-To see it work without waiting hours, change the mood helper by hand: the Delivery and Flavor helpers should update within a second.
+## 6. Choose what she can see
 
-## 5. Add the prompt
+Settings → Voice assistants → **Expose**:
 
-Open `home-assistant/lena_prompt.txt`, change the entity IDs to yours (the header comment lists them), and paste the whole file into the conversation agent's **Instructions** field. Details in [Prompt-Reference](Prompt-Reference.md).
+- Expose **Lena feel**, **Lena recall** and her **Lena's Memory** to-do list. These are her tools.
+- Don't expose her five feelings helpers; she gets those through her prompt, and exposing them invites her to change her own mood on request.
+- Expose only devices you'd mention out loud. Under about a hundred entities is faster and more accurate, and give duplicates distinct names (four lights all called "Light Switch" cause wrong-device errors).
 
-You can paste it into Developer tools > Template first to see exactly what the model will receive.
+## 7. Paste her prompt
 
-## 6. Add memory (optional)
+Open `home-assistant/lena_prompt.txt` and paste the whole file into the Ollama agent's **Instructions** (step 1). It's short: her character is in the model, so this only adds the time, who's home, how she feels and how to use her memory.
 
-Follow [Memory](Memory.md) to create the to-do list and add the sensor.
+- If your helpers have different entity IDs, pass them to `feelings()` (the comment under it shows how).
+- If you skipped memory, delete the "Your memory" section at the end.
 
-## 7. Create a voice assistant
+Paste it into Developer tools → Template first to see exactly what she'll receive. More in the [Prompt reference](Prompt-Reference.md).
 
-1. Settings > Voice assistants > Add assistant.
-2. Conversation agent: **Lena** (the Ollama agent).
-3. Speech-to-text and text-to-speech: your Whisper and Piper entries.
-4. Consider enabling **Prefer handling commands locally**. Simple commands like "turn on the kitchen light" are then handled instantly without the model, and Lena handles everything else.
+## 8. Make a voice assistant
 
-Voice tuning is on [Voice-Piper](../voice/Piper.md).
+Settings → Voice assistants → Add assistant:
 
-## 8. Choose what she can see
-
-Settings > Voice assistants > Expose. Expose only what you would say out loud. Fewer than about a hundred entities is faster and more accurate. Give duplicate names distinct names (four lights all called "Light Switch" cause wrong-device errors), and leave her own helpers and memory list unexposed unless you want to change them by voice.
+- **Conversation agent:** your Lena (Ollama) agent.
+- **Speech-to-text** and **Text-to-speech:** your Whisper and Piper.
+- **Prefer handling commands locally:** on. Simple commands like "turn on the kitchen light" are then handled instantly without the model, and Lena handles everything else.
 
 ## 9. Try it
 
-- "Turn on the kitchen light."
 - "Who are you?"
-- "Remember that Alex likes the office at seventy degrees." Then check the to-do list.
-- Change the mood helper and ask the same thing twice.
+- "Turn on the kitchen light."
+- "Remember that Alex likes the office at seventy degrees." Check the to-do list, then ask "What do you remember about Alex?"
+- Set her mood to **Grumpy** by hand and ask how her day is going. Then **Fond**, and ask again.
+- "Thank you, Lena, that was perfect." Her Moment may change to **Pleased**.
 
-If something is wrong, see [Troubleshooting](Troubleshooting.md).
+If something's wrong, see [Troubleshooting](Troubleshooting.md). Then finish the Open WebUI side so her feelings and memory reach your phone: [Lena in Open WebUI](../open-webui/Setup.md).

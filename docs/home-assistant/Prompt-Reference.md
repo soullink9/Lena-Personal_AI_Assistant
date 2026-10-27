@@ -1,51 +1,52 @@
 # Prompt reference
 
-[← Back to README](../../README.md)
+[← Back to Home Assistant installation](Installation.md)
 
-Lena's instructions come from two places. Understanding the split makes editing safe.
+What Lena receives from Home Assistant, in the order the model sees it:
 
-## The split
+| # | Part | From | Contains |
+|---|---|---|---|
+| 1 | Her character | `ollama/Modelfile` (`MESSAGE system`) | Who she is, how she talks, honesty, running the house, how to act on feelings. Always first, whatever Home Assistant sends. |
+| 2 | Her prompt | `home-assistant/lena_prompt.txt`, pasted into the agent's Instructions | She's speaking aloud, the time, who's home, how she feels, how to use her memory |
+| 3 | Home Assistant's block | Home Assistant itself | The devices and areas she can see, and how to use its tools |
+| 4 | Tools | Home Assistant | Device control, timers, to-do lists, and her exposed scripts (Lena feel, Lena recall) |
+| 5 | The conversation | Home Assistant | What was said |
 
-| | `ollama/Modelfile` | `home-assistant/lena_prompt.txt` |
-| --- | --- | --- |
-| Answers | Who is Lena? | Where is she, and what is happening right now? |
-| Used by | Anything that loads the model | Only Home Assistant |
-| Contains | Character, humor, honesty, how she talks, hard rules | Voice rules, accuracy rules, memory rules, live data, mood, legend |
-| Changes | Rarely | Every request (it is a template) |
+Because part 1 always arrives, part 2 doesn't repeat her character. It only adds what's true right now in this house.
 
-Home Assistant may **replace** the Modelfile's system prompt with its own instructions rather than add to it. Because of that, `lena_prompt.txt` repeats the core of her character in its "Who you are" section. Keep the two in agreement.
+## The prompt file
 
-Home Assistant also **adds its own block after your instructions**: the list of exposed devices and rules for calling its tools. Do not duplicate that in the prompt.
+`lena_prompt.txt` is a template that Home Assistant renders before every request:
 
-## How the prompt is built
-
-The file is a Jinja template. Home Assistant renders it before every request:
-
-- `{{ ... }}` parts are replaced with live values (time, who is home, memory text, the five mood helpers).
+- `{{ ... }}` parts become live values: the time, the people at home, her feelings.
 - `{# ... #}` parts are comments and are removed, so they cost nothing.
-- `pick('entity', 'fallback')` is a small helper at the top. It returns an entity's state, or the fallback when the entity is missing or unavailable, so the model never sees the word "unknown".
+- `{% from 'lena.jinja' import feelings %}` loads her feelings from `config/custom_templates/lena.jinja`. If that file is missing the whole prompt fails to render, so copy it in first.
 
-To preview the result, paste the file into Developer tools > Template in Home Assistant, or run `python3 tools/check.py` for a test render with stand-in data.
+To preview it, paste the file into Developer tools → Template, or run `python3 tools/check.py` for a test render.
 
 ## Sections
 
 | Section | Purpose |
-| --- | --- |
-| Who you are | Short copy of her character, in case the Modelfile prompt is replaced |
-| Voice rules | Everything is spoken: no markdown, lists or symbols; numbers said the way a person says them |
-| Accuracy | Never claim success without confirmation; report each outcome of multi-part requests |
-| Interpreting requests | Room handling, sensible inference, confirmation before opening the house |
-| Being a real assistant | Keeps her useful beyond device control |
-| Your memory | When and how to write to the memory list |
-| Household context | Time, who is home, the memory text |
-| Expression modifiers | Current mood, energy, reaction, delivery, flavor, plus a legend for every value |
-| Never | Limits that hold in every state |
+|---|---|
+| Opening line | Everything she says is spoken, so her spoken-reply rules apply |
+| Right now | Day and time, and who's home (remove it if you don't use person entities) |
+| How you feel right now | From `feelings()`: her current mood, energy and moment, each with its description and reason |
+| Your memory | When to check, save and forget, using her shared to-do list (delete it if you don't use memory) |
+
+## Different helper names
+
+If your helpers' entity IDs differ from the defaults, pass them in:
+
+```
+{{ feelings(mood_entity='input_select.my_mood', energy_entity='input_select.my_energy',
+            moment_entity='input_select.my_moment', mood_reason_entity='input_text.my_mood_reason',
+            moment_reason_entity='input_text.my_moment_reason') }}
+```
+
+The Open WebUI filter uses the defaults. If you change them, change `FEELINGS_TEMPLATE` at the top of `open-webui/lena_filter.py` the same way.
 
 ## Editing tips
 
-- Change a personality trait in **both** files.
-- If you add an option to a helper, add its meaning to the legend. Otherwise the model guesses.
-- The confirmation before unlocking doors, opening the garage or gate, or disarming an alarm is in "Interpreting requests". Delete that bullet if you do not want it.
-- Keep it short. Every token is sent on every request, and small models follow short, concrete rules better than long ones.
-- Use quoted "never say X" phrases sparingly. Small models sometimes repeat the very phrases they are told to avoid. The prompt names a few generic filler phrases because a model without them replied with exactly that filler; prefer describing the behavior wanted for everything else.
-- After editing, test with one plain command, one question, one joke and one serious topic.
+- Character changes go in the Modelfile, not here, so every app gets them.
+- Keep it short. Every word is sent with every request, alongside Home Assistant's device list.
+- After editing, test with a command, a question, a joke and a serious topic.

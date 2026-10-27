@@ -11,38 +11,35 @@ Lena is one character reached three ways: by voice through Home Assistant, by ty
         │ HTTPS
         ▼
    Open WebUI ──speech──► voice bridge ──Wyoming──► Whisper + Piper ◄──Wyoming── Home Assistant Assist
-        │                                                                              │
-        └──────────────────────────► Ollama, model "lena" ◄────────────────────────────┘
-                                  (Modelfile = her character)
+     │    ▲                                                                         │      │
+     │    └──── Lena filter and tool: her feelings and shared memory ◄──────────────┼──────┤
+     │                                                                              │  mood engine,
+     └────────────────────────► Ollama, model "lena" ◄──────────────────────────────┘  helpers,
+                               (Modelfile = her character)                             memory list
 ```
 
-- **Home Assistant** listens with Whisper, builds a prompt from `lena_prompt.txt` plus the state of your home, her memory and today's mood, sends it to the `lena` model, carries out any device actions and speaks the reply with Piper.
-- **Open WebUI** uses the same `lena` model with your tools, knowledge collections and memories.
-- **The Lena app** is a native Android shell around your Open WebUI, plus extras a web page can't do: being your phone's assistant, a voice sheet, a widget, a Quick Settings tile, Share to Lena, notifications and scheduled prompts. Everything it starts is saved in your Open WebUI history.
+- **Ollama** runs the `lena` model. Her whole character is built into it, so every app gets the same Lena.
+- **Home Assistant** listens with Whisper, adds the time, who's home and how she feels to her prompt, sends it to `lena`, carries out device actions and speaks the reply with Piper. It also keeps her **feelings** (the mood engine and five helpers) and her **memory** (a to-do list).
+- **Open WebUI** uses the same `lena` model with your tools and knowledge. The **Lena filter** brings her current feelings and memory over from Home Assistant, and the **Lena tool** lets her save memories and react, so she's the same Lena in a chat as in the kitchen.
+- **The Lena app** is a native Android shell around your Open WebUI, plus what a web page can't do: being your phone's assistant, a voice sheet, a widget, a Quick Settings tile, Share to Lena, notifications and scheduled prompts. It goes through Open WebUI, so the filter and tool work there too.
 - **The voice bridge** lets Open WebUI (and so the app) use the same Piper voice and Whisper as Home Assistant. Without it, Open WebUI uses its own speech engines.
 
 ## Who decides what
 
-Three things shape how she talks:
-
-| Part | What it decides | Where it applies |
+| Part | Decides | Applies to |
 |---|---|---|
-| `ollama/Modelfile` | Who she is: character, humour, values, model settings | Everywhere the `lena` model is used |
-| `home-assistant/lena_prompt.txt` | Where she is right now: spoken replies only, the house, what she remembers, her current mood | Home Assistant only |
-| The persona engine blueprint | How her mood, energy, delivery and flavour change through the day | Home Assistant only |
+| `ollama/Modelfile` | Who she is: character, voice, values, honesty, how she runs the house and acts on feelings | Everything that uses the `lena` model |
+| Home Assistant's mood engine, helpers and `lena.jinja` | How she feels right now, and why | Home Assistant directly; Open WebUI and the app through the filter |
+| `home-assistant/lena_prompt.txt` | That she's speaking aloud, the time, who's home, how to use her memory | Home Assistant voice |
+| The Lena filter in Open WebUI | Her feelings and memory in chats | Open WebUI and the app |
 
-In Open WebUI and the app she gets her character from the Modelfile and her context from Open WebUI's own system prompt, tools and memories. More in the [Prompt reference](home-assistant/Prompt-Reference.md).
+More: [Her personality](personality/Personality.md) and [Her feelings](personality/Moods.md).
 
-## Her two memories
+## One memory
 
-Lena currently remembers things in two separate places:
+Her memory is one Home Assistant to-do list, **Lena's Memory**, shared everywhere. In Home Assistant she reads it with the Lena recall script; in Open WebUI and the app the filter adds it to every chat, and the tool saves and forgets. See [Memory](home-assistant/Memory.md).
 
-| Memory | Where it's kept | Used by | How to see it |
-|---|---|---|---|
-| **Lena's Memory** to-do list | Home Assistant | Home Assistant voice | The to-do list in Home Assistant. See [Memory](home-assistant/Memory.md). |
-| **Open WebUI memories** | Open WebUI | Open WebUI and the app | **Memory & knowledge** in the app's drawer, or Open WebUI's settings |
-
-Something you tell her in the kitchen isn't automatically known on your phone, and the other way round.
+Open WebUI's own memory feature is separate; turn it off for a single shared memory. The app's **Memory & knowledge** screen shows Open WebUI's memories and knowledge, not her shared list.
 
 ## One context size
 

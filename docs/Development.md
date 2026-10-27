@@ -13,14 +13,20 @@ How the repository is organised and how to change it without breaking things. Th
 ├── CONTRIBUTING.md
 ├── LICENSE                        GPL-3.0
 ├── ollama/
-│   ├── Modelfile                  Lena's character and model settings
+│   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog
 ├── home-assistant/
 │   ├── lena_prompt.txt            prompt pasted into the Ollama agent
-│   ├── templates/
-│   │   └── lena_memory_sensor.yaml      memory sensor (YAML)
-│   └── blueprints/automation/soullink9/
-│       └── ai_persona_engine.yaml       mood and energy blueprint
+│   ├── custom_templates/
+│   │   └── lena.jinja             how each feeling sounds; feelings()
+│   └── blueprints/
+│       ├── automation/soullink9/lena_mood_engine.yaml   what moves her feelings
+│       └── script/soullink9/
+│           ├── lena_feel.yaml     her tool: react to how she's treated
+│           └── lena_recall.yaml   her tool: read her memory
+├── open-webui/
+│   ├── lena_filter.py             feelings and memory into chats
+│   └── lena_tools.py              remember, forget, feel
 ├── android/                       the Lena app (Gradle project)
 │   └── app/src/main/kotlin/io/github/soullink9/lena/
 ├── voice/
@@ -29,14 +35,14 @@ How the repository is organised and how to change it without breaking things. Th
 ├── tools/
 │   └── check.py                   offline checks
 ├── docs/                          everything in detail
-│   ├── Overview.md, Development.md
-│   ├── home-assistant/, app/, voice/
+│   ├── Getting-Started.md, Overview.md, Development.md
+│   ├── personality/, open-webui/, home-assistant/, app/, voice/
 └── .github/
     ├── workflows/build.yml        builds, signs and releases the app
     └── ISSUE_TEMPLATE/
 ```
 
-The blueprint sits in `blueprints/automation/soullink9/` on purpose. That's the folder Home Assistant expects (`config/blueprints/automation/<author>/`), so the whole `blueprints` folder can be copied into a Home Assistant configuration as it is.
+The blueprints sit in `blueprints/<automation|script>/soullink9/` and the template in `custom_templates/` on purpose. Those are the folders Home Assistant expects, so both folders can be copied into a Home Assistant configuration as they are.
 
 The app build only runs when something in `android/` or the workflow changes, so editing docs or Home Assistant files doesn't build an APK.
 
@@ -44,9 +50,10 @@ The app build only runs when something in `android/` or the workflow changes, so
 
 | If you change... | ...also update |
 |---|---|
-| Her character in `ollama/Modelfile` | The "Who you are" section of `home-assistant/lena_prompt.txt` |
-| A word used in the blueprint pools | The legend in `lena_prompt.txt` and the options on the [Helpers](home-assistant/Helpers.md) page |
-| An entity ID | `lena_prompt.txt`, `lena_memory_sensor.yaml`, and the pages that mention it |
+| Her character | Only `ollama/Modelfile`. Nothing else repeats it. Rebuild the model. |
+| A feeling's name (adding, renaming) | `lena.jinja`, its dropdown's options on the [Helpers](home-assistant/Helpers.md) page, the mood engine's lists, and for moments she sets herself `lena_feel.yaml` and `open-webui/lena_tools.py`. See [Her feelings](personality/Moods.md#add-or-rename-a-feeling). |
+| A feelings helper's entity ID | The defaults in `lena.jinja`'s `feelings()` (or the call in `lena_prompt.txt` and `FEELINGS_TEMPLATE` in `lena_filter.py`), and the [Helpers](home-assistant/Helpers.md) page |
+| The memory list's entity ID | The `memory_list` settings of the Open WebUI filter and tool, and the [Helpers](home-assistant/Helpers.md) page |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Lena's context size** in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The app's version | `versionCode` and `versionName` in `android/app/build.gradle.kts`, plus an **App** entry in `CHANGELOG.md` |
@@ -59,21 +66,32 @@ pip install pyyaml jinja2
 python3 tools/check.py
 ```
 
-The script checks that the YAML files and templates parse, that the prompt renders with every helper missing, that every persona word in the blueprint appears in the prompt, that the compose watchdog escapes its dollar signs, that the context size matches across the Modelfile and the app, that the voice bridge compiles, and that no obvious private data (home IP addresses, tokens, passwords) has crept in. It can't test Home Assistant, Ollama or the app itself.
+The script checks that:
+
+- the YAML files and templates parse;
+- `feelings()` renders every combination of mood, energy and moment, describing only the current ones;
+- her Home Assistant prompt renders;
+- every feeling the mood engine, the Lena feel script and the Open WebUI tool use is defined in `lena.jinja`, and the script and tool offer the same moments;
+- every branch of the mood engine runs against stand-in states and writes only defined feelings;
+- the Modelfile carries her character in `MESSAGE system`, and its context size matches the app's;
+- the Python files compile, the compose watchdog escapes its dollar signs, and no obvious private data (home IP addresses, tokens, passwords) has crept in.
+
+It can't test Home Assistant, Ollama, Open WebUI or the app themselves.
 
 ## Testing a change for real
 
-- **Prompt:** paste it into **Developer tools → Template**, then ask Lena a command, a question, a joke and a serious question.
-- **Blueprint:** reload automations, change a helper by hand, and read the automation trace.
-- **Modelfile:** `ollama create lena -f ollama/Modelfile`, then `ollama run lena`.
-- **Memory sensor:** run the configuration check, reload template entities, and look at the sensor in **Developer tools → States**.
+- **Modelfile:** `ollama create lena -f ollama/Modelfile`, then the test in [Getting started](Getting-Started.md#1-her-model), then a command, a question, a joke and a serious question.
+- **Feelings:** copy `lena.jinja` in, reload custom templates, set the helpers by hand and render `feelings()` in **Developer tools → Template**.
+- **Mood engine and scripts:** reload automations and scripts, change a helper by hand, and read the traces.
+- **Prompt:** paste it into **Developer tools → Template**.
+- **Open WebUI filter and tool:** paste the new version over the old one in Open WebUI, then try the test in [Lena in Open WebUI](open-webui/Setup.md#7-test-it).
 - **App:** push to `main` (or run **Build APK** by hand) and install the APK from the run. See [App development](app/Development.md).
 - **Voice bridge:** rebuild the container, then try call mode in Open WebUI and check the bridge's log.
 
 ## Releasing
 
 - **The app** is released from GitHub Actions: bump the version, add the changelog entry, then **Actions → Build APK → Run workflow** with **Publish a release** ticked. Details in [App development](app/Development.md#making-a-release).
-- **The Home Assistant files and the Modelfile** don't need a build. Add an entry under **Home Assistant personality** in `CHANGELOG.md`, run the checks and commit. People update by copying the new files in (or re-importing the blueprint).
+- **The personality** (Modelfile, Home Assistant files, Open WebUI files) doesn't need a build. Add an entry under **Personality** in `CHANGELOG.md`, run the checks and commit. People update by rebuilding the model, copying the new files in (or re-importing the blueprints) and pasting the Open WebUI files over the old ones.
 
 ## Conventions
 

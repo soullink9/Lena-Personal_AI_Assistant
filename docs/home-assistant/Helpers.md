@@ -1,35 +1,30 @@
 # Helpers
 
-[← Back to README](../../README.md)
+[← Back to Home Assistant installation](Installation.md)
 
-The blueprint reads and writes five dropdown helpers, and the prompt reads them back. Create them in the Home Assistant UI: Settings > Devices & services > Helpers > Create helper > **Dropdown**.
+Lena's feelings live in five helpers, and her memory in a to-do list. Create them all in the Home Assistant UI: Settings → Devices & services → Helpers → **Create helper**. The mood engine writes the feelings, her prompt reads them, and you can change them by hand at any time.
 
-Option names are **case-sensitive**. If a helper lacks an option the blueprint wants to use, that option is skipped silently, so a missing word just means she never uses it.
+Names are **case-sensitive** and must match `custom_templates/lena.jinja`. A name a dropdown doesn't offer is simply never chosen, so leaving one out just means she never feels it.
 
-## The five dropdowns
+## Her feelings
 
-Suggested names and entity IDs (the prompt uses these IDs; change them in the prompt if yours differ):
+| Create a | Name | Entity ID | Options / settings |
+|---|---|---|---|
+| Dropdown | Lena Mood | `input_select.lena_mood` | Content, Cheerful, Playful, Smug, Curious, Focused, Restless, Wistful, Grumpy, Uneasy, Fond |
+| Dropdown | Lena Energy | `input_select.lena_energy` | Groggy, Steady, Wired, Drained |
+| Dropdown | Lena Moment | `input_select.lena_moment` | Nothing, Pleased, Amused, Proud, Touched, Delighted, Exasperated, Offended, Worried, Relieved |
+| Text | Lena Mood Reason | `input_text.lena_mood_reason` | Maximum length **255** |
+| Text | Lena Moment Reason | `input_text.lena_moment_reason` | Maximum length **255** |
 
-| Name | Entity ID | Options |
-| --- | --- | --- |
-| Lena's Mood | `input_select.lenas_mood` | Content, Confident, Interested, Appreciative, Joyful, Surprised, Disgusted, Anxious, Angry, Sad |
-| Lena's Energy Level | `input_select.lenas_energy_level` | Exhausted, Lazy, Caffeinated, Hyperactive |
-| Lena's Reaction | `input_select.lenas_reaction` | Neutral, Irritated, Frustrated, Impressed, Curious, Protective |
-| Lena's Delivery | `input_select.lenas_delivery` | Deadpan, Dry, Witty, Sharp, Smug, Playful, Warm, Subtle, Dramatic |
-| Lena's Delivery Flavor | `input_select.lenas_delivery_flavor` | Mischievous, Observational, Curious, Philosophical, Protective, Playful, Dramatic, Subtle |
+- **Mood** is how she is today; it lasts hours.
+- **Energy** follows her day: groggy in the morning, drained at night.
+- **Moment** is a reaction to something that just happened. **Nothing** means no reaction; it's listed first so it's the starting value.
+- The two **Reason** helpers hold why she feels that way ("It just started raining."), so she can mention it. Text helpers default to a maximum of 100 characters; set it to 255 under **Advanced settings** when you create them.
 
-Home Assistant builds the entity ID from the name when you create the helper. Check the real ID in Developer tools > States.
+Home Assistant builds the entity ID from the name. If yours come out different, check them in Developer tools → States and pass them to `feelings()` in her prompt. What each feeling means and what moves her between them: [Her feelings](../personality/Moods.md).
 
-### What each one means
+## Her memory (optional)
 
-- **Mood**: her emotional tone. Changes every few hours.
-- **Energy**: how much effort and speed shows. Follows the time of day.
-- **Reaction**: her attitude to the most recent request. Nothing in this repository sets it; use your own scripts or automations if you want it to react to events. It returns to Neutral on its own.
-- **Delivery**: how she phrases things. Derived from the other three.
-- **Delivery flavor**: the extra touch she adds. Derived from the other three.
+Settings → Devices & services → Add integration → **Local To-do**, named `Lena's Memory`. It usually becomes `todo.lena_s_memory`, because Home Assistant turns the apostrophe into an underscore. Check in Developer tools → States.
 
-The prompt has a one-line meaning for every option. If you add an option, add its meaning to the prompt too, or the model has to guess. `tools/check.py` warns if a word used by the blueprint is missing from the prompt.
-
-## The memory list
-
-Her memory is a to-do list. Create it with Settings > Devices & services > Add integration > **Local To-do**, and name it `Lena's Memory`. Check its entity ID in Developer tools > States; you will need it for the [memory sensor](Memory.md).
+This one list is her memory everywhere: in Home Assistant, in Open WebUI and in the Lena app. See [Memory](Memory.md).

@@ -39,6 +39,8 @@ Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but 
 
 You can still start a chat with any model by tapping the title in the top bar.
 
+To talk to Lena herself, pick the `lena` model. Her personality, feelings and shared memory then work in the app exactly as in Open WebUI, because the app goes through Open WebUI: set them up once in [Lena in Open WebUI](../open-webui/Setup.md).
+
 ## Tools
 
 **In the main app**, chats are the real Open WebUI page, so tools work exactly as they do in your browser.
