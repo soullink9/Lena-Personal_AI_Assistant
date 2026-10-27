@@ -11,6 +11,16 @@
     <!-- Sets scheduled prompts again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <!-- allowBackup=false + extraction rules: your sign-in never goes to Google backups or phone-to-phone transfers. -->
     <application
         android:allowBackup="false"

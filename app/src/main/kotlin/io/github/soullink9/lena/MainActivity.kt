@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package io.github.soullink9.lena
 
@@ -25,7 +25,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +51,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -56,6 +61,8 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
@@ -73,12 +80,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +95,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -394,6 +406,9 @@ class MainActivity : ComponentActivity() {
         var checked by remember { mutableStateOf(false) }
         var title by remember { mutableStateOf("Lena") }
         var modelMenu by remember { mutableStateOf(false) }
+        var refresh by remember { mutableIntStateOf(0) }
+        var renaming by remember { mutableStateOf<ChatItem?>(null) }
+        var deleting by remember { mutableStateOf<ChatItem?>(null) }
         val url = currentUrl.value
         val chatId = chatIdOf(url)
 
@@ -409,7 +424,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Fill the drawer when it opens, and as you search.
-        LaunchedEffect(drawer.isOpen, query) {
+        LaunchedEffect(drawer.isOpen, query, refresh) {
             if (!drawer.isOpen) return@LaunchedEffect
             if (query.isNotBlank()) delay(300)
             version = api.version()
@@ -460,9 +475,12 @@ class MainActivity : ComponentActivity() {
                             shape = RoundedCornerShape(28.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                         )
-                        ChatList(chats, chatsError, query.isNotBlank(), chatId, Modifier.weight(1f)) { id ->
-                            closeThen { openChat(id) }
-                        }
+                        ChatList(
+                            chats, chatsError, query.isNotBlank(), chatId, Modifier.weight(1f),
+                            onOpen = { id -> closeThen { openChat(id) } },
+                            onRename = { renaming = it },
+                            onDelete = { deleting = it },
+                        )
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                         NavigationDrawerItem(
                             label = { Text("Open WebUI menus") },
@@ -533,7 +551,51 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        renaming?.let { c ->
+            var newTitle by remember(c.id) { mutableStateOf(c.title) }
+            AlertDialog(
+                onDismissRequest = { renaming = null },
+                title = { Text("Rename chat") },
+                text = { OutlinedTextField(value = newTitle, onValueChange = { newTitle = it }, singleLine = true) },
+                confirmButton = {
+                    TextButton(enabled = newTitle.isNotBlank(), onClick = {
+                        val t = newTitle.trim()
+                        renaming = null
+                        scope.launch {
+                            if (runCatching { api.renameChat(c.id, t) }.isFailure) toast("Couldn't rename the chat")
+                            refresh++
+                        }
+                    }) { Text("Rename") }
+                },
+                dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
+            )
+        }
+
+        deleting?.let { c ->
+            AlertDialog(
+                onDismissRequest = { deleting = null },
+                title = { Text("Delete chat?") },
+                text = { Text("\u201C${c.title}\u201D will be deleted from Open WebUI too.") },
+                confirmButton = {
+                    TextButton(
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        onClick = {
+                            deleting = null
+                            scope.launch {
+                                if (runCatching { api.deleteChat(c.id) }.isFailure) toast("Couldn't delete the chat")
+                                else if (c.id == chatIdOf(currentUrl.value)) openNew()
+                                refresh++
+                            }
+                        },
+                    ) { Text("Delete") }
+                },
+                dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            )
+        }
     }
+
+    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
     @Composable
     private fun DrawerItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
@@ -571,6 +633,8 @@ class MainActivity : ComponentActivity() {
         currentId: String?,
         modifier: Modifier,
         onOpen: (String) -> Unit,
+        onRename: (ChatItem) -> Unit,
+        onDelete: (ChatItem) -> Unit,
     ) {
         LazyColumn(modifier) {
             when {
@@ -589,18 +653,54 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         items(list, key = { it.id }) { c ->
-                            NavigationDrawerItem(
-                                label = { Text(c.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                selected = c.id == currentId,
-                                onClick = { onOpen(c.id) },
-                                badge = {
-                                    if (c.active) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                                },
-                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).height(48.dp),
-                            )
+                            ChatRow(c, c.id == currentId, { onOpen(c.id) }, { onRename(c) }, { onDelete(c) })
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /** A chat in the drawer: tap to open, long-press to rename or delete. */
+    @Composable
+    private fun ChatRow(c: ChatItem, selected: Boolean, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+        var menu by remember { mutableStateOf(false) }
+        val haptics = LocalHapticFeedback.current
+        Box(Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().height(48.dp).clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                    .combinedClickable(
+                        onClick = onOpen,
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menu = true
+                        },
+                    )
+                    .padding(horizontal = 16.dp),
+            ) {
+                Text(
+                    c.title,
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (c.active) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Rename") },
+                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                    onClick = { menu = false; onRename() },
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, null) },
+                    onClick = { menu = false; onDelete() },
+                )
             }
         }
     }

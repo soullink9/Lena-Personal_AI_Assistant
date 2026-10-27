@@ -53,13 +53,15 @@ class Api(server: String) {
     /** True when Lena holds a sign-in for your server. */
     suspend fun signedIn(): Boolean = tokenFrom(cookies()) != null
 
-    private suspend fun request(
+    private suspend fun call(
         method: String,
         path: String,
-        body: JSONObject? = null,
+        body: ByteArray? = null,
+        contentType: String = "application/json",
         auth: Boolean = true,
         readTimeoutMs: Int = 30_000,
-    ): String {
+        accept: String = "application/json",
+    ): ByteArray {
         val cookies = cookies()
         val token = tokenFrom(cookies)
         if (auth && token == null) throw AuthException()
@@ -70,25 +72,33 @@ class Api(server: String) {
                 conn.instanceFollowRedirects = false // a redirect means a sign-in page, not an answer
                 conn.connectTimeout = 10_000
                 conn.readTimeout = readTimeoutMs
-                conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty("Accept", accept)
                 if (cookies != null) conn.setRequestProperty("Cookie", cookies)
                 if (auth) conn.setRequestProperty("Authorization", "Bearer $token")
                 if (body != null) {
                     conn.doOutput = true
-                    conn.setRequestProperty("Content-Type", "application/json")
-                    conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                    conn.setRequestProperty("Content-Type", contentType)
+                    conn.outputStream.use { it.write(body) }
                 }
                 val code = conn.responseCode
                 if (code == 401 || code == 403 || code in 300..399) throw AuthException()
-                val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
-                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                val bytes = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.use { it.readBytes() } ?: ByteArray(0)
                 if (code !in 200..299) throw IOException("HTTP $code")
-                text
+                bytes
             } finally {
                 conn.disconnect()
             }
         }
     }
+
+    private suspend fun request(
+        method: String,
+        path: String,
+        body: JSONObject? = null,
+        auth: Boolean = true,
+        readTimeoutMs: Int = 30_000,
+    ): String = String(call(method, path, body?.toString()?.toByteArray(), auth = auth, readTimeoutMs = readTimeoutMs))
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
@@ -168,17 +178,17 @@ class Api(server: String) {
     data class Started(val chatId: String, val messageId: String)
 
     /**
-     * Starts a real Open WebUI chat with [prompt], answered server-side with the model's tools,
-     * the same way the web page does. The chat shows up in your history like any other.
+     * Sends [prompt] as a real Open WebUI chat, answered server-side with the model's tools, the
+     * same way the web page does. With [chatId] it continues that chat after [parentId] (its
+     * latest answer); otherwise it starts a new chat in your history.
      */
-    suspend fun ask(prompt: String, model: Model): Started {
+    suspend fun ask(prompt: String, model: Model, chatId: String? = null, parentId: String? = null): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis() / 1000
 
         val user = JSONObject()
-            .put("id", userId).put("parentId", JSONObject.NULL)
-            .put("childrenIds", JSONArray().put(replyId))
+            .put("id", userId).put("childrenIds", JSONArray().put(replyId))
             .put("role", "user").put("content", prompt).put("timestamp", now)
             .put("models", JSONArray().put(model.id))
         val reply = JSONObject()
@@ -186,17 +196,52 @@ class Api(server: String) {
             .put("role", "assistant").put("content", "")
             .put("model", model.id).put("modelName", model.name).put("modelIdx", 0)
             .put("done", false).put("timestamp", now)
-        val chat = JSONObject()
-            .put("title", prompt.lineSequence().first().take(60))
-            .put("models", JSONArray().put(model.id))
-            .put("params", JSONObject())
-            .put("history", JSONObject().put("currentId", replyId)
-                .put("messages", JSONObject().put(userId, user).put(replyId, reply)))
-            .put("messages", JSONArray().put(user).put(reply))
-            .put("tags", JSONArray())
-            .put("timestamp", now * 1000)
 
-        val chatId = JSONObject(request("POST", "/api/v1/chats/new", JSONObject().put("chat", chat))).getString("id")
+        val id: String
+        val conversation: JSONArray
+        if (chatId == null) {
+            user.put("parentId", JSONObject.NULL)
+            val chat = JSONObject()
+                .put("title", prompt.lineSequence().first().take(60))
+                .put("models", JSONArray().put(model.id))
+                .put("params", JSONObject())
+                .put("history", JSONObject().put("currentId", replyId)
+                    .put("messages", JSONObject().put(userId, user).put(replyId, reply)))
+                .put("messages", JSONArray().put(user).put(reply))
+                .put("tags", JSONArray())
+                .put("timestamp", now * 1000)
+            id = JSONObject(request("POST", "/api/v1/chats/new", JSONObject().put("chat", chat))).getString("id")
+            conversation = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
+        } else {
+            val chat = chat(chatId).optJSONObject("chat") ?: JSONObject()
+            val history = chat.optJSONObject("history") ?: JSONObject()
+            val messages = history.optJSONObject("messages") ?: JSONObject()
+            val parent = parentId ?: history.optString("currentId").takeIf { !history.isNull("currentId") }
+            user.put("parentId", parent ?: JSONObject.NULL)
+            parent?.let { messages.optJSONObject(it) }?.let { p ->
+                (p.optJSONArray("childrenIds") ?: JSONArray().also { p.put("childrenIds", it) }).put(userId)
+            }
+            messages.put(userId, user).put(replyId, reply)
+            history.put("messages", messages).put("currentId", replyId)
+            val list = (chat.optJSONArray("messages") ?: JSONArray()).put(user).put(reply)
+            request("POST", "/api/v1/chats/${enc(chatId)}",
+                JSONObject().put("chat", JSONObject().put("history", history).put("messages", list)))
+            id = chatId
+            // The model sees the whole thread up to your new message.
+            val thread = mutableListOf<JSONObject>()
+            var cursor: String? = userId
+            while (cursor != null) {
+                val m = messages.optJSONObject(cursor) ?: break
+                val role = m.optString("role")
+                if (role == "user" || role == "assistant") {
+                    val content = m.optString("content")
+                    thread.add(0, JSONObject().put("role", role)
+                        .put("content", if (role == "assistant") Markdown.clean(content) else content))
+                }
+                cursor = if (m.isNull("parentId")) null else m.optString("parentId")
+            }
+            conversation = JSONArray(thread)
+        }
 
         val features = JSONObject()
         listOf("web_search", "code_interpreter", "image_generation").forEach { features.put(it, it in model.features) }
@@ -204,18 +249,42 @@ class Api(server: String) {
 
         val body = JSONObject()
             .put("model", model.id)
-            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
+            .put("messages", conversation)
             .put("stream", true)
-            .put("chat_id", chatId)
+            .put("chat_id", id)
             .put("id", replyId)
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
             .put("background_tasks", JSONObject()
-                .put("title_generation", true).put("tags_generation", false).put("follow_up_generation", false))
+                .put("title_generation", chatId == null).put("tags_generation", false).put("follow_up_generation", false))
         request("POST", "/api/chat/completions", body, readTimeoutMs = 120_000)
-        return Started(chatId, replyId)
+        return Started(id, replyId)
     }
+
+    suspend fun deleteChat(id: String) {
+        request("DELETE", "/api/v1/chats/${enc(id)}")
+    }
+
+    suspend fun renameChat(id: String, title: String) {
+        request("POST", "/api/v1/chats/${enc(id)}", JSONObject().put("chat", JSONObject().put("title", title)))
+    }
+
+    /** Your voice to text, with Open WebUI's speech-to-text. */
+    suspend fun transcribe(wav: ByteArray): String {
+        val boundary = "lena-${UUID.randomUUID()}"
+        val head = "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"speech.wav\"\r\n" +
+            "Content-Type: audio/wav\r\n\r\n"
+        val body = head.toByteArray() + wav + "\r\n--$boundary--\r\n".toByteArray()
+        val json = String(call("POST", "/api/v1/audio/transcriptions", body, "multipart/form-data; boundary=$boundary",
+            readTimeoutMs = 60_000))
+        return JSONObject(json).optString("text")
+    }
+
+    /** Text to audio, in the voice you've set in Open WebUI. */
+    suspend fun speech(text: String): ByteArray =
+        call("POST", "/api/v1/audio/speech", JSONObject().put("input", text).toString().toByteArray(),
+            readTimeoutMs = 60_000, accept = "audio/*")
 
     /** The answer as it's written, until it's done (or 15 minutes pass). */
     fun follow(chatId: String, messageId: String): Flow<Reply> = flow {

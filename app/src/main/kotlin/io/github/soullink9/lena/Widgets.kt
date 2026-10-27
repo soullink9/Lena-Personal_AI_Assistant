@@ -55,7 +55,7 @@ class LenaTile : TileService() {
     }
 }
 
-/** Home screen widget: Call, Ask and New chat, plus your first three quick prompts. */
+/** Home screen widget: Talk, Call, Type and New chat, plus your first three quick prompts. */
 class LenaWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -74,9 +74,11 @@ class LenaWidget : GlanceAppWidget() {
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium),
                     modifier = GlanceModifier.defaultWeight(),
                 )
-                Action(R.drawable.ic_glyph_call, "Voice call", Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_CALL))
+                Action(R.drawable.ic_glyph_call, "Talk to Lena", AskActivity.intent(c, talk = true))
                 Spacer(GlanceModifier.width(8.dp))
-                Action(R.drawable.ic_glyph_ask, "Ask Lena", AskActivity.intent(c))
+                Action(R.drawable.ic_stat_lena, "Voice call", Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_CALL))
+                Spacer(GlanceModifier.width(8.dp))
+                Action(R.drawable.ic_glyph_ask, "Type to Lena", AskActivity.intent(c))
                 Spacer(GlanceModifier.width(8.dp))
                 Action(R.drawable.ic_glyph_new, "New chat", Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_NEW_CHAT))
             }

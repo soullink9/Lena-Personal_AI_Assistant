@@ -8,8 +8,14 @@ import java.security.SecureRandom
 import java.util.Locale
 import java.util.UUID
 
-/** What the assistant gesture opens. */
-enum class AssistAction { ASK, CALL, CHAT }
+/** What the assistant gesture opens: talk (the Ask sheet, listening), type (the Ask sheet, keyboard), a call or a chat. */
+enum class AssistAction { ASK, TYPE, CALL, CHAT }
+
+/** Who turns your voice into text in the Ask sheet. */
+enum class Hearing { PHONE, SERVER }
+
+/** Who reads Lena's spoken replies aloud. */
+enum class Speaking { SERVER, PHONE, OFF }
 
 /** A prompt Lena sends on her own every day at [hour]:[minute]. */
 data class Schedule(
@@ -29,6 +35,9 @@ data class Settings(
     val notifyReplies: Boolean = true,
     val quickPrompts: List<String> = emptyList(),
     val schedules: List<Schedule> = emptyList(),
+    val hearing: Hearing = Hearing.PHONE,
+    val speaking: Speaking = Speaking.SERVER,
+    val followUps: Boolean = true,
 )
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
@@ -44,6 +53,14 @@ object Prefs {
     fun assistAction(c: Context): AssistAction =
         runCatching { AssistAction.valueOf(p(c).getString("assist_action", null) ?: "ASK") }
             .getOrDefault(AssistAction.ASK)
+
+    fun hearing(c: Context): Hearing =
+        runCatching { Hearing.valueOf(p(c).getString("hearing", null) ?: "PHONE") }.getOrDefault(Hearing.PHONE)
+
+    fun speaking(c: Context): Speaking =
+        runCatching { Speaking.valueOf(p(c).getString("speaking", null) ?: "SERVER") }.getOrDefault(Speaking.SERVER)
+
+    fun followUps(c: Context): Boolean = p(c).getBoolean("follow_ups", true)
 
     fun quickPrompts(c: Context): List<String> {
         val a = runCatching { JSONArray(p(c).getString("quick_prompts", "[]")) }.getOrDefault(JSONArray())
@@ -72,6 +89,9 @@ object Prefs {
         notifyReplies = notifyReplies(c),
         quickPrompts = quickPrompts(c),
         schedules = schedules(c),
+        hearing = hearing(c),
+        speaking = speaking(c),
+        followUps = followUps(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -90,6 +110,9 @@ object Prefs {
             .putBoolean("notify_replies", s.notifyReplies)
             .putString("quick_prompts", JSONArray(s.quickPrompts.filter { it.isNotBlank() }).toString())
             .putString("schedules", schedules.toString())
+            .putString("hearing", s.hearing.name)
+            .putString("speaking", s.speaking.name)
+            .putBoolean("follow_ups", s.followUps)
             .apply()
     }
 

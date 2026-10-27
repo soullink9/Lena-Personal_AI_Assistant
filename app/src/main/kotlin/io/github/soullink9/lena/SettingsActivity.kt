@@ -190,8 +190,11 @@ class SettingsActivity : ComponentActivity() {
                 }
 
                 Section("Assistant gesture")
-                Choice("Ask Lena sheet", "A quick question over whatever you're doing", s.assist == AssistAction.ASK) {
+                Choice("Talk to Lena", "Listens straight away, over whatever you're doing", s.assist == AssistAction.ASK) {
                     s = s.copy(assist = AssistAction.ASK)
+                }
+                Choice("Type to Lena", "The same sheet, with the keyboard", s.assist == AssistAction.TYPE) {
+                    s = s.copy(assist = AssistAction.TYPE)
                 }
                 Choice("Voice call", "Straight into a voice call", s.assist == AssistAction.CALL) {
                     s = s.copy(assist = AssistAction.CALL)
@@ -205,6 +208,34 @@ class SettingsActivity : ComponentActivity() {
                     } catch (_: ActivityNotFoundException) {
                     }
                 }) { Text("Make Lena your digital assistant") }
+
+                Section("Talking to Lena")
+                val phoneEar = remember { PhoneEar.available(this@SettingsActivity) }
+                Text("Hearing you", style = MaterialTheme.typography.labelLarge)
+                Choice(
+                    "On this phone",
+                    if (phoneEar) "Shows your words as you speak. The audio never leaves the phone."
+                    else "Not available on this phone; your server is used instead.",
+                    s.hearing == Hearing.PHONE,
+                ) { s = s.copy(hearing = Hearing.PHONE) }
+                Choice("Your server", "Open WebUI's speech-to-text, the same as call mode", s.hearing == Hearing.SERVER) {
+                    s = s.copy(hearing = Hearing.SERVER)
+                }
+                Text("Lena's voice", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+                Choice("Your server's voice", "Open WebUI's text-to-speech, the same as call mode", s.speaking == Speaking.SERVER) {
+                    s = s.copy(speaking = Speaking.SERVER)
+                }
+                Choice("The phone's voice", "Android's text-to-speech", s.speaking == Speaking.PHONE) {
+                    s = s.copy(speaking = Speaking.PHONE)
+                }
+                Choice("Don't read replies aloud", "Show them only", s.speaking == Speaking.OFF) {
+                    s = s.copy(speaking = Speaking.OFF)
+                }
+                Toggle(
+                    "Keep listening when Lena asks a question",
+                    "Answer her follow-up without tapping",
+                    s.followUps,
+                ) { s = s.copy(followUps = it) }
 
                 Section("Notifications")
                 Toggle(
