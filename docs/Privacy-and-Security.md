@@ -6,7 +6,7 @@ Lena is built so that your conversations go to your server and nowhere else.
 
 ## What Lena connects to
 
-Your Open WebUI address, and whatever that page itself loads. Nothing else: no analytics, no crash reporting, no update checks, and no server run by anyone else.
+Your Open WebUI address, any sign-in addresses you add (such as Authentik), and whatever those pages themselves load. Nothing else: no analytics, no crash reporting, no update checks, and no server run by anyone else.
 
 Links to other sites open in your normal browser, not in Lena, so those sites never see Lena's storage or your sign-in.
 
@@ -14,7 +14,7 @@ Links to other sites open in your normal browser, not in Lena, so those sites ne
 
 | What | Where |
 |---|---|
-| Your Open WebUI address, model ID and the call-mode switch | Lena's private app settings |
+| Your Open WebUI address, model ID, sign-in addresses and the call-mode switch | Lena's private app settings |
 | Your Open WebUI sign-in, and anything Open WebUI keeps in the browser | Lena's private web view storage |
 
 Both stay on the phone. Lena turns off Android backups and phone-to-phone transfer for all of its data, so your sign-in never reaches Google's cloud or a new phone. Uninstalling Lena deletes everything.
@@ -28,7 +28,7 @@ Both stay on the phone. Lena turns off Android backups and phone-to-phone transf
 
 ## The microphone
 
-Only your Open WebUI address can use the microphone, and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
+Only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
 
 Android itself blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 

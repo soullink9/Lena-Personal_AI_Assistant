@@ -39,9 +39,14 @@ Tools, knowledge and system prompts attached to that model in Open WebUI apply a
 
 ## Sign-in
 
-Sign in with your Open WebUI username and password (or LDAP). Lena keeps you signed in.
+Lena keeps you signed in either way.
 
-Sign-in that hops to another website, such as SSO through Authentik, Authelia, Google or GitHub, doesn't work. Lena only opens your Open WebUI address, so the sign-in page opens in your normal browser instead and can't hand the session back.
+- **Username and password (or LDAP):** nothing to set up.
+- **Single sign-on** (Authentik, Authelia, Keycloak and so on), whether through Open WebUI's own sign-in button or a proxy in front of it: add your sign-in page's address in Lena's settings under **Sign-in address**, for example `https://auth.example.com`. Without it, Lena sends the sign-in page to your normal browser, which can't hand the session back.
+
+Sign-in addresses can load inside Lena, but they never get the microphone. If your sign-in hops through more than one site (for example, Authentik passing you on to Google), add each address, separated by spaces.
+
+Passkeys and security keys may not work inside Lena, because Android's web view only supports them in apps built with extra Google libraries. Use a password with a one-time code or a push approval for this sign-in.
 
 ## Open WebUI version
 

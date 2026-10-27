@@ -26,6 +26,7 @@ Under the hood, Lena opens your address with Open WebUI's `?model=<id>` and `?ca
 ## Links
 
 - Pages on your Open WebUI address open inside Lena.
+- Your sign-in addresses (such as Authentik), if you've added any, also open inside Lena so sign-in can finish.
 - `http://` and `https://` links to anywhere else (citations, web search results and so on) open in your normal browser.
 - Everything else, such as `intent:` and `file:` links, is blocked.
 - Previews that Open WebUI draws in frames from its own content still work.

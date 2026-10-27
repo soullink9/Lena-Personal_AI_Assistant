@@ -8,7 +8,7 @@ Note: Built with the assistance of Claude.ai. I'm putting it here now so you don
 
 A tiny Android app for your own Open WebUI. Make it your phone's assistant, and one gesture drops you straight into a voice call with your local model, with all your tools.
 
-- **one server only**: it opens your Open WebUI and nothing else; other links go to your normal browser
+- **one server only**: it opens your Open WebUI (and your Authentik or other sign-in page, if you use one) and nothing else; other links go to your normal browser
 - **your phone's assistant**: long-press power or home (or swipe from a corner) to start a fresh chat
 - **straight into a call**: the assistant gesture opens Open WebUI's call mode on the model you pick
 - **Call shortcut**: long-press the icon, or drag Call onto your home screen for one-tap calls
@@ -22,7 +22,7 @@ A tiny Android app for your own Open WebUI. Make it your phone's assistant, and 
 **Needs:** Android 11 or newer, and Open WebUI reachable over **HTTPS** with server-side speech-to-text and text-to-speech. See [Open WebUI Setup](docs/Open-WebUI-Setup.md).
 
 1. **Get the APK.** Download `lena-<version>.apk` from the [latest release](https://github.com/soullink9/lena-android/releases/latest) and install it. Your browser will ask to allow installs the first time.
-2. **Connect.** Enter your `https://` Open WebUI address and, if you like, the model to use for new chats. Sign in once.
+2. **Connect.** Enter your `https://` Open WebUI address and, if you like, the model to use for new chats. If you sign in through Authentik or another single sign-on, add its address too. Sign in once.
 3. **Make it your assistant.** Settings → Apps → Default apps → **Digital assistant app** → Lena. The button in Lena's settings takes you there.
 
 Building your own copy, with your own signing key, is covered in [Installation](docs/Installation.md).
@@ -40,7 +40,7 @@ Building your own copy, with your own signing key, is covered in [Installation](
 
 ## Privacy
 
-Lena talks to one place: the Open WebUI address you enter. It has no analytics, turns off Google Safe Browsing lookups and WebView usage reports, and keeps your sign-in out of Google backups and phone-to-phone transfers. See [Privacy and Security](docs/Privacy-and-Security.md).
+Lena talks only to the Open WebUI address you enter, plus your sign-in page if you add one. It has no analytics, turns off Google Safe Browsing lookups and WebView usage reports, and keeps your sign-in out of Google backups and phone-to-phone transfers. See [Privacy and Security](docs/Privacy-and-Security.md).
 
 ## Credits
 

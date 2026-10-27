@@ -22,9 +22,11 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.window.OnBackInvokedDispatcher;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
-/** Open WebUI full screen, locked to the one server set in Settings. */
+/** Open WebUI full screen, locked to the server (and sign-in addresses) set in Settings. */
 public class MainActivity extends Activity {
 
     static final String ACTION_CALL = "io.github.soullink9.lena.CALL";
@@ -34,6 +36,7 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private Uri server;
+    private final List<Uri> signIn = new ArrayList<>(); // e.g. Authentik: may load, never gets the mic
     private PermissionRequest pendingMic;
     private ValueCallback<Uri[]> pendingFiles;
 
@@ -47,6 +50,9 @@ public class MainActivity extends Activity {
             return;
         }
         server = Uri.parse(url);
+        for (String s : Prefs.signIn(this).split(" ")) {
+            if (!s.isEmpty()) signIn.add(Uri.parse(s));
+        }
 
         FrameLayout root = new FrameLayout(this);
         root.setFitsSystemWindows(true); // keep clear of status bar, nav bar and keyboard
@@ -109,11 +115,24 @@ public class MainActivity extends Activity {
     }
 
     private boolean isServer(Uri u) {
+        return sameOrigin(u, server);
+    }
+
+    /** Your server or one of your sign-in addresses. */
+    private boolean isAllowed(Uri u) {
+        if (isServer(u)) return true;
+        for (Uri s : signIn) {
+            if (sameOrigin(u, s)) return true;
+        }
+        return false;
+    }
+
+    private static boolean sameOrigin(Uri u, Uri base) {
         return u != null
                 && "https".equals(u.getScheme())
-                && server.getHost() != null
-                && server.getHost().equalsIgnoreCase(u.getHost())
-                && port(u) == port(server);
+                && base.getHost() != null
+                && base.getHost().equalsIgnoreCase(u.getHost())
+                && port(u) == port(base);
     }
 
     private static int port(Uri u) {
@@ -131,12 +150,12 @@ public class MainActivity extends Activity {
         goBack();
     }
 
-    /** Only your server loads in the app. Other links open in your normal browser. */
+    /** Only your server and sign-in addresses load in the app. Other links open in your normal browser. */
     private final class Client extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             Uri u = req.getUrl();
-            if (isServer(u)) return false;
+            if (isAllowed(u)) return false;
             String scheme = u.getScheme();
             if (!req.isForMainFrame()) {
                 // Open WebUI draws some previews in frames built from local content; allow those only.

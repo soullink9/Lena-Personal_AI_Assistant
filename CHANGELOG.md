@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (2026-10-27)
+
+- Single sign-on: a new **Sign-in address** setting lets Authentik (or another sign-in page) load inside Lena, so sign-in finishes in the app instead of your browser. Sign-in pages never get the microphone.
+
 ## 1.0.0 (2026-10-27)
 
 First release.

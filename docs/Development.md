@@ -8,9 +8,9 @@ Lena is plain Java against the Android framework, with no libraries. That's deli
 
 | File | What it does |
 |---|---|
-| `app/src/main/java/.../MainActivity.java` | The web view: opening your server, call mode, the link lock, microphone and file picker, back button. |
+| `app/src/main/java/.../MainActivity.java` | The web view: opening your server, call mode, the link lock (server plus sign-in addresses), microphone and file picker, back button. |
 | `app/src/main/java/.../SettingsActivity.java` | The settings screen, built in code. |
-| `app/src/main/java/.../Prefs.java` | Stores the three settings and checks the address is `https://`. |
+| `app/src/main/java/.../Prefs.java` | Stores the settings and checks every address is `https://`. |
 | `app/src/main/AndroidManifest.xml` | Permissions, the assistant registration, backup and Safe Browsing switches. |
 | `app/src/main/res/xml/network_security_config.xml` | HTTPS only; which certificate authorities to trust. |
 | `app/src/main/res/xml/data_extraction_rules.xml` | Keeps all app data out of backups and transfers. |

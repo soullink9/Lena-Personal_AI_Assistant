@@ -45,6 +45,15 @@ public class SettingsActivity extends Activity {
         if (currentModel != null) model.setText(currentModel);
         col.addView(model);
 
+        col.addView(text("Sign-in address (optional, only if you sign in through another site "
+                + "such as Authentik; separate several with spaces)", 14));
+        EditText signIn = new EditText(this);
+        signIn.setHint("https://auth.example.com");
+        signIn.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        signIn.setSingleLine(true);
+        signIn.setText(Prefs.signIn(this));
+        col.addView(signIn);
+
         CheckBox call = new CheckBox(this);
         call.setText("Assistant gesture starts a voice call");
         call.setChecked(Prefs.callOnAssist(this));
@@ -58,7 +67,12 @@ public class SettingsActivity extends Activity {
                 url.setError("Use your https:// address");
                 return;
             }
-            Prefs.save(this, server, model.getText().toString().trim(), call.isChecked());
+            String signInAddresses = Prefs.normalizeSignIn(signIn.getText().toString());
+            if (signInAddresses == null) {
+                signIn.setError("Use https:// addresses");
+                return;
+            }
+            Prefs.save(this, server, model.getText().toString().trim(), call.isChecked(), signInAddresses);
             startActivity(new Intent(this, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
             finish();

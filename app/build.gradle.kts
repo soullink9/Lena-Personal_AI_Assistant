@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.soullink9.lena"
         minSdk = 30 // Android 11
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     // The release key comes from CI secrets (see README). Without it the APK is debug-signed.

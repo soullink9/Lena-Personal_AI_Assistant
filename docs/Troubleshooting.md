@@ -30,7 +30,11 @@ Restart the phone after installing, then look again. A few phone makers hide thi
 
 ## Sign-in opens my browser
 
-Your Open WebUI uses sign-in through another website (SSO or OAuth). Lena only opens your Open WebUI address, so this can't complete inside it. Use a username and password account. See [Open WebUI Setup](Open-WebUI-Setup.md#sign-in).
+You sign in through another website, such as Authentik. Add its address under **Sign-in address** in Lena's settings (long-press the icon → Settings), for example `https://auth.example.com`, and sign in again. If a different address still opens in the browser, add that one too. See [Open WebUI Setup](Open-WebUI-Setup.md#sign-in).
+
+## Sign-in stops at a passkey or security key
+
+Android's web view can't use passkeys in Lena. Pick another method in your sign-in page, such as a one-time code or push approval.
 
 ## An update won't install
 

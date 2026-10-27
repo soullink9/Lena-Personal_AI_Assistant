@@ -59,8 +59,9 @@ To check the file, compare its SHA-256 with the `SHA256SUMS` file from the same 
 
 1. Enter your Open WebUI address, starting with `https://`.
 2. Optionally enter a **model ID** for new chats (see [Open WebUI Setup](Open-WebUI-Setup.md#picking-a-model)).
-3. Leave **Assistant gesture starts a voice call** on if you want the gesture to open straight into a call.
-4. Tap **Save** and sign in to Open WebUI. You stay signed in from then on.
+3. If you sign in through Authentik or another single sign-on, enter its address under **Sign-in address** (see [Open WebUI Setup](Open-WebUI-Setup.md#sign-in)).
+4. Leave **Assistant gesture starts a voice call** on if you want the gesture to open straight into a call.
+5. Tap **Save** and sign in to Open WebUI. You stay signed in from then on.
 
 ## 6. Make Lena your assistant
 
