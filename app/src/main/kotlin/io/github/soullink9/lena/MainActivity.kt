@@ -53,6 +53,7 @@ import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -495,6 +496,9 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                         )
                         DrawerItem("Reload", Icons.Outlined.Refresh) { closeThen { web.reload() } }
+                        DrawerItem("Memory & knowledge", Icons.Outlined.Psychology) {
+                            closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
+                        }
                         DrawerItem("Settings", Icons.Outlined.Settings) {
                             closeThen { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
                         }

@@ -418,7 +418,7 @@ class AskActivity : ComponentActivity() {
                         found.getOrNull() == null -> Prefs.setAssistChat(this@AskActivity, null) // deleted: start a new one
                         else -> {
                             chatId = saved
-                            val earlier = api.recentTurns(found.getOrNull()!!, 2).map { (q, a) ->
+                            val earlier = api.recentTurns(found.getOrNull()!!, 50).map { (q, a) ->
                                 Turn(q).also { it.answer = a; it.done = true }
                             }
                             turns.addAll(0, earlier)

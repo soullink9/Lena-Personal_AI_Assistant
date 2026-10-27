@@ -18,6 +18,9 @@ import java.util.UUID
 /** Signed out, or the session expired: open Lena and sign in again. */
 class AuthException : IOException("Signed out")
 
+/** Signed in, but your account isn't allowed to do this (or the feature is turned off). */
+class ForbiddenException : IOException("Not allowed")
+
 data class Model(val id: String, val name: String, val toolIds: List<String>, val features: Set<String>)
 
 data class ChatItem(val id: String, val title: String, val updatedMillis: Long, val active: Boolean)
@@ -101,7 +104,8 @@ class Api(server: String) {
                     conn.outputStream.use { it.write(body) }
                 }
                 val code = conn.responseCode
-                if (code == 401 || code == 403 || code in 300..399) throw AuthException()
+                if (code == 401 || code in 300..399) throw AuthException()
+                if (code == 403) throw ForbiddenException()
                 val bytes = (if (code in 200..299) conn.inputStream else conn.errorStream)
                     ?.use { it.readBytes() } ?: ByteArray(0)
                 if (code !in 200..299) throw IOException("HTTP $code")
@@ -312,7 +316,7 @@ class Api(server: String) {
 
         val features = JSONObject()
         listOf("web_search", "code_interpreter", "image_generation").forEach { features.put(it, it in model.features) }
-        features.put("memory", false)
+        features.put("memory", memoryFeature())
 
         val body = JSONObject()
             .put("model", model.id)
@@ -328,6 +332,77 @@ class Api(server: String) {
                 .put("tags_generation", false).put("follow_up_generation", false))
         request("POST", "/api/chat/completions", body, readTimeoutMs = 120_000)
         return Started(id, replyId)
+    }
+
+    private var memoryOn: Boolean? = null
+
+    /** Same rule as the web page: your memory setting, or the server's default when you haven't set one. */
+    suspend fun memoryFeature(): Boolean = memoryOn ?: runCatching {
+        val ui = JSONObject(request("GET", "/api/v1/users/user/settings")).optJSONObject("ui")
+        if (ui != null && ui.has("memory") && !ui.isNull("memory")) ui.optBoolean("memory")
+        else JSONObject(request("GET", "/api/config")).optJSONObject("features")?.optBoolean("enable_memories", false) ?: false
+    }.getOrDefault(false).also { memoryOn = it }
+
+    // ---- Memory and knowledge -------------------------------------------------------------
+
+    data class Memory(val id: String, val content: String, val path: String?, val updatedMillis: Long)
+
+    suspend fun memories(): List<Memory> {
+        val a = JSONArray(request("GET", "/api/v1/memories/"))
+        return List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            Memory(o.getString("id"), o.optString("content"),
+                o.optString("path").takeIf { !o.isNull("path") && it.isNotBlank() }, toMillis(o.optLong("updated_at")))
+        }.sortedByDescending { it.updatedMillis }
+    }
+
+    suspend fun addMemory(content: String) {
+        request("POST", "/api/v1/memories/add", JSONObject().put("content", content))
+    }
+
+    suspend fun updateMemory(id: String, content: String) {
+        request("POST", "/api/v1/memories/${enc(id)}/update", JSONObject().put("content", content))
+    }
+
+    suspend fun deleteMemory(id: String) {
+        request("DELETE", "/api/v1/memories/${enc(id)}")
+    }
+
+    data class Knowledge(val id: String, val name: String, val description: String, val canEdit: Boolean)
+
+    suspend fun knowledgeBases(): List<Knowledge> {
+        val out = mutableListOf<Knowledge>()
+        var page = 1
+        while (page <= 20) {
+            val r = JSONObject(request("GET", "/api/v1/knowledge/?page=$page"))
+            val items = r.optJSONArray("items") ?: JSONArray()
+            for (i in 0 until items.length()) {
+                val o = items.getJSONObject(i)
+                out += Knowledge(o.getString("id"), o.optString("name"), o.optString("description"),
+                    o.optBoolean("write_access", false))
+            }
+            if (items.length() == 0 || out.size >= r.optInt("total", out.size)) break
+            page++
+        }
+        return out
+    }
+
+    data class KnowledgeFile(val id: String, val name: String, val addedMillis: Long)
+
+    /** One page of a collection's documents, and the total count. */
+    suspend fun knowledgeFiles(knowledgeId: String, page: Int): Pair<List<KnowledgeFile>, Int> {
+        val r = JSONObject(request("GET", "/api/v1/knowledge/${enc(knowledgeId)}/files?page=$page"))
+        val items = r.optJSONArray("items") ?: JSONArray()
+        val files = List(items.length()) { i ->
+            val o = items.getJSONObject(i)
+            val name = o.optJSONObject("meta")?.optString("name")?.ifBlank { null } ?: o.optString("filename")
+            KnowledgeFile(o.getString("id"), name, toMillis(o.optLong("created_at")))
+        }
+        return files to r.optInt("total", files.size)
+    }
+
+    suspend fun removeKnowledgeFile(knowledgeId: String, fileId: String) {
+        request("POST", "/api/v1/knowledge/${enc(knowledgeId)}/file/remove", JSONObject().put("file_id", fileId))
     }
 
     suspend fun deleteChat(id: String) {
