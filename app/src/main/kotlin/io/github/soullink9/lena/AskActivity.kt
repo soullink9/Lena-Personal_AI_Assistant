@@ -48,6 +48,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.OpenInFull
@@ -85,6 +86,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -222,6 +224,8 @@ class AskActivity : ComponentActivity() {
         var lastReplyId by remember { mutableStateOf<String?>(null) }
         var job by remember { mutableStateOf<Job?>(null) }
         val prompts = remember { Prefs.quickPrompts(this) }
+        val ongoing = remember { Prefs.ongoing(this) }
+        val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
         val codeBg = MaterialTheme.colorScheme.surfaceVariant
@@ -268,12 +272,18 @@ class AskActivity : ComponentActivity() {
             job?.cancel()
             job = scope.launch {
                 try {
+                    ready.await()
                     val m = model ?: api.defaultModel(this@AskActivity).also { model = it }
                         ?: throw IllegalStateException("No models on your server.")
-                    val started = api.ask(turn.question, m, chatId, lastReplyId)
+                    val started = api.ask(
+                        turn.question, m, chatId, lastReplyId,
+                        newTitle = if (ongoing) "Lena" else null,
+                        pinNew = ongoing,
+                    )
                     running = started
                     working = true
                     chatId = started.chatId
+                    if (ongoing) Prefs.setAssistChat(this@AskActivity, started.chatId)
                     api.follow(started.chatId, started.messageId).collect { r -> turn.answer = r.content }
                     lastReplyId = started.messageId
                     turn.done = true
@@ -397,6 +407,26 @@ class AskActivity : ComponentActivity() {
         }
 
         LaunchedEffect(Unit) {
+            // Pick up the ongoing conversation, and show where you left off.
+            try {
+                val saved = if (ongoing) Prefs.assistChat(this@AskActivity) else null
+                if (saved != null) {
+                    val found = runCatching { api.chatOrNull(saved) }
+                    when {
+                        found.isFailure -> chatId = saved // can't check right now; try it when you send
+                        found.getOrNull() == null -> Prefs.setAssistChat(this@AskActivity, null) // deleted: start a new one
+                        else -> {
+                            chatId = saved
+                            val earlier = api.recentTurns(found.getOrNull()!!, 2).map { (q, a) ->
+                                Turn(q).also { it.answer = a; it.done = true }
+                            }
+                            turns.addAll(0, earlier)
+                        }
+                    }
+                }
+            } finally {
+                ready.complete(Unit)
+            }
             model = runCatching { api.defaultModel(this@AskActivity) }.getOrNull()
         }
         LaunchedEffect(restart.intValue) {
@@ -437,6 +467,20 @@ class AskActivity : ComponentActivity() {
                                 Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                        if (turns.isNotEmpty() || chatId != null) IconButton(onClick = {
+                            // Start over: the old conversation stays in your history.
+                            job?.cancel()
+                            mouth?.stop()
+                            ear?.finish()
+                            turns.clear()
+                            chatId = null
+                            lastReplyId = null
+                            note = null
+                            heard = ""
+                            if (ongoing) Prefs.setAssistChat(this@AskActivity, null)
+                            phase = Phase.IDLE
+                            if (!typing) listen(false)
+                        }) { Icon(Icons.Outlined.AddComment, "New conversation") }
                         IconButton(onClick = {
                             if (typing) listen(false) else {
                                 job?.takeIf { phase == Phase.LISTENING }?.cancel()

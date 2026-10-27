@@ -35,7 +35,12 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her.
 3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk.
 
-Follow-ups continue the same chat. Every conversation is saved in your Open WebUI history; **Continue in Lena** opens it in the full app.
+**One ongoing conversation.** Every time you talk to Lena, she continues the same chat, titled **Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later. The sheet shows your last exchange or two when it opens.
+
+- **New conversation** (the speech-bubble button in the sheet) starts over. The old chat stays in your history.
+- Delete the **Lena** chat (from the drawer or Open WebUI) and the next time you talk, she starts a fresh one.
+- A conversation that never ends would outgrow any model, so Lena sends the model the last 15 exchanges. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
+- Prefer a new chat every time? Turn off **Settings → Talking to Lena → One ongoing conversation**.
 
 - The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
 - The **waveform** button switches to a full voice call, and the **expand** button opens the full app.
@@ -49,6 +54,7 @@ Follow-ups continue the same chat. Every conversation is saved in your Open WebU
 | Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as call mode. |
 | Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
 | Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
+| One ongoing conversation | On by default. Off starts a new chat each time you open the sheet. |
 
 If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
 

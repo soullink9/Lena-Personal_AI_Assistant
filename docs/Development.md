@@ -58,6 +58,8 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | `GET /api/tasks/chat/{id}` | Whether an answer is still running |
 | `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
 | `POST /api/v1/chats/{id}` | Adding a follow-up to a sheet conversation; renaming a chat |
+| `POST /api/v1/chats/{id}/pin` | Pinning the ongoing **Lena** chat when it's created |
+| `GET /api/v1/auths/` | Telling a deleted chat apart from an expired sign-in (Open WebUI answers both the same way) |
 | `DELETE /api/v1/chats/{id}` | Deleting a chat |
 | `POST /api/v1/audio/transcriptions`, `POST /api/v1/audio/speech` | Your server's speech-to-text and voice for the sheet |
 

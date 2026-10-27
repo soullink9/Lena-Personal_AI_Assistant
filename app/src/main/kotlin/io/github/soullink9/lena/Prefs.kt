@@ -41,6 +41,7 @@ data class Settings(
     val hearing: Hearing = Hearing.PHONE,
     val speaking: Speaking = Speaking.SERVER,
     val followUp: FollowUp = FollowUp.ALWAYS,
+    val ongoing: Boolean = true,
 )
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
@@ -67,6 +68,13 @@ object Prefs {
         p(c).getString("follow_up", null)?.let { v -> return runCatching { FollowUp.valueOf(v) }.getOrDefault(FollowUp.ALWAYS) }
         return if (p(c).getBoolean("follow_ups", true)) FollowUp.ALWAYS else FollowUp.OFF // 2.1.0 setting
     }
+
+    /** One ongoing conversation for talking to Lena, instead of a new chat each time. */
+    fun ongoing(c: Context): Boolean = p(c).getBoolean("ongoing", true)
+
+    /** The chat that conversation lives in, once it exists. */
+    fun assistChat(c: Context): String? = p(c).getString("assist_chat", null)
+    fun setAssistChat(c: Context, id: String?) = p(c).edit().putString("assist_chat", id).apply()
 
     fun quickPrompts(c: Context): List<String> {
         val a = runCatching { JSONArray(p(c).getString("quick_prompts", "[]")) }.getOrDefault(JSONArray())
@@ -98,6 +106,7 @@ object Prefs {
         hearing = hearing(c),
         speaking = speaking(c),
         followUp = followUp(c),
+        ongoing = ongoing(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -119,6 +128,7 @@ object Prefs {
             .putString("hearing", s.hearing.name)
             .putString("speaking", s.speaking.name)
             .putString("follow_up", s.followUp.name)
+            .putBoolean("ongoing", s.ongoing)
             .apply()
     }
 

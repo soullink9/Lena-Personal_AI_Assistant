@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0 (2026-10-27)
+
+- **One ongoing conversation:** talking to Lena now continues the same chat every time (titled **Lena** and pinned in Open WebUI), so she remembers earlier conversations. The sheet shows where you left off. If you delete the chat, she starts a new one next time.
+- **New conversation** button in the sheet to start over.
+- The model sees the last 15 exchanges of a long conversation; the chat keeps everything.
+- Setting to go back to a new chat each time.
+
 ## 2.1.1 (2026-10-27)
 
 - Fixed "Couldn't hear you" after Lena spoke, which also stopped the mic from opening again. The phone's recognizer is now kept for the whole conversation, retried if it's busy, and your server's speech-to-text takes over if the phone can't listen.

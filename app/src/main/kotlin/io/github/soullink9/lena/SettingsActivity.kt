@@ -237,6 +237,12 @@ class SettingsActivity : ComponentActivity() {
                 Choice("Only when Lena asks a question", "Like Home Assistant's \"continue conversation\"",
                     s.followUp == FollowUp.QUESTIONS) { s = s.copy(followUp = FollowUp.QUESTIONS) }
                 Choice("Off", "Tap the mic to talk again", s.followUp == FollowUp.OFF) { s = s.copy(followUp = FollowUp.OFF) }
+                Toggle(
+                    "One ongoing conversation",
+                    "Talking to Lena always continues the same chat, so she remembers earlier conversations. " +
+                        "Start over with New conversation in the sheet.",
+                    s.ongoing,
+                ) { s = s.copy(ongoing = it) }
 
                 Section("Notifications")
                 Toggle(

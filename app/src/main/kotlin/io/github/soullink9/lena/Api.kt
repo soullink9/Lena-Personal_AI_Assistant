@@ -38,6 +38,9 @@ class Api(server: String) {
 
     companion object {
         fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it) }
+
+        /** How much of a long conversation the model sees: the last 15 exchanges. */
+        const val MAX_CONTEXT_MESSAGES = 30
     }
 
     private suspend fun cookies(): String? = withContext(Dispatchers.Main) {
@@ -157,6 +160,42 @@ class Api(server: String) {
 
     suspend fun chat(id: String): JSONObject = JSONObject(request("GET", "/api/v1/chats/${enc(id)}"))
 
+    /**
+     * The chat, or null if it no longer exists (for example, you deleted it). Open WebUI answers a
+     * missing chat the same way as a signed-out request, so check which it is.
+     */
+    suspend fun chatOrNull(id: String): JSONObject? = try {
+        chat(id)
+    } catch (e: AuthException) {
+        if (runCatching { request("GET", "/api/v1/auths/") }.isSuccess) null else throw e
+    } catch (e: IOException) {
+        if (e.message == "HTTP 404") null else throw e
+    }
+
+    /** The last [count] question-and-answer pairs of a chat, oldest first. */
+    fun recentTurns(chatResponse: JSONObject, count: Int): List<Pair<String, String>> {
+        val history = chatResponse.optJSONObject("chat")?.optJSONObject("history") ?: return emptyList()
+        val messages = history.optJSONObject("messages") ?: return emptyList()
+        val thread = mutableListOf<JSONObject>()
+        var cursor: String? = if (history.isNull("currentId")) null else history.optString("currentId")
+        while (cursor != null && thread.size < count * 2 + 2) {
+            val m = messages.optJSONObject(cursor) ?: break
+            thread.add(0, m)
+            cursor = if (m.isNull("parentId")) null else m.optString("parentId")
+        }
+        val pairs = mutableListOf<Pair<String, String>>()
+        var i = 0
+        while (i < thread.size) {
+            val m = thread[i]
+            if (m.optString("role") == "user") {
+                val reply = thread.getOrNull(i + 1)?.takeIf { it.optString("role") == "assistant" }
+                pairs += m.optString("content") to (reply?.optString("content") ?: "")
+                i += if (reply != null) 2 else 1
+            } else i++
+        }
+        return pairs.takeLast(count)
+    }
+
     /** The first model of a chat, for the title bar. */
     suspend fun chatModel(id: String): String? =
         chat(id).optJSONObject("chat")?.optJSONArray("models")?.optString(0)?.ifBlank { null }
@@ -182,7 +221,14 @@ class Api(server: String) {
      * same way the web page does. With [chatId] it continues that chat after [parentId] (its
      * latest answer); otherwise it starts a new chat in your history.
      */
-    suspend fun ask(prompt: String, model: Model, chatId: String? = null, parentId: String? = null): Started {
+    suspend fun ask(
+        prompt: String,
+        model: Model,
+        chatId: String? = null,
+        parentId: String? = null,
+        newTitle: String? = null,
+        pinNew: Boolean = false,
+    ): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis() / 1000
@@ -199,10 +245,12 @@ class Api(server: String) {
 
         val id: String
         val conversation: JSONArray
-        if (chatId == null) {
+        // Continue the chat if it still exists; if it was deleted, start a new one.
+        val existing = chatId?.let { chatOrNull(it) }
+        if (existing == null) {
             user.put("parentId", JSONObject.NULL)
             val chat = JSONObject()
-                .put("title", prompt.lineSequence().first().take(60))
+                .put("title", newTitle ?: prompt.lineSequence().first().take(60))
                 .put("models", JSONArray().put(model.id))
                 .put("params", JSONObject())
                 .put("history", JSONObject().put("currentId", replyId)
@@ -211,9 +259,10 @@ class Api(server: String) {
                 .put("tags", JSONArray())
                 .put("timestamp", now * 1000)
             id = JSONObject(request("POST", "/api/v1/chats/new", JSONObject().put("chat", chat))).getString("id")
+            if (pinNew) runCatching { request("POST", "/api/v1/chats/${enc(id)}/pin") }
             conversation = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
         } else {
-            val chat = chat(chatId).optJSONObject("chat") ?: JSONObject()
+            val chat = existing.optJSONObject("chat") ?: JSONObject()
             val history = chat.optJSONObject("history") ?: JSONObject()
             val messages = history.optJSONObject("messages") ?: JSONObject()
             val parent = parentId ?: history.optString("currentId").takeIf { !history.isNull("currentId") }
@@ -224,9 +273,9 @@ class Api(server: String) {
             messages.put(userId, user).put(replyId, reply)
             history.put("messages", messages).put("currentId", replyId)
             val list = (chat.optJSONArray("messages") ?: JSONArray()).put(user).put(reply)
-            request("POST", "/api/v1/chats/${enc(chatId)}",
+            id = chatId!!
+            request("POST", "/api/v1/chats/${enc(id)}",
                 JSONObject().put("chat", JSONObject().put("history", history).put("messages", list)))
-            id = chatId
             // The model sees the whole thread up to your new message.
             val thread = mutableListOf<JSONObject>()
             var cursor: String? = userId
@@ -240,7 +289,10 @@ class Api(server: String) {
                 }
                 cursor = if (m.isNull("parentId")) null else m.optString("parentId")
             }
-            conversation = JSONArray(thread)
+            // A conversation that never ends outgrows any model, so send only its recent part.
+            var recent = thread.takeLast(MAX_CONTEXT_MESSAGES)
+            while (recent.isNotEmpty() && recent.first().optString("role") != "user") recent = recent.drop(1)
+            conversation = JSONArray(recent)
         }
 
         val features = JSONObject()
@@ -257,7 +309,8 @@ class Api(server: String) {
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
             .put("background_tasks", JSONObject()
-                .put("title_generation", chatId == null).put("tags_generation", false).put("follow_up_generation", false))
+                .put("title_generation", existing == null && newTitle == null)
+                .put("tags_generation", false).put("follow_up_generation", false))
         request("POST", "/api/chat/completions", body, readTimeoutMs = 120_000)
         return Started(id, replyId)
     }
