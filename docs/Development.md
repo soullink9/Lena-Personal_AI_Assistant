@@ -14,6 +14,7 @@ All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
 | `AskActivity.kt` | The talk/type sheet, the assistant gesture and Share to Lena. |
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's). |
 | `SettingsActivity.kt` | The settings screen. |
+| `MemoryActivity.kt` | Memory & knowledge: your memories and knowledge collections. |
 | `Api.kt` | Open WebUI's API, using the page's sign-in: models, chats, search, running tasks, and starting and following a chat. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, daily alarms, and quick prompt shortcuts. |
 | `Widgets.kt` | The Quick Settings tile and the home screen widget. |
@@ -59,6 +60,9 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
 | `POST /api/v1/chats/{id}` | Adding a follow-up to a sheet conversation; renaming a chat |
 | `POST /api/v1/chats/{id}/pin` | Pinning the ongoing **Lena** chat when it's created |
+| `GET /api/v1/users/user/settings`, `GET /api/config` | Whether to use Open WebUI's memory feature (your setting, or the server default) |
+| `GET /api/v1/memories/`, `POST /api/v1/memories/add`, `POST /api/v1/memories/{id}/update`, `DELETE /api/v1/memories/{id}` | Memories |
+| `GET /api/v1/knowledge/`, `GET /api/v1/knowledge/{id}/files`, `POST /api/v1/knowledge/{id}/file/remove` | Knowledge collections and their documents |
 | `GET /api/v1/auths/` | Telling a deleted chat apart from an expired sign-in (Open WebUI answers both the same way) |
 | `DELETE /api/v1/chats/{id}` | Deleting a chat |
 | `POST /api/v1/audio/transcriptions`, `POST /api/v1/audio/speech` | Your server's speech-to-text and voice for the sheet |

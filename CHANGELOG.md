@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-10-27)
+
+- **Memory & knowledge** (in the drawer): see, search, fix, add and forget Lena's memories about you, and remove documents from your knowledge collections.
+- Talking to Lena now uses Open WebUI's memory feature when it's on for you, like the web page. Before, it was always off.
+- The sheet opens on the whole ongoing conversation instead of the last exchange or two.
+
 ## 2.2.1 (2026-10-27)
 
 - The ongoing conversation now gets half of Lena's context instead of a fixed 15 exchanges: usually 50 to 80 spoken exchanges with a 32k model. New **Lena's context size** setting (32,768 by default).

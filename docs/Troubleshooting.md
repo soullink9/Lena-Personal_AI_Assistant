@@ -40,6 +40,10 @@ Lena's native features use your sign-in from the page. Sign in on the main scree
 
 Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale).
 
+## Memory & knowledge says a feature is turned off
+
+Memories need **Admin Panel → Settings → General → Memories** (or your account's memory permission) in Open WebUI; knowledge needs knowledge access for your account. An admin can turn these on.
+
 ## Talking to Lena doesn't hear me
 
 - Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.

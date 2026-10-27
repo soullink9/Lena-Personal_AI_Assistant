@@ -48,7 +48,7 @@ You can still start a chat with any model by tapping the title in the top bar.
 - every tool and MCP server **attached to the model** in **Workspace → Models** (its Tools list),
 - the model's **default features** (web search, code interpreter, image generation) if you've set them on the model.
 
-So the easiest way to make a tool available everywhere is to attach it to your model in Open WebUI. These chats get titles as usual; Open WebUI's memory feature, follow-up suggestions and tags are turned off for them.
+So the easiest way to make a tool available everywhere is to attach it to your model in Open WebUI. Open WebUI's memory feature follows your own memory setting, as on the web page. Follow-up suggestions and tags are turned off for these chats.
 
 Open WebUI's own built-in tools (its knowledge, notes, time and so on) are offered when the model is set to **Native** function calling, as in the browser.
 

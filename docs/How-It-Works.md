@@ -18,6 +18,7 @@ Lena is two things working together:
 - **New chat**, **Temporary chat** (one Open WebUI doesn't save) and **Voice call**.
 - **Search** and your **recent chats**, grouped by day. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
 - **Server status**: whether your server is reachable, and its Open WebUI version.
+- **Memory & knowledge**: see what Lena remembers about you and what's in your knowledge collections (more below).
 - **Open WebUI menus**: shows Open WebUI's own header again, for things the shell doesn't cover, such as chat controls, switching models mid-chat, your Open WebUI settings and signing out.
 - **Reload** and **Settings**.
 
@@ -35,7 +36,7 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her.
 3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk.
 
-**One ongoing conversation.** Every time you talk to Lena, she continues the same chat, titled **Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later. The sheet shows your last exchange or two when it opens.
+**One ongoing conversation.** Every time you talk to Lena, she continues the same chat, titled **Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later. The sheet opens on the whole conversation, scrolled to the latest.
 
 - **New conversation** (the speech-bubble button in the sheet) starts over. The old chat stays in your history.
 - Delete the **Lena** chat (from the drawer or Open WebUI) and the next time you talk, she starts a fresh one.
@@ -60,6 +61,15 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
 
 Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu, and **Type to Lena** for the keyboard version.
+
+## Memory & knowledge
+
+Open it from the drawer. It shows what Lena draws on beyond the conversation, so you can fix anything that went in by mistake.
+
+- **Memories**: the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
+- **Knowledge**: your knowledge collections and the documents in each. Remove a document from a collection you can edit (by default, Open WebUI also deletes the file).
+
+Talking to Lena uses your memories when Open WebUI's memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page.
 
 ## Share to Lena
 
