@@ -4,10 +4,12 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # Only the app needs building; docs and Home Assistant files don't.
+    paths: ["android/**", ".github/workflows/build.yml"]
   workflow_dispatch:
     inputs:
       release:
-        description: "Publish a release for the versionName in app/build.gradle.kts"
+        description: "Publish a release for the versionName in android/app/build.gradle.kts"
         type: boolean
         default: false
 
@@ -52,11 +54,11 @@ jobs:
           LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           RELEASE: ${{ inputs.release }}
         run: |
-          app_version="v$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)"
+          app_version="v$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' android/app/build.gradle.kts)"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="$GITHUB_REF_NAME"
             [ "$version" = "$app_version" ] || {
-              echo "::error::Tag $version doesn't match versionName ($app_version) in app/build.gradle.kts"; exit 1; }
+              echo "::error::Tag $version doesn't match versionName ($app_version) in android/app/build.gradle.kts"; exit 1; }
           elif [ "$RELEASE" = "true" ]; then
             version="$app_version"
           else
@@ -64,6 +66,7 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
+          cd android
           set -o pipefail
           if ! gradle --no-daemon assembleRelease 2>&1 | tee "$RUNNER_TEMP/build.log"; then
             # Put the errors in the run summary, so they can be read without opening the full log.
@@ -73,7 +76,7 @@ jobs:
             echo "::error title=Build failed::${msg:-see the build log}"
             exit 1
           fi
-          cd app/build/outputs/apk/release
+          cd app/build/outputs/apk/release   # inside android/
           mv app-release.apk "lena-${version}.apk"
           sha256sum lena-*.apk | tee SHA256SUMS
 
@@ -81,8 +84,8 @@ jobs:
         with:
           name: lena-apk
           path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/release/SHA256SUMS
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/release/SHA256SUMS
           if-no-files-found: error
 
   # Version tags, or Run workflow with "Publish a release" ticked.

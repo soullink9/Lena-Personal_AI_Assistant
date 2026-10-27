@@ -324,6 +324,12 @@ class Api(server: String) {
             .put("stream", true)
             .put("chat_id", id)
             .put("id", replyId)
+            // Open WebUI 0.12+ writes the turn into the chat itself and links the reply to this message.
+            // Without it, the reply is saved with no parent and the conversation's history breaks.
+            .put("user_message", JSONObject()
+                .put("id", userId).put("parentId", user.opt("parentId") ?: JSONObject.NULL)
+                .put("role", "user").put("content", prompt)
+                .put("models", JSONArray().put(model.id)).put("timestamp", now))
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
