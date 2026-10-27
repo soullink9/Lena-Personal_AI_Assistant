@@ -41,7 +41,7 @@ Home Assistant only lets **administrators** render templates, which the filter n
    | ha_url | Your Home Assistant address **as the Open WebUI container can reach it**, for example `http://homeassistant:8123` or `https://ha.example.com` |
    | ha_token | The token from step 3 |
    | feelings | On (needs `lena.jinja` in Home Assistant; see [Home Assistant installation](../home-assistant/Installation.md#3-copy-in-her-files)) |
-   | memory_list | Her memory to-do list, usually `todo.lena_s_memory`. Empty to skip memory |
+   | memory_list | Her memory **to-do list** (a `todo.` entity, usually `todo.lena_s_memory`), not a script. Empty to skip memory |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |
 
 4. Workspace → Models → `lena` → **Filters**: tick **Lena (feelings and memory)**. Attach it to `lena` only, not globally, so your other models aren't affected.
@@ -50,7 +50,9 @@ Home Assistant only lets **administrators** render templates, which the filter n
 
 1. Workspace → **Tools** → **+** (new tool).
 2. Paste the whole of `open-webui/lena_tools.py` and save.
-3. Open its settings: the same `ha_url` and `ha_token`, the same `memory_list`, and `feel_script` = `script.lena_feel`.
+3. Open its settings: the same `ha_url` and `ha_token`, the same `memory_list` (the `todo.` list), and `feel_script` = `script.lena_feel`.
+
+> Open WebUI reads and writes her memory list directly, so it never uses the **Lena recall** script. That script is only for her Home Assistant voice. The only script Open WebUI needs is `script.lena_feel`.
 4. Workspace → Models → `lena` → **Tools**: tick **Lena (remember, forget, feel)**.
 
 The Lena app uses the model's tools and filters automatically, so there's nothing to set in the app.
