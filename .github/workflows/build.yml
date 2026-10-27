@@ -5,6 +5,11 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a release for the versionName in app/build.gradle.kts"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -12,6 +17,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.build.outputs.version }}
     env:
       GRADLE_VERSION: "8.14.3"
     steps:
@@ -40,16 +47,22 @@ jobs:
 
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner.
       - name: Build
+        id: build
         env:
           LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE: ${{ inputs.release }}
         run: |
+          app_version="v$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="$GITHUB_REF_NAME"
-            grep -q "versionName = \"${version#v}\"" app/build.gradle.kts || {
-              echo "::error::Tag $version doesn't match versionName in app/build.gradle.kts"; exit 1; }
+            [ "$version" = "$app_version" ] || {
+              echo "::error::Tag $version doesn't match versionName ($app_version) in app/build.gradle.kts"; exit 1; }
+          elif [ "$RELEASE" = "true" ]; then
+            version="$app_version"
           else
             version="${GITHUB_SHA::7}"
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
           gradle --no-daemon assembleRelease
           cd app/build/outputs/apk/release
@@ -64,9 +77,10 @@ jobs:
             app/build/outputs/apk/release/SHA256SUMS
           if-no-files-found: error
 
-  # Version tags only. Kept apart from the build so only this step can write to the repo.
+  # Version tags, or Run workflow with "Publish a release" ticked.
+  # Kept apart from the build so only this step can write to the repo.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -76,7 +90,8 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n lena-apk -D apk
-          gh release create "$GITHUB_REF_NAME" apk/* -R "$GITHUB_REPOSITORY" \
-            --title "Lena ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release create "$VERSION" apk/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Lena ${VERSION#v}" --generate-notes

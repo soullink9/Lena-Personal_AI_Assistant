@@ -47,7 +47,7 @@ Without these, builds still work but are debug-signed with a throwaway key, and 
 Every push to `main` builds the app. To build by hand: **Actions → Build APK → Run workflow**.
 
 - **Test builds** (pushes to `main`) appear under the run's **Artifacts** as `lena-apk`, a zip holding `lena-<commit>.apk` and `SHA256SUMS`.
-- **Releases** are built when you push a version tag such as `v1.0.1`. They appear under **Releases** with the APK attached directly. See [Development](Development.md#making-a-release).
+- **Releases** are built when you run the workflow with **Publish a release** ticked (or push a version tag). They appear under **Releases** with the APK attached directly. See [Development](Development.md#making-a-release).
 
 ## 4. Install
 

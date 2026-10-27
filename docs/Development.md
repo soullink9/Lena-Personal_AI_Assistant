@@ -58,10 +58,8 @@ export LENA_KEYSTORE_PASSWORD='your password'
 1. In `app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example, `1.0.1`).
 2. Add a line to `CHANGELOG.md`.
 3. Commit and push to `main`.
-4. Tag and push the tag:
-   ```sh
-   git tag v1.0.1
-   git push origin v1.0.1
-   ```
+4. **Actions → Build APK → Run workflow**, tick **Publish a release**, and run it.
 
-The release appears under **Releases** a couple of minutes later.
+The build reads the version from `versionName`, creates the tag (for example, `v1.0.1`) and publishes the release with the APK attached. It appears under **Releases** a couple of minutes later. Running it twice for the same version fails rather than overwriting the first release.
+
+Pushing a tag yourself (`git tag v1.0.1 && git push origin v1.0.1`) does the same thing. The tag must match `versionName`, or the build stops.
