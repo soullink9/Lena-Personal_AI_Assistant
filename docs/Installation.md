@@ -55,17 +55,22 @@ Download the APK on your phone and open it. Android asks once to allow installs 
 
 To check the file, compare its SHA-256 with the `SHA256SUMS` file from the same build.
 
+Lena needs **Android 16** or newer.
+
 ## 5. First run
 
-1. Enter your Open WebUI address, starting with `https://`.
-2. Optionally enter a **model ID** for new chats (see [Open WebUI Setup](Open-WebUI-Setup.md#picking-a-model)).
-3. If you sign in through Authentik or another single sign-on, enter its address under **Sign-in address** (see [Open WebUI Setup](Open-WebUI-Setup.md#sign-in)).
-4. Leave **Assistant gesture starts a voice call** on if you want the gesture to open straight into a call.
-5. Tap **Save** and sign in to Open WebUI. You stay signed in from then on.
+Lena opens on its settings screen.
+
+1. Enter your **Open WebUI address**, starting with `https://`.
+2. If you sign in through Authentik or another single sign-on, enter its **sign-in address** (see [Open WebUI Setup](Open-WebUI-Setup.md#sign-in)).
+3. Tap **Save** and sign in to Open WebUI. You stay signed in from then on.
+4. Allow notifications when asked, if you want "Lena finished" and scheduled prompt notifications.
+
+Then open Settings again from the drawer to pick your model for new chats, what the assistant gesture opens, quick prompts and scheduled prompts. The model list fills in once you're signed in.
 
 ## 6. Make Lena your assistant
 
-**Settings → Apps → Default apps → Digital assistant app → Lena.** The **Open default apps** button in Lena's settings takes you there. On Samsung phones the path is **Settings → Apps → Choose default apps → Digital assistant app**.
+**Settings → Apps → Default apps → Digital assistant app → Lena.** The **Make Lena your digital assistant** button in Lena's settings takes you there. On Samsung phones the path is **Settings → Apps → Choose default apps → Digital assistant app**.
 
 How you trigger the assistant depends on your phone and navigation style: usually long-pressing the power button, long-pressing home, or swiping up from a bottom corner.
 
@@ -75,4 +80,8 @@ Install the new APK over the old one. Your settings and sign-in stay. If Android
 
 ## Changing your settings later
 
-Long-press Lena's icon and tap **Settings**.
+Open the drawer and tap **Settings**, or long-press Lena's icon and tap **Settings**.
+
+## Updating from 1.x
+
+2.0 needs Android 16. Install it over 1.x as usual; your address and sign-in carry over. The assistant gesture now opens the **Ask Lena sheet** by default; switch it back to **Voice call** in Settings → Assistant gesture if you prefer.

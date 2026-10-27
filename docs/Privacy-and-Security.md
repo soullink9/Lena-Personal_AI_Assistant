@@ -10,27 +10,50 @@ Your Open WebUI address, any sign-in addresses you add (such as Authentik), and 
 
 Links to other sites open in your normal browser, not in Lena, so those sites never see Lena's storage or your sign-in.
 
+## How the native features sign in
+
+When you sign in inside Lena, Open WebUI stores your session in a cookie for your server's address. The drawer, Ask sheet, notifications and scheduled prompts read that cookie from Lena's own storage and send it only to your Open WebUI address, the same way the page does. If a proxy such as Authentik sits in front of Open WebUI, its cookie for that address is sent too.
+
+- Lena never sees your password, and there's no API key to store.
+- Signing out of Open WebUI (through **Open WebUI menus** in the drawer) signs out the native features too.
+- If a request is redirected to a sign-in page, Lena stops and asks you to sign in again rather than following it.
+
 ## What Lena stores
 
 | What | Where |
 |---|---|
-| Your Open WebUI address, model ID, sign-in addresses and the call-mode switch | Lena's private app settings |
+| Your addresses, model, gesture choice, quick prompts and scheduled prompts | Lena's private app settings |
 | Your Open WebUI sign-in, and anything Open WebUI keeps in the browser | Lena's private web view storage |
+| Pending background checks | Lena's private WorkManager database |
 
-Both stay on the phone. Lena turns off Android backups and phone-to-phone transfer for all of its data, so your sign-in never reaches Google's cloud or a new phone. Uninstalling Lena deletes everything.
+All of it stays on the phone. Lena turns off Android backups and phone-to-phone transfer for all of its data, so your sign-in never reaches Google's cloud or a new phone. Uninstalling Lena deletes everything.
+
+Chats you start from the Ask sheet or a scheduled prompt are saved on your server, in your Open WebUI history, like any other chat.
+
+## Who can make Lena send a prompt
+
+Sending a prompt can run your tools, so Lena is careful about it:
+
+- **Other apps** can open the Ask sheet (by sharing text, for example) but can only fill the box. Nothing is sent until you tap send.
+- **Lena's own widget and quick prompt shortcuts** send straight away. They carry a random secret that only Lena knows, so another app can't fake them.
+- **Scheduled prompts** only run what you set up in Lena's settings.
+
+## Notifications
+
+Notifications show the start of a reply. On a locked screen, Android hides the text and shows only "Lena replied", unless you've told Android to show sensitive notification content.
 
 ## What Lena turns off
 
-- **Google Safe Browsing.** Normally Android's web view checks pages against Google's list of dangerous sites. Lena only opens your own server, so it turns this off rather than send lookups to Google.
+- **Google Safe Browsing.** Lena only opens your own server, so it doesn't send page lookups to Google.
 - **Web view usage reports.** Lena opts out of the usage metrics Android's web view can send to Google.
-- **Plain `http://`.** All traffic must be encrypted, and pages can't load insecure content.
-- **Third-party cookies, file access, location and pop-up windows.**
+- **Plain `http://`.** All traffic, the page and the native features alike, must be encrypted.
+- **Third-party cookies, file access, location and pop-up windows** in the page.
 
 ## The microphone
 
 Only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
 
-Android itself blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
+Android blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 
 ## Certificates
 
@@ -38,15 +61,18 @@ Lena trusts the normal public certificate authorities, plus any you've installed
 
 If you only use public certificates (for example, Let's Encrypt or Tailscale), you can make Lena stricter: delete the `<certificates src="user" />` line from `app/src/main/res/xml/network_security_config.xml` and rebuild.
 
+## Code from others
+
+Lena uses Google's Android Jetpack libraries and JetBrains' coroutines library, all open source. There are no ad, analytics or tracking libraries, and nothing that talks to a service of its own.
+
 ## Your signing key
 
 Every APK you build is signed with your own key, which lives only in your repository's secrets and wherever you saved the file. Android refuses to install an update signed with a different key, so nobody else can publish an update that installs over your copy.
 
 ## Keeping it secure
 
-- Keep **Android System WebView** up to date in the Play Store. It's the engine Lena uses, and it gets security fixes there, not in Lena's updates.
+- Keep **Android System WebView** up to date in the Play Store. It gets security fixes there, not in Lena's updates.
 - Keep your Open WebUI updated. Lena shows whatever your server sends.
-- The code is short enough to read in one sitting: start with `MainActivity.java`.
 
 ## Reporting a problem
 

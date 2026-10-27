@@ -31,11 +31,22 @@ If either is set to "Web API", call mode will open but either won't hear you or 
 
 ## Picking a model
 
-The **model ID** in Lena's settings decides which model new chats from the assistant gesture and the Call shortcut use. Leave it blank to use Open WebUI's default.
+**Settings → Chats → Model for new chats** decides which model new chats, calls, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in), or type its ID. Leave it blank to use Open WebUI's default; the Ask sheet and scheduled prompts then use the first model on your list.
 
-The ID is the model's identifier in Open WebUI, not necessarily its display name. For a workspace model, open **Workspace → Models**, edit the model, and use the ID shown there (for example, `lena`).
+You can still start a chat with any model by tapping the title in the top bar.
 
-Tools, knowledge and system prompts attached to that model in Open WebUI apply as usual, because Lena is the same Open WebUI page you use on a computer.
+## Tools
+
+**In the main app**, chats are the real Open WebUI page, so tools work exactly as they do in your browser.
+
+**In the Ask sheet and scheduled prompts**, Lena starts a real Open WebUI chat through its API and Open WebUI answers it on your server, with the full tool loop. Lena turns on:
+
+- every tool and MCP server **attached to the model** in **Workspace → Models** (its Tools list),
+- the model's **default features** (web search, code interpreter, image generation) if you've set them on the model.
+
+So the easiest way to make a tool available everywhere is to attach it to your model in Open WebUI. These chats get titles as usual; Open WebUI's memory feature, follow-up suggestions and tags are turned off for them.
+
+Open WebUI's own built-in tools (its knowledge, notes, time and so on) are offered when the model is set to **Native** function calling, as in the browser.
 
 ## Sign-in
 

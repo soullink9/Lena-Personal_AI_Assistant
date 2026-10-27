@@ -2,31 +2,59 @@
 
 [← Back to README](../README.md)
 
-Lena is plain Java against the Android framework, with no libraries. That's deliberate: there's nothing to audit beyond the files below.
+Lena is Kotlin with Jetpack Compose. The only libraries are Google's Android Jetpack libraries and JetBrains' coroutines library; network calls use Android's built-in HTTP client and JSON parser.
 
 ## Files
 
+All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
+
 | File | What it does |
 |---|---|
-| `app/src/main/java/.../MainActivity.java` | The web view: opening your server, call mode, the link lock (server plus sign-in addresses), microphone and file picker, back button. |
-| `app/src/main/java/.../SettingsActivity.java` | The settings screen, built in code. |
-| `app/src/main/java/.../Prefs.java` | Stores the settings and checks every address is `https://`. |
-| `app/src/main/AndroidManifest.xml` | Permissions, the assistant registration, backup and Safe Browsing switches. |
-| `app/src/main/res/xml/network_security_config.xml` | HTTPS only; which certificate authorities to trust. |
-| `app/src/main/res/xml/data_extraction_rules.xml` | Keeps all app data out of backups and transfers. |
-| `app/src/main/res/xml/shortcuts.xml` | The Call and Settings shortcuts. |
-| `app/src/main/res/` (the rest) | Name, theme colours and icons. |
+| `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar and drawer, hiding Open WebUI's header, intents from shortcuts and notifications. |
+| `AskActivity.kt` | The Ask Lena sheet, the assistant gesture and Share to Lena. |
+| `SettingsActivity.kt` | The settings screen. |
+| `Api.kt` | Open WebUI's API, using the page's sign-in: models, chats, search, running tasks, and starting and following a chat. |
+| `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, daily alarms, and quick prompt shortcuts. |
+| `Widgets.kt` | The Quick Settings tile and the home screen widget. |
+| `Prefs.kt` | Stored settings and address checks. |
+| `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |
+| `Theme.kt` | Material You colours. |
+
+| File | What it does |
+|---|---|
+| `app/src/main/AndroidManifest.xml` | Permissions, activities, the assistant and share registrations, tile, widget and receivers. |
+| `res/xml/network_security_config.xml` | HTTPS only; which certificate authorities to trust. |
+| `res/xml/data_extraction_rules.xml` | Keeps all app data out of backups and transfers. |
+| `res/xml/shortcuts.xml` | The app icon's long-press shortcuts. |
+| `res/xml/lena_widget_info.xml` | The widget's size and description. |
 | `.github/workflows/build.yml` | Builds, signs and publishes the APK. |
 
 ## Versions
 
 | Item | Version |
 |---|---|
-| Minimum Android | 11 (API 30) |
-| Target and compile SDK | 36 |
+| Android | 16 (API 36) minimum, target and compile SDK. Don't raise these until the phone runs a newer Android. |
 | Android Gradle Plugin | 8.13.0 |
 | Gradle | 8.14.3 |
+| Kotlin | 2.2.20 |
+| Compose BOM | 2025.10.00 (Material 3) |
+| Other Jetpack | activity-compose 1.11.0, core-ktx 1.17.0, lifecycle 2.9.4, webkit 1.14.0, work 2.10.1, glance-appwidget 1.1.1 |
 | Java | 17 language level; builds on JDK 17 or 21 |
+
+Newer Jetpack releases may need a newer compile SDK. Check before raising a version.
+
+## How Lena talks to Open WebUI
+
+Lena never asks for an API key. It reads Open WebUI's `token` cookie from the web view's cookie store and sends it as a bearer token, along with the other cookies for that address, only to the configured server. The calls it makes:
+
+| Call | Used for |
+|---|---|
+| `GET /api/version` | Server status in the drawer |
+| `GET /api/models` | Model picker; tools and default features for the Ask sheet |
+| `GET /api/v1/chats/?page=1`, `GET /api/v1/chats/search` | The drawer's chat list and search |
+| `GET /api/v1/chats/{id}` | Chat titles and models, and following an answer as it's written |
+| `GET /api/tasks/chat/{id}` | Whether an answer is still running |
+| `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the Ask sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
 
 ## Building locally
 

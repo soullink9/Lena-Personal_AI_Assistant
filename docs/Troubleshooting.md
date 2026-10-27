@@ -28,6 +28,25 @@
 
 Restart the phone after installing, then look again. A few phone makers hide this setting or limit it to their own assistant; the Call shortcut on your home screen works everywhere.
 
+## Open WebUI's header shows up again
+
+An Open WebUI update probably changed its page, so Lena's hiding no longer matches. Everything still works; the page just shows its own header under Lena's. Check **Open WebUI menus** is off in the drawer, then open an issue so Lena can catch up.
+
+## The drawer says "Sign in to see your chats"
+
+Lena's native features use your sign-in from the page. Sign in on the main screen (or sign in again if your session expired), then reopen the drawer.
+
+## The Ask sheet says "Couldn't reach your server"
+
+Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale).
+
+## No "Lena finished" or scheduled prompt notifications
+
+- **Settings → Apps → Lena → Notifications** must be allowed, with both channels on.
+- **Settings → Notifications** in Lena must be on (for finished replies).
+- If they arrive late or not at all, set **Settings → Apps → Lena → Battery** to **Unrestricted**. Android delays background work for apps it's saving battery on.
+- Scheduled prompts run within a few minutes of their time, not to the second.
+
 ## Sign-in opens my browser
 
 You sign in through another website, such as Authentik. Add its address under **Sign-in address** in Lena's settings (long-press the icon → Settings), for example `https://auth.example.com`, and sign in again. If a different address still opens in the browser, add that one too. See [Open WebUI Setup](Open-WebUI-Setup.md#sign-in).

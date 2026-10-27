@@ -139,6 +139,8 @@ class MainActivity : ComponentActivity() {
         pendingMic = null
     }
 
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     private val filePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
         val uris: Array<Uri>? = if (result.resultCode == RESULT_OK && data != null) {
@@ -167,6 +169,17 @@ class MainActivity : ComponentActivity() {
         applyShellStyle()
         setContent { LenaTheme { Shell() } }
         handle(intent, fresh = true)
+        askForNotificationsOnce()
+    }
+
+    /** "Lena finished" notifications are on by default, so ask for the permission the first time. */
+    private fun askForNotificationsOnce() {
+        val prefs = getSharedPreferences("lena", MODE_PRIVATE)
+        if (prefs.getBoolean("asked_notifications", false) || !Prefs.notifyReplies(this)) return
+        prefs.edit().putBoolean("asked_notifications", true).apply()
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
