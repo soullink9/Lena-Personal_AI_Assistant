@@ -11,7 +11,8 @@ All app code is in `app/src/main/kotlin/io/github/soullink9/lena/`.
 | File | What it does |
 |---|---|
 | `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar and drawer, hiding Open WebUI's header, intents from shortcuts and notifications. |
-| `AskActivity.kt` | The Ask Lena sheet, the assistant gesture and Share to Lena. |
+| `AskActivity.kt` | The talk/type sheet, the assistant gesture and Share to Lena. |
+| `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's). |
 | `SettingsActivity.kt` | The settings screen. |
 | `Api.kt` | Open WebUI's API, using the page's sign-in: models, chats, search, running tasks, and starting and following a chat. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, daily alarms, and quick prompt shortcuts. |
@@ -54,7 +55,10 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | `GET /api/v1/chats/?page=1`, `GET /api/v1/chats/search` | The drawer's chat list and search |
 | `GET /api/v1/chats/{id}` | Chat titles and models, and following an answer as it's written |
 | `GET /api/tasks/chat/{id}` | Whether an answer is still running |
-| `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the Ask sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
+| `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
+| `POST /api/v1/chats/{id}` | Adding a follow-up to a sheet conversation; renaming a chat |
+| `DELETE /api/v1/chats/{id}` | Deleting a chat |
+| `POST /api/v1/audio/transcriptions`, `POST /api/v1/audio/speech` | Your server's speech-to-text and voice for the sheet |
 
 ## Building locally
 

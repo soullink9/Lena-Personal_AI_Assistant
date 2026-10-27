@@ -16,7 +16,7 @@ Lena is two things working together:
 
 **Drawer**
 - **New chat**, **Temporary chat** (one Open WebUI doesn't save) and **Voice call**.
-- **Search** and your **recent chats**, grouped by day. A spinner marks a chat that's still being answered.
+- **Search** and your **recent chats**, grouped by day. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
 - **Server status**: whether your server is reachable, and its Open WebUI version.
 - **Open WebUI menus**: shows Open WebUI's own header again, for things the shell doesn't cover, such as chat controls, switching models mid-chat, your Open WebUI settings and signing out.
 - **Reload** and **Settings**.
@@ -27,31 +27,36 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 **Back** goes back within Open WebUI, then closes Lena to the background.
 
-## Ask Lena sheet
+## Talking to Lena
 
-A quick question over whatever app you're in. Open it with the assistant gesture (if that's what you chose in settings), the Ask button on the widget, the app icon's long-press menu, or by sharing text to Lena.
+The assistant gesture opens a sheet over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
 
-- Type a question, or tap one of your **quick prompts**.
-- The answer is written on your server with your model's tools (the tools attached to that model in Open WebUI), and appears as it's written.
-- **Continue in Lena** opens it as a normal chat. Every question you ask here is saved in your Open WebUI history, titled automatically.
-- The **voice** button switches to a call, and the **expand** button opens the full app.
+1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
+2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her.
+3. **If her reply ends with a question, she listens for your answer**, like Home Assistant's "continue conversation". Tap the mic to say something else.
+
+Follow-ups continue the same chat. Every conversation is saved in your Open WebUI history; **Continue in Lena** opens it in the full app.
+
+- The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
+- The **waveform** button switches to a full voice call, and the **expand** button opens the full app.
+- Your **quick prompts** appear as chips when typing.
 - Tap outside the sheet to close it. If Lena is still answering, you get a notification when she's done.
 
-## The assistant gesture
+**Settings → Talking to Lena** chooses who hears you and who speaks:
 
-In Settings → Assistant gesture, pick what it opens:
-
-| Choice | What happens |
+| Setting | Choices |
 |---|---|
-| **Ask Lena sheet** (default) | The sheet above, over your current app. |
-| **Voice call** | The main app, in a new chat, straight into call mode. |
-| **New chat** | The main app on a new chat. |
+| Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as call mode. |
+| Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
+| Keep listening when Lena asks a question | On by default. |
 
-On the lock screen, Android asks you to unlock first.
+If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If your server's voice isn't set up, Lena uses the phone's.
+
+Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu, and **Type to Lena** for the keyboard version.
 
 ## Share to Lena
 
-Share text or a link from any app and pick **Ask Lena**. It goes into the Ask sheet's box so you can add what you want ("Summarise this", "Is this right?") before sending. Nothing is sent until you tap send.
+Share text or a link from any app and pick **Ask Lena**. It goes into the sheet's text box so you can add what you want ("Summarise this", "Is this right?") before sending. Nothing is sent until you tap send.
 
 ## Voice calls
 
@@ -67,15 +72,15 @@ Settings → On your phone → **Add Quick Settings tile**. Tapping **Call Lena*
 
 ## Home screen widget
 
-Settings → On your phone → **Add home screen widget**, or add it from your launcher's widget list. It has **Voice call**, **Ask** and **New chat** buttons, and your first three quick prompts, which open the Ask sheet and send straight away. It uses your wallpaper's colours.
+Settings → On your phone → **Add home screen widget**, or add it from your launcher's widget list. It has **Talk**, **Voice call**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
 
 ## Quick prompts
 
-Settings → Quick prompts. Up to six. They appear as chips in the Ask sheet; the first three also appear on the widget and on the app icon's long-press menu.
+Settings → Quick prompts. Up to six. They appear as chips in the sheet when typing; the first three also appear on the widget and on the app icon's long-press menu.
 
 ## "Lena finished" notifications
 
-If you leave Lena (or close the Ask sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off in Settings → Notifications.
+If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off in Settings → Notifications.
 
 Lena watches for up to about nine minutes. Android may delay the check a little to save battery.
 
@@ -101,7 +106,7 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 | Permission | Why |
 |---|---|
 | Internet | To reach your Open WebUI. |
-| Microphone | Call mode and voice input. Asked the first time, and only ever granted to your Open WebUI address. |
+| Microphone | Talking to Lena, call mode and voice input. Asked the first time. In the main app, only your Open WebUI address can use it. |
 | Notifications | "Lena finished" and scheduled prompts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |
 | Change audio settings | Needed by Android's web view to use the microphone. It never prompts. |

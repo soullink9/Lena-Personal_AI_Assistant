@@ -51,7 +51,13 @@ Notifications show the start of a reply. On a locked screen, Android hides the t
 
 ## The microphone
 
-Only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
+When you talk to Lena in the sheet:
+
+- **On this phone** (the default) uses Android's on-device speech recognition. The audio stays on the phone; only the words go to your server.
+- **Your server** records until you stop talking and sends the recording to your Open WebUI's speech-to-text.
+- Spoken replies are made by your Open WebUI's text-to-speech (the reply text goes to your server, which already wrote it), or by the phone's own voice if you choose.
+
+The sheet only listens while it shows "Listening…". In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
 
 Android blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 

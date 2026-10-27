@@ -40,6 +40,19 @@ Lena's native features use your sign-in from the page. Sign in on the main scree
 
 Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale).
 
+## Talking to Lena doesn't hear me
+
+- Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.
+- With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server meanwhile. You can also switch to **Your server** in Lena's settings.
+- With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)).
+
+## Lena doesn't speak her replies
+
+- Check **Lena's voice** in Lena's settings isn't **Off**.
+- She only reads replies aloud when you spoke. Typed questions get text replies.
+- With **Your server's voice**, Open WebUI's text-to-speech must be set up; if it isn't, Lena uses the phone's voice.
+- Replies play at media volume.
+
 ## No "Lena finished" or scheduled prompt notifications
 
 - **Settings → Apps → Lena → Notifications** must be allowed, with both channels on.

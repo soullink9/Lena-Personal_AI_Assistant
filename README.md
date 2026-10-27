@@ -9,9 +9,10 @@ Note: Built with the assistance of Claude.ai. I'm putting it here now so you don
 A native Android app for your own Open WebUI. Your real Open WebUI, with all your tools, inside a proper Android shell, plus the phone-level extras a website can't do.
 
 - **feels like an app**: a native top bar and side drawer with your chats, search and model picker, in your wallpaper's Material You colours
-- **your phone's assistant**: the assistant gesture opens the **Ask Lena** sheet over whatever you're doing, or straight into a voice call
+- **your phone's assistant**: like Google Assistant or Home Assistant's Assist, the assistant gesture opens a sheet that's already listening, then Lena answers out loud in your Open WebUI voice and keeps listening if she asks you something
 - **voice calls**: one tap from the top bar, the Quick Settings tile, the widget or the app icon
-- **share to Lena** from any app; the text lands in the Ask sheet for you to add a question
+- **share to Lena** from any app; the text lands in the sheet for you to add a question
+- **manage chats** from the drawer: long-press to rename or delete
 - **"Lena finished" notifications** when you leave mid-answer
 - **scheduled prompts**: "every morning at 7, give me my briefing", answered and saved as a chat
 - **home screen widget** and **quick prompts** on the app icon's long-press menu

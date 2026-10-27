@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 (2026-10-27)
+
+- **Talk to Lena:** the assistant gesture now opens a sheet that's already listening, like Google Assistant or Home Assistant's Assist. Your words show as you speak, Lena answers with your tools and reads the reply aloud in your Open WebUI voice, and if she asks a question she listens for your answer. Follow-ups continue the same chat.
+- New **Talking to Lena** settings: hear you on the phone (on-device) or with your server; speak with your server's voice, the phone's, or not at all; keep listening after questions.
+- **Rename and delete chats:** long-press a chat in the drawer.
+- **Talk to Lena** on the widget and the app icon's long-press menu; the typed version is now **Type to Lena**.
+
 ## 2.0.2 (2026-10-27)
 
 - Open WebUI follows your phone's dark mode again, including when you switch it while Lena is open (you stay on the same chat).

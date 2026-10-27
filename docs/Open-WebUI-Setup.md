@@ -29,6 +29,8 @@ In Open WebUI: **Admin Panel → Settings → Audio**.
 
 If either is set to "Web API", call mode will open but either won't hear you or won't answer out loud.
 
+Talking to Lena in the sheet uses the same text-to-speech for her voice, and the same speech-to-text if you set **Hearing you** to **Your server**.
+
 ## Picking a model
 
 **Settings → Chats → Model for new chats** decides which model new chats, calls, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in), or type its ID. Leave it blank to use Open WebUI's default; the Ask sheet and scheduled prompts then use the first model on your list.
