@@ -30,7 +30,7 @@ Restart the phone after installing, then look again. A few phone makers hide thi
 
 ## Open WebUI's header shows up again
 
-An Open WebUI update probably changed its page, so Lena's hiding no longer matches. Everything still works; the page just shows its own header under Lena's. Check **Open WebUI menus** is off in the drawer, then open an issue so Lena can catch up.
+An Open WebUI update probably changed its page, so Lena's hiding no longer matches. Everything still works; the page just shows its own header under Lena's. Check **Settings → Chats → Show Open WebUI's own menus** is off, then open an issue so Lena can catch up.
 
 ## The drawer says "Sign in to see your chats"
 

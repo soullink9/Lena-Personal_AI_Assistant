@@ -7,6 +7,14 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.7.0 (2026-10-27)
+
+- **Settings, redesigned:** grouped into cards (Open WebUI, Home Assistant, Chats, Assistant gesture, Talking to Lena, Quick prompts, Scheduled prompts, On your phone) under a large collapsing title, with Save always at hand.
+- **Show Open WebUI's own menus** moved from the drawer into Settings → Chats.
+- **A roomier drawer:** New chat, Temporary chat and Voice call are now only in the top bar, and Settings, Memory & knowledge and Reload are three icon buttons along the bottom, so search and your chats get most of the space. Lena's name, server status and mood share one header.
+- **Top bar:** Temporary chat joins New chat and Voice call, and her avatar shows next to the title when you're talking to Lena.
+- **Ask sheet:** Voice call and Open in Lena moved into a ⋮ menu, leaving room for her name and mood.
+
 ### 2.6.0 (2026-10-27)
 
 - **Show her a photo:** a camera button in the sheet takes or chooses a photo to ask about, by typing or by voice. It's saved in the chat. Uses Android's photo picker, so Lena never gets access to your gallery, and asks for no new permissions.

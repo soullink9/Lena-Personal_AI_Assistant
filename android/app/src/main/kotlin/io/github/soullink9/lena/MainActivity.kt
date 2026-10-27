@@ -82,6 +82,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -365,7 +368,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::web.isInitialized) web.onResume()
+        if (::web.isInitialized) {
+            web.onResume()
+            // "Show Open WebUI's own menus" lives in Settings; pick up a change made there.
+            val wanted = Prefs.showOpenWebUiMenus(this)
+            if (wanted != showMenus.value) {
+                showMenus.value = wanted
+                applyShellStyle()
+            }
+        }
     }
 
     override fun onPause() {
@@ -407,6 +418,7 @@ class MainActivity : ComponentActivity() {
         var feelings by remember { mutableStateOf<Feelings?>(null) }
         var checked by remember { mutableStateOf(false) }
         var title by remember { mutableStateOf("Lena") }
+        var titleIsLena by remember { mutableStateOf(false) }
         var modelMenu by remember { mutableStateOf(false) }
         var refresh by remember { mutableIntStateOf(0) }
         var renaming by remember { mutableStateOf<ChatItem?>(null) }
@@ -424,6 +436,7 @@ class MainActivity : ComponentActivity() {
             val id = if (chatId != null) runCatching { api.chatModel(chatId) }.getOrNull()
             else Uri.parse(url).getQueryParameter("model") ?: Prefs.effectiveModel(this@MainActivity)
             title = models.firstOrNull { it.id == id }?.name ?: id ?: "Lena"
+            titleIsLena = id != null && id == Prefs.lenaIn(models)?.id
         }
 
         // Fill the drawer when it opens, and as you search.
@@ -457,21 +470,22 @@ class MainActivity : ComponentActivity() {
             drawerContent = {
                 ModalDrawerSheet(Modifier.width(320.dp)) {
                     Column(Modifier.fillMaxHeight()) {
+                        // Who and how she is
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.padding(start = 20.dp, top = 20.dp, end = 16.dp),
                         ) {
-                            LenaAvatar(40.dp)
-                            Text("Lena", style = MaterialTheme.typography.titleLarge)
+                            LenaAvatar(44.dp)
+                            Column {
+                                Text("Lena", style = MaterialTheme.typography.titleLarge)
+                                Status(checked, version)
+                            }
                         }
-                        Status(checked, version)
-                        feelings?.let { FeelingsLine(it, Modifier.padding(start = 28.dp, end = 16.dp, top = 4.dp)) }
-                        Spacer(Modifier.height(8.dp))
-                        DrawerItem("New chat", Icons.Outlined.AddComment) { closeThen { openNew() } }
-                        DrawerItem("Temporary chat", Icons.Outlined.VisibilityOff) { closeThen { openNew(temporary = true) } }
-                        DrawerItem("Voice call", Icons.Rounded.GraphicEq) { closeThen { openNew(call = true) } }
-                        OutlinedTextField(
+                        feelings?.let { FeelingsLine(it, Modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp)) }
+
+                        // Search, then your chats
+                        TextField(
                             value = query,
                             onValueChange = { query = it },
                             placeholder = { Text("Search chats") },
@@ -481,7 +495,13 @@ class MainActivity : ComponentActivity() {
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(28.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
                         )
                         ChatList(
                             chats, chatsError, query.isNotBlank(), chatId, Modifier.weight(1f),
@@ -489,27 +509,21 @@ class MainActivity : ComponentActivity() {
                             onRename = { renaming = it },
                             onDelete = { deleting = it },
                         )
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        NavigationDrawerItem(
-                            label = { Text("Open WebUI menus") },
-                            icon = { Icon(Icons.Outlined.Tune, null) },
-                            badge = { Switch(checked = showMenus.value, onCheckedChange = null) },
-                            selected = false,
-                            onClick = {
-                                showMenus.value = !showMenus.value
-                                Prefs.setShowOpenWebUiMenus(this@MainActivity, showMenus.value)
-                                applyShellStyle()
-                            },
-                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                        )
-                        DrawerItem("Reload", Icons.Outlined.Refresh) { closeThen { web.reload() } }
-                        DrawerItem("Memory & knowledge", Icons.Outlined.Psychology) {
-                            closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
+
+                        // Settings, memory and reload, side by side
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            DrawerIcon(Icons.Outlined.Settings, "Settings") {
+                                closeThen { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+                            }
+                            DrawerIcon(Icons.Outlined.Psychology, "Memory & knowledge") {
+                                closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
+                            }
+                            DrawerIcon(Icons.Outlined.Refresh, "Reload") { closeThen { web.reload() } }
                         }
-                        DrawerItem("Settings", Icons.Outlined.Settings) {
-                            closeThen { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
-                        }
-                        Spacer(Modifier.height(12.dp))
                     }
                 }
             },
@@ -530,6 +544,7 @@ class MainActivity : ComponentActivity() {
                                         .clickable(enabled = models.isNotEmpty()) { modelMenu = true }
                                         .padding(horizontal = 8.dp, vertical = 4.dp),
                                 ) {
+                                    if (titleIsLena) LenaAvatar(26.dp, Modifier.padding(end = 10.dp))
                                     Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
                                     if (models.isNotEmpty()) Icon(Icons.Rounded.ExpandMore, null)
                                 }
@@ -550,6 +565,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         actions = {
+                            IconButton(onClick = { openNew(temporary = true) }) { Icon(Icons.Outlined.VisibilityOff, "Temporary chat") }
                             IconButton(onClick = { openNew() }) { Icon(Icons.Outlined.AddComment, "New chat") }
                             IconButton(onClick = { openNew(call = true) }) { Icon(Icons.Rounded.GraphicEq, "Voice call") }
                         },
@@ -608,15 +624,10 @@ class MainActivity : ComponentActivity() {
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
+    /** One of the icon buttons along the bottom of the drawer. */
     @Composable
-    private fun DrawerItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-        NavigationDrawerItem(
-            label = { Text(label) },
-            icon = { Icon(icon, null) },
-            selected = false,
-            onClick = onClick,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-        )
+    private fun DrawerIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, label) }
     }
 
     @Composable
@@ -628,10 +639,10 @@ class MainActivity : ComponentActivity() {
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(start = 28.dp, top = 4.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(top = 2.dp),
         ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(color))
             Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

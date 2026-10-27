@@ -15,7 +15,7 @@ Links to other sites open in your normal browser, not in Lena, so those sites ne
 When you sign in inside Lena, Open WebUI stores your session in a cookie for your server's address. The drawer, Ask sheet, notifications and scheduled prompts read that cookie from Lena's own storage and send it only to your Open WebUI address, the same way the page does. If a proxy such as Authentik sits in front of Open WebUI, its cookie for that address is sent too.
 
 - Lena never sees your password, and there's no API key to store.
-- Signing out of Open WebUI (through **Open WebUI menus** in the drawer) signs out the native features too.
+- Signing out of Open WebUI (turn on **Settings → Chats → Show Open WebUI's own menus** to reach it) signs out the native features too.
 - If a request is redirected to a sign-in page, Lena stops and asks you to sign in again rather than following it.
 
 ## Home Assistant (optional)

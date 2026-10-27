@@ -11,17 +11,15 @@ Lena is two things working together:
 
 **Top bar**
 - **☰** opens the drawer.
-- **The title** is the current chat's model. Tap it to start a new chat with another model.
-- **New chat** and **Voice call** on the right.
+- **The title** is the current chat's model, with her avatar when it's Lena. Tap it to start a new chat with another model.
+- **Temporary chat** (one Open WebUI doesn't save), **New chat** and **Voice call** on the right.
 
 **Drawer**
-- **New chat**, **Temporary chat** (one Open WebUI doesn't save) and **Voice call**.
-- **Search** and your **recent chats**, grouped by day. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
-- **Server status**: whether your server is reachable, and its Open WebUI version.
-- **Memory & knowledge**: see what Lena remembers and what's in your knowledge collections (more below).
-- **How she feels**, under the server status, if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
-- **Open WebUI menus**: shows Open WebUI's own header again, for things the shell doesn't cover, such as chat controls, switching models mid-chat, your Open WebUI settings and signing out.
-- **Reload** and **Settings**.
+- **Lena** at the top, with whether your server is reachable (and its Open WebUI version), and **how she feels** if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
+- **Search** and your **recent chats**, grouped by day, taking up most of the drawer. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
+- Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
+
+**Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Settings → Chats → Show Open WebUI's own menus**.
 
 Lena hides Open WebUI's own header and sidebar because the top bar and drawer replace them. If an Open WebUI update changes its page, the header may simply reappear until Lena catches up; nothing breaks.
 

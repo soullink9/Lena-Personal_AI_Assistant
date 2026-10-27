@@ -48,6 +48,7 @@ data class Settings(
     val moodVoice: Boolean = false,
     val widgetMood: Boolean = false,
     val lockScreen: Boolean = false,
+    val openWebUiMenus: Boolean = false,
 )
 
 /** Her shared memory to-do list in Home Assistant, as in docs/home-assistant/Helpers.md. */
@@ -153,6 +154,7 @@ object Prefs {
         moodVoice = moodVoice(c),
         widgetMood = widgetMood(c),
         lockScreen = lockScreen(c),
+        openWebUiMenus = showOpenWebUiMenus(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -181,11 +183,11 @@ object Prefs {
             .putBoolean("mood_voice", s.moodVoice)
             .putBoolean("widget_mood", s.widgetMood)
             .putBoolean("lock_screen", s.lockScreen)
+            .putBoolean("show_owui_menus", s.openWebUiMenus)
             .apply()
     }
 
     fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", false)
-    fun setShowOpenWebUiMenus(c: Context, show: Boolean) = p(c).edit().putBoolean("show_owui_menus", show).apply()
 
     /**
      * A random secret only Lena knows. Lena's own widget and shortcuts include it, so a prompt

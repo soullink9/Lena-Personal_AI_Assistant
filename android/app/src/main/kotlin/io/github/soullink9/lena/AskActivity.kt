@@ -59,6 +59,7 @@ import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -267,6 +268,7 @@ class AskActivity : ComponentActivity() {
         val ongoing = remember { Prefs.ongoing(this) && !startedLocked }
         var photo by remember { mutableStateOf<Photo?>(null) }
         var photoMenu by remember { mutableStateOf(false) }
+        var moreMenu by remember { mutableStateOf(false) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
@@ -577,14 +579,29 @@ class AskActivity : ComponentActivity() {
                         }) {
                             Icon(if (typing) Icons.Rounded.Mic else Icons.Outlined.Keyboard, if (typing) "Talk" else "Type")
                         }
-                        IconButton(onClick = { forward(MainActivity.ACTION_CALL) }) { Icon(Icons.Rounded.GraphicEq, "Voice call") }
-                        IconButton(onClick = {
-                            val id = chatId
-                            if (id != null) openChat(id) else unlockThen {
-                                startActivity(Intent(this@AskActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                finish()
+                        // Less-used actions, out of the way so her name and mood have room.
+                        Box {
+                            IconButton(onClick = { moreMenu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                            DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Voice call") },
+                                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
+                                    onClick = { moreMenu = false; forward(MainActivity.ACTION_CALL) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (chatId != null) "Open this chat in Lena" else "Open Lena") },
+                                    leadingIcon = { Icon(Icons.Outlined.OpenInFull, null) },
+                                    onClick = {
+                                        moreMenu = false
+                                        val id = chatId
+                                        if (id != null) openChat(id) else unlockThen {
+                                            startActivity(Intent(this@AskActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                            finish()
+                                        }
+                                    },
+                                )
                             }
-                        }) { Icon(Icons.Outlined.OpenInFull, "Open Lena") }
+                        }
                     }
 
                     if (startedLocked && turns.isEmpty()) {
