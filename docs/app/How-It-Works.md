@@ -78,15 +78,15 @@ That last part is an instruction to her, not a lock: anyone holding your phone c
 
 Open it from the drawer. It shows what Lena draws on beyond the conversation, so you can fix anything that went in by mistake.
 
-- **Shared** (only if you've connected Home Assistant): Lena's own memory, the to-do list in Home Assistant she uses in the house, in Open WebUI and here. Search, correct, forget or add, the same as below.
-- **Memories** (called **Open WebUI** when Shared is there): the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
+- **Hers** (only if you've connected Home Assistant): Lena's own memory, the to-do list the Lena integration keeps in Home Assistant, which she uses in the house, in Open WebUI and here. Search, correct, forget or add, the same as below.
+- **Memories** (called **Open WebUI** when Hers is there): the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
 - **Knowledge**: your knowledge collections and the documents in each. Remove a document from a collection you can edit (by default, Open WebUI also deletes the file).
 
 Talking to Lena uses Open WebUI's memories when its memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page. Her shared memory reaches her through the Lena filter in Open WebUI; see [Lena in Open WebUI](../open-webui/Setup.md).
 
 ## How she feels
 
-Connect Home Assistant under **Settings → Home Assistant**: its address, a long-lived access token (your Home Assistant profile → Security), and her memory list. **Test connection** checks it. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too. It reads the five helpers from [Helpers](../home-assistant/Helpers.md) with their default names.
+Connect Home Assistant under **Settings → Home Assistant**: its address and a long-lived access token (your Home Assistant profile → Security). Any user's token works. **Test connection** checks it, and tells you if the [Lena integration](../home-assistant/Installation.md) isn't set up yet. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too.
 
 ## Share to Lena
 

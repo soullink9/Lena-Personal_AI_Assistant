@@ -2,11 +2,11 @@
 
 [← Back to Getting started](../Getting-Started.md)
 
-Open WebUI is where you chat with Lena in a browser, and it's what the Lena app talks to. Her character comes from the `lena` model itself. Two small add-ons bring over what Home Assistant knows: how she feels right now, and her shared memory.
+Open WebUI is where you chat with Lena in a browser, and it's what the Lena app talks to. Her character comes from the `lena` model itself. Two small add-ons bring over what the Lena integration in Home Assistant knows: how she feels right now, and her shared memory.
 
 | Piece | File | What it does |
 |---|---|---|
-| **Lena (feelings and memory)** filter | `open-webui/lena_filter.py` | Before each message, asks Home Assistant the time at home, how she feels and what she remembers, and adds it to the chat |
+| **Lena (feelings and memory)** filter | `open-webui/lena_filter.py` | Before each message, reads `/api/lena/context` from Home Assistant (the time at home, who's home, how she feels and what she remembers) and adds it to the chat |
 | **Lena (remember, forget, feel)** tool | `open-webui/lena_tools.py` | Lets her save to and remove from her memory list, and record how something made her feel |
 
 Both talk only to your Home Assistant, using a token you give them. Neither needs anything installed.
@@ -30,7 +30,7 @@ Workspace → Models → `lena` (edit it; if it isn't listed, create a model wit
 
 In Home Assistant: your profile (bottom left) → **Security** → **Long-lived access tokens** → Create token. Name it "Open WebUI" and copy it.
 
-Home Assistant only lets **administrators** render templates, which the filter needs to read her feelings, so create the token on an admin account. Open WebUI keeps it on your server, and only Open WebUI admins can see function and tool settings. If you'd rather not, turn off **feelings** in the filter's settings; memory works with any user's token.
+Any user's token works; no admin rights are needed. A Home Assistant user just for Lena, without admin rights, is the safer choice. Open WebUI keeps the token on your server, and only Open WebUI admins can see function and tool settings.
 
 ## 4. Add the filter
 
@@ -42,10 +42,10 @@ Home Assistant only lets **administrators** render templates, which the filter n
    |---|---|
    | ha_url | Your Home Assistant address **as the Open WebUI container can reach it**, for example `http://homeassistant:8123` or `https://ha.example.com` |
    | ha_token | The token from step 3 |
-   | time | On. The date and time at home, from Home Assistant in its time zone. The model has no clock of its own |
-   | feelings | On (needs `lena.jinja` in Home Assistant; see [Home Assistant installation](../home-assistant/Installation.md#3-copy-in-her-files)) |
-   | memory_list | Her memory **to-do list** (a `todo.` entity, usually `todo.lena_s_memory`), not a script. Empty to skip memory |
+   | memory | On, to include her shared memory |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |
+
+   The date and time come from Home Assistant, in your house's time zone; the model has no clock of its own.
 
 4. Workspace → Models → `lena` → **Filters**: tick **Lena (feelings and memory)**. Attach it to `lena` only, not globally, so your other models aren't affected.
 
@@ -53,29 +53,27 @@ Home Assistant only lets **administrators** render templates, which the filter n
 
 1. Workspace → **Tools** → **+** (new tool).
 2. Paste the whole of `open-webui/lena_tools.py` and save.
-3. Open its settings: the same `ha_url` and `ha_token`, the same `memory_list` (the `todo.` list), and `feel_script` = `script.lena_feel`.
-
-> Open WebUI reads and writes her memory list directly, so it never uses the **Lena recall** script. That script is only for her Home Assistant voice. The only script Open WebUI needs is `script.lena_feel`.
+3. Open its settings: the same `ha_url` and `ha_token`, and `memory_list` = `todo.lena_memory` (the default).
 4. Workspace → Models → `lena` → **Tools**: tick **Lena (remember, forget, feel)**.
 
 The Lena app uses the model's tools and filters automatically, so there's nothing to set in the app.
 
 ## 6. Open WebUI's own memory
 
-Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory & knowledge** screen shows both: connect Home Assistant in the app's settings and a **Shared** tab shows her shared list next to Open WebUI's memories and your knowledge.
+Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory & knowledge** screen shows both: connect Home Assistant in the app's settings and a **Hers** tab shows her shared list next to Open WebUI's memories and your knowledge.
 
 ## 7. Test it
 
-1. In Home Assistant, set her mood helper to **Grumpy** by hand.
+1. In Home Assistant, set **Lena Mood** to **Grumpy** by hand.
 2. In a new chat with `lena`, ask "How's your day going?" She should sound grumpy without saying the word.
-3. "Remember that Sam takes his coffee black." Check the to-do list in Home Assistant.
-4. "Thanks, Lena, you're the best." Her Moment helper may change to **Pleased** or **Touched**. She uses it only when something genuinely lands, so don't expect it every time.
+3. "Remember that Sam takes his coffee black." Check **Lena Memory** in Home Assistant's To-do lists.
+4. "Thanks, Lena, you're the best." **Lena Moment** may change to **Pleased** or **Touched**. She uses it only when something genuinely lands, so don't expect it every time.
 
 A change in Home Assistant can take up to a minute (`cache_seconds`) to reach her.
 
 ## If something's wrong
 
 - **No feelings or memory in chats:** check the filter is switched on and ticked on the `lena` model, and that `ha_url` works from inside the Open WebUI container (`curl` it from there). Open WebUI's log shows `Lena filter: Home Assistant request failed` with the reason.
-- **Feelings missing but memory works:** the token isn't an admin's, or `lena.jinja` isn't in Home Assistant's `custom_templates` folder (reload custom templates after copying it).
+- **Nothing from Home Assistant at all:** open `<ha_url>/api/lena/context` with the token (for example with `curl -H "Authorization: Bearer <token>"`). A 404 means the Lena integration isn't set up; a 401 means the token is wrong.
 - **She never uses the tool:** check Function Calling is **Native** and the tool is ticked on the model.
 - More in [Troubleshooting](../home-assistant/Troubleshooting.md).

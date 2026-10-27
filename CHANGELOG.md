@@ -7,6 +7,12 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.9.0 (2026-10-27)
+
+- **Works with the Lena integration in Home Assistant.** Her feelings come from it, so any Home Assistant user's token works (no admin rights). **Test connection** says if the integration isn't set up yet.
+- **No memory list setting:** her memory is always the integration's `todo.lena_memory`. Its tab in **Memory & knowledge** is now called **Hers**.
+- **Memory & knowledge and the drawer** use the same rounded, grouped look as Settings: tabs as a segmented switch, an **Add a memory** row, and chats grouped by day.
+
 ### 2.8.0 (2026-10-27)
 
 - **Settings, redone like a phone's own settings:** one short list of categories in rounded groups, each showing what it's set to (Open WebUI, Home Assistant, Model, Assistant gesture, Voice, Conversation, Quick prompts, Scheduled prompts, Widget & tile). Tap one for its page. Reply notifications and Open WebUI's own menus are switches right on the list.
@@ -113,6 +119,16 @@ First release.
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
 ## Personality
+
+### 3.0.0 (2026-10-27)
+
+- **One Home Assistant integration replaces everything else there.** Copy `custom_components/lena` into Home Assistant, add **Lena** in Devices & services, and tick **Lena** next to **Assist** in your Ollama agent. It creates her mood, energy and moment dropdowns and her memory list, runs her day, and gives her the `remember_fact`, `forget_fact` and `record_feeling` tools. No helpers, blueprints, scripts, custom template or pasted prompt.
+- **How each feeling sounds** lives on its own in `feelings.yaml`, in the integration's folder: edit it and reload the integration.
+- **Settings in the UI:** the people she misses, weather, special-days calendars, things that worry her, her day, and how quickly her feelings move, under **Configure**.
+- **Shared memory** is the integration's `todo.lena_memory`. She reads it on every request, so there's no recall step.
+- **Open WebUI filter and tool 2.0.0:** the filter gets everything from the integration's new `/api/lena/context` address, and any user's token works. Paste both files over the old ones and set the tool's `memory_list` to `todo.lena_memory`.
+- Tested automatically against Home Assistant 2026.9 and the latest release.
+- **Upgrading from 2.x:** add the integration, then delete the old Lena mood engine automation, the Lena feel and Lena recall scripts, the blueprints, `custom_templates/lena.jinja`, her five feelings helpers and the old memory list (copy anything you want to keep into **Lena Memory** first), and empty the Ollama agent's Instructions.
 
 ### 2.0.2 (2026-10-27)
 

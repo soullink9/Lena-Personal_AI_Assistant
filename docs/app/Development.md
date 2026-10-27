@@ -72,9 +72,9 @@ And, only if you add it, your Home Assistant, with the token you give it:
 
 | Call | What for |
 |---|---|
-| `GET /api/` | **Test** in settings |
-| `GET /api/states/{entity}` | Her five feelings helpers |
-| `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list |
+| `GET /api/` | **Test connection** in settings |
+| `GET /api/lena/context?memory=0` | How she feels, from the Lena integration |
+| `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list, `todo.lena_memory` |
 
 ## Building locally
 

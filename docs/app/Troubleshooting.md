@@ -44,6 +44,12 @@ Check you can open your Open WebUI in Lena's main screen. Away from home, the ph
 
 Memories need **Admin Panel → Settings → General → Memories** (or your account's memory permission) in Open WebUI; knowledge needs knowledge access for your account. An admin can turn these on.
 
+## Her feelings or the Hers tab don't show
+
+- **Settings → Home Assistant → Test connection.** "Connected, but the Lena integration isn't set up" means the app reached Home Assistant but the [integration](../home-assistant/Installation.md) hasn't been added there yet.
+- If the test fails, check the address is the `https://` one you use from your phone, and that the token hasn't been revoked. Paste a new one to replace it.
+- The **Hers** tab reads `todo.lena_memory`. If you renamed that entity in Home Assistant, rename it back.
+
 ## Talking to Lena doesn't hear me
 
 - Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.

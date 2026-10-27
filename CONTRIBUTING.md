@@ -6,7 +6,7 @@ This is a personal project shared in case it helps someone, so replies and merge
 
 Open an issue using the bug report template, and include:
 
-- Which part is affected: the app, the Modelfile, Home Assistant (prompt, feelings, mood engine, scripts), the Open WebUI filter or tool, the voice bridge or Piper.
+- Which part is affected: the app, the Modelfile, the Home Assistant integration (feelings, memory, tools), the Open WebUI filter or tool, the voice bridge or Piper.
 - Versions: the app version (bottom of its settings), Android version and phone, Open WebUI, Home Assistant and Ollama, the model you used and your GPU.
 - What you said or did, what you expected, and what happened.
 - For Home Assistant prompt problems, the rendered prompt: **Settings → Voice assistants → your assistant → Debug** shows what was sent.
@@ -23,8 +23,8 @@ Open an issue using the bug report template, and include:
 ### Personality and Home Assistant
 
 - Her character lives only in `ollama/Modelfile`. Don't copy it into the Home Assistant prompt or Open WebUI.
-- If you add or rename a feeling, follow [Her feelings](docs/personality/Moods.md#add-or-rename-a-feeling); `tools/check.py` tells you what's out of step.
-- Helpers are created through the Home Assistant UI, never in YAML.
+- If you add or rename a feeling, follow [Her feelings](docs/personality/Moods.md#adding-or-removing-one); `tools/check.py` tells you what's out of step.
+- Nothing in Home Assistant is set up in YAML: the integration creates what it needs and is configured in the UI.
 
 ### The app
 

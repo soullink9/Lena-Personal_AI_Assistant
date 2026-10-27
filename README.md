@@ -23,7 +23,7 @@ Lena is a Jarvis-style assistant that runs entirely on your own servers. She's o
 | Folder | What it is |
 |---|---|
 | [`ollama/`](ollama) | Her character and model settings (`Modelfile`), and an example Ollama setup that keeps her loaded |
-| [`home-assistant/`](home-assistant) | Her feelings (template, mood engine) and tools (scripts), and the voice assistant prompt |
+| [`home-assistant/`](home-assistant) | The **Lena** integration: her feelings, shared memory and tools, in one folder |
 | [`open-webui/`](open-webui) | A filter and a tool that bring her feelings and memory into Open WebUI and the app |
 | [`android/`](android) | The **Lena** app for Android 16, built and signed by GitHub Actions |
 | [`voice/`](voice) | An example Piper container, and the bridge that gives Open WebUI your Piper and Whisper voices |
@@ -49,7 +49,7 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 |---|---|
 | **Setup** | [Getting started](docs/Getting-Started.md) · [Lena in Open WebUI](docs/open-webui/Setup.md) · [Home Assistant installation](docs/home-assistant/Installation.md) · [App installation](docs/app/Installation.md) |
 | **Her personality** | [Personality](docs/personality/Personality.md) · [Feelings](docs/personality/Moods.md) · [Memory](docs/home-assistant/Memory.md) |
-| **Home Assistant** | [Helpers](docs/home-assistant/Helpers.md) · [Prompt reference](docs/home-assistant/Prompt-Reference.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
+| **Home Assistant** | [The Lena integration](docs/home-assistant/Integration.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
 | **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
 | **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
 | **Development** | [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) |
@@ -66,7 +66,7 @@ Issues and suggestions are welcome, with the caveat from the disclosure: updates
 
 This project builds on, and wouldn't exist without:
 
-- [Home Assistant](https://www.home-assistant.io/) and its Assist, Ollama, Wyoming and blueprint features.
+- [Home Assistant](https://www.home-assistant.io/) and its Assist, Ollama and Wyoming integrations.
 - [Ollama](https://ollama.com/) for running the model locally. The base model named in the Modelfile is Google's Gemma 4; other choices are listed in the file.
 - [Open WebUI](https://openwebui.com/), which the app wraps and talks to. Lena is an independent client and isn't affiliated with Open WebUI.
 - [Piper](https://docs.linuxserver.io/images/docker-piper/) text-to-speech and [Whisper](https://github.com/openai/whisper) speech-to-text, packaged as containers by [LinuxServer.io](https://www.linuxserver.io/), and the [Wyoming protocol](https://github.com/OHF-Voice/wyoming) the bridge speaks to them.

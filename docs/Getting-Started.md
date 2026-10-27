@@ -52,7 +52,7 @@ Full details: [App installation](app/Installation.md) and [Open WebUI setup for 
 2. Enter your `https://` Open WebUI address (and your sign-in page, if you use Authentik or similar) and sign in.
 3. In the app's settings, leave **Model** on **Lena, automatically** (or pick `lena`), and **Conversation → Her context size** at 32,768 to match the Modelfile.
 4. Make her your assistant: Android Settings → Apps → Default apps → **Digital assistant app** → Lena.
-5. After part 4, come back to **Settings → Home Assistant** in the app: your Home Assistant's `https://` address and a long-lived access token. The sheet then shows how she feels, and **Memory & knowledge** gets a **Shared** tab with her shared memory.
+5. After part 4, come back to **Settings → Home Assistant** in the app: your Home Assistant's `https://` address and a long-lived access token. Any user's token works. The sheet then shows how she feels, and **Memory & knowledge** gets a **Hers** tab with her shared memory.
 
 The app talks to Open WebUI, so the filter and tool from part 2 work there with nothing extra: same feelings, same memory, same tools.
 
@@ -60,17 +60,15 @@ The app talks to Open WebUI, so the filter and tool from part 2 work there with 
 
 ## 4. Home Assistant
 
-Full details: [Home Assistant installation](home-assistant/Installation.md). The steps, all done in the Home Assistant UI apart from copying three files:
+Full details: [Home Assistant installation](home-assistant/Installation.md). Everything is done in the Home Assistant UI apart from copying one folder:
 
-1. **Connect Ollama:** add the Ollama integration, choose `lena`, turn on **Control Home Assistant**, set the context window to 32768 and keep-alive to -1.
-2. **Create her helpers:** three dropdowns and two text helpers for her feelings, plus a to-do list for her memory. Names and options: [Helpers](home-assistant/Helpers.md).
-3. **Copy in her files:** `custom_templates/lena.jinja` (how each feeling sounds) and the `blueprints` folder.
-4. **Create the mood engine** automation from its blueprint, and the **Lena feel** and **Lena recall** scripts from theirs.
-5. **Expose** the two scripts and the memory list to Assist.
-6. **Paste the prompt** `home-assistant/lena_prompt.txt` into the Ollama agent's Instructions.
-7. **Make a voice assistant** with Lena as the conversation agent and your Whisper and Piper.
+1. **Copy in the integration:** `home-assistant/custom_components/lena` into your config folder's `custom_components`, then restart.
+2. **Add Lena:** Settings → Devices & services → Add integration → **Lena**. It creates her mood, energy and moment dropdowns and her memory list.
+3. **Configure** it (optional): the people she misses, your weather, special-days calendars and sensors that worry her.
+4. **Connect Ollama:** add the Ollama integration and a conversation agent with the model `lena`. Under **Control Home Assistant** tick **Assist** and **Lena**, leave **Instructions** empty, set the context window to 32768 and keep-alive to -1.
+5. **Make a voice assistant** with Lena as the conversation agent and your Whisper and Piper.
 
-**Test:** "Who are you?", "Remember that Alex likes the office at seventy degrees", then change her mood helper by hand and ask the same thing again.
+**Test:** "Who are you?", "Remember that Alex likes the office at seventy degrees", then set **Lena Mood** by hand and ask the same thing again.
 
 Now go back to Open WebUI (part 2, step 3) and fill in the filter and tool settings. Ask her on your phone what she remembers: it's the same list.
 

@@ -7,8 +7,8 @@ Lena is one character with two layers: who she always is, and how she feels righ
 | Layer | Where | Changes | Reaches |
 |---|---|---|---|
 | **Her baseline**: character, voice, values, honesty, how she runs the house, how she acts on feelings | `ollama/Modelfile` | When you edit it | Everything that uses the `lena` model |
-| **Her feelings**: mood, energy, moment, and why | Home Assistant helpers, described by `home-assistant/custom_templates/lena.jinja` | Through the day | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
-| **The moment's context**: the time, who's home, her memory | `home-assistant/lena_prompt.txt`, and the Lena filter in Open WebUI | Every message | The app that's asking |
+| **Her feelings**: mood, energy, moment, and why | The Lena integration in Home Assistant, described by its `feelings.yaml` | Through the day | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
+| **The moment's context**: the time, who's home, her memory | The Lena integration (in Home Assistant), and the Lena filter (in Open WebUI) | Every message | The app that's asking |
 
 ## Who she is
 

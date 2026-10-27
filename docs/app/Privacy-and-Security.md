@@ -20,7 +20,7 @@ When you sign in inside Lena, Open WebUI stores your session in a cookie for you
 
 ## Home Assistant (optional)
 
-If you add your Home Assistant under **Settings → Home Assistant**, Lena uses a long-lived access token you create there to read her feelings helpers and her shared memory list, and to change that list when you edit it.
+If you add your Home Assistant under **Settings → Home Assistant**, Lena uses a long-lived access token you create there to read her feelings from the Lena integration and her shared memory list, and to change that list when you edit it.
 
 - The token is encrypted with a key kept in the phone's keystore, which can't be copied off the phone, and is sent only to the Home Assistant address you entered (HTTPS only).
 - Lena never shows the saved token again. Paste a new one to replace it, or remove it with the bin icon.

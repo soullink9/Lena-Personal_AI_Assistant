@@ -10,7 +10,7 @@ assignees: ""
 A clear description of the problem, and what you expected instead.
 
 **Your setup**
-- Which part is affected (app, Modelfile, Home Assistant prompt, feelings or mood engine, Lena feel or recall script, Open WebUI filter or tool, voice bridge, Piper, Docker examples):
+- Which part is affected (app, Modelfile, the Lena integration in Home Assistant (feelings, memory, tools), Open WebUI filter or tool, voice bridge, Piper, Docker examples):
 - App version and phone/Android version (if it's the app):
 - Open WebUI version:
 - Home Assistant version:
