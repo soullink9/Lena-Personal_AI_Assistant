@@ -47,7 +47,7 @@ jobs:
           cd app/build/outputs/apk/release
           sha256sum *.apk | tee SHA256SUMS
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: lena-apk
           path: |
