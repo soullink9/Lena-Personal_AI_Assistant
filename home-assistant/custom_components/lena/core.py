@@ -1,0 +1,399 @@
+"""Lena's state in Home Assistant: her feelings, her memory, and what moves them.
+
+`brain.py` decides; this file listens to Home Assistant (the clock, people, the weather, worry
+sensors), applies what the brain decides, saves it, and tells her entities to update.
+"""
+
+from __future__ import annotations
+
+import logging
+import random
+import uuid
+from datetime import datetime, time, timedelta
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_change,
+)
+from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
+
+from . import brain
+from .const import (
+    CONF_AWAY_HOURS,
+    CONF_BEDTIME,
+    CONF_CALENDARS,
+    CONF_EMPTY_HOURS,
+    CONF_MOMENT_MINUTES,
+    CONF_MOOD_CHANGE_CHANCE,
+    CONF_MOOD_HOLD_HOURS,
+    CONF_MORNING,
+    CONF_PEOPLE,
+    CONF_WEATHER,
+    CONF_WEATHER_CHANCE,
+    CONF_WORRIES,
+    DOMAIN,
+    SIGNAL_UPDATED,
+)
+
+_LOGGER = logging.getLogger(__name__)
+FEELINGS_FILE = Path(__file__).parent / "feelings.yaml"
+
+
+def load_catalog() -> brain.Catalog:
+    """Read feelings.yaml (call it in the executor; it's file I/O)."""
+    data = yaml.safe_load(FEELINGS_FILE.read_text(encoding="utf-8")) or {}
+
+    def section(name: str) -> dict[str, str]:
+        raw = data.get(name) or {}
+        return {str(k): " ".join(str(v).split()) for k, v in raw.items() if v}
+
+    catalog = brain.Catalog(moods=section("moods"), energies=section("energy"), moments=section("moments"))
+    if not catalog.moods or not catalog.energies:
+        raise ValueError("feelings.yaml needs at least one mood and one energy")
+    return catalog
+
+
+def _parse_time(value: str, fallback: str) -> time:
+    try:
+        return time.fromisoformat(value)
+    except (TypeError, ValueError):
+        return time.fromisoformat(fallback)
+
+
+def _ts(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _dt(value: str | None) -> datetime | None:
+    return dt_util.parse_datetime(value) if value else None
+
+
+class LenaCore:
+    """Everything the integration's entities, tools and view share."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, catalog: brain.Catalog) -> None:
+        self.hass = hass
+        self.entry = entry
+        self.catalog = catalog
+        self.feelings = brain.Feelings()
+        self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed"}
+        self._rng = random.Random()
+        self._state_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.feelings")
+        self._memory_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.memory")
+        self._unsubs: list[CALLBACK_TYPE] = []
+        self._timers: dict[str, CALLBACK_TYPE] = {}
+
+    # ---- Settings ----------------------------------------------------------------------------
+
+    def opt(self, key: str) -> Any:
+        return self.entry.options.get(key, brain.DEFAULTS.get(key))
+
+    @property
+    def people(self) -> list[str]:
+        return list(self.opt(CONF_PEOPLE) or [])
+
+    @property
+    def worries(self) -> list[str]:
+        return list(self.opt(CONF_WORRIES) or [])
+
+    @property
+    def weather_entity(self) -> str | None:
+        return self.opt(CONF_WEATHER) or None
+
+    # ---- Starting and stopping -------------------------------------------------------------
+
+    async def async_start(self) -> None:
+        saved = await self._state_store.async_load() or {}
+        f = self.feelings
+        f.mood = saved.get("mood", f.mood)
+        f.mood_reason = saved.get("mood_reason", "")
+        f.mood_since = _dt(saved.get("mood_since")) or dt_util.now()
+        f.energy = saved.get("energy", f.energy)
+        f.moment = saved.get("moment", brain.NOTHING)
+        f.moment_reason = saved.get("moment_reason", "")
+        f.moment_since = _dt(saved.get("moment_since"))
+        if f.mood not in self.catalog.moods:
+            f.mood = next(iter(self.catalog.moods))
+        if f.energy not in self.catalog.energies:
+            f.energy = "Steady" if "Steady" in self.catalog.energies else next(iter(self.catalog.energies))
+        if f.moment != brain.NOTHING and f.moment not in self.catalog.moments:
+            f.moment = brain.NOTHING
+        self.memory = (await self._memory_store.async_load() or {}).get("items", [])
+
+        hass = self.hass
+        wake = _parse_time(self.opt(CONF_MORNING), brain.DEFAULTS["morning"])
+        bed = _parse_time(self.opt(CONF_BEDTIME), brain.DEFAULTS["bedtime"])
+        self._unsubs += [
+            async_track_time_change(hass, self._on_morning, hour=wake.hour, minute=wake.minute, second=wake.second),
+            async_track_time_change(hass, self._on_bedtime, hour=bed.hour, minute=bed.minute, second=bed.second),
+            async_track_time_change(hass, self._on_hour, minute=7, second=0),
+        ]
+        if self.people:
+            self._unsubs.append(async_track_state_change_event(hass, self.people, self._on_person))
+        if self.weather_entity:
+            self._unsubs.append(async_track_state_change_event(hass, [self.weather_entity], self._on_weather))
+        if self.worries:
+            self._unsubs.append(async_track_state_change_event(hass, self.worries, self._on_worry))
+        self._schedule_fade()
+        self._check_empty_house()
+
+    @callback
+    def async_stop(self) -> None:
+        for unsub in self._unsubs:
+            unsub()
+        self._unsubs.clear()
+        for cancel in self._timers.values():
+            cancel()
+        self._timers.clear()
+
+    # ---- Applying changes ------------------------------------------------------------------
+
+    @callback
+    def apply(self, change: brain.Change, source: str) -> None:
+        """Set what an event decided, save it, and update her entities."""
+        if not change:
+            return
+        f, now = self.feelings, dt_util.now()
+        if change.energy and change.energy != f.energy:
+            f.energy = change.energy
+        if change.mood and change.mood != f.mood:
+            f.mood, f.mood_reason, f.mood_since = change.mood, change.mood_reason, now
+        if change.moment is not None:
+            f.moment = change.moment
+            f.moment_reason = change.moment_reason if change.moment != brain.NOTHING else ""
+            f.moment_since = now if change.moment != brain.NOTHING else None
+            self._schedule_fade()
+        _LOGGER.debug("%s: mood %s, energy %s, moment %s", source, f.mood, f.energy, f.moment)
+        self._changed()
+
+    @callback
+    def _changed(self) -> None:
+        f = self.feelings
+        self._state_store.async_delay_save(
+            lambda: {
+                "mood": f.mood, "mood_reason": f.mood_reason, "mood_since": _ts(f.mood_since),
+                "energy": f.energy, "moment": f.moment, "moment_reason": f.moment_reason,
+                "moment_since": _ts(f.moment_since),
+            },
+            1,
+        )
+        async_dispatcher_send(self.hass, SIGNAL_UPDATED)
+
+    @callback
+    def set_by_hand(self, kind: str, value: str) -> None:
+        """You picked a feeling in a dropdown. The old reason no longer fits, so it's cleared."""
+        if kind == "mood":
+            self.apply(brain.Change(mood=value), "set by hand")
+        elif kind == "energy":
+            self.apply(brain.Change(energy=value), "set by hand")
+        else:
+            self.apply(brain.Change(moment=value), "set by hand")
+
+    @callback
+    def feel(self, moment: str, reason: str) -> bool:
+        """She (or an automation) records how something made her feel."""
+        if moment not in self.catalog.moments:
+            return False
+        self.apply(brain.Change(moment=moment, moment_reason=reason.strip()[:300]), "feel")
+        return True
+
+    # ---- Her memory --------------------------------------------------------------------------
+
+    def memories(self) -> list[str]:
+        return [m["summary"] for m in self.memory if m.get("status") != "completed"]
+
+    @callback
+    def memory_changed(self) -> None:
+        self._memory_store.async_delay_save(lambda: {"items": self.memory}, 1)
+        async_dispatcher_send(self.hass, SIGNAL_UPDATED)
+
+    @callback
+    def remember(self, fact: str) -> dict[str, str]:
+        item = {"uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action"}
+        self.memory.append(item)
+        self.memory_changed()
+        return item
+
+    @callback
+    def forget(self, fact: str) -> str | None:
+        """Removes the saved memory that best matches, and returns it."""
+        wanted = fact.strip().lower()
+        open_items = [m for m in self.memory if m.get("status") != "completed"]
+        match = next((m for m in open_items if wanted and wanted in m["summary"].lower()), None)
+        if match is None:
+            import difflib  # noqa: PLC0415
+
+            close = difflib.get_close_matches(fact.strip(), [m["summary"] for m in open_items], n=1, cutoff=0.5)
+            match = next((m for m in open_items if close and m["summary"] == close[0]), None)
+        if match is None:
+            return None
+        self.memory.remove(match)
+        self.memory_changed()
+        return match["summary"]
+
+    # ---- What she's told -------------------------------------------------------------------
+
+    def context(self, with_reasons: bool = True, memory: bool = True) -> str:
+        """The time, who's home, how she feels and what she remembers."""
+        now = dt_util.now()
+        home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
+        parts = [
+            "## Right now\n"
+            f"It's {now.strftime('%A, %B')} {now.day}, {now.year}, {now.strftime('%I:%M %p').lstrip('0')}.\n"
+            f"At home: {', '.join(home) if home else 'nobody'}.",
+            brain.describe(self.feelings, self.catalog, with_reasons),
+        ]
+        if memory:
+            parts.append(brain.remembered(self.memories()))
+        return "\n\n".join(parts)
+
+    # ---- Events ------------------------------------------------------------------------------
+
+    def _wake_bed(self) -> tuple[time, time]:
+        return (
+            _parse_time(self.opt(CONF_MORNING), brain.DEFAULTS["morning"]),
+            _parse_time(self.opt(CONF_BEDTIME), brain.DEFAULTS["bedtime"]),
+        )
+
+    def _weather(self) -> str | None:
+        state = self.hass.states.get(self.weather_entity) if self.weather_entity else None
+        return state.state if state else None
+
+    def _home_counts(self) -> tuple[int, int]:
+        states = [self.hass.states.get(p) for p in self.people]
+        return sum(1 for s in states if s and s.state == STATE_HOME), len(self.people)
+
+    def _worries_on(self) -> int:
+        return sum(1 for w in self.worries if (s := self.hass.states.get(w)) and s.state == "on")
+
+    async def _on_morning(self, now: datetime) -> None:
+        special: list[str] = []
+        calendars = list(self.opt(CONF_CALENDARS) or [])
+        if calendars:
+            start = dt_util.start_of_local_day()
+            try:
+                found = await self.hass.services.async_call(
+                    "calendar", "get_events",
+                    {"entity_id": calendars, "start_date_time": start, "end_date_time": start + timedelta(days=1)},
+                    blocking=True, return_response=True,
+                )
+                for cal in (found or {}).values():
+                    for event in cal.get("events", []):
+                        if (summary := event.get("summary")) and summary not in special:
+                            special.append(summary)
+            except Exception:  # noqa: BLE001 - a calendar problem shouldn't stop her waking up
+                _LOGGER.warning("Couldn't read the special days calendars", exc_info=True)
+        self.apply(brain.morning(self.feelings, self.catalog, special, self._weather(), self._rng), "morning")
+
+    @callback
+    def _on_bedtime(self, now: datetime) -> None:
+        self.apply(brain.bedtime(self.catalog), "bedtime")
+
+    @callback
+    def _on_hour(self, now: datetime) -> None:
+        wake, bed = self._wake_bed()
+        home, total = self._home_counts()
+        change = brain.hourly(
+            self.feelings, self.catalog, dt_util.now(), wake, bed, self._weather(), home, total,
+            float(self.opt(CONF_MOOD_HOLD_HOURS)), int(self.opt(CONF_MOOD_CHANGE_CHANCE)), self._rng,
+        )
+        self.apply(change, "hourly")
+
+    @callback
+    def _on_person(self, event: Event[EventStateChangedData]) -> None:
+        old, new = event.data["old_state"], event.data["new_state"]
+        if new is None:
+            return
+        if old is not None and new.state == STATE_HOME and old.state not in (STATE_HOME, STATE_UNKNOWN, STATE_UNAVAILABLE):
+            away = (new.last_changed - old.last_changed).total_seconds() / 3600
+            self.apply(brain.arrived(self.catalog, new.name, away, float(self.opt(CONF_AWAY_HOURS))), "arrived")
+        self._check_empty_house()
+
+    @callback
+    def _check_empty_house(self) -> None:
+        """Start the lonely timer when everyone's out; stop it when someone's back."""
+        home, total = self._home_counts()
+        if total and home == 0:
+            if "empty" not in self._timers:
+                self._timers["empty"] = async_call_later(
+                    self.hass, timedelta(hours=float(self.opt(CONF_EMPTY_HOURS))), self._on_empty
+                )
+        elif cancel := self._timers.pop("empty", None):
+            cancel()
+
+    @callback
+    def _on_empty(self, now: datetime) -> None:
+        self._timers.pop("empty", None)
+        if self._home_counts()[0] == 0:
+            self.apply(brain.house_empty(self.feelings, self.catalog, self._rng), "house empty")
+
+    @callback
+    def _on_weather(self, event: Event[EventStateChangedData]) -> None:
+        old, new = event.data["old_state"], event.data["new_state"]
+        if new is None or old is None or old.state == new.state:
+            return
+        before, after = old.state, new.state
+        if cancel := self._timers.pop("weather", None):
+            cancel()
+
+        @callback
+        def settled(now: datetime) -> None:
+            # Only react if it's still like this a quarter of an hour later.
+            self._timers.pop("weather", None)
+            if self._weather() == after:
+                change = brain.weather_turned(self.feelings, self.catalog, before, after,
+                                              int(self.opt(CONF_WEATHER_CHANCE)), self._rng)
+                self.apply(change, "weather")
+
+        self._timers["weather"] = async_call_later(self.hass, timedelta(minutes=15), settled)
+
+    @callback
+    def _on_worry(self, event: Event[EventStateChangedData]) -> None:
+        new, entity_id = event.data["new_state"], event.data["entity_id"]
+        if new is None:
+            return
+        key = f"worry:{entity_id}"
+        if cancel := self._timers.pop(key, None):
+            cancel()
+        if new.state == "on":
+            @callback
+            def still_on(now: datetime) -> None:
+                self._timers.pop(key, None)
+                state = self.hass.states.get(entity_id)
+                if state and state.state == "on":
+                    self.apply(brain.worried(self.catalog, state.name, state.attributes.get("device_class")), "worry")
+
+            self._timers[key] = async_call_later(self.hass, timedelta(minutes=2), still_on)
+        elif new.state == "off":
+            self.apply(brain.worry_cleared(self.feelings, self.catalog, new.name, self._worries_on()), "worry cleared")
+
+    @callback
+    def _schedule_fade(self) -> None:
+        if cancel := self._timers.pop("fade", None):
+            cancel()
+        f = self.feelings
+        if f.moment == brain.NOTHING:
+            return
+        due = (f.moment_since or dt_util.now()) + timedelta(minutes=float(self.opt(CONF_MOMENT_MINUTES)))
+        delay = max((due - dt_util.now()).total_seconds(), 1)
+        self._timers["fade"] = async_call_later(self.hass, delay, self._on_fade)
+
+    @callback
+    def _on_fade(self, now: datetime) -> None:
+        self._timers.pop("fade", None)
+        change = brain.fade(self.feelings, self._worries_on())
+        if change:
+            self.apply(change, "fade")
+        elif self.feelings.moment != brain.NOTHING:
+            # Still worried about something that hasn't cleared: check again later.
+            self._timers["fade"] = async_call_later(self.hass, timedelta(minutes=5), self._on_fade)

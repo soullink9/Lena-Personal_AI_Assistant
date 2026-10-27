@@ -1,0 +1,37 @@
+name: Home Assistant integration
+
+# Tests custom_components/lena against a real Home Assistant.
+on:
+  push:
+    branches: [main]
+    paths: ["home-assistant/**", ".github/workflows/home-assistant.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Home Assistant's test harness
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest-homeassistant-custom-component
+          python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
+      - name: Test
+        working-directory: home-assistant
+        run: |
+          set -o pipefail
+          if ! python -m pytest -q -p no:cacheprovider 2>&1 | tee "$RUNNER_TEMP/pytest.log"; then
+            # Put the failures in the run summary, so they can be read without opening the full log.
+            msg=$(grep -E "^(FAILED|ERROR)|Error|assert |^E  " "$RUNNER_TEMP/pytest.log" | head -80 \
+              | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+            echo "::error title=Tests failed::${msg:-see the log}"
+            exit 1
+          fi
+          echo "::notice title=Tests passed::$(tail -1 "$RUNNER_TEMP/pytest.log")"

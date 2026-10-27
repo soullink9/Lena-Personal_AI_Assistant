@@ -1,0 +1,86 @@
+"""Adding Lena (one click) and her settings (Configure): who she misses, what she notices, her day."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    TimeSelector,
+)
+
+from . import brain
+from .compat import vol
+from .const import (
+    CONF_AWAY_HOURS,
+    CONF_BEDTIME,
+    CONF_CALENDARS,
+    CONF_EMPTY_HOURS,
+    CONF_MOMENT_MINUTES,
+    CONF_MOOD_CHANGE_CHANCE,
+    CONF_MOOD_HOLD_HOURS,
+    CONF_MORNING,
+    CONF_PEOPLE,
+    CONF_WEATHER,
+    CONF_WEATHER_CHANCE,
+    CONF_WORRIES,
+    DOMAIN,
+    NAME,
+)
+
+
+class LenaConfigFlow(ConfigFlow, domain=DOMAIN):
+    VERSION = 1
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(title=NAME, data={}, options={})
+        return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> LenaOptionsFlow:
+        return LenaOptionsFlow()
+
+
+def _number(low: float, high: float, unit: str, step: float = 1) -> NumberSelector:
+    return NumberSelector(NumberSelectorConfig(min=low, max=high, step=step, unit_of_measurement=unit, mode=NumberSelectorMode.BOX))
+
+
+class LenaOptionsFlow(OptionsFlowWithReload):
+    """Configure: her house, her day, and how quickly her feelings move."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+        o = self.config_entry.options
+
+        def default(key: str) -> dict[str, Any]:
+            value = o.get(key, brain.DEFAULTS.get(key))
+            return {"suggested_value": value} if value is not None else {}
+
+        schema = vol.Schema({
+            vol.Optional(CONF_PEOPLE, description=default(CONF_PEOPLE)):
+                EntitySelector(EntitySelectorConfig(domain="person", multiple=True)),
+            vol.Optional(CONF_WEATHER, description=default(CONF_WEATHER)):
+                EntitySelector(EntitySelectorConfig(domain="weather")),
+            vol.Optional(CONF_CALENDARS, description=default(CONF_CALENDARS)):
+                EntitySelector(EntitySelectorConfig(domain="calendar", multiple=True)),
+            vol.Optional(CONF_WORRIES, description=default(CONF_WORRIES)):
+                EntitySelector(EntitySelectorConfig(domain="binary_sensor", multiple=True)),
+            vol.Required(CONF_MORNING, description=default(CONF_MORNING)): TimeSelector(),
+            vol.Required(CONF_BEDTIME, description=default(CONF_BEDTIME)): TimeSelector(),
+            vol.Required(CONF_AWAY_HOURS, description=default(CONF_AWAY_HOURS)): _number(1, 72, "h"),
+            vol.Required(CONF_EMPTY_HOURS, description=default(CONF_EMPTY_HOURS)): _number(1, 24, "h"),
+            vol.Required(CONF_WEATHER_CHANCE, description=default(CONF_WEATHER_CHANCE)): _number(0, 100, "%"),
+            vol.Required(CONF_MOOD_HOLD_HOURS, description=default(CONF_MOOD_HOLD_HOURS)): _number(1, 12, "h"),
+            vol.Required(CONF_MOOD_CHANGE_CHANCE, description=default(CONF_MOOD_CHANGE_CHANCE)): _number(0, 100, "%"),
+            vol.Required(CONF_MOMENT_MINUTES, description=default(CONF_MOMENT_MINUTES)): _number(2, 240, "min"),
+        })
+        return self.async_show_form(step_id="init", data_schema=schema)
