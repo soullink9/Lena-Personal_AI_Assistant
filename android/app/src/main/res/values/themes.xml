@@ -3,8 +3,8 @@
     <!-- The screens are drawn by Jetpack Compose; this sets the window and Android's launch screen. -->
     <style name="Lena" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
-        <item name="android:windowSplashScreenBackground">@color/bg</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenBackground">@color/icon_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_bg</item>
     </style>
 

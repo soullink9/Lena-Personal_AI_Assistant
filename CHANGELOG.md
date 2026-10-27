@@ -7,6 +7,11 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.5.0 (2026-10-27)
+
+- **New icon:** Lena's logo, on its own dark background, with a silhouette for Android's themed icons. The launch screen uses it too.
+- Her logo as a round avatar in the sheet, the drawer, settings and the widget, and on "Lena finished" notifications. The notification icon is the logo's silhouette.
+
 ### 2.4.0 (2026-10-27)
 
 - **Lena by default:** with no model chosen, new chats, the sheet and scheduled prompts use `lena` (the model built from the Modelfile) when your server has it.

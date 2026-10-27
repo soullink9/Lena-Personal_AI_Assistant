@@ -457,11 +457,14 @@ class MainActivity : ComponentActivity() {
             drawerContent = {
                 ModalDrawerSheet(Modifier.width(320.dp)) {
                     Column(Modifier.fillMaxHeight()) {
-                        Text(
-                            "Lena",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(start = 28.dp, top = 20.dp, end = 16.dp),
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 16.dp),
+                        ) {
+                            LenaAvatar(40.dp)
+                            Text("Lena", style = MaterialTheme.typography.titleLarge)
+                        }
                         Status(checked, version)
                         feelings?.let { FeelingsLine(it, Modifier.padding(start = 28.dp, end = 16.dp, top = 4.dp)) }
                         Spacer(Modifier.height(8.dp))

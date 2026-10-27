@@ -69,6 +69,12 @@ class LenaWidget : GlanceAppWidget() {
             GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).cornerRadius(24.dp).padding(12.dp),
         ) {
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    provider = ImageProvider(R.drawable.lena_avatar),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(28.dp).cornerRadius(14.dp),
+                )
+                Spacer(GlanceModifier.width(8.dp))
                 Text(
                     "Lena",
                     style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium),

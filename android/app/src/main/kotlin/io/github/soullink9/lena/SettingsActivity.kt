@@ -406,11 +406,14 @@ class SettingsActivity : ComponentActivity() {
 
                 HorizontalDivider(Modifier.padding(top = 8.dp))
                 val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull()
-                Text(
-                    "Lena ${version ?: ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LenaAvatar(32.dp)
+                    Text(
+                        "Lena ${version ?: ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(24.dp))
             }
         }

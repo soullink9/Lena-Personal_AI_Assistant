@@ -470,6 +470,7 @@ class AskActivity : ComponentActivity() {
                             .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        LenaAvatar(36.dp, Modifier.padding(end = 12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Lena", style = MaterialTheme.typography.titleMedium)
                             val f = feelings

@@ -33,8 +33,10 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── piper/docker-compose.example.yml text-to-speech example
 │   └── bridge/                    Wyoming bridge for Open WebUI
 ├── tools/
-│   └── check.py                   offline checks
+│   ├── check.py                   offline checks
+│   └── make_images.py             app icon, notification icon and avatars from the logo
 ├── docs/                          everything in detail
+│   ├── assets/                    the logo, avatar and GitHub social preview
 │   ├── Getting-Started.md, Overview.md, Development.md
 │   ├── personality/, open-webui/, home-assistant/, app/, voice/
 └── .github/
@@ -92,6 +94,21 @@ It can't test Home Assistant, Ollama, Open WebUI or the app themselves.
 
 - **The app** is released from GitHub Actions: bump the version, add the changelog entry, then **Actions → Build APK → Run workflow** with **Publish a release** ticked. Details in [App development](app/Development.md#making-a-release).
 - **The personality** (Modelfile, Home Assistant files, Open WebUI files) doesn't need a build. Add an entry under **Personality** in `CHANGELOG.md`, run the checks and commit. People update by rebuilding the model, copying the new files in (or re-importing the blueprints) and pasting the Open WebUI files over the old ones.
+
+## The logo
+
+`docs/assets/lena-logo.png` is the source for every image. `python3 tools/make_images.py` (needs `pillow`, `numpy` and `scipy`) rebuilds from it:
+
+| Image | Used for |
+|---|---|
+| `mipmap-*/ic_launcher_foreground.png` | The app icon and the launch screen, on the logo's dark background (`icon_bg`) |
+| `mipmap-*/ic_launcher_monochrome.png` | Android's themed icons: the logo's main shapes as a silhouette |
+| `drawable-*/ic_stat_logo.png` | The notification icon |
+| `drawable-nodpi/lena_avatar.png` | Her round avatar in the sheet, drawer, settings, widget and notifications |
+| `docs/assets/lena-avatar.png` | The `lena` model's profile image in Open WebUI |
+| `docs/assets/social-preview.png` | GitHub's social preview: Settings → General → Social preview |
+
+To change the logo, run it with the new file (`python3 tools/make_images.py new-logo.png`), then check the icon in a circle and a rounded square, and the notification icon at small size.
 
 ## Conventions
 

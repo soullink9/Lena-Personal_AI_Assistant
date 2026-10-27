@@ -4,6 +4,8 @@ This project was primarily created for personal use and for my family. While I m
 
 Note: Built with the assistance of Claude.ai. I'm putting it here now so you don't have to hunt for it below.
 
+<p align="center"><img src="docs/assets/lena-logo.png" width="200" alt="Lena's logo"></p>
+
 # Lena: a personal AI assistant on your own hardware
 
 Lena is a Jarvis-style assistant that runs entirely on your own servers. She's one character everywhere you meet her: in Home Assistant's voice assistant, in Open WebUI, and in an Android app that makes her your phone's assistant. She's sharp, sassy and quietly caring. She runs your home, uses your Open WebUI tools, remembers what you tell her, and has feelings that change for real reasons.
