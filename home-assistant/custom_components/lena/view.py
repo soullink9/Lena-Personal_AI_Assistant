@@ -1,6 +1,7 @@
 """GET /api/lena/context: how Lena feels and what she remembers, for Open WebUI and the Lena app.
 
 Any Home Assistant user's long-lived access token can read it; no admin rights needed.
+Add ?memory=0 to leave her memory out, or ?reasons=0 to leave out why she feels the way she does.
 """
 
 from __future__ import annotations
@@ -25,7 +26,10 @@ class LenaContextView(HomeAssistantView):
         f = core.feelings
         return self.json({
             # Ready to add to a chat's system message: the time, who's home, feelings, memory.
-            "context": core.context(),
+            "context": core.context(
+                with_reasons=request.query.get("reasons") != "0",
+                memory=request.query.get("memory") != "0",
+            ),
             "feelings": {
                 "mood": f.mood,
                 "mood_reason": f.mood_reason,
