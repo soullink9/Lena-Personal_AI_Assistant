@@ -6,7 +6,7 @@
 
 With no argument it uses docs/assets/lena-logo.png. Makes the launcher icon (foreground and
 themed silhouette), the notification icon, the in-app avatar, and docs/assets/lena-avatar.png
-and social-preview.png. The logo is expected to be square on a plain dark background; if yours
+and social-preview.png, and the Home Assistant integration's brand images. The logo is expected to be square on a plain dark background; if yours
 changes, update BG (its background colour) and the artwork centre and width below.
 """
 import sys, os
@@ -81,4 +81,37 @@ dr.text((680, 200), "Lena", font=title, fill=(255, 255, 255))
 for i, t in enumerate(["A personal AI assistant", "on your own hardware"]):
     dr.text((686, 390 + i * 52), t, font=line, fill=(170, 176, 210))
 sp.save(f"{assets}/social-preview.png", optimize=True)
+
+# ---- Home Assistant brand images ----------------------------------------------
+# Home Assistant 2026.3+ shows a custom integration's own brand/ images. The rules (from the
+# home-assistant/brands repository): PNG, trimmed, transparency preferred; icon square at 256
+# and 512 (@2x); logo landscape with its short side 128-256 (256-512 for @2x); dark_ files are
+# used on dark themes. The icon is the logo on its dark tile with rounded corners, the same as
+# the app icon, so its white shape stays visible on light themes too. The logo adds her name:
+# dark text for light themes, white for dark ones.
+brand = f"{REPO}/home-assistant/custom_components/lena/brand"
+os.makedirs(brand, exist_ok=True)
+
+def tile(px):
+    """The artwork on a rounded dark square, px wide, with transparent corners."""
+    t = place(src, px * 4, px * 4 * 0.86, BG).convert("RGBA")   # drawn 4x, then shrunk: smooth corners
+    mask = Image.new("L", t.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, t.size[0] - 1, t.size[1] - 1), radius=round(px * 4 * 0.22), fill=255)
+    t.putalpha(mask)
+    return t.resize((px, px), Image.LANCZOS)
+
+def wordmark(h, colour):
+    """Tile plus "Lena", h pixels high, trimmed to the content."""
+    name = ImageFont.truetype(f"{fonts}/InterDisplay-Bold.otf", round(h * 0.62))
+    gap = round(h * 0.22)
+    left, top, right, bottom = name.getbbox("Lena")
+    canvas = Image.new("RGBA", (h + gap + right - left, h), (0, 0, 0, 0))
+    canvas.alpha_composite(tile(h))
+    ImageDraw.Draw(canvas).text((h + gap - left, (h - (bottom - top)) / 2 - top), "Lena", font=name, fill=colour)
+    return canvas
+
+for suffix, k in (("", 1), ("@2x", 2)):
+    tile(256 * k).save(f"{brand}/icon{suffix}.png", optimize=True)
+    wordmark(128 * k, (24, 26, 40, 255)).save(f"{brand}/logo{suffix}.png", optimize=True)
+    wordmark(128 * k, (255, 255, 255, 255)).save(f"{brand}/dark_logo{suffix}.png", optimize=True)
 print("ok")

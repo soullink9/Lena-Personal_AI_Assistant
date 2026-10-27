@@ -24,7 +24,8 @@ How the repository is organised and how to change it without breaking things. Th
 │   │   ├── view.py                GET /api/lena/context for Open WebUI and the app
 │   │   ├── select.py, todo.py     her dropdowns and her memory list
 │   │   ├── config_flow.py         adding and configuring her in the UI
-│   │   └── compat.py              differences between Home Assistant versions
+│   │   ├── compat.py              differences between Home Assistant versions
+│   │   └── brand/                 her icon and logo in Home Assistant (made by make_images.py)
 │   ├── tests/                     runs the integration in a real Home Assistant
 │   └── pytest.ini
 ├── open-webui/
@@ -111,8 +112,9 @@ It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's ow
 | `drawable-nodpi/lena_avatar.png` | Her round avatar in the sheet, drawer, settings, widget and notifications |
 | `docs/assets/lena-avatar.png` | The `lena` model's profile image in Open WebUI |
 | `docs/assets/social-preview.png` | GitHub's social preview: Settings → General → Social preview |
+| `home-assistant/custom_components/lena/brand/` | The integration's icon and logo in Home Assistant 2026.3+: `icon.png` and `@2x` (the logo on its rounded dark tile), `logo.png` with her name in dark text, `dark_logo.png` in white for dark themes |
 
-To change the logo, run it with the new file (`python3 tools/make_images.py new-logo.png`), then check the icon in a circle and a rounded square, and the notification icon at small size.
+To change the logo, run it with the new file (`python3 tools/make_images.py new-logo.png`), then check the icon in a circle and a rounded square, the notification icon at small size, and the integration's logo on a light and a dark Home Assistant theme.
 
 ## Conventions
 

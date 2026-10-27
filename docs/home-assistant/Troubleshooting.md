@@ -18,6 +18,10 @@ Example: "Sure thing! How can I help you today?" Her character isn't reaching th
 
 The folder isn't where Home Assistant looks, or Home Assistant hasn't restarted since you copied it. It must be at `config/custom_components/lena/` with `manifest.json` directly inside. Restart, then refresh the browser page. Settings → System → Logs shows any error loading it.
 
+## Lena shows "icon not available" instead of her logo
+
+Check `config/custom_components/lena/brand/` came across with the rest of the folder, restart, then hard-refresh the browser (or clear the companion app's cache): images are cached for a long time.
+
 ## There's no Lena under Control Home Assistant
 
 Add the Lena integration first (Settings → Devices & services → Add integration → Lena). The choice appears once it's set up.

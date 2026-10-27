@@ -14,7 +14,8 @@ editing:
   - each of her feelings events choosing something that isn't defined;
   - the Open WebUI tool offering moments the integration doesn't have;
   - the Modelfile losing her character or its context size drifting from the app's;
-  - Python that doesn't compile, and private data slipping into the repository.
+  - Python that doesn't compile, and private data slipping into the repository;
+  - the integration's brand images missing or the wrong size.
 
 Exit code 0 means every check passed.
 """
@@ -215,6 +216,24 @@ for path in ROOT.rglob("*"):
             if "${{" not in line and not match.group(2).isupper():
                 hits.append(f"{relative}:{number} ({match.group(1)} value)")
 check(not hits, "no obvious private data found" + (f" ({', '.join(hits[:10])})" if hits else ""))
+
+# ---- 9. Home Assistant brand images -----------------------------------------------------------
+# Sizes from the home-assistant/brands rules; tools/make_images.py makes them. Read from the PNG
+# header so the check needs no image library.
+def png_size(path):
+    head = path.read_bytes()[:24]
+    if head[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+BRAND = ROOT / "home-assistant/custom_components/lena/brand"
+for name, k in (("icon.png", 1), ("icon@2x.png", 2)):
+    size = png_size(BRAND / name) if (BRAND / name).exists() else None
+    check(size == (256 * k, 256 * k), f"brand/{name} is a {256 * k}x{256 * k} PNG (got {size})")
+for name, k in (("logo.png", 1), ("logo@2x.png", 2), ("dark_logo.png", 1), ("dark_logo@2x.png", 2)):
+    size = png_size(BRAND / name) if (BRAND / name).exists() else None
+    check(size is not None and size[0] >= size[1] and 128 * k <= min(size) <= 256 * k,
+          f"brand/{name} is a landscape PNG with its short side {128 * k}-{256 * k} (got {size})")
 
 print()
 if failures:

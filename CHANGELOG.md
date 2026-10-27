@@ -120,6 +120,10 @@ First release.
 
 ## Personality
 
+### 3.0.1 (2026-10-27)
+
+- The Lena integration shows her logo in Home Assistant: on Devices & services, the Add integration list and the integration's page, with a dark-theme version. Copy the new `custom_components/lena` folder over the old one and restart, then refresh the browser page.
+
 ### 3.0.0 (2026-10-27)
 
 - **One Home Assistant integration replaces everything else there.** Copy `custom_components/lena` into Home Assistant, add **Lena** in Devices & services, and tick **Lena** next to **Assist** in your Ollama agent. It creates her mood, energy and moment dropdowns and her memory list, runs her day, and gives her the `remember_fact`, `forget_fact` and `record_feeling` tools. No helpers, blueprints, scripts, custom template or pasted prompt.
