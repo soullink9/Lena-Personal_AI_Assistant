@@ -24,7 +24,7 @@ jobs:
           pip install pytest-homeassistant-custom-component
           # Her tools are called through the conversation integration; install what it needs, at the
           # versions this Home Assistant pins.
-          reqs=$(python -c "import json, pathlib, homeassistant.components.conversation as c; print(' '.join(json.loads((pathlib.Path(c.__file__).parent / 'manifest.json').read_text())['requirements']))")
+          reqs=$(python -c "import json, pathlib, homeassistant; m = pathlib.Path(homeassistant.__file__).parent / 'components' / 'conversation' / 'manifest.json'; print(' '.join(json.loads(m.read_text())['requirements']))")
           echo "Installing: $reqs"
           pip install $reqs
           python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
