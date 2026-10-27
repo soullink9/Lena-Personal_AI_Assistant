@@ -51,7 +51,7 @@ FROM gemma4:12b
 # the CPU, drop to 16384.
 # Keep three numbers the same: this one, the context window in Home
 # Assistant's Ollama agent (it overrides this for Home Assistant), and
-# "Lena's context size" in the Lena app's settings.
+# "Her context size" in the Lena app's Conversation settings.
 PARAMETER num_ctx 32768
 
 # Google's recommended sampling for Gemma 4. If device control gets sloppy

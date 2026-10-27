@@ -50,7 +50,7 @@ Full details: [App installation](app/Installation.md) and [Open WebUI setup for 
 
 1. Install `lena-<version>.apk` from the [latest release](../../../releases/latest) (Android 16).
 2. Enter your `https://` Open WebUI address (and your sign-in page, if you use Authentik or similar) and sign in.
-3. In the app's settings, set **Chats → Model for new chats** to `lena`, and leave **Lena's context size** at 32,768 to match the Modelfile.
+3. In the app's settings, leave **Model** on **Lena, automatically** (or pick `lena`), and **Conversation → Her context size** at 32,768 to match the Modelfile.
 4. Make her your assistant: Android Settings → Apps → Default apps → **Digital assistant app** → Lena.
 5. After part 4, come back to **Settings → Home Assistant** in the app: your Home Assistant's `https://` address and a long-lived access token. The sheet then shows how she feels, and **Memory & knowledge** gets a **Shared** tab with her shared memory.
 

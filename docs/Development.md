@@ -56,7 +56,7 @@ The app build only runs when something in `android/` or the workflow changes, so
 | A feeling's name (adding, renaming) | `lena.jinja`, its dropdown's options on the [Helpers](home-assistant/Helpers.md) page, the mood engine's lists, and for moments she sets herself `lena_feel.yaml` and `open-webui/lena_tools.py`. See [Her feelings](personality/Moods.md#add-or-rename-a-feeling). |
 | A feelings helper's entity ID | The defaults in `lena.jinja`'s `feelings()` (or the call in `lena_prompt.txt` and `FEELINGS_TEMPLATE` in `lena_filter.py`), and the [Helpers](home-assistant/Helpers.md) page |
 | The memory list's entity ID | The `memory_list` settings of the Open WebUI filter and tool, and the [Helpers](home-assistant/Helpers.md) page |
-| `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Lena's context size** in `android/.../Prefs.kt` |
+| `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Conversation) in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The app's version | `versionCode` and `versionName` in `android/app/build.gradle.kts`, plus an **App** entry in `CHANGELOG.md` |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |

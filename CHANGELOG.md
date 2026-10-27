@@ -7,6 +7,12 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.8.0 (2026-10-27)
+
+- **Settings, redone like a phone's own settings:** one short list of categories in rounded groups, each showing what it's set to (Open WebUI, Home Assistant, Model, Assistant gesture, Voice, Conversation, Quick prompts, Scheduled prompts, Widget & tile). Tap one for its page. Reply notifications and Open WebUI's own menus are switches right on the list.
+- **No Save button:** changes save as you make them. Addresses save once they're valid https:// addresses, and changing your server signs you in again when you leave settings.
+- **Model** is now a list of your server's models to pick from, with **Lena, automatically** first.
+
 ### 2.7.0 (2026-10-27)
 
 - **Settings, redesigned:** grouped into cards (Open WebUI, Home Assistant, Chats, Assistant gesture, Talking to Lena, Quick prompts, Scheduled prompts, On your phone) under a large collapsing title, with Save always at hand.

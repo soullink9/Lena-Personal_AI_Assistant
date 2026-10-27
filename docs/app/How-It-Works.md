@@ -19,11 +19,11 @@ Lena is two things working together:
 - **Search** and your **recent chats**, grouped by day, taking up most of the drawer. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
 - Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
 
-**Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Settings → Chats → Show Open WebUI's own menus**.
+**Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings.
 
 Lena hides Open WebUI's own header and sidebar because the top bar and drawer replace them. If an Open WebUI update changes its page, the header may simply reappear until Lena catches up; nothing breaks.
 
-**New chats** use your chosen model (Settings → Chats), unless you pick another from the title.
+**New chats** use your chosen model (Settings → Model), unless you pick another from the title.
 
 **Back** goes back within Open WebUI, then closes Lena to the background.
 
@@ -39,15 +39,15 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 
 - **New conversation** (the speech-bubble button in the sheet) starts over. The old chat stays in your history.
 - Delete the **Lena** chat (from the drawer or Open WebUI) and the next time you talk, she starts a fresh one.
-- A conversation that never ends would outgrow any model, so Lena gives it **half of the model's context** (set **Lena's context size** in settings; 32,768 by default), filled from the newest exchange back. For short spoken exchanges that's usually 50 to 80 of them. The other half stays free for her system prompt, tools, tool results and reply. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
-- Prefer a new chat every time? Turn off **Settings → Talking to Lena → One ongoing conversation**.
+- A conversation that never ends would outgrow any model, so Lena gives it **half of the model's context** (set **Her context size** under Settings → Conversation; 32,768 by default), filled from the newest exchange back. For short spoken exchanges that's usually 50 to 80 of them. The other half stays free for her system prompt, tools, tool results and reply. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
+- Prefer a new chat every time? Turn off **Settings → Conversation → One ongoing conversation**.
 
 - The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
 - The **waveform** button switches to a full voice call, and the **expand** button opens the full app.
 - Your **quick prompts** appear as chips when typing.
 - Tap outside the sheet to close it. If Lena is still answering, you get a notification when she's done.
 
-**Settings → Talking to Lena** chooses who hears you and who speaks:
+**Settings → Voice** chooses who hears you and who speaks:
 
 | Setting | Choices |
 |---|---|
@@ -55,7 +55,7 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 | Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
 | Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
 | One ongoing conversation | On by default. Off starts a new chat each time you open the sheet. |
-| Lena's context size | Your model's context length in tokens (32,768 by default). Half of it holds the ongoing conversation. |
+| Her context size (Conversation) | Your model's context length in tokens (32,768 by default). Half of it holds the ongoing conversation. |
 
 If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
 
@@ -63,9 +63,9 @@ Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu
 
 **Show her a photo.** The camera button in the sheet takes a photo or lets you choose one ("What's this plant?", "Read this label"). Ask about it by typing or by tapping the mic, or just send it. The photo is shrunk to a sensible size, sent with your question, and saved in the chat like any other. Lena needs a model that can see images; `gemma4:12b` can. The camera app saves the picture into Lena's private storage and it's deleted as soon as it's read; choosing a photo uses Android's photo picker, so Lena only ever sees the one you pick.
 
-**Her voice follows her mood** (Settings → Talking to Lena, off by default, needs Home Assistant). She speaks a little slower and lower when she's groggy, drained or wistful, and a little quicker and brighter when she's wired, cheerful or playful. The changes are small on purpose. It works with your server's voice and the phone's.
+**Her voice follows her mood** (Settings → Voice, off by default, needs Home Assistant). She speaks a little slower and lower when she's groggy, drained or wistful, and a little quicker and brighter when she's wired, cheerful or playful. The changes are small on purpose. It works with your server's voice and the phone's.
 
-**On the lock screen** (Settings → Assistant gesture → Talk to Lena on the lock screen, off by default). With it off, Android asks you to unlock before the sheet opens. With it on, the gesture opens her straight over the lock screen in a private mode:
+**On the lock screen** (Settings → Assistant gesture → On the lock screen, off by default). With it off, Android asks you to unlock before the sheet opens. With it on, the gesture opens her straight over the lock screen in a private mode:
 
 - She starts a fresh conversation. Your ongoing **Lena** chat and its history stay hidden.
 - Her mood shows, but not the reasons.
@@ -86,7 +86,7 @@ Talking to Lena uses Open WebUI's memories when its memory setting is on for you
 
 ## How she feels
 
-Connect Home Assistant under **Settings → Home Assistant**: its address, a long-lived access token (your Home Assistant profile → Security), and her memory list. **Test** checks it. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too. It reads the five helpers from [Helpers](../home-assistant/Helpers.md) with their default names.
+Connect Home Assistant under **Settings → Home Assistant**: its address, a long-lived access token (your Home Assistant profile → Security), and her memory list. **Test connection** checks it. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too. It reads the five helpers from [Helpers](../home-assistant/Helpers.md) with their default names.
 
 ## Share to Lena
 
@@ -102,13 +102,13 @@ Start one from the top bar, the drawer, the Quick Settings tile, the widget, the
 
 ## Quick Settings tile
 
-Settings → On your phone → **Add Quick Settings tile**. Tapping **Call Lena** in the pull-down shade starts a call (after unlocking).
+Settings → Widget & tile → **Add the Quick Settings tile**. Tapping **Call Lena** in the pull-down shade starts a call (after unlocking).
 
 ## Home screen widget
 
-Settings → On your phone → **Add home screen widget**, or add it from your launcher's widget list. It has **Talk**, **Voice call**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
+Settings → Widget & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Voice call**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
 
-Turn on **Her mood on the widget** (Settings → On your phone, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
+Turn on **Her mood on the widget** (Settings → Widget & tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
 
 ## Quick prompts
 
@@ -116,7 +116,7 @@ Settings → Quick prompts. Up to six. They appear as chips in the sheet when ty
 
 ## "Lena finished" notifications
 
-If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off in Settings → Notifications.
+If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off with **Reply notifications** in Settings.
 
 Lena watches for up to about nine minutes. Android may delay the check a little to save battery.
 
