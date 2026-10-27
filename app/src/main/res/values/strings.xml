@@ -2,5 +2,10 @@
 <resources>
     <string name="app_name">Lena</string>
     <string name="shortcut_call">Call</string>
+    <string name="shortcut_ask">Ask Lena</string>
+    <string name="shortcut_new">New chat</string>
     <string name="shortcut_settings">Settings</string>
+    <string name="tile_label">Call Lena</string>
+    <string name="widget_description">Call, ask or start a chat with Lena, plus your quick prompts</string>
+    <string name="share_label">Ask Lena</string>
 </resources>

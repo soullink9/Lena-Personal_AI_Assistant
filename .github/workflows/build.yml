@@ -64,7 +64,15 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
-          gradle --no-daemon assembleRelease
+          set -o pipefail
+          if ! gradle --no-daemon assembleRelease 2>&1 | tee "$RUNNER_TEMP/build.log"; then
+            # Put the errors in the run summary, so they can be read without opening the full log.
+            msg=$(grep -E '^e: |What went wrong|^> |^  > |error:|Error:' "$RUNNER_TEMP/build.log" \
+              | sed "s#file://$GITHUB_WORKSPACE/##; s#$GITHUB_WORKSPACE/##" | head -60 \
+              | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+            echo "::error title=Build failed::${msg:-see the build log}"
+            exit 1
+          fi
           cd app/build/outputs/apk/release
           mv app-release.apk "lena-${version}.apk"
           sha256sum lena-*.apk | tee SHA256SUMS
