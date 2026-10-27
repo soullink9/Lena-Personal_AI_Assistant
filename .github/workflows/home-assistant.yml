@@ -22,8 +22,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest-homeassistant-custom-component
-          # The conversation integration (used when her tools are called) needs these.
-          pip install hassil home-assistant-intents
+          # Her tools are called through the conversation integration; install what it needs, at the
+          # versions this Home Assistant pins.
+          reqs=$(python -c "import json, pathlib, homeassistant.components.conversation as c; print(' '.join(json.loads((pathlib.Path(c.__file__).parent / 'manifest.json').read_text())['requirements']))")
+          echo "Installing: $reqs"
+          pip install $reqs
           python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
       - name: Test
         working-directory: home-assistant
