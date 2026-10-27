@@ -44,7 +44,9 @@ Check you can open your Open WebUI in Lena's main screen. Away from home, the ph
 
 - Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.
 - With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server meanwhile. You can also switch to **Your server** in Lena's settings.
-- With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)).
+- With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)). Lena also uses it whenever the phone's recognizer can't listen, so it's worth setting up either way.
+- The warning says what went wrong, for example that the microphone is in use by another app.
+- If the mic doesn't open again after Lena replies, check **Keep listening** in Lena's settings.
 
 ## Lena doesn't speak her replies
 

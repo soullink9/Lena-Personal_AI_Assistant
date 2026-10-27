@@ -33,7 +33,7 @@ The assistant gesture opens a sheet over whatever you're doing, already listenin
 
 1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her.
-3. **If her reply ends with a question, she listens for your answer**, like Home Assistant's "continue conversation". Tap the mic to say something else.
+3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk.
 
 Follow-ups continue the same chat. Every conversation is saved in your Open WebUI history; **Continue in Lena** opens it in the full app.
 
@@ -48,9 +48,9 @@ Follow-ups continue the same chat. Every conversation is saved in your Open WebU
 |---|---|
 | Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as call mode. |
 | Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
-| Keep listening when Lena asks a question | On by default. |
+| Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
 
-If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If your server's voice isn't set up, Lena uses the phone's.
+If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
 
 Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu, and **Type to Lena** for the keyboard version.
 

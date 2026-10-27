@@ -86,6 +86,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -117,6 +118,7 @@ class AskActivity : ComponentActivity() {
 
     private lateinit var api: Api
     private var ear: Ear? = null
+    private var fallbackEar: Ear? = null // your server, when the phone couldn't listen this time
     private var mouth: Mouth? = null
     private var running: Api.Started? = null
     private var working = false
@@ -224,13 +226,19 @@ class AskActivity : ComponentActivity() {
         val scroll = rememberScrollState()
         val codeBg = MaterialTheme.colorScheme.surfaceVariant
 
-        lateinit var listen: () -> Unit
+        lateinit var listen: (followUp: Boolean) -> Unit
+
+        fun listenAgainAfter(answer: String): Boolean = when (Prefs.followUp(this@AskActivity)) {
+            FollowUp.ALWAYS -> true
+            FollowUp.QUESTIONS -> answer.trimEnd().endsWith("?")
+            FollowUp.OFF -> false
+        }
 
         fun speakThenMaybeListen(answer: String) {
             val voice = mouth ?: newMouth().also { mouth = it }
             val plain = Markdown.plain(answer)
             if (voice == null || plain.isBlank()) {
-                phase = Phase.IDLE
+                if (plain.isNotBlank() && listenAgainAfter(plain)) listen(true) else phase = Phase.IDLE
                 return
             }
             phase = Phase.SPEAKING
@@ -246,8 +254,7 @@ class AskActivity : ComponentActivity() {
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
                     }
                 }
-                // Like Home Assistant's "continue conversation": a question gets your answer.
-                if (Prefs.followUps(this@AskActivity) && plain.trimEnd().endsWith("?")) listen() else phase = Phase.IDLE
+                if (listenAgainAfter(plain)) listen(true) else phase = Phase.IDLE
             }
         }
 
@@ -292,13 +299,58 @@ class AskActivity : ComponentActivity() {
         }
 
         val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) listen() else {
+            if (granted) listen(false) else {
                 note = "Lena needs the microphone to hear you."
                 typing = true
             }
         }
 
-        listen = listen@{
+        // Your server's speech-to-text, for when the phone's recognizer can't listen this time.
+        suspend fun hearViaServer(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String = try {
+            ServerEar(api).also { fallbackEar = it }.listen(onPartial, onLevel)
+        } catch (c: CancellationException) {
+            throw c
+        } catch (_: AuthException) {
+            note = "Open Lena and sign in first."
+            ""
+        } catch (_: Exception) {
+            note = "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
+            ""
+        }
+
+        suspend fun hear(): String {
+            val onPartial = { t: String -> heard = t }
+            val onLevel = { l: Float -> level = l }
+            val e = ear ?: newEar().also { ear = it }
+            return try {
+                e.listen(onPartial, onLevel)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (_: EarUnavailable) {
+                // The phone's speech model is still downloading: use your server meanwhile.
+                ear = ServerEar(api)
+                note = "The phone's speech model is downloading; using your server for now."
+                hearViaServer(onPartial, onLevel)
+            } catch (err: EarError) {
+                if (err.code == android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                    note = "Lena needs the microphone to hear you."
+                    ""
+                } else {
+                    // The phone couldn't listen this time; your server can.
+                    hearViaServer(onPartial, onLevel).also {
+                        if (it.isBlank() && note == null) note = "Couldn't hear you (${err.describe()})."
+                    }
+                }
+            } catch (_: AuthException) {
+                note = "Open Lena and sign in first."
+                ""
+            } catch (_: Exception) {
+                note = "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
+                ""
+            }
+        }
+
+        listen = listen@{ followUp ->
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
                 return@listen
@@ -312,33 +364,14 @@ class AskActivity : ComponentActivity() {
             phase = Phase.LISTENING
             view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
             job = scope.launch {
-                val e = ear ?: newEar().also { ear = it }
-                val said = try {
-                    e.listen(onPartial = { heard = it }, onLevel = { level = it })
-                } catch (c: CancellationException) {
-                    throw c
-                } catch (_: EarUnavailable) {
-                    // The phone's speech model is still downloading: use your server meanwhile.
-                    ear = ServerEar(api)
-                    note = "The phone's speech model is downloading; using your server for now."
-                    try {
-                        ear!!.listen(onPartial = { heard = it }, onLevel = { level = it })
-                    } catch (c: CancellationException) {
-                        throw c
-                    } catch (_: Exception) {
-                        ""
-                    }
-                } catch (_: AuthException) {
-                    note = "Open Lena and sign in first."
-                    ""
-                } catch (_: Exception) {
-                    note = "Couldn't hear you. Check your server's speech-to-text, or switch it in Settings."
-                    ""
-                }
+                // After Lena speaks, a short pause so the mic doesn't catch the end of her voice.
+                if (followUp) delay(350)
+                val said = hear()
                 level = 0f
                 if (said.isBlank()) {
                     phase = Phase.IDLE
-                    if (note == null) note = "Didn't catch that."
+                    // Saying nothing after a reply just ends the conversation; no warning.
+                    if (note == null && !followUp) note = "Didn't catch that."
                 } else {
                     heard = said
                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -349,14 +382,17 @@ class AskActivity : ComponentActivity() {
 
         fun tapOrb() {
             when (phase) {
-                Phase.LISTENING -> ear?.finish()
+                Phase.LISTENING -> {
+                    ear?.finish()
+                    fallbackEar?.finish()
+                }
                 Phase.SPEAKING -> {
                     job?.cancel()
                     mouth?.stop()
                     phase = Phase.IDLE
                 }
                 Phase.THINKING -> Unit
-                Phase.IDLE -> listen()
+                Phase.IDLE -> listen(false)
             }
         }
 
@@ -366,7 +402,7 @@ class AskActivity : ComponentActivity() {
         LaunchedEffect(restart.intValue) {
             when {
                 restart.intValue == 0 && autoPrompt != null -> send(autoPrompt, spoken = false)
-                restart.intValue > 0 || !typing -> listen()
+                restart.intValue > 0 || !typing -> listen(false)
                 else -> runCatching { focus.requestFocus() }
             }
         }
@@ -402,7 +438,7 @@ class AskActivity : ComponentActivity() {
                             }
                         }
                         IconButton(onClick = {
-                            if (typing) listen() else {
+                            if (typing) listen(false) else {
                                 job?.takeIf { phase == Phase.LISTENING }?.cancel()
                                 ear?.release()
                                 ear = null

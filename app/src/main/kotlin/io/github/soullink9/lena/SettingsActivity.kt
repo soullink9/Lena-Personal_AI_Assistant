@@ -231,11 +231,12 @@ class SettingsActivity : ComponentActivity() {
                 Choice("Don't read replies aloud", "Show them only", s.speaking == Speaking.OFF) {
                     s = s.copy(speaking = Speaking.OFF)
                 }
-                Toggle(
-                    "Keep listening when Lena asks a question",
-                    "Answer her follow-up without tapping",
-                    s.followUps,
-                ) { s = s.copy(followUps = it) }
+                Text("Keep listening", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+                Choice("After every reply", "Talk back without tapping, like a conversation. Stays quiet if you say nothing.",
+                    s.followUp == FollowUp.ALWAYS) { s = s.copy(followUp = FollowUp.ALWAYS) }
+                Choice("Only when Lena asks a question", "Like Home Assistant's \"continue conversation\"",
+                    s.followUp == FollowUp.QUESTIONS) { s = s.copy(followUp = FollowUp.QUESTIONS) }
+                Choice("Off", "Tap the mic to talk again", s.followUp == FollowUp.OFF) { s = s.copy(followUp = FollowUp.OFF) }
 
                 Section("Notifications")
                 Toggle(

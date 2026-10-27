@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -48,9 +49,28 @@ interface Ear {
     fun release()
 }
 
+/** The phone's recognizer reported an error. [code] is one of SpeechRecognizer's ERROR_ constants. */
+class EarError(val code: Int) : IOException("Speech recognition error $code") {
+    /** Errors that usually clear if you just try again. */
+    val transient: Boolean
+        get() = code in setOf(
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_CLIENT,
+            SpeechRecognizer.ERROR_SERVER_DISCONNECTED, SpeechRecognizer.ERROR_TOO_MANY_REQUESTS,
+            SpeechRecognizer.ERROR_SERVER,
+        )
+
+    fun describe(): String = when (code) {
+        SpeechRecognizer.ERROR_AUDIO -> "the microphone is in use"
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "no microphone permission"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "the phone's recognizer was busy"
+        else -> "error $code"
+    }
+}
+
 /**
  * Android's on-device speech recognizer: shows your words as you speak, and the audio never
- * leaves the phone.
+ * leaves the phone. One recognizer is kept for the whole conversation; creating a new one
+ * right after destroying the last often fails with "busy".
  */
 class PhoneEar(private val context: Context) : Ear {
 
@@ -65,14 +85,26 @@ class PhoneEar(private val context: Context) : Ear {
         .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
 
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
+        try {
+            once(onPartial, onLevel)
+        } catch (e: EarError) {
+            if (!e.transient) throw e
+            release() // start over with a fresh recognizer
+            delay(400)
+            once(onPartial, onLevel)
+        }
+
+    private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { cont ->
-                recognizer?.destroy()
-                val r = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-                recognizer = r
+                val r = recognizer ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { recognizer = it }
+                r.cancel() // clear anything left from the last turn
                 var latest = ""
                 fun done(text: String) {
                     if (cont.isActive) cont.resume(text)
+                }
+                fun fail(e: Exception) {
+                    if (cont.isActive) cont.resumeWithException(e)
                 }
                 r.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {}
@@ -88,17 +120,20 @@ class PhoneEar(private val context: Context) : Ear {
                     }
 
                     override fun onResults(results: Bundle?) {
-                        done(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: latest)
+                        val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                        done(text?.takeIf { it.isNotBlank() } ?: latest)
                     }
 
                     override fun onError(error: Int) {
-                        when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> done(latest)
-                            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
+                        when {
+                            latest.isNotBlank() -> done(latest) // we heard you; use it
+                            error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> done("")
+                            error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+                                error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
                                 runCatching { r.triggerModelDownload(request()) }
-                                if (cont.isActive) cont.resumeWithException(EarUnavailable())
+                                fail(EarUnavailable())
                             }
-                            else -> if (cont.isActive) cont.resumeWithException(IOException("Speech recognition error $error"))
+                            else -> fail(EarError(error))
                         }
                     }
                 })

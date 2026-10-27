@@ -17,6 +17,9 @@ enum class Hearing { PHONE, SERVER }
 /** Who reads Lena's spoken replies aloud. */
 enum class Speaking { SERVER, PHONE, OFF }
 
+/** When the mic opens again after Lena answers a spoken question. */
+enum class FollowUp { ALWAYS, QUESTIONS, OFF }
+
 /** A prompt Lena sends on her own every day at [hour]:[minute]. */
 data class Schedule(
     val id: String = UUID.randomUUID().toString(),
@@ -37,7 +40,7 @@ data class Settings(
     val schedules: List<Schedule> = emptyList(),
     val hearing: Hearing = Hearing.PHONE,
     val speaking: Speaking = Speaking.SERVER,
-    val followUps: Boolean = true,
+    val followUp: FollowUp = FollowUp.ALWAYS,
 )
 
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
@@ -60,7 +63,10 @@ object Prefs {
     fun speaking(c: Context): Speaking =
         runCatching { Speaking.valueOf(p(c).getString("speaking", null) ?: "SERVER") }.getOrDefault(Speaking.SERVER)
 
-    fun followUps(c: Context): Boolean = p(c).getBoolean("follow_ups", true)
+    fun followUp(c: Context): FollowUp {
+        p(c).getString("follow_up", null)?.let { v -> return runCatching { FollowUp.valueOf(v) }.getOrDefault(FollowUp.ALWAYS) }
+        return if (p(c).getBoolean("follow_ups", true)) FollowUp.ALWAYS else FollowUp.OFF // 2.1.0 setting
+    }
 
     fun quickPrompts(c: Context): List<String> {
         val a = runCatching { JSONArray(p(c).getString("quick_prompts", "[]")) }.getOrDefault(JSONArray())
@@ -91,7 +97,7 @@ object Prefs {
         schedules = schedules(c),
         hearing = hearing(c),
         speaking = speaking(c),
-        followUps = followUps(c),
+        followUp = followUp(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -112,7 +118,7 @@ object Prefs {
             .putString("schedules", schedules.toString())
             .putString("hearing", s.hearing.name)
             .putString("speaking", s.speaking.name)
-            .putBoolean("follow_ups", s.followUps)
+            .putString("follow_up", s.followUp.name)
             .apply()
     }
 

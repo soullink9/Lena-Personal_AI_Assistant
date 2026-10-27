@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 (2026-10-27)
+
+- Fixed "Couldn't hear you" after Lena spoke, which also stopped the mic from opening again. The phone's recognizer is now kept for the whole conversation, retried if it's busy, and your server's speech-to-text takes over if the phone can't listen.
+- **Keep listening** now has three choices: **After every reply** (new default), **Only when Lena asks a question**, or **Off**. Saying nothing after a reply closes the mic quietly.
+- Listening warnings now say what went wrong.
+
 ## 2.1.0 (2026-10-27)
 
 - **Talk to Lena:** the assistant gesture now opens a sheet that's already listening, like Google Assistant or Home Assistant's Assist. Your words show as you speak, Lena answers with your tools and reads the reply aloud in your Open WebUI voice, and if she asks a question she listens for your answer. Follow-ups continue the same chat.
