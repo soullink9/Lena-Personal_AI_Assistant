@@ -1,22 +1,24 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
-
-// No dependencies on purpose: the app uses only the Android framework.
 
 android {
     namespace = "io.github.soullink9.lena"
-    compileSdk = 36
+    compileSdk = 36 // Android 16; don't raise until the phone runs a newer Android
 
     defaultConfig {
         applicationId = "io.github.soullink9.lena"
-        minSdk = 30 // Android 11
+        minSdk = 36
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "2.0.0"
     }
 
-    // The release key comes from CI secrets (see README). Without it the APK is debug-signed.
+    // The release key comes from CI secrets (see docs/Installation.md). Without it the APK is debug-signed.
     val keystore = System.getenv("LENA_KEYSTORE")
     signingConfigs {
         if (keystore != null) create("release") {
@@ -29,9 +31,15 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName(if (keystore != null) "release" else "debug")
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -39,9 +47,32 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // Leave out the Google-encrypted dependency report blob; there's nothing to report anyway.
+    // Leave out the Google-encrypted dependency report blob.
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
     }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+// Google's Jetpack libraries only, pinned to versions that build against SDK 36.
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
+    implementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
+    implementation("androidx.webkit:webkit:1.14.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }
