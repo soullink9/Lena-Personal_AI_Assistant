@@ -62,11 +62,7 @@ jobs:
           c0aea21eb84a4ce90a08c870da41b7a7173b45269e6a3207c71d67c40f3a59d8 embedding_model.tflite
           14bff778604985e1b5c19f0f7bbe477a69cf281d8db34b232b3b972411f710e2 hey_jarvis_v0.1.tflite
           EOF
-          # "Lena": a microWakeWord model by Tater Totterson (https://github.com/TaterTotterson/microWakeWords),
-          # pinned to one commit. The repository states no license, so it's downloaded here, never committed.
-          curl -fsSL -o "$dir/lena.tflite" \
-            https://raw.githubusercontent.com/TaterTotterson/microWakeWords/022fd4bdf98a61570ce8fffa6fe52482e1629e9d/microWakeWordsV3/lena.tflite
-          echo "2183b0d38d623e6ccd7f87f68c06644e7b7783b72424527452b9eb52985dbb40  $dir/lena.tflite" | sha256sum -c -
+          # "Lena" (lena.tflite, by Tater Totterson) is committed in that folder.
 
       # The "Lena" model only works if the app computes exactly the features it was trained on.
       - name: Check the wake word front end against the original C
