@@ -7,6 +7,14 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.16.0 (2026-10-28)
+
+- **She goes back to the wall display by herself.** Called by her name (or the talk button) from the dashboard or the screen saver, she returns to it when the conversation's over: when you say nothing, when she's answered and isn't listening for more, or straight away on "thanks", "that's all", "never mind", "stop" and the like. The wake word then works again; before, the sheet stayed open on top and it stopped listening. A touch keeps her open.
+- **Saying just "thanks" or "that's all"** closes the sheet anywhere, without asking her anything.
+- **The dashboard stays dimmed** under her when the wake word wakes her from its idle screen, and comes back dimmed.
+- **Reload button** in the wall display's top strip.
+- **App names are readable** in the wall display's Apps list (white on dark).
+
 ### 2.15.0 (2026-10-28)
 
 - **The screen stays on while she listens, thinks and speaks**, so a long question isn't cut off when the phone would normally sleep.

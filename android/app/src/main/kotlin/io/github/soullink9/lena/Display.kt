@@ -230,19 +230,43 @@ private fun weatherWords(condition: String): String? = when (condition) {
     else -> condition.replaceFirstChar { it.uppercase() }
 }
 
-/** Opens Lena listening, from the display or the screen saver. */
-private fun talk(c: Context) = c.startActivity(AskActivity.intent(c, talk = true))
+/** Opens Lena listening, from the display or the screen saver; she comes back here afterwards. */
+private fun talk(c: Context, from: AskActivity.From) = c.startActivity(AskActivity.intent(c, talk = true, from = from))
 
 /**
  * Display mode: [LenaDisplay] full screen, kept on, with the wake word if you turned it on.
  * Back (or a swipe from the edge) leaves it.
  */
 class DisplayActivity : ComponentActivity() {
+    companion object {
+        private const val EXTRA_SCREENSAVER = "screensaver"
+
+        /**
+         * [screensaver]: standing in for the screen saver after a conversation started from it
+         * (Android can't be asked to start a screen saver again), so it shows over the lock screen,
+         * keeps her reasons and what she said private there, and goes away when the charger is
+         * unplugged.
+         */
+        fun intent(c: Context, screensaver: Boolean = false): Intent = Intent(c, DisplayActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(EXTRA_SCREENSAVER, screensaver)
+    }
+
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
+    private var screensaver = false
+    private val unplugged = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = finish()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        screensaver = intent.getBooleanExtra(EXTRA_SCREENSAVER, false)
+        val locked = screensaver && getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        if (screensaver) {
+            setShowWhenLocked(true)
+            registerReceiver(unplugged, android.content.IntentFilter(Intent.ACTION_POWER_DISCONNECTED), RECEIVER_NOT_EXPORTED)
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
         WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -252,12 +276,19 @@ class DisplayActivity : ComponentActivity() {
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
-        setContent { LenaTheme { LenaDisplay(locked = false, listening = listening.value, onTalk = ::onTalk) } }
+        setContent { LenaTheme { LenaDisplay(locked = locked, listening = listening.value, onTalk = ::onTalk) } }
+    }
+
+    override fun onDestroy() {
+        if (screensaver) runCatching { unregisterReceiver(unplugged) }
+        super.onDestroy()
     }
 
     private fun onTalk() {
         wake?.stop()
-        talk(this)
+        talk(this, if (screensaver) AskActivity.From.SCREENSAVER else AskActivity.From.DISPLAY)
+        // As the screen saver's stand-in, she starts a fresh one when she's done.
+        if (screensaver) finish()
     }
 
     override fun onResume() {
@@ -329,7 +360,7 @@ class LenaDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
 
     private fun onTalk() {
         wake?.stop()
-        talk(this)
+        talk(this, AskActivity.From.SCREENSAVER)
         finish()
     }
 

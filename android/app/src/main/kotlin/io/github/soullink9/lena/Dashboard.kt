@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.rounded.Close
@@ -304,15 +305,18 @@ class DashboardActivity : ComponentActivity() {
 
     private fun talk() {
         wake?.stop()
-        startActivity(AskActivity.intent(this, talk = true))
+        startActivity(AskActivity.intent(this, talk = true, from = AskActivity.From.DASHBOARD))
     }
 
     override fun onResume() {
         super.onResume()
         if (!::web.isInitialized) return
         web.onResume()
+        // Time spent talking to her counts as using it, so it doesn't dim the moment she's done.
+        if (!dimmed.value) lastTouch.longValue = System.currentTimeMillis()
         if (Prefs.wakeWord(this)) {
-            val w = wake ?: WakeListener(this, onHeard = { wakeUp(); talk() }, onSilenced = { listening.value = Listening.BLOCKED })
+            // Heard her name: she talks over whatever's showing (dimmed stays dimmed underneath) and comes back to it.
+            val w = wake ?: WakeListener(this, onHeard = { talk() }, onSilenced = { listening.value = Listening.BLOCKED })
                 .also { wake = it }
             listening.value = if (w.start()) Listening.ON else Listening.OFF
         }
@@ -469,6 +473,7 @@ class DashboardActivity : ComponentActivity() {
                 FilledTonalIconButton(onClick = {
                     startActivity(Intent(this@DashboardActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }) { Icon(Icons.Outlined.Forum, "Chats") }
+                FilledTonalIconButton(onClick = { web.reload() }) { Icon(Icons.Outlined.Refresh, "Reload the dashboard") }
                 FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
                 FilledTonalIconButton(onClick = {
                     startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java))
@@ -522,14 +527,15 @@ class DashboardActivity : ComponentActivity() {
                     .sortedBy { it.label.lowercase() }
             }
         }
-        Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f), modifier = Modifier.fillMaxSize()) {
+        // Always light text on near-black, whatever the theme, so every app name is readable.
+        Surface(color = Color(0xF2101014), contentColor = Color.White, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.statusBarsPadding().navigationBarsPadding()) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 12.dp)) {
-                    Text("Apps", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
+                    Text("Apps", style = MaterialTheme.typography.headlineSmall, color = Color.White, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close", tint = Color.White) }
                 }
                 val apps = list
-                if (apps == null) Text("Loading…", Modifier.padding(24.dp))
+                if (apps == null) Text("Loading…", Modifier.padding(24.dp), color = Color.White)
                 else LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.fillMaxSize().padding(12.dp)) {
                     items(apps, key = { it.packageName }) { a ->
                         Column(
@@ -541,7 +547,7 @@ class DashboardActivity : ComponentActivity() {
                         ) {
                             Image(a.icon, null, Modifier.size(56.dp))
                             Spacer(Modifier.height(8.dp))
-                            Text(a.label, style = MaterialTheme.typography.labelLarge, maxLines = 2, textAlign = TextAlign.Center,
+                            Text(a.label, style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 2, textAlign = TextAlign.Center,
                                 overflow = TextOverflow.Ellipsis)
                         }
                     }

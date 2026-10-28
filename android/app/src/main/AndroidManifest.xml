@@ -81,9 +81,11 @@
         <activity
             android:name=".DisplayActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:excludeFromRecents="true"
             android:exported="false"
             android:label="Lena display"
-            android:launchMode="singleTask" />
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.soullink9.lena.display" />
 
         <!-- The same display as Android's screen saver (Settings > Display > Screen saver). -->
         <service

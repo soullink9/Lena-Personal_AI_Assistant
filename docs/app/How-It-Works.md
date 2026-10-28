@@ -46,7 +46,7 @@ Every look listens, answers, speaks and keeps listening the same way; only the S
 
 1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her. When you talk (rather than type), Lena tells her the reply will be read aloud, so she answers the way she would in the kitchen: short, plain sentences, no lists or formatting.
-3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk.
+3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk. Saying just "thanks", "that's all", "never mind" or "stop" closes the sheet without asking her anything.
 
 **One ongoing conversation.** Every time you talk to Lena, she continues the same chat, titled **Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later. The sheet opens on the whole conversation, scrolled to the latest.
 
@@ -118,7 +118,7 @@ Connect Home Assistant under **Settings → Home Assistant**: its address and a 
 
 Your dashboards are signed in with the token from Lena's settings, through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each one by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`); with more than one they become tabs. Home Assistant's own sidebar is folded away; its header and view tabs stay. Links that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.
 
-**Lena's strip** across the top shows the time, date and weather, her mood and why, a button to talk to her, and buttons for your chats, your apps and settings. **When she's worried** about something at home, it turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
+**Lena's strip** across the top shows the time, date and weather, her mood and why, a button to talk to her, and buttons to reload the dashboard, open your chats, your apps and settings. **When she's worried** about something at home, it turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
 ### When no one's around
 
@@ -137,6 +137,8 @@ On the wall display, the screen goes to 40% brightness for photos and 2% for the
 
 - **Lena** (default): a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/microWakeWords), the same kind of model Home Assistant's voice satellites run. The app computes exactly the sound features those devices do: its front end is a line-for-line port of TensorFlow Lite Micro's, checked bit for bit against the original on every build.
 - **Hey Jarvis:** [openWakeWord](https://github.com/dscripka/openWakeWord)'s ready-made model, free for personal, non-commercial use.
+
+**When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 
 It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing, and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
 

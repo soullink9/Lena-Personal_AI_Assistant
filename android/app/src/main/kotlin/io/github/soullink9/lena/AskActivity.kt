@@ -86,6 +86,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -148,12 +149,61 @@ class AskActivity : ComponentActivity() {
         private const val EXTRA_PROMPT = "prompt"
         private const val EXTRA_KEY = "key"
 
-        /** Opens the sheet; with [prompt], sends it straight away. Only Lena's own widget and shortcuts use this. */
-        fun intent(c: Context, prompt: String? = null, talk: Boolean = false): Intent = Intent(c, AskActivity::class.java)
-            .setAction(if (talk) ACTION_TALK else ACTION_ASK)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .apply { if (prompt != null) putExtra(EXTRA_PROMPT, prompt).putExtra(EXTRA_KEY, Prefs.launchKey(c)) }
+        private const val EXTRA_FROM = "from"
+
+        /**
+         * Opens the sheet; with [prompt], sends it straight away (only Lena's own widget and shortcuts
+         * use that). [from]: the wall screen that called her, which she goes back to when the
+         * conversation's over.
+         */
+        fun intent(c: Context, prompt: String? = null, talk: Boolean = false, from: From? = null): Intent =
+            Intent(c, AskActivity::class.java)
+                .setAction(if (talk) ACTION_TALK else ACTION_ASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .apply {
+                    if (prompt != null) putExtra(EXTRA_PROMPT, prompt).putExtra(EXTRA_KEY, Prefs.launchKey(c))
+                    if (from != null) putExtra(EXTRA_FROM, from.name)
+                }
+
+        /**
+         * Things people say to end a conversation. Said on their own, she doesn't answer them; the
+         * sheet just closes (and goes back to the wall display or screen saver).
+         */
+        private val GOODBYES = setOf(
+            "stop", "cancel", "never mind", "nevermind", "nothing", "that's all", "that is all", "that's it",
+            "thats all", "thats it", "thank you", "thanks", "thanks a lot", "thank you very much", "no thanks", "no thank you",
+            "goodbye", "good bye", "bye", "bye bye", "all done", "done", "i'm done", "im done", "i am done", "we're done",
+            "go away", "dismiss", "close", "that'll be all", "thatll be all", "okay thanks", "ok thanks", "okay thank you",
+            "ok thank you", "got it thanks", "perfect thanks", "great thanks", "good night", "goodnight",
+        )
+
+        fun isGoodbye(said: String): Boolean {
+            val words = said.lowercase().replace('’', '\'').replace(Regex("[^a-z' ]"), " ")
+                .split(' ').filter { it.isNotBlank() && it != "lena" && it != "jarvis" && it != "hey" }
+            return words.isNotEmpty() && words.joinToString(" ") in GOODBYES
+        }
     }
+
+    /** The wall screen that called her: she goes back to it when the conversation's over. */
+    enum class From { DASHBOARD, DISPLAY, SCREENSAVER }
+
+    private var from: From? = null
+
+    /** A touch on the sheet: stops it closing by itself, since you're using it. */
+    private var onTouch: (() -> Unit)? = null
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) onTouch?.invoke()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /** Closes the sheet, back to wherever she was called from. */
+    private fun goBack() {
+        if (from == From.SCREENSAVER) startActivity(DisplayActivity.intent(this, screensaver = true))
+        finish()
+    }
+
+    private fun fromOf(i: Intent): From? = i.getStringExtra(EXTRA_FROM)?.let { runCatching { From.valueOf(it) }.getOrNull() }
 
     private enum class Phase { IDLE, LISTENING, THINKING, SPEAKING }
 
@@ -195,6 +245,7 @@ class AskActivity : ComponentActivity() {
             }
         }
         startTalking = wantsTalk(intent)
+        from = fromOf(intent)
 
         // Over the lock screen only if you turned it on; otherwise Android asks you to unlock first.
         if (Prefs.lockScreen(this) && intent.action != Intent.ACTION_SEND) setShowWhenLocked(true)
@@ -223,6 +274,7 @@ class AskActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        fromOf(intent)?.let { from = it }
         if (wantsTalk(intent)) restart.intValue++
     }
 
@@ -315,6 +367,24 @@ class AskActivity : ComponentActivity() {
 
         lateinit var listen: (followUp: Boolean) -> Unit
 
+        // Called from a wall screen: when the conversation's over, she goes back to it by herself.
+        val handsFree = from != null
+        var closer by remember { mutableStateOf<Job?>(null) }
+        fun closeAfter(ms: Long) {
+            if (!handsFree) return
+            closer?.cancel()
+            closer = scope.launch {
+                delay(ms)
+                Logs.i("Ask", "Conversation over; back to the ${from?.name?.lowercase()}")
+                goBack()
+            }
+        }
+        LaunchedEffect(phase) { if (phase != Phase.IDLE) closer?.cancel() }
+        DisposableEffect(Unit) {
+            onTouch = { closer?.cancel() }
+            onDispose { onTouch = null }
+        }
+
         fun listenAgainAfter(answer: String): Boolean = when (Prefs.followUp(this@AskActivity)) {
             FollowUp.ALWAYS -> true
             FollowUp.QUESTIONS -> answer.trimEnd().endsWith("?")
@@ -325,7 +395,11 @@ class AskActivity : ComponentActivity() {
             val voice = mouth ?: newMouth().also { mouth = it }
             val plain = Markdown.plain(answer)
             if (voice == null || plain.isBlank()) {
-                if (plain.isNotBlank() && listenAgainAfter(plain)) listen(true) else phase = Phase.IDLE
+                if (plain.isNotBlank() && listenAgainAfter(plain)) listen(true) else {
+                    phase = Phase.IDLE
+                    // Not read aloud: time to read it first.
+                    closeAfter((4_000L + plain.length * 50L).coerceAtMost(30_000L))
+                }
                 return
             }
             phase = Phase.SPEAKING
@@ -344,7 +418,10 @@ class AskActivity : ComponentActivity() {
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
                     }
                 }
-                if (listenAgainAfter(plain)) listen(true) else phase = Phase.IDLE
+                if (listenAgainAfter(plain)) listen(true) else {
+                    phase = Phase.IDLE
+                    closeAfter(5_000)
+                }
             }
         }
 
@@ -400,6 +477,7 @@ class AskActivity : ComponentActivity() {
                     if (phase == Phase.THINKING) {
                         note = "Couldn't reach your server."
                         phase = Phase.IDLE
+                        closeAfter(8_000)
                     }
                 } finally {
                     working = false
@@ -493,6 +571,13 @@ class AskActivity : ComponentActivity() {
                     phase = Phase.IDLE
                     // Saying nothing after a reply just ends the conversation; no warning.
                     if (note == null && !followUp) note = "Didn't catch that."
+                    // From a wall screen, silence means you're done: back to it.
+                    closeAfter(if (note != null && !followUp) 2_000 else 300)
+                } else if (isGoodbye(said)) {
+                    Logs.i("Ask", "Heard a goodbye; closing")
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    phase = Phase.IDLE
+                    goBack()
                 } else {
                     heard = said
                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
