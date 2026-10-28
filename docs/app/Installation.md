@@ -76,7 +76,13 @@ How you trigger the assistant depends on your phone and navigation style: usuall
 
 ## Updating
 
-Install the new APK over the old one. Your settings and sign-in stay. If Android says the app isn't installed or conflicts with an existing one, see [Troubleshooting](Troubleshooting.md#an-update-wont-install).
+**From the app (2.14.0 and later):** Settings → **Updates**. For a private repository, add a GitHub token first: on GitHub, Settings → Developer settings → **Fine-grained tokens** → Generate new token, choose **Only select repositories** with just this one, and under Repository permissions give **Contents** read-only access. Paste it into the token field in Lena (it's stored encrypted and sent only to GitHub). Then:
+
+1. **Check for updates**, then **Download**. The APK is checked against the release's `SHA256SUMS`, and that it's Lena, newer, and signed with your key; anything else is thrown away.
+2. **Let Lena install apps** (Android's "Install unknown apps" for Lena) and, if Play Protect stops the install, pause it. You can leave for those settings and come back: the download waits.
+3. **Install**. Android asks you to confirm. Once the update is in, the downloaded APK is deleted, and if you paused Play Protect, Lena reminds you to turn it back on.
+
+**By hand:** install the new APK over the old one. Your settings and sign-in stay. If Android says the app isn't installed or conflicts with an existing one, see [Troubleshooting](Troubleshooting.md#an-update-wont-install).
 
 ## Changing your settings later
 

@@ -89,6 +89,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import android.widget.Toast
+import androidx.compose.runtime.produceState
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.InstallMobile
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -117,7 +129,7 @@ class SettingsActivity : ComponentActivity() {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
         SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display & screen saver"),
-        DASHBOARD("Dashboard mode"), WAKE("Wake word"),
+        DASHBOARD("Dashboard mode"), WAKE("Wake word"), UPDATES("Updates"),
     }
 
     private lateinit var original: Settings
@@ -226,6 +238,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.DISPLAY -> DisplayPage(s, ::set) { page = it }
                         Page.DASHBOARD -> DashboardPage(s, ::set) { page = it }
                         Page.WAKE -> WakePage(s, ::set)
+                        Page.UPDATES -> UpdatesPage()
                     }
                 }
             }
@@ -280,6 +293,23 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
         Group {
+            val waiting = remember { Updates.pending(this@SettingsActivity) }
+            Item(Icons.Outlined.SystemUpdate, "Updates",
+                waiting?.let { "${it.first} downloaded, ready to install" } ?: upd.available ?: "From your GitHub releases") { open(Page.UPDATES) }
+            val problems by produceState<Int?>(null) {
+                value = withContext(Dispatchers.IO) {
+                    val day = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+                    Logs.read().count { it.level != Logs.Level.INFO && it.time > day }
+                }
+            }
+            Item(Icons.Outlined.BugReport, "Logs", when (problems) {
+                null -> null
+                0 -> "No problems in the last day"
+                1 -> "1 problem in the last day"
+                else -> "$problems problems in the last day"
+            }) { startActivity(Intent(this@SettingsActivity, LogsActivity::class.java)) }
+        }
+        Group {
             val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -297,6 +327,177 @@ class SettingsActivity : ComponentActivity() {
     }
 
     // ---- Pages ------------------------------------------------------------------------------
+
+    /** Update state lives with the activity, so a download carries on while you look at other pages. */
+    private class UpdateState {
+        var release by mutableStateOf<Updates.Release?>(null)
+        var status by mutableStateOf<String?>(null)
+        var progress by mutableStateOf<Float?>(null)
+        var available by mutableStateOf<String?>(null)
+        var checked = false
+    }
+
+    private val upd = UpdateState()
+
+    private fun checkForUpdate() {
+        lifecycleScope.launch {
+            upd.status = "Checking…"
+            try {
+                val r = Updates.latest(this@SettingsActivity)
+                upd.release = r
+                val installed = Updates.installed(this@SettingsActivity)
+                val newer = Updates.newer(r.version, installed)
+                upd.available = if (newer) "${r.version} is available" else null
+                upd.status = if (newer) "Lena ${r.version} is available" else "You have the latest ($installed)"
+            } catch (e: Exception) {
+                Logs.w("Updates", "Couldn't check for updates", e)
+                upd.status = e.message ?: "Couldn't reach GitHub."
+            }
+        }
+    }
+
+    private fun download(r: Updates.Release, done: () -> Unit) {
+        if (upd.progress != null) return
+        lifecycleScope.launch {
+            upd.progress = 0f
+            try {
+                Updates.download(this@SettingsActivity, r) { upd.progress = it }
+                upd.status = "Downloaded and checked ${r.version}"
+                done()
+            } catch (e: Exception) {
+                upd.status = e.message ?: "The download failed."
+            } finally {
+                upd.progress = null
+            }
+        }
+    }
+
+    @Composable
+    private fun UpdatesPage() {
+        val installed = remember { Updates.installed(this) }
+        var pending by remember { mutableStateOf(Updates.pending(this)) }
+        var mayInstall by remember { mutableStateOf(Updates.mayInstall(this)) }
+        var repo by remember { mutableStateOf(Updates.repo(this)) }
+        var token by remember { mutableStateOf("") }
+        var tokenSaved by remember { mutableStateOf(Secrets.has(this, Updates.GITHUB_TOKEN)) }
+
+        // Coming back from Android's settings: see what changed.
+        val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        DisposableEffect(owner) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    mayInstall = Updates.mayInstall(this@SettingsActivity)
+                    pending = Updates.pending(this@SettingsActivity)
+                }
+            }
+            owner.lifecycle.addObserver(observer)
+            onDispose { owner.lifecycle.removeObserver(observer) }
+        }
+        LaunchedEffect(Unit) {
+            if (!upd.checked && pending == null) {
+                upd.checked = true
+                checkForUpdate()
+            }
+        }
+
+        Footnote("This is Lena $installed. Updates come from the releases in your GitHub repository.")
+
+        pending?.let { (version, file) ->
+            Section("Ready to install $version") {
+                Item(Icons.Outlined.AdminPanelSettings, "1. Let Lena install apps",
+                    if (mayInstall) "Allowed" else "Not allowed yet: tap, turn on Allow from this source, then come back",
+                    trailing = if (mayInstall) { { Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp)) } } else null,
+                ) {
+                    startActivity(Intent(AndroidSettings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                }
+                Item(Icons.Outlined.Shield, "2. If Play Protect stops it",
+                    "Pause scanning in Play Protect, then come back here and install. Lena reminds you to turn it back on afterwards.") {
+                    Updates.remindPlayProtect(this@SettingsActivity, true)
+                    try {
+                        startActivity(Updates.playProtect())
+                    } catch (_: ActivityNotFoundException) {
+                        Toast.makeText(this@SettingsActivity, "Open the Play Store → your picture → Play Protect", Toast.LENGTH_LONG).show()
+                    }
+                }
+                Item(Icons.Outlined.InstallMobile, "3. Install $version", "Android asks you to confirm. The download is deleted once the update is in.") {
+                    if (!mayInstall) {
+                        startActivity(Intent(AndroidSettings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                    } else {
+                        try {
+                            Updates.install(this@SettingsActivity)
+                        } catch (e: Exception) {
+                            Logs.e("Updates", "Couldn't start the install", e)
+                            upd.status = "Couldn't start the install. See Settings → Logs."
+                        }
+                    }
+                }
+                Item(Icons.Outlined.Delete, "Delete the download", "%.1f MB".format(file.length() / 1_048_576.0)) {
+                    Updates.discard(this@SettingsActivity)
+                    pending = null
+                }
+            }
+        }
+
+        Group {
+            Item(Icons.Outlined.Refresh, "Check for updates", upd.status ?: "From $repo") { checkForUpdate() }
+            val r = upd.release
+            if (r != null && Updates.newer(r.version, installed) && pending?.first != r.version) {
+                val p = upd.progress
+                Item(
+                    Icons.Outlined.Download,
+                    if (p != null) "Downloading ${r.version}… ${(p * 100).toInt()}%" else "Download ${r.version}",
+                    "%.1f MB, checked against the release's SHA256SUMS and your signing key".format(r.size / 1_048_576.0),
+                    trailing = if (p != null) { { LinearProgressIndicator(progress = { p }, modifier = Modifier.width(72.dp).padding(end = 12.dp)) } } else null,
+                ) { download(r) { pending = Updates.pending(this@SettingsActivity) } }
+                if (r.notes.isNotBlank()) FieldItem {
+                    Column {
+                        Text("What's new", style = MaterialTheme.typography.titleSmall)
+                        Text(r.notes.trim().take(1500), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        Section("Your repository") {
+            FieldItem {
+                OutlinedTextField(
+                    value = repo, onValueChange = { repo = it.trim(); Updates.setRepo(this@SettingsActivity, it) },
+                    label = { Text("owner/repository") }, singleLine = true,
+                    supportingText = { Text("Where the releases are. Lena's own is ${Updates.DEFAULT_REPO}.") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            FieldItem {
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = {
+                        token = it
+                        if (it.isNotBlank()) {
+                            Secrets.put(this@SettingsActivity, Updates.GITHUB_TOKEN, it.trim())
+                            tokenSaved = true
+                        }
+                    },
+                    label = { Text(if (tokenSaved && token.isBlank()) "GitHub token (saved)" else "GitHub token") },
+                    placeholder = { Text(if (tokenSaved) "Paste a new one to replace it" else "Needed for a private repository") },
+                    supportingText = { Text("Stored encrypted on this phone and sent only to GitHub.") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        if (tokenSaved) IconButton(onClick = {
+                            Secrets.put(this@SettingsActivity, Updates.GITHUB_TOKEN, null)
+                            tokenSaved = false
+                            token = ""
+                        }) { Icon(Icons.Outlined.Delete, "Remove the saved token") }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Footnote("For a private repository, make a token on GitHub: Settings → Developer settings → Fine-grained tokens → Generate. " +
+            "Choose only this repository, and under Repository permissions give Contents read-only access. Nothing else.")
+    }
 
     @Composable
     private fun OpenWebUiPage(s: Settings, set: (Settings) -> Unit) {

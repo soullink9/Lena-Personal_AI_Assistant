@@ -197,6 +197,14 @@ At that time Lena sends the prompt to your chosen model, waits for the answer an
 
 Open WebUI's attach button opens Android's file picker. Lena has no camera permission; photos come from the picker.
 
+## Logs
+
+**Settings → Logs** shows what's been going on: **Problems** (warnings and errors), **Everything** (what she was doing too), and **Android** (Android's own log for Lena's current run, for crashes inside the web pages). Tap an entry for the details, such as where a crash happened. Search, copy, share or clear it from the top bar. The Logs row in settings says how many problems there were in the last day.
+
+## Updates
+
+**Settings → Updates** checks your GitHub repository's latest release, downloads it, checks it, and installs it, with a token for a private repository. See [Installation → Updating](Installation.md#updating).
+
 ## Permissions
 
 | Permission | Why |
@@ -206,5 +214,6 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 | Notifications | "Lena finished", scheduled prompts and house alerts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |
 | Change audio settings | Needed by Android's web view to use the microphone. It never prompts. |
+| Install apps | Installing an update you downloaded in Settings → Updates. You allow it in Android's settings, and every install asks you to confirm. |
 
 WorkManager, the Jetpack library that runs the background checks, also adds its own no-prompt permissions for network status and keeping the phone awake during a check. Lena never asks for camera, location, contacts or storage.

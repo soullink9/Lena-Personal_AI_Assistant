@@ -95,7 +95,7 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
         var n = 0
         while (true) {
             if (list.isEmpty() || System.currentTimeMillis() - listedAt > 30 * 60_000L) {
-                list = runCatching { ha.photos(slides.album) }.getOrElse { emptyList() }
+                list = runCatching { ha.photos(slides.album) }.getOrElse { Logs.w("Slideshow", "Couldn't list ${slides.albumName}", it); emptyList() }
                     .let { if (slides.shuffle) it.shuffled() else it }
                 listedAt = System.currentTimeMillis()
                 at = 0
@@ -106,7 +106,8 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
                 }
             }
             val started = System.currentTimeMillis()
-            val bitmap = runCatching { load(context, ha, list[at % list.size]) }.getOrNull()
+            val bitmap = runCatching { load(context, ha, list[at % list.size]) }
+                .onFailure { Logs.w("Slideshow", "Couldn't show a photo", it) }.getOrNull()
             at++
             if (bitmap != null) {
                 problem = null

@@ -78,10 +78,21 @@ class HomeAssistant(server: String, private val token: String) {
                 conn.setRequestProperty("Content-Type", "application/json")
                 conn.outputStream.use { it.write(body.toString().toByteArray()) }
             }
-            val code = conn.responseCode
-            if (code == 401 || code == 403) throw HaAuthException()
+            val code = try {
+                conn.responseCode
+            } catch (e: IOException) {
+                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: couldn't connect", e)
+                throw e
+            }
+            if (code == 401 || code == 403) {
+                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: the token wasn't accepted (HTTP $code)")
+                throw HaAuthException()
+            }
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.use { String(it.readBytes()) } ?: ""
-            if (code !in 200..299) throw IOException("HTTP $code")
+            if (code !in 200..299) {
+                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: HTTP $code ${text.take(200)}")
+                throw IOException("HTTP $code")
+            }
             text
         } finally {
             conn.disconnect()
@@ -101,7 +112,10 @@ class HomeAssistant(server: String, private val token: String) {
             conn.setRequestProperty("Authorization", "Bearer $token")
             val code = conn.responseCode
             if (code == 401 || code == 403) throw HaAuthException()
-            if (code !in 200..299) throw IOException("HTTP $code")
+            if (code !in 200..299) {
+                Logs.w("Home Assistant", "GET ${path.substringBefore('?')}: HTTP $code")
+                throw IOException("HTTP $code")
+            }
             conn.inputStream.use { it.readBytes() }
         } finally {
             conn.disconnect()

@@ -338,6 +338,14 @@ class MainActivity : ComponentActivity() {
             return true // intent:, file:, javascript: and anything else is blocked
         }
 
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+            if (request.isForMainFrame) Logs.w("Open WebUI", "Page didn't load: ${error.description} (${request.url.path})")
+        }
+
+        override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: android.webkit.WebResourceResponse) {
+            if (request.isForMainFrame) Logs.w("Open WebUI", "Page answered HTTP ${response.statusCode} (${request.url.path})")
+        }
+
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             currentUrl.value = url ?: ""
             canGoBack.value = view.canGoBack()

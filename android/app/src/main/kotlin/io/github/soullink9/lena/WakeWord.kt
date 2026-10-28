@@ -208,7 +208,9 @@ class WakeListener(
 
     @SuppressLint("MissingPermission") // checked in start()
     private fun loop() {
+        val phrase = Prefs.wakePhrase(context)
         val model = runCatching { WakeWord.open(context) }.getOrElse {
+            Logs.e("Wake word", "Couldn't load the ${phrase.label} model", it)
             running = false
             return
         }
@@ -218,6 +220,7 @@ class WakeListener(
                 AudioFormat.ENCODING_PCM_16BIT, maxOf(min, WakeWord.CHUNK * 2 * 4))
         }.getOrNull()
         if (mic == null || mic.state != AudioRecord.STATE_INITIALIZED) {
+            Logs.w("Wake word", "Couldn't open the microphone")
             mic?.release()
             model.close()
             running = false
@@ -238,6 +241,7 @@ class WakeListener(
                 // A blocked microphone delivers exact zeros; real rooms never do.
                 if (chunk.all { it.toInt() == 0 }) {
                     if (++silent == 40) { // about 3 seconds
+                        Logs.w("Wake word", "The microphone only gives silence here (Android blocks it), so she can't listen")
                         running = false
                         main.post(onSilenced)
                         break
@@ -246,6 +250,7 @@ class WakeListener(
                 val s = model.score(chunk)
                 main.post { onScore(s) }
                 if (s >= model.threshold) {
+                    Logs.i("Wake word", "Heard \u201C${phrase.label}\u201D (%.2f)".format(s))
                     running = false
                     main.post(onHeard)
                 }

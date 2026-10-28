@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Sets scheduled prompts again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Installing an update you downloaded in Settings > Updates (Android asks you to confirm each time). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine, and (dashboard
          mode's Apps button) the apps you can open. -->
@@ -28,6 +30,7 @@
 
     <!-- allowBackup=false + extraction rules: your sign-in never goes to Google backups or phone-to-phone transfers. -->
     <application
+        android:name=".LenaApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
@@ -70,6 +73,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Settings > Logs. -->
+        <activity android:name=".LogsActivity" android:exported="false" android:label="Logs" />
 
         <!-- Display mode: a clock, the weather and Lena, full screen and kept on. -->
         <activity
@@ -155,6 +161,8 @@
         </provider>
 
         <receiver android:name=".ScheduleReceiver" android:exported="false" />
+        <!-- Android's installer reports an update's progress here. -->
+        <receiver android:name=".UpdateReceiver" android:exported="false" />
 
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>

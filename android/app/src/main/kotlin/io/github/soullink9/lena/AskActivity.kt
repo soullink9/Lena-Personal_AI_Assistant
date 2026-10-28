@@ -333,8 +333,9 @@ class AskActivity : ComponentActivity() {
                     withSpeechFocus(this@AskActivity) { voice.say(plain) }
                 } catch (c: CancellationException) {
                     throw c
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     // Your server's voice failed (for example, no text-to-speech engine set): use the phone's.
+                    Logs.w("Voice", "Couldn't speak with ${if (voice is ServerMouth) "your server's voice; trying the phone's" else "the phone's voice"}", e)
                     if (voice is ServerMouth) runCatching {
                         val phone = PhoneMouth(this@AskActivity).also { mouth = it; it.tone = tone }
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
@@ -388,9 +389,11 @@ class AskActivity : ComponentActivity() {
                     note = "Open Lena and sign in first."
                     phase = Phase.IDLE
                 } catch (e: IllegalStateException) {
+                    Logs.w("Ask", e.message ?: "Couldn't ask", e)
                     note = e.message
                     phase = Phase.IDLE
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Logs.e("Ask", "Couldn't get an answer", e)
                     if (phase == Phase.THINKING) {
                         note = "Couldn't reach your server."
                         phase = Phase.IDLE
@@ -425,7 +428,8 @@ class AskActivity : ComponentActivity() {
         } catch (_: AuthException) {
             note = "Open Lena and sign in first."
             ""
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Logs.w("Voice", "Your server's speech-to-text failed", e)
             note = "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
             ""
         }
@@ -444,6 +448,7 @@ class AskActivity : ComponentActivity() {
                 note = "The phone's speech model is downloading; using your server for now."
                 hearViaServer(onPartial, onLevel)
             } catch (err: EarError) {
+                Logs.w("Voice", "The phone couldn't listen: ${err.describe()}")
                 if (err.code == android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                     note = "Lena needs the microphone to hear you."
                     ""
@@ -456,7 +461,8 @@ class AskActivity : ComponentActivity() {
             } catch (_: AuthException) {
                 note = "Open Lena and sign in first."
                 ""
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Logs.w("Voice", "Listening failed", e)
                 note = "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
                 ""
             }

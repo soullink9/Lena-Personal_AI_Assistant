@@ -7,6 +7,11 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.14.0 (2026-10-28)
+
+- **Logs** (Settings → Logs): Lena's own log of problems and what she was doing, crashes included, with a Problems view, search, copy, share and clear, plus Android's log for her current run. Errors and events only; never messages, answers or tokens.
+- **Updates** (Settings → Updates): check your GitHub releases, download, and install from the app, with a read-only GitHub token for a private repository. Each download is checked against the release's SHA256SUMS, and that it's Lena, newer and signed with your key. It waits until you've allowed the install (and paused Play Protect if needed), so you don't download twice; it's deleted once the update is in, with a reminder to turn Play Protect back on.
+
 ### 2.13.0 (2026-10-28)
 
 - **Photo slideshow** (Settings → Display & screen saver): an album from Home Assistant's media, such as an Immich album, instead of the clock in the screen saver, display mode and dashboard mode's idle screen. Choose how long each photo shows, a fade, slide, slow zoom or no transition, shuffle, fill or whole photo, the time and her mood on top, and the clock at night. Needs the Lena integration 1.2.0.

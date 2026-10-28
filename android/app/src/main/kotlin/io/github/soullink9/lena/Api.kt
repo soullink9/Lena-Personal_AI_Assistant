@@ -103,12 +103,26 @@ class Api(server: String) {
                     conn.setRequestProperty("Content-Type", contentType)
                     conn.outputStream.use { it.write(body) }
                 }
-                val code = conn.responseCode
-                if (code == 401 || code in 300..399) throw AuthException()
-                if (code == 403) throw ForbiddenException()
+                val code = try {
+                    conn.responseCode
+                } catch (e: IOException) {
+                    Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: couldn't connect", e)
+                    throw e
+                }
+                if (code == 401 || code in 300..399) {
+                    Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: not signed in (HTTP $code)")
+                    throw AuthException()
+                }
+                if (code == 403) {
+                    Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: not allowed (HTTP 403)")
+                    throw ForbiddenException()
+                }
                 val bytes = (if (code in 200..299) conn.inputStream else conn.errorStream)
                     ?.use { it.readBytes() } ?: ByteArray(0)
-                if (code !in 200..299) throw IOException("HTTP $code")
+                if (code !in 200..299) {
+                    Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: HTTP $code ${String(bytes).take(200)}")
+                    throw IOException("HTTP $code")
+                }
                 bytes
             } finally {
                 conn.disconnect()

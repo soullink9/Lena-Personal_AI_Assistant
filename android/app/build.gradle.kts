@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.soullink9.lena"
         minSdk = 36
         targetSdk = 36
-        versionCode = 21
-        versionName = "2.13.0"
+        versionCode = 22
+        versionName = "2.14.0"
         // Android 16 phones and tablets are 64-bit; leaving out 32-bit keeps the wake word's native code small.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }

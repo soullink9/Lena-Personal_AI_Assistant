@@ -53,6 +53,7 @@ object Alerts {
         when {
             f.moment == "Worried" && f.momentWhy.isNotBlank() && f.momentWhy != last -> {
                 show(c, "Lena's worried", f.momentWhy, urgent = true)
+                Logs.i("Alerts", "Told you she's worried: ${f.momentWhy}")
                 Prefs.setLastAlert(c, f.momentWhy)
             }
             f.moment != "Worried" && last != null -> {
@@ -91,7 +92,7 @@ object Alerts {
 
 class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        runCatching { Alerts.check(applicationContext) }
+        runCatching { Alerts.check(applicationContext) }.onFailure { Logs.w("Alerts", "Couldn't check Home Assistant", it) }
         return Result.success()
     }
 }

@@ -112,8 +112,10 @@ class ReplyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             Notify.show(applicationContext, Notify.REPLIES, title, text.take(600).ifBlank { "Your reply is ready." }, chatId)
             Result.success()
         } catch (_: AuthException) {
+            Logs.w("Notifications", "Couldn't follow a reply: not signed in")
             Result.success()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Logs.w("Notifications", "Couldn't follow a reply (try ${runAttemptCount + 1})", e)
             if (runAttemptCount < 2) Result.retry() else Result.success()
         }
     }
@@ -151,9 +153,11 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Notify.show(c, Notify.SCHEDULED, title, text, started.chatId)
             Result.success()
         } catch (_: AuthException) {
+            Logs.w("Scheduled prompts", "Couldn't run one: not signed in")
             Notify.show(c, Notify.SCHEDULED, title, "Open Lena and sign in again so scheduled prompts can run.", null)
             Result.success()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Logs.w("Scheduled prompts", "Couldn't run one (try ${runAttemptCount + 1})", e)
             if (runAttemptCount < 2) Result.retry()
             else {
                 Notify.show(c, Notify.SCHEDULED, title, "Couldn't reach your server for this scheduled prompt.", null)
@@ -242,6 +246,7 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             Schedules.rescheduleAll(context)
         }
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) Updates.afterUpdate(context)
     }
 }
 

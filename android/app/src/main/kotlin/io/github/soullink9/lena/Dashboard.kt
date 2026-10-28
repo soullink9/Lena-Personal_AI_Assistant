@@ -176,6 +176,22 @@ class DashboardActivity : ComponentActivity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 loaded = true
             }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+                if (request.isForMainFrame) Logs.w("Dashboard", "Page didn't load: ${error.description} (${request.url.path})")
+            }
+
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: android.webkit.WebResourceResponse) {
+                if (request.isForMainFrame) Logs.w("Dashboard", "Page answered HTTP ${response.statusCode} (${request.url.path})")
+            }
+        }
+        webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
+                    Logs.w("Dashboard", "Home Assistant page: ${m.message()}")
+                }
+                return true
+            }
         }
         bridge(this)
     }
@@ -196,6 +212,7 @@ class DashboardActivity : ComponentActivity() {
             val m = runCatching { JSONObject(message.data ?: "") }.getOrNull() ?: return@addWebMessageListener
             when (m.optString("kind")) {
                 "auth" -> {
+                    Logs.i("Dashboard", "Home Assistant asked to sign in; gave it the saved token")
                     val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthSetToken" }
                     if (!callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) return@addWebMessageListener
                     val auth = JSONObject().put("access_token", token).put("expires_in", 1800)
