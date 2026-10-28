@@ -64,7 +64,9 @@ import androidx.compose.material.icons.outlined.NotificationImportant
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SmartToy
@@ -114,7 +116,7 @@ class SettingsActivity : ComponentActivity() {
     private enum class Page(val title: String) {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
-        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display mode"),
+        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display & screen saver"),
         DASHBOARD("Dashboard mode"), WAKE("Wake word"),
     }
 
@@ -273,7 +275,8 @@ class SettingsActivity : ComponentActivity() {
         }
         Group {
             Item(Icons.Outlined.Dashboard, "Dashboard mode", "Your Home Assistant dashboards, always on") { open(Page.DASHBOARD) }
-            Item(Icons.Outlined.Tv, "Display mode", "Clock, weather and her mood, full screen") { open(Page.DISPLAY) }
+            Item(Icons.Outlined.Tv, "Display & screen saver",
+                if (s.slides.on && s.slides.albumName.isNotBlank()) "Slideshow: ${s.slides.albumName}" else "Clock, weather and her mood, full screen") { open(Page.DISPLAY) }
             Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
         Group {
@@ -596,6 +599,54 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
+        SlideshowSettings(s, set, open)
+    }
+
+    /** The photo slideshow: shown by the screen saver, display mode and dashboard mode when it dims. */
+    @Composable
+    private fun SlideshowSettings(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        val sl = s.slides
+        fun put(n: Slides) = set(s.copy(slides = n))
+        var picking by remember { mutableStateOf(false) }
+        val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
+        SectionTitle("Photo slideshow")
+        Footnote("Photos from Home Assistant's media, such as an Immich album, instead of the clock: in the screen saver, display mode, and dashboard mode when it dims. Needs the Lena integration 1.2.0 or newer.")
+        if (!house) {
+            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", null) { open(Page.HOME_ASSISTANT) } }
+            return
+        }
+        Group {
+            SwitchItem(Icons.Outlined.Slideshow, "Show photos", null, sl.on) { on ->
+                put(sl.copy(on = on))
+                if (on && sl.album.isBlank()) picking = true
+            }
+            Item(Icons.Outlined.PhotoAlbum, "Album", sl.albumName.ifBlank { "Choose one" }) { picking = true }
+        }
+        if (sl.on) {
+            Section("Each photo for") {
+                listOf(5 to "5 seconds", 10 to "10 seconds", 15 to "15 seconds", 30 to "30 seconds", 60 to "1 minute", 300 to "5 minutes").forEach { (sec, label) ->
+                    ChoiceItem(label, null, sl.seconds == sec) { put(sl.copy(seconds = sec)) }
+                }
+            }
+            Section("Transition") {
+                SlideTransition.entries.forEach { t -> ChoiceItem(t.label, null, sl.transition == t) { put(sl.copy(transition = t)) } }
+            }
+            Group {
+                SwitchItem(null, "Shuffle", "Otherwise in the album's order", sl.shuffle) { put(sl.copy(shuffle = it)) }
+                SwitchItem(null, "Fill the screen", "Crops the edges. Off shows the whole photo on a blurred copy of itself.", sl.fill) { put(sl.copy(fill = it)) }
+                SwitchItem(null, "Time and her mood over the photos", null, sl.overlay) { put(sl.copy(overlay = it)) }
+                SwitchItem(null, "Just the clock at night", "10 PM to 6 AM, and when she's drained, so it doesn't light up a room", sl.clockAtNight) {
+                    put(sl.copy(clockAtNight = it))
+                }
+            }
+        }
+        if (picking) AlbumPicker(
+            onPick = { id, name ->
+                picking = false
+                put(sl.copy(album = id, albumName = name, on = true))
+            },
+            onDismiss = { picking = false },
+        )
     }
 
     @Composable

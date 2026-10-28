@@ -75,6 +75,8 @@ And, only if you add it, your Home Assistant, with the token you give it:
 | `GET /api/` | **Test connection** in settings |
 | `GET /api/lena/context?memory=0` | How she feels and the weather, from the Lena integration (the sheet, the drawer, display and dashboard modes, house alerts) |
 | `GET /api/states/{entity}` | Dashboard mode's motion sensor, while it's dimmed |
+| `GET /api/lena/media`, `?photos=1` | Picking the slideshow's album, and its photos (Lena integration 1.2.0+) |
+| The photos' own paths (`/immich/…`, `/media/…`) | The slideshow; only paths on your Home Assistant, never another address |
 | Home Assistant's own pages | Dashboard mode, in a web view signed in with the token |
 | `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list, `todo.lena_memory` |
 
@@ -85,7 +87,7 @@ And, only if you add it, your Home Assistant, with the token you give it:
 - **Lena** (`lena.tflite`): a microWakeWord streaming model. Its input is the output of TensorFlow Lite Micro's audio front end, so `MicroFrontend.java` is a line-for-line port of that C code (and of KISS FFT's fixed-point FFT). It's Java because it's all integer arithmetic that relies on C's overflow behaviour, which Java's `int`, `long` and `short` reproduce exactly. `tools/frontend_check/run.sh` builds the original C and compares both on test audio; the build workflow runs it, and it must match bit for bit.
 - **Hey Jarvis**: openWakeWord's `melspectrogram.tflite`, `embedding_model.tflite` and `hey_jarvis_v0.1.tflite`.
 
-The Lena model is committed in `app/src/main/assets/wakeword/` (with its `lena.json`), copied from [TaterTotterson/microWakeWords](https://github.com/TaterTotterson/microWakeWords) at commit `022fd4b`; this repository is private. The Hey Jarvis models aren't committed: the **Build APK** workflow downloads them from openWakeWord's v0.5.1 release and checks each against a pinned SHA-256. Without them the app builds fine and only Lena is offered. Licences: openWakeWord's code Apache 2.0, its Hey Jarvis model CC BY-NC-SA 4.0 (non-commercial); the Lena model's repository states no licence; the front end is Apache 2.0 (TensorFlow) and BSD (KISS FFT).
+All the models are committed in `app/src/main/assets/wakeword/` (this repository is private), so the build downloads nothing for the wake word: `lena.tflite` and its `lena.json` from [TaterTotterson/microWakeWords](https://github.com/TaterTotterson/microWakeWords) at commit `022fd4b`, and the three Hey Jarvis files from openWakeWord's v0.5.1 release. The C that `tools/frontend_check` compares against is in `tools/frontend_check/vendor/` for the same reason. (Gradle and the app's libraries still come from their official servers, as in any Android build.) Licences: openWakeWord's code Apache 2.0, its Hey Jarvis model CC BY-NC-SA 4.0 (non-commercial); the Lena model's repository states no licence; the front end is Apache 2.0 (TensorFlow) and BSD (KISS FFT).
 
 ## Building locally
 

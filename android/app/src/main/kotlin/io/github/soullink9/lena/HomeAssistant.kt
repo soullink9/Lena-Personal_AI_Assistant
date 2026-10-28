@@ -36,6 +36,9 @@ data class Weather(val condition: String, val temperature: Double?, val unit: St
 /** How she feels and the weather, together, for the display. */
 data class HouseNow(val feelings: Feelings?, val weather: Weather?)
 
+/** A folder or photo in Home Assistant's media (Immich albums, My media...). */
+data class MediaItem(val id: String, val title: String, val folder: Boolean, val photo: Boolean)
+
 /** One item on her shared memory list. */
 data class HouseMemory(val uid: String, val text: String)
 
@@ -67,7 +70,7 @@ class HomeAssistant(server: String, private val token: String) {
             conn.requestMethod = method
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 8_000
-            conn.readTimeout = 15_000
+            conn.readTimeout = 30_000 // a large album takes a moment to list
             conn.setRequestProperty("Authorization", "Bearer $token")
             conn.setRequestProperty("Accept", "application/json")
             if (body != null) {
@@ -86,6 +89,40 @@ class HomeAssistant(server: String, private val token: String) {
     }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+    /** A file from Home Assistant itself (only paths on it, so the token never goes elsewhere). */
+    suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+        require(path.startsWith("/") && !path.startsWith("//")) { "Not a Home Assistant path" }
+        val conn = URL(base + path).openConnection() as HttpURLConnection
+        try {
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 30_000
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            val code = conn.responseCode
+            if (code == 401 || code == 403) throw HaAuthException()
+            if (code !in 200..299) throw IOException("HTTP $code")
+            conn.inputStream.use { it.readBytes() }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** A folder of Home Assistant's media, through the Lena integration (null id: the top level). */
+    suspend fun browse(id: String?): Pair<String, List<MediaItem>> {
+        val r = JSONObject(call("GET", "/api/lena/media" + if (id != null) "?id=${enc(id)}" else ""))
+        val a = r.optJSONArray("children") ?: JSONArray()
+        return r.optString("title") to List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            MediaItem(o.optString("id"), o.optString("title"), o.optBoolean("folder"), o.optBoolean("photo"))
+        }
+    }
+
+    /** The photos in a folder, as paths on Home Assistant. */
+    suspend fun photos(id: String): List<String> {
+        val a = JSONObject(call("GET", "/api/lena/media?id=${enc(id)}&photos=1")).optJSONArray("photos") ?: JSONArray()
+        return List(a.length()) { a.getString(it) }.filter { it.startsWith("/") && !it.startsWith("//") }
+    }
 
     /** True when the address and token work. */
     suspend fun check(): Boolean = runCatching { call("GET", "/api/") }.isSuccess

@@ -258,3 +258,39 @@ async def test_no_alerts_without_phones(hass: HomeAssistant) -> None:
     await setup(hass)
     await _leak(hass, "on")
     assert calls == []
+
+
+async def test_media_view(hass: HomeAssistant, hass_client, tmp_path) -> None:
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.lena.view import _screen_sized
+
+    (tmp_path / "beach.jpg").write_bytes(b"\xff\xd8\xff")
+    (tmp_path / "dog.png").write_bytes(b"\x89PNG")
+    (tmp_path / "notes.txt").write_text("not a photo")
+    (tmp_path / "2025").mkdir()
+    hass.config.media_dirs = {"local": str(tmp_path)}
+    assert await async_setup_component(hass, "media_source", {})
+    await setup(hass)
+    client = await hass_client()
+
+    top = await (await client.get("/api/lena/media")).json()
+    assert any(c["folder"] for c in top["children"])
+
+    folder = await client.get("/api/lena/media", params={"id": "media-source://media_source/local/."})
+    assert folder.status == 200
+    children = (await folder.json())["children"]
+    titles = {c["title"]: c for c in children}
+    assert titles["beach.jpg"]["photo"] and titles["dog.png"]["photo"]
+    assert titles["2025"]["folder"]
+    assert "notes.txt" not in titles
+
+    photos = await (await client.get(
+        "/api/lena/media", params={"id": "media-source://media_source/local/.", "photos": "1"})).json()
+    assert sorted(photos["photos"]) == ["/media/local/beach.jpg", "/media/local/dog.png"]
+
+    bad = await client.get("/api/lena/media", params={"id": "media-source://nothing_here"})
+    assert bad.status == 400
+
+    assert _screen_sized("/immich/abc/123/fullsize/image/heic") == "/immich/abc/123/preview/image/jpeg"
+    assert _screen_sized("/media/local/beach.jpg") == "/media/local/beach.jpg"

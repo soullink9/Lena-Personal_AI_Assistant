@@ -272,7 +272,11 @@ class DashboardActivity : ComponentActivity() {
 
     private fun dim() {
         dimmed.value = true
-        brightness(0.02f)
+        // Photos need some light; the night clock (and the slideshow's night) as little as possible.
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val slides = Prefs.slides(this)
+        val photos = slides.on && slides.album.isNotBlank() && !(slides.clockAtNight && (hour >= 22 || hour < 6))
+        brightness(if (photos) 0.4f else 0.02f)
     }
 
     private fun brightness(level: Float) {

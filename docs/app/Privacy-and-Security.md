@@ -31,6 +31,10 @@ If you add your Home Assistant under **Settings → Home Assistant**, Lena uses 
 
 Dashboard mode shows your Home Assistant's own pages in a web view and signs them in with your saved token, handing it over only when Home Assistant's page asks (the way the companion app does), only on your Home Assistant's address, and only to the top frame, never to iframe or camera cards from elsewhere. The token is never put in an address or written into the page. Because the dashboard is your real Home Assistant, anyone at the tablet can do whatever that token's user can; for a shared tablet, use a token from a non-admin Home Assistant user.
 
+## The photo slideshow
+
+The slideshow asks the Lena integration for an album's photos and downloads each one from your Home Assistant with your token, decoded in memory and never saved. Lena only fetches paths on your Home Assistant's own address, so the token can't be sent anywhere else, even if a media source names another site.
+
 ## What Lena stores
 
 | What | Where |

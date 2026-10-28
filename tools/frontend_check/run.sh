@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # Checks the app's MicroFrontend.java against the original C (TensorFlow Lite Micro's audio
-# front end, as packaged by pymicro-features) on test audio. Every feature must match exactly,
+# front end, copied into vendor/) on test audio. Every feature must match exactly,
 # because the "Lena" wake word model was trained on the C's output.
 #
-#   tools/frontend_check/run.sh        (needs git, g++, python3 and a JDK)
+#   tools/frontend_check/run.sh        (needs g++, python3 and a JDK; nothing is downloaded)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-git clone -q https://github.com/rhasspy/pymicro-features.git "$work/pmf"
-git -C "$work/pmf" checkout -q 96bd69cfad79aa67697e176570d3dd87052c3def
-lib="$work/pmf/tensorflow/lite/experimental/microfrontend/lib"
-g++ -O2 -I"$work/pmf" -I"$work/pmf/kissfft" -o "$work/ref" "$here/ref.cc" \
+src="$here/vendor"
+lib="$src/tensorflow/lite/experimental/microfrontend/lib"
+g++ -O2 -I"$src" -I"$src/kissfft" -o "$work/ref" "$here/ref.cc" \
   "$lib"/{frontend,frontend_util,window,window_util,fft,fft_util,kiss_fft_int16,filterbank,filterbank_util}.cc \
   "$lib"/{noise_reduction,noise_reduction_util,pcan_gain_control,pcan_gain_control_util,log_scale,log_scale_util,log_lut}.cc -lm
 

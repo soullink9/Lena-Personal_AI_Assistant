@@ -40,6 +40,22 @@ enum class AskStyle(val label: String, val detail: String) {
     SUBTITLES("Subtitles", "No panel: her words appear at the bottom like film subtitles"),
 }
 
+/** How one photo gives way to the next in the slideshow. */
+enum class SlideTransition(val label: String) { FADE("Fade"), SLIDE("Slide"), ZOOM("Slow zoom and fade"), NONE("None") }
+
+/** The photo slideshow in the screen saver, display mode and dashboard mode's idle screen. */
+data class Slides(
+    val on: Boolean = false,
+    val album: String = "",
+    val albumName: String = "",
+    val seconds: Int = 15,
+    val transition: SlideTransition = SlideTransition.FADE,
+    val shuffle: Boolean = true,
+    val fill: Boolean = true,
+    val overlay: Boolean = true,
+    val clockAtNight: Boolean = true,
+)
+
 /** One of your Home Assistant dashboards, shown as a tab in dashboard mode. */
 data class Dashboard(val name: String, val path: String)
 
@@ -85,6 +101,7 @@ data class Settings(
     val dashboards: List<Dashboard> = listOf(Dashboard("Home", "lovelace")),
     val dimMinutes: Int = 5,
     val motionEntity: String = "",
+    val slides: Slides = Slides(),
 )
 
 /** Her memory to-do list, created by the Lena integration in Home Assistant. */
@@ -196,6 +213,7 @@ object Prefs {
         dashboards = dashboards(c),
         dimMinutes = dimMinutes(c),
         motionEntity = motionEntity(c),
+        slides = slides(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -234,6 +252,15 @@ object Prefs {
             }.toString())
             .putInt("dim_minutes", s.dimMinutes)
             .putString("motion_entity", s.motionEntity.trim())
+            .putBoolean("slides_on", s.slides.on)
+            .putString("slides_album", s.slides.album)
+            .putString("slides_album_name", s.slides.albumName)
+            .putInt("slides_seconds", s.slides.seconds)
+            .putString("slides_transition", s.slides.transition.name)
+            .putBoolean("slides_shuffle", s.slides.shuffle)
+            .putBoolean("slides_fill", s.slides.fill)
+            .putBoolean("slides_overlay", s.slides.overlay)
+            .putBoolean("slides_night", s.slides.clockAtNight)
             .apply()
     }
 
@@ -256,6 +283,19 @@ object Prefs {
             .filter { it.path.isNotBlank() }
         return list.ifEmpty { listOf(Dashboard("Home", "lovelace")) }
     }
+
+    fun slides(c: Context): Slides = Slides(
+        on = p(c).getBoolean("slides_on", false),
+        album = p(c).getString("slides_album", "") ?: "",
+        albumName = p(c).getString("slides_album_name", "") ?: "",
+        seconds = p(c).getInt("slides_seconds", 15),
+        transition = runCatching { SlideTransition.valueOf(p(c).getString("slides_transition", null) ?: "FADE") }
+            .getOrDefault(SlideTransition.FADE),
+        shuffle = p(c).getBoolean("slides_shuffle", true),
+        fill = p(c).getBoolean("slides_fill", true),
+        overlay = p(c).getBoolean("slides_overlay", true),
+        clockAtNight = p(c).getBoolean("slides_night", true),
+    )
 
     /** Minutes without a touch before dashboard mode dims to the clock; 0 never dims. */
     fun dimMinutes(c: Context): Int = p(c).getInt("dim_minutes", 5)

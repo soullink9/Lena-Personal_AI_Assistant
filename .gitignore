@@ -26,7 +26,3 @@ secrets.yaml
 ollama-data/
 piper-data/
 
-# The Hey Jarvis models are downloaded at build time (see .github/workflows/build.yml); the Lena model is committed.
-android/app/src/main/assets/wakeword/melspectrogram.tflite
-android/app/src/main/assets/wakeword/embedding_model.tflite
-android/app/src/main/assets/wakeword/hey_jarvis_v0.1.tflite

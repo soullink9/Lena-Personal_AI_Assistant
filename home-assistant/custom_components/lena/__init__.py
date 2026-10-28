@@ -2,7 +2,8 @@
 
 Sets up one Lena (there's only ever one), her Mood, Energy and Moment dropdowns, her memory
 to-do list, the "Lena" choice under Control Home Assistant in a conversation agent, the
-lena.feel action, and /api/lena/context for Open WebUI and the Lena app.
+lena.feel action, /api/lena/context for Open WebUI and the Lena app, and /api/lena/media for
+the app's photo slideshow.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
 from .llm_api import LenaAPI
-from .view import LenaContextView
+from .view import LenaContextView, LenaMediaView
 
 PLATFORMS = [Platform.SELECT, Platform.TODO]
 
@@ -36,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
 
     if not hass.data.get(f"{DOMAIN}_view"):
         hass.http.register_view(LenaContextView())
+        hass.http.register_view(LenaMediaView())
         hass.data[f"{DOMAIN}_view"] = True
 
     async def feel(call: ServiceCall) -> None:

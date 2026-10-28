@@ -7,6 +7,11 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.13.0 (2026-10-28)
+
+- **Photo slideshow** (Settings → Display & screen saver): an album from Home Assistant's media, such as an Immich album, instead of the clock in the screen saver, display mode and dashboard mode's idle screen. Choose how long each photo shows, a fade, slide, slow zoom or no transition, shuffle, fill or whole photo, the time and her mood on top, and the clock at night. Needs the Lena integration 1.2.0.
+- **Nothing downloaded at build time for the wake word**: the Hey Jarvis models and the front end check's C sources are now in the repository, like the Lena model.
+
 ### 2.12.0 (2026-10-27)
 
 - **Dashboard mode** (Settings → Dashboard mode): your Home Assistant dashboards on a tablet, always on, signed in with Lena's token (no login page), with Lena across the top: time, weather, her mood, talk, chats, apps and settings. Several dashboards become tabs. It dims to her night clock after a few idle minutes and wakes on a touch, a motion sensor you pick, or when she's worried, which also turns the top into a banner with what's wrong.
@@ -138,6 +143,10 @@ First release.
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
 ## Personality
+
+### 3.2.0 (2026-10-28)
+
+- The Lena integration (1.2.0) adds `/api/lena/media`: Home Assistant's media folders and photos (Immich albums included) for the app's photo slideshow. Copy the new `custom_components/lena` folder over the old one and restart.
 
 ### 3.1.0 (2026-10-27)
 

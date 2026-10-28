@@ -15,6 +15,7 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Action | `lena.feel` | Sets her moment, with a reason. For your own automations, and used by Open WebUI. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |
 | Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
+| Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
 
 Her feelings and memory are saved, so they survive restarts.
 
@@ -69,6 +70,18 @@ Returns:
 ```
 
 Add `?memory=0` to leave her memory out of `context`, or `?reasons=0` to leave out the reasons. Any user's token works; no admin rights are needed.
+
+## /api/lena/media
+
+For the Lena app's photo slideshow: Home Assistant's media browser (the same one as Media in the sidebar), without the websocket.
+
+```
+GET /api/lena/media                                  the top level: Immich, My media...
+GET /api/lena/media?id=media-source://immich/...     a folder: {"title", "children": [{"id", "title", "folder", "photo"}]}
+GET /api/lena/media?id=...&photos=1                  its photos: {"title", "photos": ["/immich/.../preview/image/jpeg", ...]}
+```
+
+Photos are paths on this Home Assistant (fetch them with the same token). Immich photos come at its screen-sized "preview" quality. Folders and photos only; videos and other files are left out. Any user's token works.
 
 ## Tests
 

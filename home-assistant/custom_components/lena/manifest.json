@@ -1,7 +1,7 @@
 {
   "domain": "lena",
   "name": "Lena",
-  "after_dependencies": ["calendar", "conversation", "http"],
+  "after_dependencies": ["calendar", "conversation", "http", "media_source"],
   "codeowners": ["@soullink9"],
   "config_flow": true,
   "dependencies": ["http"],
@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/soullink9/Lena-Personal_AI_Assistant/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

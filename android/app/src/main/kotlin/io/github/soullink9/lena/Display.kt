@@ -129,6 +129,12 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
     // At night: dim, warm and quiet, so it doesn't light up a bedroom.
     val ink = if (night) Color(0xFF9E5A4A) else Color.White
     val soft = ink.copy(alpha = if (night) 0.6f else 0.65f)
+    // The photo slideshow instead of the clock, when it's on (by default, not at night).
+    val slides = remember { Prefs.slides(context) }
+    if (slides.on && slides.album.isNotBlank() && !(night && slides.clockAtNight)) {
+        PhotoFrame(slides, now, house, locked, listening, onTalk)
+        return
+    }
     val dx by animateDpAsState(((shift % 17) - 8).dp, label = "dx")
     val dy by animateDpAsState(((shift / 17 % 17) - 8).dp, label = "dy")
 

@@ -103,11 +103,22 @@ Connect Home Assistant under **Settings → Home Assistant**: its address and a 
 
 ## Display mode
 
-**Settings → Display mode → Start display mode** turns the phone or tablet into a Lena display: the time, the date, the weather, how she feels and the last thing she said, on black and kept on. Tap anywhere to talk; back leaves it. The content drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
+**Settings → Display & screen saver → Start display mode** turns the phone or tablet into a Lena display: the time, the date, the weather, how she feels and the last thing she said, on black and kept on. Tap anywhere to talk; back leaves it. The content drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
 
 **As the screen saver:** Android settings → Display → Screen saver → **Lena** (or **Use it as the screen saver** in the same page), then choose when it starts, for example while charging. Over the lock screen it shows her mood but not the reasons, nor anything she said. Tapping it opens Lena listening (after you unlock, unless **On the lock screen** is on).
 
 The weather comes from the weather entity chosen in the Lena integration in Home Assistant; without Home Assistant the display shows the clock and nothing about her mood.
+
+### Photo slideshow
+
+**Settings → Display & screen saver → Photo slideshow** shows an album instead of the clock: in the screen saver, display mode, and dashboard mode when it dims. Pick the album from Home Assistant's media: Immich's albums, people, tags and favorites (with Home Assistant's Immich integration), your My media folders, or any other media source with photos. It needs the Lena integration 1.2.0 or newer.
+
+- **Each photo for** 5 seconds to 5 minutes, with a **fade**, **slide**, **slow zoom and fade** (the photo drifts in a little while it's shown) or no transition.
+- **Shuffle** or the album's own order; **Fill the screen** (cropping the edges) or the whole photo on a blurred copy of itself.
+- **Time and her mood** in a corner over a soft shade, or nothing at all.
+- **Just the clock at night** (on by default): 10 PM to 6 AM, and whenever she's drained, it's her dim night clock instead, so a bedroom doesn't light up.
+
+Photos come from Immich at its screen-sized "preview" quality rather than the full originals, and the album is read again every half hour so new photos join in. In dashboard mode the screen dims to 40% for photos instead of the night clock's 2%.
 
 ## Dashboard mode
 
