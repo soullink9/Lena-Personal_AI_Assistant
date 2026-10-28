@@ -7,6 +7,11 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.15.0 (2026-10-28)
+
+- **The screen stays on while she listens, thinks and speaks**, so a long question isn't cut off when the phone would normally sleep.
+- **One Wall display section in Settings**, replacing Dashboard mode, Display & screen saver and the separate wake word entry. Its page has Start, Make it this tablet's home screen, and three sub-pages: **Dashboards**, **When no one's around** (when it steps aside, her clock or the photo frame and its options, and what wakes it up) and **Wake word**, plus the screen saver. Long option lists became single rows you tap to choose from.
+
 ### 2.14.0 (2026-10-28)
 
 - **Logs** (Settings → Logs): Lena's own log of problems and what she was doing, crashes included, with a Problems view, search, copy, share and clear, plus Android's log for her current run. Errors and events only; never messages, answers or tokens.

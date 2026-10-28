@@ -87,6 +87,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -292,6 +293,8 @@ class AskActivity : ComponentActivity() {
         var text by remember { mutableStateOf(initial) }
         val turns = remember { mutableStateListOf<Turn>() }
         var phase by remember { mutableStateOf(Phase.IDLE) }
+        // Keep the screen on while she listens, thinks or speaks, so a long question isn't cut off.
+        SideEffect { view.keepScreenOn = phase != Phase.IDLE }
         var heard by remember { mutableStateOf("") }
         var level by remember { mutableStateOf(0f) }
         var note by remember { mutableStateOf<String?>(null) }

@@ -73,11 +73,11 @@ And, only if you add it, your Home Assistant, with the token you give it:
 | Call | What for |
 |---|---|
 | `GET /api/` | **Test connection** in settings |
-| `GET /api/lena/context?memory=0` | How she feels and the weather, from the Lena integration (the sheet, the drawer, display and dashboard modes, house alerts) |
-| `GET /api/states/{entity}` | Dashboard mode's motion sensor, while it's dimmed |
+| `GET /api/lena/context?memory=0` | How she feels and the weather, from the Lena integration (the sheet, the drawer, the wall display, house alerts) |
+| `GET /api/states/{entity}` | The wall display's motion sensor, while it's idle |
 | `GET /api/lena/media`, `?photos=1` | Picking the slideshow's album, and its photos (Lena integration 1.2.0+) |
 | The photos' own paths (`/immich/…`, `/media/…`) | The slideshow; only paths on your Home Assistant, never another address |
-| Home Assistant's own pages | Dashboard mode, in a web view signed in with the token |
+| Home Assistant's own pages | The wall display's dashboards, in a web view signed in with the token |
 | `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list, `todo.lena_memory` |
 
 ## The wake word models

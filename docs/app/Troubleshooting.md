@@ -50,13 +50,13 @@ Memories need **Admin Panel → Settings → General → Memories** (or your acc
 - If the test fails, check the address is the `https://` one you use from your phone, and that the token hasn't been revoked. Paste a new one to replace it.
 - The **Hers** tab reads `todo.lena_memory`. If you renamed that entity in Home Assistant, rename it back.
 
-## Dashboard mode shows Home Assistant's login page
+## The wall display shows Home Assistant's login page
 
 The page didn't get Lena's token. Check **Settings → Home Assistant → Test connection**, and that the dashboard path is right (open `https://<your Home Assistant>/<path>` in a browser). Updating **Android System WebView** helps if it's very old; the sign-in needs its newer features.
 
 ## The wake word never hears me
 
-Use **Settings → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, and try the other name to compare. In the screen saver some phones block the microphone; it says so on screen, and display or dashboard mode will hear you.
+Use **Settings → Wall display → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, and try the other name to compare. In the screen saver some phones block the microphone; it says so on screen, and the wall display itself will hear you.
 
 ## Talking to Lena doesn't hear me
 

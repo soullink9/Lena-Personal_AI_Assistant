@@ -101,45 +101,44 @@ Talking to Lena uses Open WebUI's memories when its memory setting is on for you
 
 Connect Home Assistant under **Settings → Home Assistant**: its address and a long-lived access token (your Home Assistant profile → Security). Any user's token works. **Test connection** checks it, and tells you if the [Lena integration](../home-assistant/Installation.md) isn't set up yet. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too.
 
-## Display mode
+## Wall display
 
-**Settings → Display & screen saver → Start display mode** turns the phone or tablet into a Lena display: the time, the date, the weather, how she feels and the last thing she said, on black and kept on. Tap anywhere to talk; back leaves it. The content drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
+**Settings → Wall display** turns a tablet on the wall (or a docked phone) into a home panel: your Home Assistant dashboards while someone's using it, a photo frame or her clock when no one is, and her name to talk to her from across the room. Everything for it is on that one page:
 
-**As the screen saver:** Android settings → Display → Screen saver → **Lena** (or **Use it as the screen saver** in the same page), then choose when it starts, for example while charging. Over the lock screen it shows her mood but not the reasons, nor anything she said. Tapping it opens Lena listening (after you unlock, unless **On the lock screen** is on).
+| On the page | What it does |
+|---|---|
+| **Start the wall display** | Full screen and kept on; back leaves it. Without Home Assistant connected it's just the idle screen. |
+| **Make it this tablet's home screen** | Android's choice of home app; pick Lena. Home then always brings the wall display back, and **Apps** in its top strip lists everything else on the tablet. |
+| **Dashboards** | The Home Assistant dashboards it shows, as tabs. |
+| **When no one's around** | When it steps aside, what it shows then (her clock or a photo frame), and what wakes it up. |
+| **Wake word** | Saying her name to talk to her. |
+| **Use it as the screen saver** | The same idle screen as Android's screen saver, so it appears by itself whenever the device charges. |
 
-The weather comes from the weather entity chosen in the Lena integration in Home Assistant; without Home Assistant the display shows the clock and nothing about her mood.
+### Dashboards
 
-### Photo slideshow
+Your dashboards are signed in with the token from Lena's settings, through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each one by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`); with more than one they become tabs. Home Assistant's own sidebar is folded away; its header and view tabs stay. Links that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.
 
-**Settings → Display & screen saver → Photo slideshow** shows an album instead of the clock: in the screen saver, display mode, and dashboard mode when it dims. Pick the album from Home Assistant's media: Immich's albums, people, tags and favorites (with Home Assistant's Immich integration), your My media folders, or any other media source with photos. It needs the Lena integration 1.2.0 or newer.
+**Lena's strip** across the top shows the time, date and weather, her mood and why, a button to talk to her, and buttons for your chats, your apps and settings. **When she's worried** about something at home, it turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
-- **Each photo for** 5 seconds to 5 minutes, with a **fade**, **slide**, **slow zoom and fade** (the photo drifts in a little while it's shown) or no transition.
-- **Shuffle** or the album's own order; **Fill the screen** (cropping the edges) or the whole photo on a blurred copy of itself.
-- **Time and her mood** in a corner over a soft shade, or nothing at all.
-- **Just the clock at night** (on by default): 10 PM to 6 AM, and whenever she's drained, it's her dim night clock instead, so a bedroom doesn't light up.
+### When no one's around
 
-Photos come from Immich at its screen-sized "preview" quality rather than the full originals, and the album is read again every half hour so new photos join in. In dashboard mode the screen dims to 40% for photos instead of the night clock's 2%.
+After a few minutes without a touch (2, 5, 10 or 30, or never) the dashboards step aside for one of these. The screen saver shows the same.
 
-## Dashboard mode
+- **Her clock:** the time, the date, the weather, how she feels and the last thing she said, on black. It drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
+- **Photo frame:** an album from Home Assistant's media: Immich's albums, people, tags and favorites (with Home Assistant's Immich integration), your My media folders, or any other media source with photos. It needs the Lena integration 1.2.0 or newer. Choose how long each photo shows (5 seconds to 5 minutes), the transition (fade, slide, slow zoom and fade, or none), shuffle, whether photos fill the screen or show whole on a blurred copy of themselves, and whether the time and her mood sit in a corner. **Her dim clock at night** (on by default) swaps in the night clock from 10 PM to 6 AM and whenever she's drained, so it doesn't light up the room. Immich photos come at its screen-sized "preview" quality, and the album is read again every half hour so new photos join in.
 
-**Settings → Dashboard mode** turns a tablet into an always-on Home Assistant panel with Lena across the top. It needs Home Assistant connected in Lena's settings.
+On the wall display, the screen goes to 40% brightness for photos and 2% for the night clock. **A touch wakes it**, and so does a **motion or presence sensor** you name (checked every few seconds while idle), or Lena being worried.
 
-- **Your dashboards**, signed in with the token from Lena's settings through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each dashboard you want by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`); with more than one they become tabs. Home Assistant's own sidebar is folded away; its header and view tabs stay.
-- **Lena's strip:** the time, date and weather, her mood and why, a button to talk to her (or say her name, with the wake word on), and buttons for your chats, your apps and settings.
-- **When she's worried** about something at home, the strip turns into a red banner with what's wrong and a **Talk to her** button, and the screen lights up if it was dimmed.
-- **Dims by itself** to her night clock after a few minutes without a touch (2, 5, 10 or 30, or never), at the lowest brightness. A touch brings the dashboard back; so does a motion or presence sensor you name (it's checked every few seconds while dimmed).
-- **As the tablet's home screen:** **Make it this tablet's home screen** opens Android's choice of home app; pick Lena. Home then always brings you back to the first dashboard, and **Apps** lists everything else on the tablet.
+**As the screen saver** over the lock screen it shows her mood but not the reasons, nor anything she said. Tapping it opens Lena listening (after you unlock, unless **On the lock screen** is on).
 
-The screen stays on in dashboard mode. Links on a dashboard that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.
+### Wake word
 
-## The wake word
-
-**Settings → Wake word** lets display mode, dashboard mode and the screen saver listen for her name, so you can talk to her across the room. Choose:
+**Wall display → Wake word** lets the wall display and the screen saver listen for her name. Choose:
 
 - **Lena** (default): a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/microWakeWords), the same kind of model Home Assistant's voice satellites run. The app computes exactly the sound features those devices do: its front end is a line-for-line port of TensorFlow Lite Micro's, checked bit for bit against the original on every build.
 - **Hey Jarvis:** [openWakeWord](https://github.com/dscripka/openWakeWord)'s ready-made model, free for personal, non-commercial use.
 
-It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while one of those screens is showing, and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens the screen saver says so and you tap to talk.
+It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing, and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
 
 ## House alerts
 

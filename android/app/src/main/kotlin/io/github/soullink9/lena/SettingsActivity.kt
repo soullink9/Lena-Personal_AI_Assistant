@@ -89,6 +89,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material.icons.outlined.Animation
+import androidx.compose.material.icons.outlined.Timer
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import android.widget.Toast
@@ -128,8 +133,18 @@ class SettingsActivity : ComponentActivity() {
     private enum class Page(val title: String) {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
-        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display & screen saver"),
-        DASHBOARD("Dashboard mode"), WAKE("Wake word"), UPDATES("Updates"),
+        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), UPDATES("Updates"),
+        WALL("Wall display"), WALL_DASHBOARDS("Dashboards"), WALL_IDLE("When no one's around"), WAKE("Wake word");
+
+        /** Where back goes: the wall display's own pages sit under it. */
+        val parent: Page?
+            get() = when (this) {
+                MAIN -> null
+                WALL_DASHBOARDS, WALL_IDLE, WAKE -> WALL
+                else -> MAIN
+            }
+
+        val depth: Int get() = parent?.let { it.depth + 1 } ?: 0
     }
 
     private lateinit var original: Settings
@@ -194,7 +209,7 @@ class SettingsActivity : ComponentActivity() {
         }
 
         fun back() {
-            if (page == Page.MAIN) leave() else page = Page.MAIN
+            page.parent?.let { page = it } ?: leave()
         }
         BackHandler { back() }
 
@@ -211,7 +226,7 @@ class SettingsActivity : ComponentActivity() {
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
-                    val forward = targetState != Page.MAIN
+                    val forward = targetState.depth > initialState.depth
                     (slideInHorizontally { w -> if (forward) w / 4 else -w / 4 } + fadeIn()) togetherWith
                         (slideOutHorizontally { w -> if (forward) -w / 4 else w / 4 } + fadeOut())
                 },
@@ -235,8 +250,9 @@ class SettingsActivity : ComponentActivity() {
                         Page.SCHEDULED -> ScheduledPage(s, ::set)
                         Page.PHONE -> PhonePage(s, ::set)
                         Page.APPEARANCE -> AppearancePage(s, ::set)
-                        Page.DISPLAY -> DisplayPage(s, ::set) { page = it }
-                        Page.DASHBOARD -> DashboardPage(s, ::set) { page = it }
+                        Page.WALL -> WallPage(s) { page = it }
+                        Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
+                        Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
                         Page.WAKE -> WakePage(s, ::set)
                         Page.UPDATES -> UpdatesPage()
                     }
@@ -287,10 +303,7 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.Widgets, "Widget & tile", if (s.widgetMood) "Widget shows her mood" else null) { open(Page.PHONE) }
         }
         Group {
-            Item(Icons.Outlined.Dashboard, "Dashboard mode", "Your Home Assistant dashboards, always on") { open(Page.DASHBOARD) }
-            Item(Icons.Outlined.Tv, "Display & screen saver",
-                if (s.slides.on && s.slides.albumName.isNotBlank()) "Slideshow: ${s.slides.albumName}" else "Clock, weather and her mood, full screen") { open(Page.DISPLAY) }
-            Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
+            Item(Icons.Outlined.Tv, "Wall display", "Dashboards when you need them, a photo frame when you don't") { open(Page.WALL) }
         }
         Group {
             val waiting = remember { Updates.pending(this@SettingsActivity) }
@@ -785,96 +798,67 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    @Composable
-    private fun DisplayPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
-        Footnote("A clock, the weather, how she feels and the last thing she said, on black. For a docked phone or a bedside table. Tap anywhere to talk; back to leave.")
-        Group {
-            Item(Icons.Outlined.PlayArrow, "Start display mode", null) {
-                startActivity(Intent(this@SettingsActivity, DisplayActivity::class.java))
-            }
-            Item(Icons.AutoMirrored.Outlined.OpenInNew, "Use it as the screen saver", "Android settings → Screen saver → Lena. It shows while the phone charges.") {
-                try {
-                    startActivity(Intent(AndroidSettings.ACTION_DREAM_SETTINGS))
-                } catch (_: ActivityNotFoundException) {
-                }
-            }
-            Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
-        }
-        SlideshowSettings(s, set, open)
-    }
+    private fun hasHouse() = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
 
-    /** The photo slideshow: shown by the screen saver, display mode and dashboard mode when it dims. */
+    private fun dimLabel(m: Int) = if (m == 0) "Never" else "After $m minutes without a touch"
+
+    /**
+     * The wall display: one place for a tablet on the wall. Your Home Assistant dashboards while
+     * someone's using it; the photo frame (or her clock) when no one is; her name to talk to her.
+     */
     @Composable
-    private fun SlideshowSettings(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+    private fun WallPage(s: Settings, open: (Page) -> Unit) {
+        val house = hasHouse()
         val sl = s.slides
-        fun put(n: Slides) = set(s.copy(slides = n))
-        var picking by remember { mutableStateOf(false) }
-        val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
-        SectionTitle("Photo slideshow")
-        Footnote("Photos from Home Assistant's media, such as an Immich album, instead of the clock: in the screen saver, display mode, and dashboard mode when it dims. Needs the Lena integration 1.2.0 or newer.")
-        if (!house) {
-            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", null) { open(Page.HOME_ASSISTANT) } }
-            return
-        }
+        Footnote("For a tablet on the wall: your Home Assistant dashboards while you're using it, a photo frame or her clock when no one's around, and her name to talk to her from across the room.")
         Group {
-            SwitchItem(Icons.Outlined.Slideshow, "Show photos", null, sl.on) { on ->
-                put(sl.copy(on = on))
-                if (on && sl.album.isBlank()) picking = true
+            Item(Icons.Outlined.PlayArrow, "Start the wall display",
+                if (house) "Back leaves it" else "Clock and photos only until Home Assistant is connected") {
+                startActivity(Intent(this@SettingsActivity, if (house) DashboardActivity::class.java else DisplayActivity::class.java))
             }
-            Item(Icons.Outlined.PhotoAlbum, "Album", sl.albumName.ifBlank { "Choose one" }) { picking = true }
-        }
-        if (sl.on) {
-            Section("Each photo for") {
-                listOf(5 to "5 seconds", 10 to "10 seconds", 15 to "15 seconds", 30 to "30 seconds", 60 to "1 minute", 300 to "5 minutes").forEach { (sec, label) ->
-                    ChoiceItem(label, null, sl.seconds == sec) { put(sl.copy(seconds = sec)) }
-                }
-            }
-            Section("Transition") {
-                SlideTransition.entries.forEach { t -> ChoiceItem(t.label, null, sl.transition == t) { put(sl.copy(transition = t)) } }
-            }
-            Group {
-                SwitchItem(null, "Shuffle", "Otherwise in the album's order", sl.shuffle) { put(sl.copy(shuffle = it)) }
-                SwitchItem(null, "Fill the screen", "Crops the edges. Off shows the whole photo on a blurred copy of itself.", sl.fill) { put(sl.copy(fill = it)) }
-                SwitchItem(null, "Time and her mood over the photos", null, sl.overlay) { put(sl.copy(overlay = it)) }
-                SwitchItem(null, "Just the clock at night", "10 PM to 6 AM, and when she's drained, so it doesn't light up a room", sl.clockAtNight) {
-                    put(sl.copy(clockAtNight = it))
-                }
-            }
-        }
-        if (picking) AlbumPicker(
-            onPick = { id, name ->
-                picking = false
-                put(sl.copy(album = id, albumName = name, on = true))
-            },
-            onDismiss = { picking = false },
-        )
-    }
-
-    @Composable
-    private fun DashboardPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
-        val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
-        Footnote("Your Home Assistant dashboards, always on, with Lena across the top: the time, the weather, how she feels and a tap to talk. " +
-            "For a tablet on the wall. After a while without a touch it dims to her night clock.")
-        if (!house) {
-            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
-            return
-        }
-        Group {
-            Item(Icons.Outlined.PlayArrow, "Start dashboard mode", null) {
-                startActivity(Intent(this@SettingsActivity, DashboardActivity::class.java))
-            }
-            Item(Icons.Outlined.Home, "Make it this tablet's home screen", "Android settings → Default apps → Home app → Lena") {
+            Item(Icons.Outlined.Home, "Make it this tablet's home screen", "Then Home always brings it back") {
                 try {
                     startActivity(Intent(AndroidSettings.ACTION_HOME_SETTINGS))
                 } catch (_: ActivityNotFoundException) {
                     startActivity(Intent(AndroidSettings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
                 }
             }
+        }
+
+        SectionTitle("Set it up")
+        Group {
+            Item(Icons.Outlined.Dashboard, "Dashboards",
+                if (house) s.dashboards.joinToString(", ") { it.name.ifBlank { it.path } } else "Connect Home Assistant first") {
+                open(if (house) Page.WALL_DASHBOARDS else Page.HOME_ASSISTANT)
+            }
+            Item(Icons.Outlined.PhotoAlbum, "When no one's around",
+                (if (sl.on && sl.albumName.isNotBlank()) "Photo frame: ${sl.albumName}" else "Her clock") +
+                    if (s.dimMinutes == 0) " · never steps aside" else " · after ${s.dimMinutes} min") {
+                open(Page.WALL_IDLE)
+            }
             Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
 
-        SectionTitle("Dashboards")
-        Footnote("Each one is a tab. The path is what comes after your Home Assistant's address, like lovelace or dashboard-floorplan/0.")
+        SectionTitle("While it charges")
+        Group {
+            Item(Icons.AutoMirrored.Outlined.OpenInNew, "Use it as the screen saver",
+                "The same idle screen, on its own whenever the device charges. Android settings → Screen saver → Lena.") {
+                try {
+                    startActivity(Intent(AndroidSettings.ACTION_DREAM_SETTINGS))
+                } catch (_: ActivityNotFoundException) {
+                }
+            }
+        }
+    }
+
+    /** The dashboards it shows, as tabs. */
+    @Composable
+    private fun DashboardsPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        if (!hasHouse()) {
+            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
+            return
+        }
+        Footnote("Each one is a tab across the top. The path is what comes after your Home Assistant's address, like lovelace or dashboard-floorplan/0.")
         Group {
             s.dashboards.forEachIndexed { i, d ->
                 FieldItem {
@@ -896,29 +880,85 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.Add, "Add a dashboard", null) { set(s.copy(dashboards = s.dashboards + Dashboard("", ""))) }
         }
+        Footnote("Lena's strip across the top shows the time, the weather and how she feels, with buttons to talk to her, open your chats, your other apps and settings. When she's worried about something at home it turns into a banner saying what's wrong.")
+    }
 
-        Section("Dim to the clock after") {
-            listOf(2, 5, 10, 30, 0).forEach { m ->
-                ChoiceItem(if (m == 0) "Never" else "$m minutes without a touch", null, s.dimMinutes == m) { set(s.copy(dimMinutes = m)) }
+    /** What it shows when no one's using it, and what wakes it up. Also the screen saver. */
+    @Composable
+    private fun IdlePage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        val sl = s.slides
+        fun put(n: Slides) = set(s.copy(slides = n))
+        var picking by remember { mutableStateOf(false) }
+        val house = hasHouse()
+
+        Footnote("After a while without a touch the dashboards step aside for this. The screen saver shows it too.")
+        Group {
+            PickItem(Icons.Outlined.Timer, "Step aside", listOf(2, 5, 10, 30, 0).map { it to dimLabel(it) }, s.dimMinutes) {
+                set(s.copy(dimMinutes = it))
             }
         }
+
+        SectionTitle("Show")
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            SegmentedButton(selected = !sl.on, onClick = { put(sl.copy(on = false)) }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
+                Text("Her clock")
+            }
+            SegmentedButton(
+                selected = sl.on, enabled = house,
+                onClick = { put(sl.copy(on = true)); if (sl.album.isBlank()) picking = true },
+                shape = SegmentedButtonDefaults.itemShape(1, 2),
+            ) { Text("Photo frame") }
+        }
+        if (!sl.on) {
+            Footnote(if (house) "The time, the weather, how she feels and the last thing she said, on black. It drifts a little each minute so it doesn't burn in, and goes dim and warm at night."
+                else "The time and the date on black. Connect Home Assistant for the weather, her mood and the photo frame.")
+        } else {
+            Group {
+                Item(Icons.Outlined.PhotoAlbum, "Album", sl.albumName.ifBlank { "Choose one" }) { picking = true }
+                PickItem(Icons.Outlined.Schedule, "Each photo for",
+                    listOf(5 to "5 seconds", 10 to "10 seconds", 15 to "15 seconds", 30 to "30 seconds", 60 to "1 minute", 300 to "5 minutes"),
+                    sl.seconds) { put(sl.copy(seconds = it)) }
+                PickItem(Icons.Outlined.Animation, "Transition", SlideTransition.entries.map { it to it.label }, sl.transition) {
+                    put(sl.copy(transition = it))
+                }
+            }
+            Group {
+                SwitchItem(null, "Shuffle", "Otherwise in the album's order", sl.shuffle) { put(sl.copy(shuffle = it)) }
+                SwitchItem(null, "Fill the screen", "Crops the edges. Off shows the whole photo on a blurred copy of itself.", sl.fill) { put(sl.copy(fill = it)) }
+                SwitchItem(null, "Time and her mood on top", null, sl.overlay) { put(sl.copy(overlay = it)) }
+                SwitchItem(null, "Her dim clock at night", "10 PM to 6 AM, and when she's drained, so it doesn't light up the room", sl.clockAtNight) {
+                    put(sl.copy(clockAtNight = it))
+                }
+            }
+            Footnote("Albums come from Home Assistant's media: Immich albums, people and favorites, your My media folders. Needs the Lena integration 1.2.0 or newer.")
+        }
+
+        SectionTitle("Waking it up")
         Group {
             FieldItem {
                 OutlinedTextField(
                     value = s.motionEntity, onValueChange = { set(s.copy(motionEntity = it)) },
-                    label = { Text("Wake when this sensor sees someone (optional)") },
+                    label = { Text("Motion or presence sensor (optional)") },
                     placeholder = { Text("binary_sensor.hallway_motion") },
-                    supportingText = { Text("A motion or presence sensor near the tablet. Checked every few seconds while it's dimmed.") },
+                    supportingText = { Text("Brings the dashboards back when it sees someone. Checked every few seconds while it's idle.") },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
-        Footnote("She also lights it up when she's worried about something at home, with what's wrong across the top.")
+        Footnote("A touch always wakes it, and so does Lena being worried about something at home.")
+
+        if (picking) AlbumPicker(
+            onPick = { id, name ->
+                picking = false
+                put(sl.copy(album = id, albumName = name, on = true))
+            },
+            onDismiss = { picking = false; if (sl.album.isBlank()) put(sl.copy(on = false)) },
+        )
     }
 
     @Composable
     private fun WakePage(s: Settings, set: (Settings) -> Unit) {
-        Footnote("Talk to her across the room in display mode, dashboard mode and the screen saver. It listens on this device only; nothing is recorded or sent until she hears her name.")
+        Footnote("Talk to her from across the room while the wall display or the screen saver is showing. It listens on this device only; nothing is recorded or sent until she hears her name.")
         Group {
             SwitchItem(Icons.Outlined.Hearing, "Listen for \u201C${s.wakePhrase.label}\u201D", null, s.wakeWord) {
                 set(s.copy(wakeWord = it))
