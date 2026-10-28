@@ -190,7 +190,7 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
                 if (listening == Listening.ON) Icon(Icons.Rounded.Mic, null, tint = soft, modifier = Modifier.size(16.dp))
                 Text(
                     when (listening) {
-                        Listening.ON -> "Say “${WakeWord.PHRASE}” or tap to talk"
+                        Listening.ON -> "Say \u201C${Prefs.wakePhrase(context).label}\u201D or tap to talk"
                         Listening.BLOCKED -> "Tap to talk (the phone won't let her listen here)"
                         Listening.OFF -> "Tap to talk"
                     },

@@ -52,6 +52,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
@@ -114,6 +115,7 @@ class SettingsActivity : ComponentActivity() {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
         SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display mode"),
+        DASHBOARD("Dashboard mode"), WAKE("Wake word"),
     }
 
     private lateinit var original: Settings
@@ -219,7 +221,9 @@ class SettingsActivity : ComponentActivity() {
                         Page.SCHEDULED -> ScheduledPage(s, ::set)
                         Page.PHONE -> PhonePage(s, ::set)
                         Page.APPEARANCE -> AppearancePage(s, ::set)
-                        Page.DISPLAY -> DisplayPage(s, ::set)
+                        Page.DISPLAY -> DisplayPage(s, ::set) { page = it }
+                        Page.DASHBOARD -> DashboardPage(s, ::set) { page = it }
+                        Page.WAKE -> WakePage(s, ::set)
                     }
                 }
             }
@@ -266,9 +270,11 @@ class SettingsActivity : ComponentActivity() {
                 set(s.copy(openWebUiMenus = it))
             }
             Item(Icons.Outlined.Widgets, "Widget & tile", if (s.widgetMood) "Widget shows her mood" else null) { open(Page.PHONE) }
-            Item(Icons.Outlined.Tv, "Display mode", if (s.wakeWord) "Listens for \u201C${WakeWord.PHRASE}\u201D" else "Clock, weather and her mood, full screen") {
-                open(Page.DISPLAY)
-            }
+        }
+        Group {
+            Item(Icons.Outlined.Dashboard, "Dashboard mode", "Your Home Assistant dashboards, always on") { open(Page.DASHBOARD) }
+            Item(Icons.Outlined.Tv, "Display mode", "Clock, weather and her mood, full screen") { open(Page.DISPLAY) }
+            Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
         Group {
             val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
@@ -576,9 +582,8 @@ class SettingsActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun DisplayPage(s: Settings, set: (Settings) -> Unit) {
-        val hasModel = remember { WakeWord.available(this) }
-        Footnote("A clock, the weather, how she feels and the last thing she said, on black. For a docked phone or a tablet on the wall. Tap anywhere to talk; back to leave.")
+    private fun DisplayPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        Footnote("A clock, the weather, how she feels and the last thing she said, on black. For a docked phone or a bedside table. Tap anywhere to talk; back to leave.")
         Group {
             Item(Icons.Outlined.PlayArrow, "Start display mode", null) {
                 startActivity(Intent(this@SettingsActivity, DisplayActivity::class.java))
@@ -589,30 +594,100 @@ class SettingsActivity : ComponentActivity() {
                 } catch (_: ActivityNotFoundException) {
                 }
             }
+            Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
         }
-        if (hasModel) {
-            Group {
-                SwitchItem(Icons.Outlined.Hearing, "Listen for \u201C${WakeWord.PHRASE}\u201D",
-                    "In display mode and the screen saver. It runs on this phone; nothing is sent until she hears it.", s.wakeWord) {
-                    set(s.copy(wakeWord = it))
-                    if (it && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3)
+    }
+
+    @Composable
+    private fun DashboardPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
+        Footnote("Your Home Assistant dashboards, always on, with Lena across the top: the time, the weather, how she feels and a tap to talk. " +
+            "For a tablet on the wall. After a while without a touch it dims to her night clock.")
+        if (!house) {
+            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
+            return
+        }
+        Group {
+            Item(Icons.Outlined.PlayArrow, "Start dashboard mode", null) {
+                startActivity(Intent(this@SettingsActivity, DashboardActivity::class.java))
+            }
+            Item(Icons.Outlined.Home, "Make it this tablet's home screen", "Android settings → Default apps → Home app → Lena") {
+                try {
+                    startActivity(Intent(AndroidSettings.ACTION_HOME_SETTINGS))
+                } catch (_: ActivityNotFoundException) {
+                    startActivity(Intent(AndroidSettings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                }
+            }
+            Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
+        }
+
+        SectionTitle("Dashboards")
+        Footnote("Each one is a tab. The path is what comes after your Home Assistant's address, like lovelace or dashboard-floorplan/0.")
+        Group {
+            s.dashboards.forEachIndexed { i, d ->
+                FieldItem {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = d.name, onValueChange = { v -> set(s.copy(dashboards = s.dashboards.mapIndexed { j, o -> if (j == i) o.copy(name = v) else o })) },
+                            label = { Text("Name") }, singleLine = true, modifier = Modifier.weight(0.4f),
+                        )
+                        OutlinedTextField(
+                            value = d.path, onValueChange = { v -> set(s.copy(dashboards = s.dashboards.mapIndexed { j, o -> if (j == i) o.copy(path = v.trim()) else o })) },
+                            label = { Text("Path") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.weight(0.6f),
+                        )
+                        if (s.dashboards.size > 1) IconButton(onClick = { set(s.copy(dashboards = s.dashboards.filterIndexed { j, _ -> j != i })) }) {
+                            Icon(Icons.Outlined.Delete, "Remove")
+                        }
                     }
                 }
-                WakeTest()
             }
-            Footnote(
-                "The wake word is openWakeWord's free \u201C${WakeWord.PHRASE}\u201D model (for personal, non-commercial use) until there's a " +
-                    "\u201CHey Lena\u201D one. Some phones don't let an app listen from the screen saver; it then says so and you tap to talk."
-            )
-        } else {
-            Footnote("This build of Lena doesn't include the wake word.")
+            Item(Icons.Outlined.Add, "Add a dashboard", null) { set(s.copy(dashboards = s.dashboards + Dashboard("", ""))) }
         }
+
+        Section("Dim to the clock after") {
+            listOf(2, 5, 10, 30, 0).forEach { m ->
+                ChoiceItem(if (m == 0) "Never" else "$m minutes without a touch", null, s.dimMinutes == m) { set(s.copy(dimMinutes = m)) }
+            }
+        }
+        Group {
+            FieldItem {
+                OutlinedTextField(
+                    value = s.motionEntity, onValueChange = { set(s.copy(motionEntity = it)) },
+                    label = { Text("Wake when this sensor sees someone (optional)") },
+                    placeholder = { Text("binary_sensor.hallway_motion") },
+                    supportingText = { Text("A motion or presence sensor near the tablet. Checked every few seconds while it's dimmed.") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Footnote("She also lights it up when she's worried about something at home, with what's wrong across the top.")
+    }
+
+    @Composable
+    private fun WakePage(s: Settings, set: (Settings) -> Unit) {
+        Footnote("Talk to her across the room in display mode, dashboard mode and the screen saver. It listens on this device only; nothing is recorded or sent until she hears her name.")
+        Group {
+            SwitchItem(Icons.Outlined.Hearing, "Listen for \u201C${s.wakePhrase.label}\u201D", null, s.wakeWord) {
+                set(s.copy(wakeWord = it))
+                if (it && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3)
+                }
+            }
+            WakeTest(s.wakePhrase)
+        }
+        Section("Her name") {
+            WakePhrase.entries.forEach { w ->
+                val there = remember(w) { WakeWord.available(this@SettingsActivity, w) }
+                ChoiceItem(w.label, if (there) w.detail else "Not in this build", s.wakePhrase == w) { if (there) set(s.copy(wakePhrase = w)) }
+            }
+        }
+        Footnote("Some phones don't let an app use the microphone from the screen saver; it then says so and you tap to talk.")
     }
 
     /** Listens for the wake word right here and shows how close each try gets. */
     @Composable
-    private fun WakeTest() {
+    private fun WakeTest(phrase: WakePhrase) {
         var on by remember { mutableStateOf(false) }
         var level by remember { mutableStateOf(0f) }
         var heard by remember { mutableStateOf(0) }
@@ -622,7 +697,7 @@ class SettingsActivity : ComponentActivity() {
         DisposableEffect(Unit) { onDispose { listener.stop() } }
         Item(
             Icons.Outlined.GraphicEq,
-            if (on) "Listening… say \u201C${WakeWord.PHRASE}\u201D" else "Try it",
+            if (on) "Listening… say \u201C${phrase.label}\u201D" else "Try it",
             when {
                 on -> "Tap to stop"
                 heard > 0 -> "Heard you. Tap to try again."

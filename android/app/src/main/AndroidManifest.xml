@@ -11,8 +11,13 @@
     <!-- Sets scheduled prompts again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine. -->
+    <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine, and (dashboard
+         mode's Apps button) the apps you can open. -->
     <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
@@ -47,6 +52,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- Dashboard mode: your Home Assistant dashboards in a Lena frame. It can be a tablet's
+             home screen (Android settings > Apps > Default apps > Home app > Lena). -->
+        <activity
+            android:name=".DashboardActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|density"
+            android:exported="true"
+            android:label="Lena dashboard"
+            android:launchMode="singleTask"
+            android:resumeWhilePausing="true"
+            android:stateNotNeeded="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- Display mode: a clock, the weather and Lena, full screen and kept on. -->

@@ -109,9 +109,26 @@ Connect Home Assistant under **Settings → Home Assistant**: its address and a 
 
 The weather comes from the weather entity chosen in the Lena integration in Home Assistant; without Home Assistant the display shows the clock and nothing about her mood.
 
-**"Hey Jarvis."** Turn on **Listen for "Hey Jarvis"** and display mode listens for it, so you can talk to her across the room. The wake word runs entirely on the phone: three small models from [openWakeWord](https://github.com/dscripka/openWakeWord) score each 80 ms of sound, and nothing is recorded or sent until she hears the phrase; then the mic is handed to Lena as if you'd tapped. **Try it** on the same page shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while display mode or the screen saver is showing, and Android's microphone indicator stays on while it does.
+## Dashboard mode
 
-"Hey Jarvis" is openWakeWord's ready-made model, free for personal, non-commercial use; a "Hey Lena" model needs training and may replace it later. Some phones don't let an app use the microphone from the screen saver. When that happens the screen saver says so and you tap to talk; display mode itself always can.
+**Settings → Dashboard mode** turns a tablet into an always-on Home Assistant panel with Lena across the top. It needs Home Assistant connected in Lena's settings.
+
+- **Your dashboards**, signed in with the token from Lena's settings through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each dashboard you want by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`); with more than one they become tabs. Home Assistant's own sidebar is folded away; its header and view tabs stay.
+- **Lena's strip:** the time, date and weather, her mood and why, a button to talk to her (or say her name, with the wake word on), and buttons for your chats, your apps and settings.
+- **When she's worried** about something at home, the strip turns into a red banner with what's wrong and a **Talk to her** button, and the screen lights up if it was dimmed.
+- **Dims by itself** to her night clock after a few minutes without a touch (2, 5, 10 or 30, or never), at the lowest brightness. A touch brings the dashboard back; so does a motion or presence sensor you name (it's checked every few seconds while dimmed).
+- **As the tablet's home screen:** **Make it this tablet's home screen** opens Android's choice of home app; pick Lena. Home then always brings you back to the first dashboard, and **Apps** lists everything else on the tablet.
+
+The screen stays on in dashboard mode. Links on a dashboard that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.
+
+## The wake word
+
+**Settings → Wake word** lets display mode, dashboard mode and the screen saver listen for her name, so you can talk to her across the room. Choose:
+
+- **Lena** (default): a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/microWakeWords), the same kind of model Home Assistant's voice satellites run. The app computes exactly the sound features those devices do: its front end is a line-for-line port of TensorFlow Lite Micro's, checked bit for bit against the original on every build.
+- **Hey Jarvis:** [openWakeWord](https://github.com/dscripka/openWakeWord)'s ready-made model, free for personal, non-commercial use.
+
+It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while one of those screens is showing, and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens the screen saver says so and you tap to talk.
 
 ## House alerts
 

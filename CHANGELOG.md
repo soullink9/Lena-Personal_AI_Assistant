@@ -7,6 +7,12 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.12.0 (2026-10-27)
+
+- **Dashboard mode** (Settings → Dashboard mode): your Home Assistant dashboards on a tablet, always on, signed in with Lena's token (no login page), with Lena across the top: time, weather, her mood, talk, chats, apps and settings. Several dashboards become tabs. It dims to her night clock after a few idle minutes and wakes on a touch, a motion sensor you pick, or when she's worried, which also turns the top into a banner with what's wrong.
+- **Lena can be a tablet's home screen**, with an Apps button for everything else.
+- **"Lena" wake word**, now the default: a microWakeWord model, with the app computing exactly the sound features Home Assistant's voice satellites do (checked bit for bit against the original on every build). "Hey Jarvis" is still there to choose. The wake word has its own page and works in dashboard mode too.
+
 ### 2.11.0 (2026-10-27)
 
 - **Display mode** (Settings → Display mode): the time, date, weather, how she feels and the last thing she said, full screen on black, for a docked phone or a tablet on the wall. Tap to talk. It drifts slightly against burn-in and goes dim and warm at night.

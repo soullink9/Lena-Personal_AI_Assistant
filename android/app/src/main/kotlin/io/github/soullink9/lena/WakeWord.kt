@@ -9,67 +9,136 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
+import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * Listens for "Hey Jarvis" on the phone itself, with openWakeWord's models (run by LiteRT).
- * Nothing leaves the phone: the audio goes through three small models and is thrown away.
- *
- * The pipeline is openWakeWord's own streaming one: every 80 ms of 16 kHz audio becomes eight
- * rows of a mel spectrogram; the last 76 rows become one 96-number "speech embedding"; the last
- * 16 embeddings (about 1.3 seconds) go to the wake word model, which scores 0 to 1.
- */
-class WakeWord(c: Context) : Closeable {
+/** One wake word model: fed 80 ms of 16 kHz audio at a time, it says how sure it is. */
+interface WakeEngine : Closeable {
+    /** At or above this, she was called. */
+    val threshold: Float
+    fun score(chunk: ShortArray): Float
+}
 
-    companion object {
-        const val PHRASE = "Hey Jarvis"
-        const val CHUNK = 1280 // 80 ms at 16 kHz
-        private const val CONTEXT = 480 // the melspectrogram looks a little further back
-        private const val ROWS = 76
-        private const val BINS = 32
-        private const val FEATURES = 16
-        private const val EMBEDDING = 96
-        private const val DIR = "wakeword"
-        private const val WORD = "hey_jarvis_v0.1.tflite"
+/** The wake words: picking one, and whether this build of the app has its model. */
+object WakeWord {
+    const val CHUNK = 1280 // 80 ms at 16 kHz
+    private const val DIR = "wakeword"
 
-        /** The models are added when the app is built; a build without them has no wake word. */
-        fun available(c: Context): Boolean = runCatching { c.assets.list(DIR)?.contains(WORD) == true }.getOrDefault(false)
+    fun available(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c)): Boolean =
+        runCatching { c.assets.list(DIR)?.contains(phrase.file) == true }.getOrDefault(false)
 
-        private fun load(c: Context, name: String): ByteBuffer {
-            val bytes = c.assets.open("$DIR/$name").use { it.readBytes() }
-            return ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).put(bytes).also { it.rewind() }
-        }
-
-        private fun floats(n: Int): ByteBuffer = ByteBuffer.allocateDirect(4 * n).order(ByteOrder.nativeOrder())
+    fun open(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c)): WakeEngine = when (phrase) {
+        WakePhrase.LENA -> MicroWakeWord(c, phrase.file)
+        WakePhrase.JARVIS -> OpenWakeWord(c, phrase.file)
     }
 
-    private val mel = Interpreter(load(c, "melspectrogram.tflite")).apply {
-        resizeInput(0, intArrayOf(1, CHUNK + CONTEXT))
+    internal fun load(c: Context, name: String): ByteBuffer {
+        val bytes = c.assets.open("$DIR/$name").use { it.readBytes() }
+        return ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).put(bytes).also { it.rewind() }
+    }
+
+    internal fun floats(n: Int): ByteBuffer = ByteBuffer.allocateDirect(4 * n).order(ByteOrder.nativeOrder())
+}
+
+/**
+ * "Lena": a microWakeWord model, the kind Home Assistant's voice satellites run. Its audio goes
+ * through [MicroFrontend] (the same features an ESP32 computes, bit for bit), 40 numbers every
+ * 10 ms; every few frames the model gives a probability, and the average of the last few has to
+ * pass the model's cutoff. The model keeps its own memory between calls (a streaming model).
+ */
+class MicroWakeWord(c: Context, file: String) : WakeEngine {
+    // From the model's .json: probability_cutoff and sliding_window_size.
+    override val threshold = 0.76f
+    private val window = 3
+
+    private val model = Interpreter(WakeWord.load(c, file))
+    private val inTensor = model.getInputTensor(0)
+    private val outTensor = model.getOutputTensor(0)
+    private val stride = inTensor.shape().let { if (it.size >= 2) it[1] else 3 }
+    private val inScale = inTensor.quantizationParams().scale.toDouble()
+    private val inZero = inTensor.quantizationParams().zeroPoint
+    private val inSigned = inTensor.dataType() == DataType.INT8
+    private val outScale = outTensor.quantizationParams().scale
+    private val outZero = outTensor.quantizationParams().zeroPoint
+    private val outSigned = outTensor.dataType() == DataType.INT8
+
+    private val frontend = MicroFrontend()
+    private val pending = ArrayList<IntArray>()
+    private val recent = ArrayDeque<Float>()
+    private val input = ByteBuffer.allocateDirect(stride * MicroFrontend.CHANNELS).order(ByteOrder.nativeOrder())
+    private val output = ByteBuffer.allocateDirect(outTensor.numBytes()).order(ByteOrder.nativeOrder())
+
+    override fun score(chunk: ShortArray): Float {
+        var best = 0f
+        var at = 0
+        while (at < chunk.size) {
+            at += frontend.process(chunk, at, chunk.size - at)
+            if (!frontend.ready) continue
+            pending += frontend.features.copyOf()
+            if (pending.size < stride) continue
+
+            // The features as floats (value / 25.6), quantized the way the model expects.
+            input.rewind()
+            for (frame in pending) for (v in frame) {
+                val q = Math.rint(v * 0.0390625 / inScale + inZero).toInt()
+                input.put((if (inSigned) q.coerceIn(-128, 127) else q.coerceIn(0, 255)).toByte())
+            }
+            pending.clear()
+            input.rewind()
+            output.rewind()
+            model.run(input, output)
+            val raw = output.get(0).toInt().let { if (outSigned) it else it and 0xFF }
+            recent.addLast((raw - outZero) * outScale)
+            while (recent.size > window) recent.removeFirst()
+            if (recent.size == window) best = maxOf(best, recent.average().toFloat())
+        }
+        return best
+    }
+
+    override fun close() = model.close()
+}
+
+/**
+ * "Hey Jarvis", with openWakeWord's models. Every 80 ms of audio becomes eight rows of a mel
+ * spectrogram; the last 76 rows become one 96-number speech embedding; the last 16 embeddings
+ * (about 1.3 seconds) go to the wake word model, which scores 0 to 1.
+ */
+class OpenWakeWord(c: Context, file: String) : WakeEngine {
+    override val threshold = 0.5f
+
+    private companion object {
+        const val CONTEXT = 480 // the melspectrogram looks a little further back
+        const val ROWS = 76
+        const val BINS = 32
+        const val FEATURES = 16
+        const val EMBEDDING = 96
+    }
+
+    private val mel = Interpreter(WakeWord.load(c, "melspectrogram.tflite")).apply {
+        resizeInput(0, intArrayOf(1, WakeWord.CHUNK + CONTEXT))
         allocateTensors()
     }
-    private val embed = Interpreter(load(c, "embedding_model.tflite"))
-    private val word = Interpreter(load(c, WORD))
+    private val embed = Interpreter(WakeWord.load(c, "embedding_model.tflite"))
+    private val word = Interpreter(WakeWord.load(c, file))
 
     private val melFrames = mel.getOutputTensor(0).shape().let { if (it.size >= 2) it[it.size - 2] else 8 }
-    private val audio = FloatArray(CHUNK + CONTEXT)
+    private val audio = FloatArray(WakeWord.CHUNK + CONTEXT)
     private val rows = ArrayDeque<FloatArray>().apply { repeat(ROWS) { add(FloatArray(BINS) { 1f }) } }
     private val features = ArrayDeque<FloatArray>()
 
-    private val melIn = floats(CHUNK + CONTEXT)
-    private val melOut = floats(melFrames * BINS)
-    private val embedIn = floats(ROWS * BINS)
-    private val embedOut = floats(EMBEDDING)
-    private val wordIn = floats(FEATURES * EMBEDDING)
-    private val wordOut = floats(1)
+    private val melIn = WakeWord.floats(WakeWord.CHUNK + CONTEXT)
+    private val melOut = WakeWord.floats(melFrames * BINS)
+    private val embedIn = WakeWord.floats(ROWS * BINS)
+    private val embedOut = WakeWord.floats(EMBEDDING)
+    private val wordIn = WakeWord.floats(FEATURES * EMBEDDING)
+    private val wordOut = WakeWord.floats(1)
 
-    /** Feeds the next 80 ms and returns how sure it is that someone just said the phrase. */
-    fun score(chunk: ShortArray): Float {
-        // Keep the last CONTEXT samples and add the new chunk (as int16 values in a float).
-        System.arraycopy(audio, CHUNK, audio, 0, CONTEXT)
-        for (i in 0 until CHUNK) audio[CONTEXT + i] = chunk[i].toFloat()
+    override fun score(chunk: ShortArray): Float {
+        System.arraycopy(audio, WakeWord.CHUNK, audio, 0, CONTEXT)
+        for (i in 0 until WakeWord.CHUNK) audio[CONTEXT + i] = chunk[i].toFloat()
 
         melIn.rewind(); melIn.asFloatBuffer().put(audio)
         melOut.rewind()
@@ -106,7 +175,7 @@ class WakeWord(c: Context) : Closeable {
 }
 
 /**
- * Runs [WakeWord] on the microphone in the background until [stop]. Calls back on the main thread:
+ * Runs the chosen wake word on the microphone in the background until [stop]. Calls back on the main thread:
  * [onScore] about 12 times a second, [onHeard] once when it hears the phrase (and then stops,
  * freeing the mic for Lena), and [onSilenced] if Android gives it only silence, which is what
  * happens when the phone doesn't let an app listen from where it is (the screen saver, on some phones).
@@ -116,7 +185,6 @@ class WakeListener(
     private val onHeard: () -> Unit,
     private val onSilenced: () -> Unit = {},
     private val onScore: (Float) -> Unit = {},
-    private val threshold: Float = 0.5f,
 ) {
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var running = false
@@ -140,7 +208,7 @@ class WakeListener(
 
     @SuppressLint("MissingPermission") // checked in start()
     private fun loop() {
-        val model = runCatching { WakeWord(context) }.getOrElse {
+        val model = runCatching { WakeWord.open(context) }.getOrElse {
             running = false
             return
         }
@@ -177,7 +245,7 @@ class WakeListener(
                 } else silent = 0
                 val s = model.score(chunk)
                 main.post { onScore(s) }
-                if (s >= threshold) {
+                if (s >= model.threshold) {
                     running = false
                     main.post(onHeard)
                 }

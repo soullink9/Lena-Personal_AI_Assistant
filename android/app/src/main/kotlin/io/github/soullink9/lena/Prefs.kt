@@ -40,6 +40,15 @@ enum class AskStyle(val label: String, val detail: String) {
     SUBTITLES("Subtitles", "No panel: her words appear at the bottom like film subtitles"),
 }
 
+/** One of your Home Assistant dashboards, shown as a tab in dashboard mode. */
+data class Dashboard(val name: String, val path: String)
+
+/** The word that wakes her in display mode, and the model file the build adds for it. */
+enum class WakePhrase(val label: String, val file: String, val detail: String) {
+    LENA("Lena", "lena.tflite", "A microWakeWord model, the kind Home Assistant's voice satellites use"),
+    JARVIS("Hey Jarvis", "hey_jarvis_v0.1.tflite", "openWakeWord's model, free for personal, non-commercial use"),
+}
+
 /** A prompt Lena sends on her own every day at [hour]:[minute]. */
 data class Schedule(
     val id: String = UUID.randomUUID().toString(),
@@ -72,6 +81,10 @@ data class Settings(
     val askStyle: AskStyle = AskStyle.SHEET,
     val alerts: Boolean = false,
     val wakeWord: Boolean = false,
+    val wakePhrase: WakePhrase = WakePhrase.LENA,
+    val dashboards: List<Dashboard> = listOf(Dashboard("Home", "lovelace")),
+    val dimMinutes: Int = 5,
+    val motionEntity: String = "",
 )
 
 /** Her memory to-do list, created by the Lena integration in Home Assistant. */
@@ -179,6 +192,10 @@ object Prefs {
         askStyle = askStyle(c),
         alerts = alerts(c),
         wakeWord = wakeWord(c),
+        wakePhrase = wakePhrase(c),
+        dashboards = dashboards(c),
+        dimMinutes = dimMinutes(c),
+        motionEntity = motionEntity(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -211,6 +228,12 @@ object Prefs {
             .putString("ask_style", s.askStyle.name)
             .putBoolean("alerts", s.alerts)
             .putBoolean("wake_word", s.wakeWord)
+            .putString("wake_phrase", s.wakePhrase.name)
+            .putString("dashboards", JSONArray().apply {
+                s.dashboards.filter { it.path.isNotBlank() }.forEach { put(JSONObject().put("name", it.name).put("path", it.path)) }
+            }.toString())
+            .putInt("dim_minutes", s.dimMinutes)
+            .putString("motion_entity", s.motionEntity.trim())
             .apply()
     }
 
@@ -225,6 +248,23 @@ object Prefs {
 
     /** Display mode and the screen saver listen for the wake word. */
     fun wakeWord(c: Context): Boolean = p(c).getBoolean("wake_word", false)
+
+    /** Dashboard mode's tabs; Home Assistant's default dashboard until you add your own. */
+    fun dashboards(c: Context): List<Dashboard> {
+        val a = runCatching { JSONArray(p(c).getString("dashboards", null) ?: "[]") }.getOrDefault(JSONArray())
+        val list = List(a.length()) { i -> a.getJSONObject(i).let { Dashboard(it.optString("name"), it.optString("path")) } }
+            .filter { it.path.isNotBlank() }
+        return list.ifEmpty { listOf(Dashboard("Home", "lovelace")) }
+    }
+
+    /** Minutes without a touch before dashboard mode dims to the clock; 0 never dims. */
+    fun dimMinutes(c: Context): Int = p(c).getInt("dim_minutes", 5)
+
+    /** A motion or presence sensor that wakes dashboard mode, or blank. */
+    fun motionEntity(c: Context): String = p(c).getString("motion_entity", "") ?: ""
+
+    fun wakePhrase(c: Context): WakePhrase =
+        runCatching { WakePhrase.valueOf(p(c).getString("wake_phrase", null) ?: "LENA") }.getOrDefault(WakePhrase.LENA)
 
     fun chatList(c: Context): ChatListStyle =
         runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "GROUPS") }.getOrDefault(ChatListStyle.GROUPS)

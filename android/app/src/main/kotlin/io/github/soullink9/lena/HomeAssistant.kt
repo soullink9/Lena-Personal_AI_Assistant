@@ -124,6 +124,13 @@ class HomeAssistant(server: String, private val token: String) {
         return HouseNow(feelings, weather)
     }
 
+    /** An entity's state ("on", "off", "home"...), or null if it doesn't exist. */
+    suspend fun state(entityId: String): String? = try {
+        JSONObject(call("GET", "/api/states/${enc(entityId)}")).optString("state")
+    } catch (e: IOException) {
+        if (e.message == "HTTP 404") null else throw e
+    }
+
     private suspend fun todo(service: String, list: String, data: JSONObject = JSONObject(), response: Boolean = false): String =
         call("POST", "/api/services/todo/$service" + if (response) "?return_response" else "", data.put("entity_id", list))
 
