@@ -20,7 +20,7 @@ When you sign in inside Lena, Open WebUI stores your session in a cookie for you
 
 ## Home Assistant (optional)
 
-If you add your Home Assistant under **Settings → Home Assistant**, Lena uses a long-lived access token you create there to read her feelings from the Lena integration and her shared memory list, and to change that list when you edit it.
+If you add your Home Assistant under **Settings → Home Assistant**, Lena uses a long-lived access token you create there to read her feelings and the weather from the Lena integration, check for house alerts if you turn them on, read her shared memory list, and to change that list when you edit it.
 
 - The token is encrypted with a key kept in the phone's keystore, which can't be copied off the phone, and is sent only to the Home Assistant address you entered (HTTPS only).
 - Lena never shows the saved token again. Paste a new one to replace it, or remove it with the bin icon.
@@ -75,7 +75,7 @@ When you talk to Lena in the sheet:
 - **Your server** records until you stop talking and sends the recording to your Open WebUI's speech-to-text.
 - Spoken replies are made by your Open WebUI's text-to-speech (the reply text goes to your server, which already wrote it), or by the phone's own voice if you choose.
 
-The sheet only listens while it shows "Listening…". In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
+The sheet only listens while it shows "Listening…". The wake word (Display mode, off unless you turn it on) listens the whole time display mode or the screen saver is showing, but on the phone only: each 80 ms of sound goes through three small models and is thrown away, and nothing is recorded or sent until it hears "Hey Jarvis" and hands over to the sheet. In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
 
 Android blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 
@@ -87,7 +87,7 @@ If you only use public certificates (for example, Let's Encrypt or Tailscale), y
 
 ## Code from others
 
-Lena uses Google's Android Jetpack libraries and JetBrains' coroutines library, all open source. There are no ad, analytics or tracking libraries, and nothing that talks to a service of its own.
+Lena uses Google's Android Jetpack libraries, Google's LiteRT (to run the wake word models on the phone) and JetBrains' coroutines library, all open source. The wake word models are openWakeWord's, downloaded and checked against pinned SHA-256 sums when the app is built. There are no ad, analytics or tracking libraries, and nothing that talks to a service of its own.
 
 ## Your signing key
 

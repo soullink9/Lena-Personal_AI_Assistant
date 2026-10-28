@@ -101,6 +101,25 @@ Talking to Lena uses Open WebUI's memories when its memory setting is on for you
 
 Connect Home Assistant under **Settings → Home Assistant**: its address and a long-lived access token (your Home Assistant profile → Security). Any user's token works. **Test connection** checks it, and tells you if the [Lena integration](../home-assistant/Installation.md) isn't set up yet. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too.
 
+## Display mode
+
+**Settings → Display mode → Start display mode** turns the phone or tablet into a Lena display: the time, the date, the weather, how she feels and the last thing she said, on black and kept on. Tap anywhere to talk; back leaves it. The content drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
+
+**As the screen saver:** Android settings → Display → Screen saver → **Lena** (or **Use it as the screen saver** in the same page), then choose when it starts, for example while charging. Over the lock screen it shows her mood but not the reasons, nor anything she said. Tapping it opens Lena listening (after you unlock, unless **On the lock screen** is on).
+
+The weather comes from the weather entity chosen in the Lena integration in Home Assistant; without Home Assistant the display shows the clock and nothing about her mood.
+
+**"Hey Jarvis."** Turn on **Listen for "Hey Jarvis"** and display mode listens for it, so you can talk to her across the room. The wake word runs entirely on the phone: three small models from [openWakeWord](https://github.com/dscripka/openWakeWord) score each 80 ms of sound, and nothing is recorded or sent until she hears the phrase; then the mic is handed to Lena as if you'd tapped. **Try it** on the same page shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while display mode or the screen saver is showing, and Android's microphone indicator stays on while it does.
+
+"Hey Jarvis" is openWakeWord's ready-made model, free for personal, non-commercial use; a "Hey Lena" model needs training and may replace it later. Some phones don't let an app use the microphone from the screen saver. When that happens the screen saver says so and you tap to talk; display mode itself always can.
+
+## House alerts
+
+When something in your house worries her (a leak, smoke, a door left open: the sensors you chose in the Lena integration), she can tell you on your phone, and tapping the alert opens Lena listening so you can ask what's going on.
+
+- **Instant, in her words:** in Home Assistant, Lena integration → Configure → **Tell these phones when she's worried**, pick your phones (they need the Home Assistant companion app), and choose your Lena agent under **Write alerts in her words with**. Each alert is written by her, and an "all clear" replaces it when the sensor clears.
+- **Backup on this phone:** Settings → Home Assistant → **Alerts on this phone**. The app checks every 15 minutes, the shortest Android allows an app without Google's push service, so an alert can arrive up to 15 minutes late and uses the plain reason ("Leak sensor is detecting water."). Use it on phones without the companion app; on phones with both, you'd get each alert twice.
+
 ## Share to Lena
 
 Share text or a link from any app and pick **Ask Lena**. It goes into the sheet's text box so you can add what you want ("Summarise this", "Is this right?") before sending. Nothing is sent until you tap send.
@@ -155,8 +174,8 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 | Permission | Why |
 |---|---|
 | Internet | To reach your Open WebUI (and your Home Assistant, if you add it). |
-| Microphone | Talking to Lena, call mode and voice input. Asked the first time. In the main app, only your Open WebUI address can use it. |
-| Notifications | "Lena finished" and scheduled prompts. Asked the first time you open Lena. |
+| Microphone | Talking to Lena, call mode, voice input and the wake word. Asked the first time. In the main app, only your Open WebUI address can use it. |
+| Notifications | "Lena finished", scheduled prompts and house alerts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |
 | Change audio settings | Needed by Android's web view to use the microphone. It never prompts. |
 

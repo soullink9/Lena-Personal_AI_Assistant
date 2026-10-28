@@ -14,7 +14,7 @@
     "step": {
       "init": {
         "title": "Lena",
-        "description": "Who she misses, what she notices, and her day. Her feelings' descriptions are in feelings.yaml in the integration's folder.",
+        "description": "Who she misses, what she notices, her day, and who she tells when something's wrong. Her feelings' descriptions are in feelings.yaml in the integration's folder.",
         "data": {
           "people": "People she misses",
           "weather": "Weather",
@@ -27,7 +27,10 @@
           "weather_chance": "Weather sensitivity",
           "mood_hold_hours": "A mood lasts at least",
           "mood_change_chance": "Chance per hour a mood moves on",
-          "moment_minutes": "Reactions fade after"
+          "moment_minutes": "Reactions fade after",
+          "alert_phones": "Tell these phones when she's worried",
+          "alert_agent": "Write alerts in her words with",
+          "alert_all_clear": "Also tell them when it's sorted"
         },
         "data_description": {
           "people": "Coming home after a while makes her delighted; an empty house makes her restless.",
@@ -35,7 +38,10 @@
           "special_days": "Birthdays, anniversaries or holidays: anything on these today puts her in a good mood.",
           "worries": "Problem sensors she frets about while they're on: leaks, smoke, a door or garage left open.",
           "mood_change_chance": "Once a mood has lasted long enough.",
-          "moment_minutes": "How long a reaction, like being pleased or exasperated, lasts."
+          "moment_minutes": "How long a reaction, like being pleased or exasperated, lasts.",
+          "alert_phones": "Phones with the Home Assistant companion app. Tapping the alert opens the Lena app, listening.",
+          "alert_agent": "Your Lena conversation agent. She writes each alert herself; leave empty to send the plain reason instead.",
+          "alert_all_clear": "A second alert when the sensor clears, replacing the first."
         }
       }
     }

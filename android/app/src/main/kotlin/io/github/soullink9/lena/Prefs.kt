@@ -70,6 +70,8 @@ data class Settings(
     val openWebUiMenus: Boolean = false,
     val chatList: ChatListStyle = ChatListStyle.GROUPS,
     val askStyle: AskStyle = AskStyle.SHEET,
+    val alerts: Boolean = false,
+    val wakeWord: Boolean = false,
 )
 
 /** Her memory to-do list, created by the Lena integration in Home Assistant. */
@@ -175,6 +177,8 @@ object Prefs {
         openWebUiMenus = showOpenWebUiMenus(c),
         chatList = chatList(c),
         askStyle = askStyle(c),
+        alerts = alerts(c),
+        wakeWord = wakeWord(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -205,10 +209,22 @@ object Prefs {
             .putBoolean("show_owui_menus", s.openWebUiMenus)
             .putString("chat_list", s.chatList.name)
             .putString("ask_style", s.askStyle.name)
+            .putBoolean("alerts", s.alerts)
+            .putBoolean("wake_word", s.wakeWord)
             .apply()
     }
 
     fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", false)
+
+    /** This phone checks Home Assistant every 15 minutes and tells you when she's worried. */
+    fun alerts(c: Context): Boolean = p(c).getBoolean("alerts", false)
+
+    /** What the last alert was about, so the same worry isn't announced twice. */
+    fun lastAlert(c: Context): String? = p(c).getString("last_alert", null)
+    fun setLastAlert(c: Context, reason: String?) = p(c).edit().putString("last_alert", reason).apply()
+
+    /** Display mode and the screen saver listen for the wake word. */
+    fun wakeWord(c: Context): Boolean = p(c).getBoolean("wake_word", false)
 
     fun chatList(c: Context): ChatListStyle =
         runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "GROUPS") }.getOrDefault(ChatListStyle.GROUPS)

@@ -7,17 +7,25 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    BooleanSelector,
+    ConversationAgentSelector,
     EntitySelector,
     EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TimeSelector,
 )
 
 from . import brain
 from .compat import vol
 from .const import (
+    CONF_ALERT_AGENT,
+    CONF_ALERT_ALL_CLEAR,
+    CONF_ALERT_PHONES,
     CONF_AWAY_HOURS,
     CONF_BEDTIME,
     CONF_CALENDARS,
@@ -65,6 +73,10 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             value = o.get(key, brain.DEFAULTS.get(key))
             return {"suggested_value": value} if value is not None else {}
 
+        phones = sorted(
+            f"notify.{name}" for name in self.hass.services.async_services().get("notify", {})
+            if name.startswith("mobile_app_")
+        )
         schema = vol.Schema({
             vol.Optional(CONF_PEOPLE, description=default(CONF_PEOPLE)):
                 EntitySelector(EntitySelectorConfig(domain="person", multiple=True)),
@@ -82,5 +94,11 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             vol.Required(CONF_MOOD_HOLD_HOURS, description=default(CONF_MOOD_HOLD_HOURS)): _number(1, 12, "h"),
             vol.Required(CONF_MOOD_CHANGE_CHANCE, description=default(CONF_MOOD_CHANGE_CHANCE)): _number(0, 100, "%"),
             vol.Required(CONF_MOMENT_MINUTES, description=default(CONF_MOMENT_MINUTES)): _number(2, 240, "min"),
+            # Alerts: the companion app's notify actions on this Home Assistant (notify.mobile_app_...).
+            vol.Optional(CONF_ALERT_PHONES, description=default(CONF_ALERT_PHONES)): SelectSelector(SelectSelectorConfig(
+                options=phones, multiple=True, custom_value=True, mode=SelectSelectorMode.DROPDOWN,
+            )),
+            vol.Optional(CONF_ALERT_AGENT, description=default(CONF_ALERT_AGENT)): ConversationAgentSelector(),
+            vol.Optional(CONF_ALERT_ALL_CLEAR, default=o.get(CONF_ALERT_ALL_CLEAR, brain.DEFAULTS[CONF_ALERT_ALL_CLEAR])): BooleanSelector(),
         })
         return self.async_show_form(step_id="init", data_schema=schema)

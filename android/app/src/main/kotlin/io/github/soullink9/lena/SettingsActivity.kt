@@ -57,7 +57,11 @@ import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Hearing
+import androidx.compose.material.icons.outlined.NotificationImportant
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RecordVoiceOver
@@ -69,6 +73,7 @@ import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -80,6 +85,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -107,7 +113,7 @@ class SettingsActivity : ComponentActivity() {
     private enum class Page(val title: String) {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
-        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"),
+        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), DISPLAY("Display mode"),
     }
 
     private lateinit var original: Settings
@@ -123,6 +129,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         WidgetMoodWorker.sync(this)
+        Alerts.sync(this)
         Schedules.rescheduleAll(this)
         Shortcuts.update(this)
         val app = applicationContext
@@ -212,6 +219,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.SCHEDULED -> ScheduledPage(s, ::set)
                         Page.PHONE -> PhonePage(s, ::set)
                         Page.APPEARANCE -> AppearancePage(s, ::set)
+                        Page.DISPLAY -> DisplayPage(s, ::set)
                     }
                 }
             }
@@ -258,6 +266,9 @@ class SettingsActivity : ComponentActivity() {
                 set(s.copy(openWebUiMenus = it))
             }
             Item(Icons.Outlined.Widgets, "Widget & tile", if (s.widgetMood) "Widget shows her mood" else null) { open(Page.PHONE) }
+            Item(Icons.Outlined.Tv, "Display mode", if (s.wakeWord) "Listens for \u201C${WakeWord.PHRASE}\u201D" else "Clock, weather and her mood, full screen") {
+                open(Page.DISPLAY)
+            }
         }
         Group {
             val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
@@ -364,6 +375,16 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+        Group {
+            SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on this phone",
+                "Checks every 15 minutes and tells you when she's worried about something at home", s.alerts) {
+                set(s.copy(alerts = it))
+                if (it && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
+                }
+            }
+        }
+        Footnote("For instant alerts, written by her, pick this phone under Tell these phones when she's worried in the Lena integration's Configure (needs the Home Assistant companion app). Use this switch on phones without it.")
     }
 
     @Composable
@@ -551,6 +572,73 @@ class SettingsActivity : ComponentActivity() {
         Group {
             Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, call, type, new chat and your quick prompts") { addWidget() }
             Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Start a voice call from the notification shade") { addTile() }
+        }
+    }
+
+    @Composable
+    private fun DisplayPage(s: Settings, set: (Settings) -> Unit) {
+        val hasModel = remember { WakeWord.available(this) }
+        Footnote("A clock, the weather, how she feels and the last thing she said, on black. For a docked phone or a tablet on the wall. Tap anywhere to talk; back to leave.")
+        Group {
+            Item(Icons.Outlined.PlayArrow, "Start display mode", null) {
+                startActivity(Intent(this@SettingsActivity, DisplayActivity::class.java))
+            }
+            Item(Icons.AutoMirrored.Outlined.OpenInNew, "Use it as the screen saver", "Android settings → Screen saver → Lena. It shows while the phone charges.") {
+                try {
+                    startActivity(Intent(AndroidSettings.ACTION_DREAM_SETTINGS))
+                } catch (_: ActivityNotFoundException) {
+                }
+            }
+        }
+        if (hasModel) {
+            Group {
+                SwitchItem(Icons.Outlined.Hearing, "Listen for \u201C${WakeWord.PHRASE}\u201D",
+                    "In display mode and the screen saver. It runs on this phone; nothing is sent until she hears it.", s.wakeWord) {
+                    set(s.copy(wakeWord = it))
+                    if (it && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3)
+                    }
+                }
+                WakeTest()
+            }
+            Footnote(
+                "The wake word is openWakeWord's free \u201C${WakeWord.PHRASE}\u201D model (for personal, non-commercial use) until there's a " +
+                    "\u201CHey Lena\u201D one. Some phones don't let an app listen from the screen saver; it then says so and you tap to talk."
+            )
+        } else {
+            Footnote("This build of Lena doesn't include the wake word.")
+        }
+    }
+
+    /** Listens for the wake word right here and shows how close each try gets. */
+    @Composable
+    private fun WakeTest() {
+        var on by remember { mutableStateOf(false) }
+        var level by remember { mutableStateOf(0f) }
+        var heard by remember { mutableStateOf(0) }
+        val listener = remember {
+            WakeListener(this, onHeard = { heard++; on = false }, onScore = { level = it })
+        }
+        DisposableEffect(Unit) { onDispose { listener.stop() } }
+        Item(
+            Icons.Outlined.GraphicEq,
+            if (on) "Listening… say \u201C${WakeWord.PHRASE}\u201D" else "Try it",
+            when {
+                on -> "Tap to stop"
+                heard > 0 -> "Heard you. Tap to try again."
+                else -> "Checks the wake word hears you from where you'll be"
+            },
+            trailing = if (on) { { LinearProgressIndicator(progress = { level.coerceIn(0f, 1f) }, modifier = Modifier.width(72.dp).padding(end = 12.dp)) } } else null,
+        ) {
+            if (on) {
+                listener.stop()
+                on = false
+            } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 3)
+            } else {
+                level = 0f
+                on = listener.start()
+            }
         }
     }
 

@@ -73,8 +73,12 @@ And, only if you add it, your Home Assistant, with the token you give it:
 | Call | What for |
 |---|---|
 | `GET /api/` | **Test connection** in settings |
-| `GET /api/lena/context?memory=0` | How she feels, from the Lena integration |
+| `GET /api/lena/context?memory=0` | How she feels and the weather, from the Lena integration (the sheet, the drawer, display mode and house alerts) |
 | `POST /api/services/todo/get_items?return_response`, `add_item`, `update_item`, `remove_item` | Her shared memory list, `todo.lena_memory` |
+
+## The wake word models
+
+`WakeWord.kt` runs openWakeWord's three models with LiteRT: `melspectrogram.tflite`, `embedding_model.tflite` and `hey_jarvis_v0.1.tflite`. They aren't in the repository: the **Build APK** workflow downloads them from openWakeWord's v0.5.1 release into `app/src/main/assets/wakeword/` and checks each against a pinned SHA-256 (see `.github/workflows/build.yml`). For a local build, run the same three downloads; without them the app builds fine and simply has no wake word. The Hey Jarvis model is CC BY-NC-SA 4.0 (non-commercial); the code is Apache 2.0.
 
 ## Building locally
 

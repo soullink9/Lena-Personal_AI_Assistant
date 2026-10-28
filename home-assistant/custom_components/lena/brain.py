@@ -91,6 +91,7 @@ DEFAULTS = {
     "mood_hold_hours": 3,
     "mood_change_chance": 40,
     "moment_minutes": 20,
+    "alert_all_clear": True,
 }
 
 

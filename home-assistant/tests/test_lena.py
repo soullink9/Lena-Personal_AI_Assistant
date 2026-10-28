@@ -4,9 +4,9 @@ import dataclasses
 from datetime import timedelta
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed, async_mock_service
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.helpers import llm
 from homeassistant.util import dt as dt_util
 
@@ -30,7 +30,7 @@ OPTIONS = {
 async def setup(hass: HomeAssistant, options=None) -> MockConfigEntry:
     hass.states.async_set("person.alex", "home", {"friendly_name": "Alex"})
     hass.states.async_set("person.sam", "home", {"friendly_name": "Sam"})
-    hass.states.async_set("weather.home", "cloudy")
+    hass.states.async_set("weather.home", "cloudy", {"temperature": 61, "temperature_unit": "°F"})
     hass.states.async_set("binary_sensor.leak", "off", {"friendly_name": "Leak sensor", "device_class": "moisture"})
     entry = MockConfigEntry(domain=DOMAIN, title="Lena", data={}, options=OPTIONS if options is None else options)
     entry.add_to_hass(hass)
@@ -189,6 +189,7 @@ async def test_context_view(hass: HomeAssistant, hass_client) -> None:
     assert "## How you feel right now" in body["context"]
     assert set(body["feelings"]) == {"mood", "mood_reason", "energy", "moment", "moment_reason"}
     assert body["memory"] == []
+    assert body["weather"] == {"condition": "cloudy", "temperature": 61, "unit": "°F"}
 
 
 async def test_options_flow(hass: HomeAssistant) -> None:
@@ -210,3 +211,50 @@ async def test_config_flow_single(hass: HomeAssistant) -> None:
     assert result["type"] == "create_entry" and result["title"] == "Lena"
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     assert result["type"] == "abort"
+
+
+async def _leak(hass: HomeAssistant, state: str) -> None:
+    hass.states.async_set("binary_sensor.leak", state, {"friendly_name": "Leak sensor", "device_class": "moisture"})
+    await hass.async_block_till_done()
+    if state == "on":
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=3))
+        await hass.async_block_till_done()
+
+
+async def test_alerts_plain(hass: HomeAssistant) -> None:
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    await setup(hass, options=dict(OPTIONS, alert_phones=["notify.mobile_app_pixel"]))
+    await _leak(hass, "on")
+    assert len(calls) == 1
+    assert calls[0].data["title"] == "Lena"
+    assert calls[0].data["message"] == "Leak sensor is detecting water."
+    assert calls[0].data["data"]["tag"] == "lena-alert"
+    assert "io.github.soullink9.lena" in calls[0].data["data"]["clickAction"]
+    await _leak(hass, "off")
+    assert len(calls) == 2
+    assert calls[1].data["message"] == "Leak sensor is back to normal."
+
+
+async def test_alerts_in_her_words_and_no_all_clear(hass: HomeAssistant) -> None:
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    options = dict(OPTIONS, alert_phones=["notify.mobile_app_pixel"], alert_agent="conversation.lena", alert_all_clear=False)
+    await setup(hass, options=options)
+    asked = async_mock_service(
+        hass, "conversation", "process",
+        response={"response": {"response_type": "action_done",
+                               "speech": {"plain": {"speech": "Water under the sink. Go look, now."}}}},
+        supports_response=SupportsResponse.ONLY,
+    )
+    await _leak(hass, "on")
+    assert asked[0].data["agent_id"] == "conversation.lena"
+    assert "Leak sensor is detecting water." in asked[0].data["text"]
+    assert calls[0].data["message"] == "Water under the sink. Go look, now."
+    await _leak(hass, "off")
+    assert len(calls) == 1  # no all-clear
+
+
+async def test_no_alerts_without_phones(hass: HomeAssistant) -> None:
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    await setup(hass)
+    await _leak(hass, "on")
+    assert calls == []

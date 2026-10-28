@@ -34,6 +34,10 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
 
 You can see exactly what was sent in the voice assistant's debug view (Settings → Voice assistants → your assistant → ⋮ → Debug).
 
+## Alerts
+
+Under **Configure**, **Tell these phones when she's worried** lists your phones' companion-app notify actions (`notify.mobile_app_…`). When a worry sensor has been on for two minutes, each phone gets a notification titled **Lena**. With an agent chosen under **Write alerts in her words with**, she writes it herself ("Water under the sink. Go look, now."); without one, or if she takes longer than 45 seconds, it's the plain reason ("Leak sensor is detecting water."). When the sensor clears, an all-clear replaces it, unless you turn **Also tell them when it's sorted** off. Tapping either opens the Lena app, listening.
+
 ## Editing her feelings
 
 `feelings.yaml` holds nothing but her feelings and their descriptions. Edit a description, then reload the integration (Settings → Devices & services → Lena → ⋮ → Reload). Names can be added or removed too: a new one appears in her dropdowns after a reload. See [Her feelings](../personality/Moods.md).
@@ -59,7 +63,8 @@ Returns:
 {
   "context": "## Right now\nIt's Tuesday, October 27, 2026, 6:40 PM.\nAt home: Alex.\n\n## How you feel right now\n...",
   "feelings": {"mood": "Grumpy", "mood_reason": "It just started raining.", "energy": "Steady", "moment": "Nothing", "moment_reason": ""},
-  "memory": ["Alex likes the office at seventy degrees."]
+  "memory": ["Alex likes the office at seventy degrees."],
+  "weather": {"condition": "rainy", "temperature": 52, "unit": "°F"}
 }
 ```
 

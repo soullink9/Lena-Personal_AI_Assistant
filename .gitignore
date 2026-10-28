@@ -25,3 +25,6 @@ secrets.yaml
 # Data folders created by the example compose files
 ollama-data/
 piper-data/
+
+# The wake word models are downloaded at build time (see .github/workflows/build.yml)
+android/app/src/main/assets/wakeword/

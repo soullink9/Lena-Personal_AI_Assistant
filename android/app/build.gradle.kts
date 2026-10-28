@@ -14,8 +14,10 @@ android {
         applicationId = "io.github.soullink9.lena"
         minSdk = 36
         targetSdk = 36
-        versionCode = 18
-        versionName = "2.10.0"
+        versionCode = 19
+        versionName = "2.11.0"
+        // Android 16 phones and tablets are 64-bit; leaving out 32-bit keeps the wake word's native code small.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     // The release key comes from CI secrets (see docs/app/Installation.md). Without it the APK is debug-signed.
@@ -75,4 +77,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // Runs the wake word models on the phone (Google's LiteRT, formerly TensorFlow Lite; no Play services).
+    implementation("com.google.ai.edge.litert:litert:1.4.0")
 }

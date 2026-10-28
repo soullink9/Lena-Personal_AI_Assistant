@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lena as a screen saver; the gear in Android's screen saver settings opens Lena's settings. -->
+<dream xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="io.github.soullink9.lena/.SettingsActivity" />

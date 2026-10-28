@@ -32,6 +32,12 @@ Add the Lena integration first (Settings → Devices & services → Add integrat
 - Her mood only drifts once it has lasted the "A mood lasts at least" time, and then only with the hourly chance you set. Set **Lena Mood** by hand to see her react straight away.
 - Settings → System → Logs, filtered for `lena`, shows what moved her if you turn on debug logging for the integration (Settings → Devices & services → Lena → ⋮ → Enable debug logging).
 
+## Alerts don't arrive
+
+- The phone must appear under **Tell these phones when she's worried**; it does once the Home Assistant companion app is signed in on it. Test it from Developer tools → Actions with `notify.mobile_app_…`.
+- The sensor has to stay on for two minutes before she worries, so a quick blip doesn't wake anyone.
+- Alerts that arrive with the plain reason instead of her words: check the agent under **Write alerts in her words with** answers in Developer tools → Actions → `conversation.process`.
+
 ## Her feelings don't show in Open WebUI or the app
 
 See [Lena in Open WebUI](../open-webui/Setup.md#if-somethings-wrong). In short: the filter must be on and ticked on the `lena` model, its Home Assistant address must work from inside the Open WebUI container, and the integration must be set up. Open `https://<your Home Assistant>/api/lena/context` with the token to test.

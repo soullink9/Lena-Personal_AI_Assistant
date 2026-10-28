@@ -49,6 +49,27 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Display mode: a clock, the weather and Lena, full screen and kept on. -->
+        <activity
+            android:name=".DisplayActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:label="Lena display"
+            android:launchMode="singleTask" />
+
+        <!-- The same display as Android's screen saver (Settings > Display > Screen saver). -->
+        <service
+            android:name=".LenaDream"
+            android:exported="true"
+            android:label="Lena"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data android:name="android.service.dream" android:resource="@xml/lena_dream" />
+        </service>
+
         <!-- The Ask sheet. Handles the assistant gesture (it can also hand off to a call or a new chat)
              and "Share to Lena". Shared text only fills the box; nothing is sent until you tap send. -->
         <activity

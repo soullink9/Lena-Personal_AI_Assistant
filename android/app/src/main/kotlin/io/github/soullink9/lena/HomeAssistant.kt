@@ -30,6 +30,12 @@ class HaAuthException : IOException("Home Assistant token rejected")
 /** How Lena feels right now, from her helpers in Home Assistant. */
 data class Feelings(val mood: String, val moodWhy: String, val energy: String, val moment: String?, val momentWhy: String)
 
+/** The weather at home, from the weather entity chosen in the Lena integration. */
+data class Weather(val condition: String, val temperature: Double?, val unit: String)
+
+/** How she feels and the weather, together, for the display. */
+data class HouseNow(val feelings: Feelings?, val weather: Weather?)
+
 /** One item on her shared memory list. */
 data class HouseMemory(val uid: String, val text: String)
 
@@ -88,21 +94,34 @@ class HomeAssistant(server: String, private val token: String) {
      * How she feels, from the Lena integration's /api/lena/context, or null if the integration
      * isn't set up.
      */
-    suspend fun feelings(): Feelings? {
+    suspend fun feelings(): Feelings? = now()?.feelings
+
+    /** How she feels and the weather, or null if the integration isn't set up. */
+    suspend fun now(): HouseNow? {
         val body = try {
             JSONObject(call("GET", "/api/lena/context?memory=0"))
         } catch (e: IOException) {
             if (e.message == "HTTP 404") return null else throw e
         }
-        val f = body.optJSONObject("feelings") ?: return null
-        val mood = f.optString("mood").ifBlank { return null }
-        return Feelings(
-            mood = mood,
-            moodWhy = f.optString("mood_reason"),
-            energy = f.optString("energy"),
-            moment = f.optString("moment").takeIf { it.isNotBlank() && it != NO_MOMENT },
-            momentWhy = f.optString("moment_reason"),
-        )
+        val feelings = body.optJSONObject("feelings")?.let { f ->
+            f.optString("mood").takeIf { it.isNotBlank() }?.let { mood ->
+                Feelings(
+                    mood = mood,
+                    moodWhy = f.optString("mood_reason"),
+                    energy = f.optString("energy"),
+                    moment = f.optString("moment").takeIf { it.isNotBlank() && it != NO_MOMENT },
+                    momentWhy = f.optString("moment_reason"),
+                )
+            }
+        }
+        val weather = body.optJSONObject("weather")?.let { w ->
+            Weather(
+                condition = w.optString("condition"),
+                temperature = if (w.isNull("temperature")) null else w.optDouble("temperature").takeIf { !it.isNaN() },
+                unit = w.optString("unit").takeIf { !w.isNull("unit") } ?: "",
+            )
+        }
+        return HouseNow(feelings, weather)
     }
 
     private suspend fun todo(service: String, list: String, data: JSONObject = JSONObject(), response: Boolean = false): String =

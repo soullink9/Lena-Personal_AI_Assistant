@@ -49,6 +49,7 @@ Settings → Devices & services → Lena → **Configure**:
 - **Special days calendars:** birthdays, anniversaries or holidays. Anything on them today puts her in a good mood, and she knows why.
 - **Things that worry her:** problem sensors like leaks, smoke or a garage door left open. She's worried until they clear, then relieved.
 - **Her day:** when she wakes up and winds down.
+- **Alerts:** the phones she tells when something worries her (they need the Home Assistant companion app), and your Lena agent, so she writes each alert herself. Tapping an alert opens the Lena app, listening. See [House alerts](../app/How-It-Works.md#house-alerts).
 - **How quickly her feelings move:** the defaults are a good start. See [Her feelings](../personality/Moods.md).
 
 All optional; she still has a day of her own without them.

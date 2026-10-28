@@ -72,6 +72,7 @@ This project builds on, and wouldn't exist without:
 - [Piper](https://docs.linuxserver.io/images/docker-piper/) text-to-speech and [Whisper](https://github.com/openai/whisper) speech-to-text, packaged as containers by [LinuxServer.io](https://www.linuxserver.io/), and the [Wyoming protocol](https://github.com/OHF-Voice/wyoming) the bridge speaks to them.
 - [FFmpeg](https://ffmpeg.org/), which the voice bridge uses to convert audio.
 - Google's open-source [Android Jetpack](https://developer.android.com/jetpack) libraries (Compose, Material 3, WebKit, WorkManager and Glance) and JetBrains' [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines), all Apache License 2.0.
+- [openWakeWord](https://github.com/dscripka/openWakeWord) for the on-phone "Hey Jarvis" wake word (code Apache 2.0; the wake word model CC BY-NC-SA 4.0, for non-commercial use), run with Google's [LiteRT](https://ai.google.dev/edge/litert) (Apache 2.0).
 - Glyphs from Google's [Material Icons](https://github.com/google/material-design-icons) (Apache License 2.0).
 - [curl](https://curl.se/), used by the Ollama watchdog example.
 - The idea of a Jarvis-style assistant comes from the J.A.R.V.I.S. of Marvel's *Iron Man*. Lena is an original character and this project isn't affiliated with Marvel.

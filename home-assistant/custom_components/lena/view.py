@@ -1,7 +1,7 @@
 """GET /api/lena/context: how Lena feels and what she remembers, for Open WebUI and the Lena app.
 
 Any Home Assistant user's long-lived access token can read it; no admin rights needed.
-Add ?memory=0 to leave her memory out, or ?reasons=0 to leave out why she feels the way she does.
+Also carries the weather, for the Lena app's display. Add ?memory=0 to leave her memory out, or ?reasons=0 to leave out why she feels the way she does.
 """
 
 from __future__ import annotations
@@ -38,4 +38,5 @@ class LenaContextView(HomeAssistantView):
                 "moment_reason": f.moment_reason,
             },
             "memory": core.memories(),
+            "weather": core.weather_now(),
         })

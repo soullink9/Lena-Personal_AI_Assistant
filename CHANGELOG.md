@@ -7,6 +7,13 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.11.0 (2026-10-27)
+
+- **Display mode** (Settings → Display mode): the time, date, weather, how she feels and the last thing she said, full screen on black, for a docked phone or a tablet on the wall. Tap to talk. It drifts slightly against burn-in and goes dim and warm at night.
+- **Lena as the screen saver** (Android settings → Display → Screen saver → Lena), so the display appears by itself while the phone charges. Over the lock screen it keeps her reasons and what she said private.
+- **"Hey Jarvis" wake word** in display mode and the screen saver, off by default. It runs entirely on the phone with openWakeWord's models; **Try it** shows how well it hears you. Some phones block the microphone in the screen saver; it says so when that happens.
+- **House alerts on this phone** (Settings → Home Assistant): a 15-minute backup check that tells you when she's worried about something at home. Tapping an alert opens Lena listening.
+
 ### 2.10.0 (2026-10-27)
 
 - **Six looks for talking to Lena** (Settings → Appearance, with **Try it**): the **Sheet** you know; **Glow**, colours running round the screen's edges that follow your voice; **Bar**, a compact bar at the bottom with her answer in a card above it; **Orb**, her logo pulsing in the middle of a darkened screen with her words as captions; **Island**, a small pill at the top whose answer drops down under it; and **Subtitles**, just her words at the bottom of the screen.
@@ -125,6 +132,11 @@ First release.
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
 ## Personality
+
+### 3.1.0 (2026-10-27)
+
+- **Alerts:** the Lena integration (1.1.0) can tell your phones when she's worried, instantly through the Home Assistant companion app, written in her own words by your Lena agent, with an all-clear when it's sorted. Tapping one opens the Lena app listening. Set it up under Configure.
+- `/api/lena/context` now includes the weather, for the app's display mode.
 
 ### 3.0.1 (2026-10-27)
 

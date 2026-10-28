@@ -6,6 +6,7 @@ sensors), applies what the brain decides, saves it, and tells her entities to up
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import uuid
@@ -29,6 +30,9 @@ from homeassistant.util import dt as dt_util
 
 from . import brain
 from .const import (
+    CONF_ALERT_AGENT,
+    CONF_ALERT_ALL_CLEAR,
+    CONF_ALERT_PHONES,
     CONF_AWAY_HOURS,
     CONF_BEDTIME,
     CONF_CALENDARS,
@@ -42,6 +46,7 @@ from .const import (
     CONF_WEATHER_CHANCE,
     CONF_WORRIES,
     DOMAIN,
+    OPEN_LENA,
     SIGNAL_UPDATED,
 )
 
@@ -366,11 +371,17 @@ class LenaCore:
                 self._timers.pop(key, None)
                 state = self.hass.states.get(entity_id)
                 if state and state.state == "on":
-                    self.apply(brain.worried(self.catalog, state.name, state.attributes.get("device_class")), "worry")
+                    change = brain.worried(self.catalog, state.name, state.attributes.get("device_class"))
+                    self.apply(change, "worry")
+                    if change:
+                        self.hass.async_create_task(self.alert(change.moment, change.moment_reason))
 
             self._timers[key] = async_call_later(self.hass, timedelta(minutes=2), still_on)
         elif new.state == "off":
-            self.apply(brain.worry_cleared(self.feelings, self.catalog, new.name, self._worries_on()), "worry cleared")
+            change = brain.worry_cleared(self.feelings, self.catalog, new.name, self._worries_on())
+            self.apply(change, "worry cleared")
+            if change and change.moment != brain.NOTHING:
+                self.hass.async_create_task(self.alert(change.moment, change.moment_reason))
 
     @callback
     def _schedule_fade(self) -> None:
@@ -392,3 +403,64 @@ class LenaCore:
         elif self.feelings.moment != brain.NOTHING:
             # Still worried about something that hasn't cleared: check again later.
             self._timers["fade"] = async_call_later(self.hass, timedelta(minutes=5), self._on_fade)
+
+    # ---- Alerts ------------------------------------------------------------------------------
+
+    async def alert(self, moment: str, reason: str) -> None:
+        """Tell the chosen phones (through the Home Assistant companion app) that she's worried, or
+        that it's sorted. In her own words when an agent is chosen, otherwise the plain reason."""
+        phones = [p for p in self.opt(CONF_ALERT_PHONES) or [] if p.startswith("notify.")]
+        if not phones or (moment != "Worried" and not self.opt(CONF_ALERT_ALL_CLEAR)):
+            return
+        message = await self._in_her_words(moment, reason) or reason
+        worried = moment == "Worried"
+        for phone in phones:
+            service = phone.removeprefix("notify.")
+            if not self.hass.services.has_service("notify", service):
+                _LOGGER.warning("Can't alert %s: there's no such notify action", phone)
+                continue
+            await self.hass.services.async_call("notify", service, {
+                "title": "Lena",
+                "message": message,
+                "data": {
+                    "tag": "lena-alert",  # the all-clear replaces the worry
+                    "clickAction": OPEN_LENA,
+                    "channel": "Lena",
+                    "importance": "high" if worried else "default",
+                    "priority": "high" if worried else "normal",
+                    "ttl": 0,
+                },
+            })
+
+    async def _in_her_words(self, moment: str, reason: str) -> str | None:
+        agent = self.opt(CONF_ALERT_AGENT)
+        if not agent:
+            return None
+        what = f"Something at home needs attention: {reason}" if moment == "Worried" else f"It's sorted: {reason}"
+        prompt = (f"{what} Write the phone notification you'd send the household about it, in your own voice: "
+                  "one or two short sentences, no greeting, no emoji. Reply with only the notification.")
+        try:
+            async with asyncio.timeout(45):
+                result = await self.hass.services.async_call(
+                    "conversation", "process", {"text": prompt, "agent_id": agent},
+                    blocking=True, return_response=True,
+                )
+            response = (result or {}).get("response", {})
+            if response.get("response_type") == "error":
+                return None
+            text = response.get("speech", {}).get("plain", {}).get("speech", "").strip().strip('"')
+            return text[:300] or None
+        except Exception:  # noqa: BLE001 - the plain reason is a fine fallback
+            _LOGGER.debug("Couldn't write the alert in her words", exc_info=True)
+            return None
+
+    def weather_now(self) -> dict[str, Any] | None:
+        """The weather right now, for the Lena app's display."""
+        state = self.hass.states.get(self.weather_entity) if self.weather_entity else None
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+        return {
+            "condition": state.state,
+            "temperature": state.attributes.get("temperature"),
+            "unit": state.attributes.get("temperature_unit"),
+        }
