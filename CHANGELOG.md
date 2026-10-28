@@ -7,6 +7,12 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.10.0 (2026-10-27)
+
+- **Six looks for talking to Lena** (Settings → Appearance, with **Try it**): the **Sheet** you know; **Glow**, colours running round the screen's edges that follow your voice; **Bar**, a compact bar at the bottom with her answer in a card above it; **Orb**, her logo pulsing in the middle of a darkened screen with her words as captions; **Island**, a small pill at the top whose answer drops down under it; and **Subtitles**, just her words at the bottom of the screen.
+- **Six ways to list your chats** in the drawer (Settings → Appearance): rounded groups, flat list, slim groups, title and time, timeline, and folding days.
+- **Swipe right from the left edge to open the drawer** instead of going back (the middle stretch of the edge; Android reserves the rest for back).
+
 ### 2.9.0 (2026-10-27)
 
 - **Works with the Lena integration in Home Assistant.** Her feelings come from it, so any Home Assistant user's token works (no admin rights). **Test connection** says if the integration isn't set up yet.

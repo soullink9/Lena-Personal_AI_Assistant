@@ -16,7 +16,7 @@ Lena is two things working together:
 
 **Drawer**
 - **Lena** at the top, with whether your server is reachable (and its Open WebUI version), and **how she feels** if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
-- **Search** and your **recent chats**, grouped by day, taking up most of the drawer. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
+- **Search** and your **recent chats**, grouped by day, taking up most of the drawer. How they're listed is up to you (Settings → Appearance → Chat list): rounded groups, a flat list, slim groups, title and time, a timeline, or days that fold open. A spinner marks a chat that's still being answered. **Long-press** a chat to rename or delete it (deleting removes it from Open WebUI too).
 - Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
 
 **Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings.
@@ -25,11 +25,24 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 **New chats** use your chosen model (Settings → Model), unless you pick another from the title.
 
-**Back** goes back within Open WebUI, then closes Lena to the background.
+**Back** goes back within Open WebUI, then closes Lena to the background. **Swiping right from the middle of the left edge** opens the drawer instead of going back; Android lets an app take over only part of an edge, so higher or lower on the left edge, and the right edge, still go back.
 
 ## Talking to Lena
 
-The assistant gesture opens a sheet over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
+The assistant gesture opens Lena over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
+
+**How it looks** is your choice (Settings → Appearance → Talking to Lena, with **Try it** to see it):
+
+| Look | What you see |
+|---|---|
+| **Sheet** (default) | A panel from the bottom with the whole conversation. Everything below describes this one. |
+| **Glow** | Lena's colours run around the edges of the screen, brighter as you speak, with a small caption card for your words and her answer. |
+| **Bar** | A compact bar at the bottom to type or talk in; her answer appears in a card above it, with Copy, Open in Lena and New. |
+| **Orb** | The screen darkens (and blurs, on phones that support it), her logo pulses in the middle, and her words appear underneath like captions. Tap the orb to talk or stop her. |
+| **Island** | A small black pill at the top showing what's happening; her answer drops down under it like a notification. Tap her avatar to talk. |
+| **Subtitles** | No panel at all: her words appear at the bottom of the screen over a soft fade, like film subtitles. |
+
+Every look listens, answers, speaks and keeps listening the same way; only the Sheet shows earlier turns. In the others, **⋮** has everything that doesn't fit: type or talk, new conversation, photos, copy, voice call and open in Lena. Tapping empty space closes any of them.
 
 1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her. When you talk (rather than type), Lena tells her the reply will be read aloud, so she answers the way she would in the kitchen: short, plain sentences, no lists or formatting.

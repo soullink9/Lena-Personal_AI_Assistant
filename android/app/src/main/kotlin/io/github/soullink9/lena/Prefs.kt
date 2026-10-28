@@ -20,6 +20,26 @@ enum class Speaking { SERVER, PHONE, OFF }
 /** When the mic opens again after Lena answers a spoken question. */
 enum class FollowUp { ALWAYS, QUESTIONS, OFF }
 
+/** How the drawer lists your chats. */
+enum class ChatListStyle(val label: String, val detail: String) {
+    GROUPS("Rounded groups", "Each day in its own rounded group"),
+    FLAT("Flat list", "Plain rows, only the open chat highlighted. Fits the most."),
+    SLIM("Slim groups", "Rounded groups, but tighter"),
+    TIMED("Title and time", "Plain rows with when you last used each chat"),
+    TIMELINE("Timeline", "Your days on a line down the side"),
+    FOLDING("Folding days", "Tap a day to open or close it"),
+}
+
+/** What talking to Lena looks like over other apps. */
+enum class AskStyle(val label: String, val detail: String) {
+    SHEET("Sheet", "A panel from the bottom with your conversation"),
+    GLOW("Glow", "Light around the edges of the screen that follows your voice, with a small caption"),
+    BAR("Bar", "A small bar at the bottom; her answer pops up in a card above it"),
+    ORB("Orb", "Her logo pulses in the middle of a darkened screen, with her words underneath"),
+    ISLAND("Island", "A small pill at the top; her answer drops down under it"),
+    SUBTITLES("Subtitles", "No panel: her words appear at the bottom like film subtitles"),
+}
+
 /** A prompt Lena sends on her own every day at [hour]:[minute]. */
 data class Schedule(
     val id: String = UUID.randomUUID().toString(),
@@ -48,6 +68,8 @@ data class Settings(
     val widgetMood: Boolean = false,
     val lockScreen: Boolean = false,
     val openWebUiMenus: Boolean = false,
+    val chatList: ChatListStyle = ChatListStyle.GROUPS,
+    val askStyle: AskStyle = AskStyle.SHEET,
 )
 
 /** Her memory to-do list, created by the Lena integration in Home Assistant. */
@@ -151,6 +173,8 @@ object Prefs {
         widgetMood = widgetMood(c),
         lockScreen = lockScreen(c),
         openWebUiMenus = showOpenWebUiMenus(c),
+        chatList = chatList(c),
+        askStyle = askStyle(c),
     )
 
     fun save(c: Context, s: Settings) {
@@ -179,10 +203,18 @@ object Prefs {
             .putBoolean("widget_mood", s.widgetMood)
             .putBoolean("lock_screen", s.lockScreen)
             .putBoolean("show_owui_menus", s.openWebUiMenus)
+            .putString("chat_list", s.chatList.name)
+            .putString("ask_style", s.askStyle.name)
             .apply()
     }
 
     fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", false)
+
+    fun chatList(c: Context): ChatListStyle =
+        runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "GROUPS") }.getOrDefault(ChatListStyle.GROUPS)
+
+    fun askStyle(c: Context): AskStyle =
+        runCatching { AskStyle.valueOf(p(c).getString("ask_style", null) ?: "SHEET") }.getOrDefault(AskStyle.SHEET)
 
     /**
      * A random secret only Lena knows. Lena's own widget and shortcuts include it, so a prompt

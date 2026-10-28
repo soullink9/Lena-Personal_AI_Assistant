@@ -58,6 +58,8 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SmartToy
@@ -105,7 +107,7 @@ class SettingsActivity : ComponentActivity() {
     private enum class Page(val title: String) {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
-        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"),
+        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"),
     }
 
     private lateinit var original: Settings
@@ -209,6 +211,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.QUICK -> QuickPage(s, ::set)
                         Page.SCHEDULED -> ScheduledPage(s, ::set)
                         Page.PHONE -> PhonePage(s, ::set)
+                        Page.APPEARANCE -> AppearancePage(s, ::set)
                     }
                 }
             }
@@ -234,6 +237,7 @@ class SettingsActivity : ComponentActivity() {
                 open(Page.GESTURE)
             }
             Item(Icons.Outlined.RecordVoiceOver, "Voice", voiceLabel(s)) { open(Page.VOICE) }
+            Item(Icons.Outlined.Palette, "Appearance", "${s.askStyle.label} · ${s.chatList.label.lowercase()}") { open(Page.APPEARANCE) }
             Item(Icons.Outlined.Forum, "Conversation",
                 if (s.ongoing) "One ongoing conversation · %,d tokens".format(s.contextTokens) else "A new chat each time") {
                 open(Page.CONVERSATION)
@@ -547,6 +551,22 @@ class SettingsActivity : ComponentActivity() {
         Group {
             Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, call, type, new chat and your quick prompts") { addWidget() }
             Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Start a voice call from the notification shade") { addTile() }
+        }
+    }
+
+    @Composable
+    private fun AppearancePage(s: Settings, set: (Settings) -> Unit) {
+        Section("Talking to Lena") {
+            AskStyle.entries.forEach { a -> ChoiceItem(a.label, a.detail, s.askStyle == a) { set(s.copy(askStyle = a)) } }
+        }
+        Group {
+            Item(Icons.Outlined.PlayArrow, "Try it", "Opens Lena the way your assistant gesture does") {
+                startActivity(AskActivity.intent(this@SettingsActivity, talk = s.assist != AssistAction.TYPE))
+            }
+        }
+        Footnote("Every look listens, answers and speaks the same way. The sheet is the only one that shows earlier turns; the others show what's happening now.")
+        Section("Chat list") {
+            ChatListStyle.entries.forEach { c -> ChoiceItem(c.label, c.detail, s.chatList == c) { set(s.copy(chatList = c)) } }
         }
     }
 

@@ -7,9 +7,9 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
-
 import android.net.Uri
 import android.os.Bundle
+import android.text.format.DateFormat
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -20,16 +20,17 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,11 +50,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
@@ -75,6 +76,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -90,7 +92,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -98,6 +99,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -105,22 +107,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 /** Open WebUI inside a native shell: top bar, drawer with your chats, and the locks around the page. */
 class MainActivity : ComponentActivity() {
@@ -156,6 +169,7 @@ class MainActivity : ComponentActivity() {
     private val currentUrl = mutableStateOf("")
     private val canGoBack = mutableStateOf(false)
     private val showMenus = mutableStateOf(false)
+    private val chatStyle = mutableStateOf(ChatListStyle.GROUPS)
 
     private var pendingMic: PermissionRequest? = null
     private var pendingFiles: ValueCallback<Array<Uri>>? = null
@@ -189,6 +203,7 @@ class MainActivity : ComponentActivity() {
         api = Api(url)
         Prefs.signIn(this).split(" ").filter { it.isNotBlank() }.forEach { signIn += Uri.parse(it) }
         showMenus.value = Prefs.showOpenWebUiMenus(this)
+        chatStyle.value = Prefs.chatList(this)
 
         enableEdgeToEdge()
         web = createWebView()
@@ -377,6 +392,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        chatStyle.value = Prefs.chatList(this) // chosen in Settings → Appearance
         if (::web.isInitialized) {
             web.onResume()
             // "Show Open WebUI's own menus" lives in Settings; pick up a change made there.
@@ -496,7 +512,7 @@ class MainActivity : ComponentActivity() {
                         // Search, then your chats
                         SearchField(query, "Search chats", Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) { query = it }
                         ChatList(
-                            chats, chatsError, query.isNotBlank(), chatId, Modifier.weight(1f),
+                            chats, chatsError, query.isNotBlank(), chatId, chatStyle.value, Modifier.weight(1f),
                             onOpen = { id -> closeThen { openChat(id) } },
                             onRename = { renaming = it },
                             onDelete = { deleting = it },
@@ -672,25 +688,118 @@ class MainActivity : ComponentActivity() {
         error: String?,
         searching: Boolean,
         currentId: String?,
+        style: ChatListStyle,
         modifier: Modifier,
         onOpen: (String) -> Unit,
         onRename: (ChatItem) -> Unit,
         onDelete: (ChatItem) -> Unit,
     ) {
-        LazyColumn(modifier, contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp)) {
+        val folded = remember { mutableStateMapOf<String, Boolean>() } // folding days: which are open
+        val side = when (style) {
+            ChatListStyle.GROUPS, ChatListStyle.SLIM -> 12.dp
+            ChatListStyle.TIMED -> 0.dp
+            else -> 8.dp
+        }
+        LazyColumn(modifier, contentPadding = PaddingValues(start = side, end = side, top = 4.dp, bottom = 12.dp)) {
             when {
                 error != null -> item { Hint(error) }
                 chats == null -> item { Hint("Loading…") }
                 chats.isEmpty() -> item { Hint(if (searching) "No matching chats" else "No chats yet") }
                 else -> {
                     val groups = if (searching) listOf("Results" to chats) else group(chats)
-                    groups.forEach { (label, list) ->
-                        // One rounded group per day, like the rest of the app.
-                        item(key = "g-$label") {
-                            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SectionTitle(label, Modifier.padding(start = 4.dp))
-                                Group {
-                                    list.forEach { c -> ChatRow(c, c.id == currentId, { onOpen(c.id) }, { onRename(c) }, { onDelete(c) }) }
+                    groups.forEachIndexed { index, (label, list) ->
+                        val row: @Composable (ChatItem, @Composable (ChatItem, () -> Unit) -> Unit) -> Unit = { c, look ->
+                            WithChatMenu({ onRename(c) }, { onDelete(c) }) { longPress -> look(c, longPress) }
+                        }
+                        when (style) {
+                            ChatListStyle.GROUPS -> item(key = "g-$label") {
+                                // One rounded group per day, like the rest of the app.
+                                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    SectionTitle(label, Modifier.padding(start = 4.dp))
+                                    Group {
+                                        list.forEach { c ->
+                                            row(c) { it, longPress ->
+                                                Item(
+                                                    icon = null, title = it.title, summary = null,
+                                                    selected = it.id == currentId,
+                                                    container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                    maxTitleLines = 1,
+                                                    trailing = if (it.active) { { Spinner(Modifier.padding(end = 12.dp)) } } else null,
+                                                    onLongClick = longPress,
+                                                    onClick = { onOpen(it.id) },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            ChatListStyle.SLIM -> item(key = "s-$label") {
+                                Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 16.dp, top = 2.dp))
+                                    Column(Modifier.clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                        list.forEach { c ->
+                                            row(c) { it, longPress ->
+                                                ChatLine(it, it.id == currentId, null, 44.dp, 16.dp, RectangleShape,
+                                                    MaterialTheme.colorScheme.surfaceContainerHigh, { onOpen(it.id) }, longPress)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            ChatListStyle.FLAT, ChatListStyle.TIMED -> {
+                                val timed = style == ChatListStyle.TIMED
+                                item(key = "h-$label") {
+                                    Text(
+                                        label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (timed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = if (timed) 20.dp else 12.dp, top = 14.dp, bottom = 4.dp),
+                                    )
+                                }
+                                items(list, key = { it.id }) { c ->
+                                    row(c) { it, longPress ->
+                                        if (timed) ChatLine(it, it.id == currentId, whenLabel(it.updatedMillis), 44.dp, 20.dp, RectangleShape,
+                                            Color.Transparent, { onOpen(it.id) }, longPress)
+                                        else ChatLine(it, it.id == currentId, null, 40.dp, 12.dp, RoundedCornerShape(20.dp),
+                                            Color.Transparent, { onOpen(it.id) }, longPress)
+                                    }
+                                }
+                            }
+                            ChatListStyle.TIMELINE -> item(key = "t-$label") {
+                                val line = MaterialTheme.colorScheme.outlineVariant
+                                val dot = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                val filled = index == 0
+                                Column(
+                                    Modifier.fillMaxWidth()
+                                        .drawBehind {
+                                            val x = 14.dp.toPx()
+                                            val y = 12.dp.toPx()
+                                            val r = 5.dp.toPx()
+                                            drawLine(line, Offset(x, y + r + 4.dp.toPx()), Offset(x, size.height), strokeWidth = 2.dp.toPx())
+                                            if (filled) drawCircle(dot, r, Offset(x, y))
+                                            else drawCircle(dot, r - 1.dp.toPx(), Offset(x, y), style = Stroke(2.dp.toPx()))
+                                        }
+                                        .padding(start = 28.dp, top = 4.dp, bottom = 8.dp),
+                                ) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 10.dp, bottom = 4.dp))
+                                    list.forEach { c ->
+                                        row(c) { it, longPress ->
+                                            ChatLine(it, it.id == currentId, null, 36.dp, 10.dp, RoundedCornerShape(18.dp),
+                                                Color.Transparent, { onOpen(it.id) }, longPress)
+                                        }
+                                    }
+                                }
+                            }
+                            ChatListStyle.FOLDING -> {
+                                val open = folded[label] ?: (searching || label == "Today" || label == "Yesterday")
+                                item(key = "f-$label") { FoldHeader(label, list.size, open) { folded[label] = !open } }
+                                if (open) items(list, key = { it.id }) { c ->
+                                    row(c) { it, longPress ->
+                                        ChatLine(it, it.id == currentId, null, 40.dp, 24.dp, RoundedCornerShape(20.dp),
+                                            Color.Transparent, { onOpen(it.id) }, longPress)
+                                    }
                                 }
                             }
                         }
@@ -700,28 +809,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** A chat in the drawer: tap to open, long-press to rename or delete. */
+    /** Long-press any chat to rename or delete it. */
     @Composable
-    private fun ChatRow(c: ChatItem, selected: Boolean, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+    private fun WithChatMenu(onRename: () -> Unit, onDelete: () -> Unit, content: @Composable (longPress: () -> Unit) -> Unit) {
         var menu by remember { mutableStateOf(false) }
         val haptics = LocalHapticFeedback.current
         Box {
-            Item(
-                icon = null,
-                title = c.title,
-                summary = null,
-                selected = selected,
-                container = MaterialTheme.colorScheme.surfaceContainerHigh,
-                maxTitleLines = 1,
-                trailing = if (c.active) {
-                    { CircularProgressIndicator(Modifier.padding(end = 12.dp).size(14.dp), strokeWidth = 2.dp) }
-                } else null,
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    menu = true
-                },
-                onClick = onOpen,
-            )
+            content {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                menu = true
+            }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
                     text = { Text("Rename") },
@@ -734,6 +831,83 @@ class MainActivity : ComponentActivity() {
                     onClick = { menu = false; onDelete() },
                 )
             }
+        }
+    }
+
+    /** A one-line chat row: the slim, flat, timed, timeline and folding lists. */
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun ChatLine(
+        c: ChatItem, selected: Boolean, time: String?, height: Dp, start: Dp, shape: Shape, idle: Color,
+        onOpen: () -> Unit, onLongClick: () -> Unit,
+    ) {
+        val cs = MaterialTheme.colorScheme
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().height(height).clip(shape)
+                .background(if (selected) cs.secondaryContainer else idle)
+                .combinedClickable(onClick = onOpen, onLongClick = onLongClick)
+                .padding(start = start, end = if (time != null) 20.dp else 12.dp),
+        ) {
+            Text(
+                c.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                color = if (selected) cs.onSecondaryContainer else cs.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            when {
+                c.active -> Spinner(Modifier.padding(start = 12.dp))
+                time != null -> Text(time, style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+
+    /** A day in the folding list: tap to open or close it. */
+    @Composable
+    private fun FoldHeader(label: String, count: Int, open: Boolean, onToggle: () -> Unit) {
+        val turn by animateFloatAsState(if (open) 180f else 0f, label = "fold")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(22.dp))
+                .clickable(onClickLabel = if (open) "Close $label" else "Open $label", onClick = onToggle)
+                .padding(horizontal = 12.dp),
+        ) {
+            Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+            Icon(Icons.Rounded.ExpandMore, null, Modifier.rotate(turn), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    @Composable
+    private fun Spinner(modifier: Modifier = Modifier) {
+        CircularProgressIndicator(modifier.size(14.dp), strokeWidth = 2.dp)
+    }
+
+    /** When a chat was last used: the time today and yesterday, the weekday this week, else the date. */
+    private fun whenLabel(t: Long): String {
+        val day = 24 * 60 * 60 * 1000L
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val date = Date(t)
+        val pattern = { skeleton: String -> SimpleDateFormat(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), Locale.getDefault()) }
+        return when {
+            t >= today - day -> DateFormat.getTimeFormat(this).format(date)
+            t >= today - 6 * day -> pattern("EEE").format(date)
+            Calendar.getInstance().apply { timeInMillis = t }.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR) ->
+                pattern("MMMd").format(date)
+            else -> pattern("yMMMd").format(date)
         }
     }
 

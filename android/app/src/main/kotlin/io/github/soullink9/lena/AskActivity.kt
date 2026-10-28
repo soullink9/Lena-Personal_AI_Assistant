@@ -11,25 +11,32 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
+import android.view.RoundedCorner
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -42,7 +49,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,23 +64,27 @@ import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.OpenInFull
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,19 +96,37 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.appwidget.updateAll
+import kotlin.math.PI
+import kotlin.math.sin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -103,8 +134,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The Ask Lena sheet: talk (or type) to Lena over whatever app you're in, like Google Assistant
- * or Home Assistant's Assist. Answers are real Open WebUI chats, written on your server with your
+ * Ask Lena: talk (or type) to Lena over whatever app you're in, like Google Assistant or Home
+ * Assistant's Assist. [Sheet] holds the conversation; one of six looks (Settings → Appearance)
+ * draws it. Answers are real Open WebUI chats, written on your server with your
  * model's tools; follow-ups continue the same chat, and "Continue in Lena" opens it.
  */
 class AskActivity : ComponentActivity() {
@@ -137,6 +169,7 @@ class AskActivity : ComponentActivity() {
     private var working = false
     private val restart = mutableIntStateOf(0) // bumped when the gesture is used again while the sheet is open
     private var startTalking = false
+    private var style = AskStyle.SHEET
 
     /** Opened over the lock screen and still locked: private mode (see [unlockThen]). */
     private val locked = mutableStateOf(false)
@@ -174,6 +207,12 @@ class AskActivity : ComponentActivity() {
         val auto = intent.getStringExtra(EXTRA_PROMPT)
             ?.takeIf { intent.getStringExtra(EXTRA_KEY) == Prefs.launchKey(this) }
 
+        style = Prefs.askStyle(this)
+        // The orb blurs whatever's behind it, where the phone supports it (otherwise it just darkens).
+        if (style == AskStyle.ORB) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.also { it.blurBehindRadius = 64 }
+        }
         enableEdgeToEdge()
         setContent { LenaTheme { Sheet(shared, auto) } }
     }
@@ -267,12 +306,9 @@ class AskActivity : ComponentActivity() {
         val startedLocked = remember { locked.value }
         val ongoing = remember { Prefs.ongoing(this) && !startedLocked }
         var photo by remember { mutableStateOf<Photo?>(null) }
-        var photoMenu by remember { mutableStateOf(false) }
-        var moreMenu by remember { mutableStateOf(false) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
-        val codeBg = MaterialTheme.colorScheme.surfaceVariant
 
         lateinit var listen: (followUp: Boolean) -> Unit
 
@@ -505,20 +541,343 @@ class AskActivity : ComponentActivity() {
                 else -> runCatching { focus.requestFocus() }
             }
         }
-        val lastAnswerLength = turns.lastOrNull()?.answer?.length ?: 0
-        LaunchedEffect(turns.size, lastAnswerLength) { scroll.animateScrollTo(scroll.maxValue) }
 
-        val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
+        val f = feelings
+        val ui = AskUi(
+            phase = phase,
+            typing = typing,
+            text = text,
+            turns = turns,
+            heard = heard,
+            level = level,
+            note = note,
+            // Locked: her mood, but not the reasons (they can mention people and the house).
+            feelings = if (f != null && locked.value) f.copy(moodWhy = "", momentWhy = "") else f,
+            model = model,
+            chatId = chatId,
+            photo = photo,
+            prompts = prompts,
+            lockedHint = startedLocked && turns.isEmpty(),
+            locked = locked.value,
+            scroll = scroll,
+            focus = focus,
+            onText = { text = it },
+            send = { if (phase == Phase.IDLE) send(text, spoken = false) },
+            sendPrompt = { send(it, spoken = false) },
+            tapOrb = { tapOrb() },
+            toggleTyping = {
+                if (typing) listen(false) else {
+                    job?.takeIf { phase == Phase.LISTENING }?.cancel()
+                    ear?.release()
+                    ear = null
+                    if (phase == Phase.LISTENING) phase = Phase.IDLE
+                    typing = true
+                }
+            },
+            newConversation = {
+                // Start over: the old conversation stays in your history.
+                job?.cancel()
+                mouth?.stop()
+                ear?.finish()
+                turns.clear()
+                chatId = null
+                lastReplyId = null
+                note = null
+                heard = ""
+                if (ongoing) Prefs.setAssistChat(this@AskActivity, null)
+                phase = Phase.IDLE
+                if (!typing) listen(false)
+            },
+            takePhoto = {
+                runCatching { takePhoto.launch(Photos.cameraUri(this@AskActivity)) }
+                    .onFailure { note = "No camera app to take a photo with." }
+            },
+            choosePhoto = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            removePhoto = { photo = null },
+            call = { forward(MainActivity.ACTION_CALL) },
+            open = {
+                val id = chatId
+                if (id != null) openChat(id) else unlockThen {
+                    startActivity(Intent(this@AskActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    finish()
+                }
+            },
+            copy = {
+                turns.lastOrNull()?.let {
+                    getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Lena", Markdown.plain(it.answer)))
+                }
+            },
+            close = { finish() },
+        )
 
+        when (style) {
+            AskStyle.SHEET -> SheetLook(ui)
+            AskStyle.GLOW -> GlowLook(ui)
+            AskStyle.BAR -> BarLook(ui)
+            AskStyle.ORB -> OrbLook(ui)
+            AskStyle.ISLAND -> IslandLook(ui)
+            AskStyle.SUBTITLES -> SubtitlesLook(ui)
+        }
+    }
+
+    /** Everything a look needs: what's happening, and what it can do. All six looks share it. */
+    private class AskUi(
+        val phase: Phase,
+        val typing: Boolean,
+        val text: String,
+        val turns: List<Turn>,
+        val heard: String,
+        val level: Float,
+        val note: String?,
+        val feelings: Feelings?,
+        val model: Model?,
+        val chatId: String?,
+        val photo: Photo?,
+        val prompts: List<String>,
+        val lockedHint: Boolean,
+        val locked: Boolean,
+        val scroll: ScrollState,
+        val focus: FocusRequester,
+        val onText: (String) -> Unit,
+        val send: () -> Unit,
+        val sendPrompt: (String) -> Unit,
+        val tapOrb: () -> Unit,
+        val toggleTyping: () -> Unit,
+        val newConversation: () -> Unit,
+        val takePhoto: () -> Unit,
+        val choosePhoto: () -> Unit,
+        val removePhoto: () -> Unit,
+        val call: () -> Unit,
+        val open: () -> Unit,
+        val copy: () -> Unit,
+        val close: () -> Unit,
+    ) {
+        val last: Turn? get() = turns.lastOrNull()
+        val canSend: Boolean get() = (text.isNotBlank() || photo != null) && phase == Phase.IDLE
+        val answered: Boolean get() = last?.done == true && phase == Phase.IDLE
+
+        /** One line saying what's happening, for the looks that don't show the whole answer. */
+        val status: String
+            get() = when (phase) {
+                Phase.LISTENING -> heard.ifBlank { "Listening…" }
+                Phase.THINKING -> "Thinking…"
+                Phase.SPEAKING -> "Speaking"
+                Phase.IDLE -> if (typing) "Type to Lena" else "Tap to talk"
+            }
+    }
+
+    // ---- Shared pieces ------------------------------------------------------------------------
+
+    /** The answer so far, or a spinner while she thinks. */
+    @Composable
+    private fun Answer(t: Turn, style: TextStyle, ink: Color, codeBg: Color, align: TextAlign = TextAlign.Start) {
+        val shown = Markdown.clean(t.answer)
+        if (!t.done && shown.isBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = ink, strokeWidth = 2.dp)
+                Text(if (t.answer.isBlank()) "Thinking…" else "Using tools…", style = MaterialTheme.typography.bodyMedium, color = ink.copy(alpha = 0.75f))
+            }
+        } else if (shown.isNotBlank()) {
+            Text(Markdown.render(t.answer, codeBg), style = style, color = ink, textAlign = align)
+        }
+    }
+
+    /** Scrolls itself to the end as her answer streams in. */
+    @Composable
+    private fun FollowingScroll(a: AskUi, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+        val scroll = rememberScrollState()
+        val length = a.last?.answer?.length ?: 0
+        LaunchedEffect(a.turns.size, length) { scroll.animateScrollTo(scroll.maxValue) }
+        Column(modifier.verticalScroll(scroll), content = content)
+    }
+
+    /** Problems, and the lock-screen notice. */
+    @Composable
+    private fun Notes(a: AskUi, ink: Color, error: Color, align: TextAlign = TextAlign.Start) {
+        if (a.lockedHint) Text(
+            "Locked: earlier conversations stay hidden and nothing opens until you unlock.",
+            style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = 0.7f), textAlign = align,
+        )
+        a.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = error, textAlign = align) }
+    }
+
+    /** The photo you're about to send, with a way to take it off. */
+    @Composable
+    private fun PhotoChip(a: AskUi, ink: Color) {
+        val p = a.photo ?: return
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(p.preview, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+            Text(
+                if (a.typing) "Photo attached. Ask about it, or just send." else "Photo attached. Tap the mic and ask about it.",
+                style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = 0.8f),
+                modifier = Modifier.weight(1f, fill = false).padding(horizontal = 10.dp),
+            )
+            IconButton(onClick = a.removePhoto) { Icon(Icons.Outlined.Close, "Remove the photo", tint = ink) }
+        }
+    }
+
+    /** Everything that doesn't fit on a small look: talk or type, start over, photos, copy, call, open. */
+    @Composable
+    private fun MoreMenu(a: AskUi, tint: Color, everything: Boolean = true) {
+        var open by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, "More", tint = tint) }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                if (everything) {
+                    DropdownMenuItem(
+                        text = { Text(if (a.typing) "Talk instead" else "Type instead") },
+                        leadingIcon = { Icon(if (a.typing) Icons.Rounded.Mic else Icons.Outlined.Keyboard, null) },
+                        onClick = { open = false; a.toggleTyping() },
+                    )
+                    if (a.turns.isNotEmpty() || a.chatId != null) DropdownMenuItem(
+                        text = { Text("New conversation") },
+                        leadingIcon = { Icon(Icons.Outlined.AddComment, null) },
+                        onClick = { open = false; a.newConversation() },
+                    )
+                    if (!a.locked) {
+                        DropdownMenuItem(
+                            text = { Text("Take a photo") },
+                            leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) },
+                            onClick = { open = false; a.takePhoto() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Choose a photo") },
+                            leadingIcon = { Icon(Icons.Outlined.Image, null) },
+                            onClick = { open = false; a.choosePhoto() },
+                        )
+                    }
+                    if (a.answered) DropdownMenuItem(
+                        text = { Text("Copy her answer") },
+                        leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) },
+                        onClick = { open = false; a.copy() },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Voice call") },
+                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
+                    onClick = { open = false; a.call() },
+                )
+                DropdownMenuItem(
+                    text = { Text(if (a.chatId != null) "Open this chat in Lena" else "Open Lena") },
+                    leadingIcon = { Icon(Icons.Outlined.OpenInFull, null) },
+                    onClick = { open = false; a.open() },
+                )
+            }
+        }
+    }
+
+    /** A rounded box to type in, with your quick prompts above it before you've said anything. */
+    @Composable
+    private fun TypeBar(a: AskUi, modifier: Modifier = Modifier, leading: (@Composable () -> Unit)? = null) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (a.turns.isEmpty() && a.prompts.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    a.prompts.forEach { p ->
+                        AssistChip(
+                            onClick = { a.sendPrompt(p) },
+                            label = { Text(p, maxLines = 1) },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        )
+                    }
+                }
+            }
+            Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                TextField(
+                    value = a.text,
+                    onValueChange = a.onText,
+                    placeholder = { Text(if (a.turns.isEmpty()) "Ask Lena" else "Reply") },
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { a.send() }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    leadingIcon = leading,
+                    trailingIcon = {
+                        IconButton(onClick = a.send, enabled = a.canSend) { Icon(Icons.AutoMirrored.Rounded.Send, "Send") }
+                    },
+                    modifier = Modifier.fillMaxWidth().focusRequester(a.focus),
+                )
+            }
+        }
+    }
+
+    /** The round talk / stop button. */
+    @Composable
+    private fun TalkButton(a: AskUi, size: Dp, container: Color, ink: Color) {
         Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.32f))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { finish() },
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(size).clip(CircleShape).background(container)
+                .clickable(enabled = a.phase != Phase.THINKING, onClick = a.tapOrb),
         ) {
+            when (a.phase) {
+                Phase.THINKING -> CircularProgressIndicator(Modifier.size(size * 0.4f), color = ink, strokeWidth = 2.dp)
+                Phase.SPEAKING -> Icon(Icons.Rounded.Stop, "Stop", tint = ink)
+                Phase.LISTENING -> Icon(Icons.Rounded.Mic, "Done talking", tint = ink)
+                Phase.IDLE -> Icon(Icons.Rounded.Mic, "Talk", tint = ink)
+            }
+        }
+    }
+
+    /** Lena's colours, from her logo. */
+    private val glowColors = listOf(
+        Color(0xFF22D3EE), Color(0xFF3B82F6), Color(0xFFA855F7), Color(0xFFEC4899), Color(0xFFF97316), Color(0xFF22D3EE),
+    )
+
+    /** Bars that move with your voice while she listens, and gently while she speaks. */
+    @Composable
+    private fun Wave(a: AskUi, color: Color, bars: Int = 5, height: Dp = 18.dp, modifier: Modifier = Modifier) {
+        val t = rememberInfiniteTransition(label = "wave")
+        val phase by t.animateFloat(0f, (2 * PI).toFloat(), infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "phase")
+        val loud by animateFloatAsState(
+            when (a.phase) {
+                Phase.LISTENING -> 0.25f + a.level * 0.75f
+                Phase.SPEAKING -> 0.6f
+                Phase.THINKING -> 0.3f
+                Phase.IDLE -> 0.15f
+            },
+            label = "loud",
+        )
+        Canvas(modifier.size(width = (bars * 6).dp, height = height)) {
+            val w = size.width / (bars * 2 - 1)
+            for (i in 0 until bars) {
+                val h = size.height * (0.25f + 0.75f * loud * (0.5f + 0.5f * sin(phase + i * 1.3f)))
+                drawRoundRect(
+                    color,
+                    topLeft = Offset(i * 2 * w, (size.height - h) / 2),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(w / 2, w / 2),
+                )
+            }
+        }
+    }
+
+    /** A tap on empty space closes the look. */
+    private fun Modifier.closesOnTap(a: AskUi): Modifier =
+        this.clickable(interactionSource = MutableInteractionSource(), indication = null, onClick = a.close)
+
+    /** Stops a tap from falling through to [closesOnTap] behind it. */
+    private fun Modifier.keepsTaps(): Modifier =
+        this.clickable(interactionSource = MutableInteractionSource(), indication = null) { }
+
+    // ---- 1. Sheet: the conversation in a panel from the bottom ---------------------------------
+
+    @Composable
+    private fun SheetLook(a: AskUi) {
+        val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
+        val codeBg = MaterialTheme.colorScheme.surfaceVariant
+        val length = a.last?.answer?.length ?: 0
+        LaunchedEffect(a.turns.size, length) { a.scroll.animateScrollTo(a.scroll.maxValue) }
+        var photoMenu by remember { mutableStateOf(false) }
+
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)).closesOnTap(a)) {
             Surface(
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 tonalElevation = 3.dp,
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().keepsTaps(),
             ) {
                 Column(
                     Modifier.navigationBarsPadding().imePadding().heightIn(max = maxHeight)
@@ -533,78 +892,30 @@ class AskActivity : ComponentActivity() {
                         LenaAvatar(36.dp, Modifier.padding(end = 12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Lena", style = MaterialTheme.typography.titleMedium)
-                            val f = feelings
-                            // Locked: her mood, but not the reasons (they can mention people and the house).
-                            if (f != null) FeelingsLine(if (locked.value) f.copy(moodWhy = "", momentWhy = "") else f)
-                            else model?.let {
+                            val f = a.feelings
+                            if (f != null) FeelingsLine(f)
+                            else a.model?.let {
                                 Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (turns.isNotEmpty() || chatId != null) IconButton(onClick = {
-                            // Start over: the old conversation stays in your history.
-                            job?.cancel()
-                            mouth?.stop()
-                            ear?.finish()
-                            turns.clear()
-                            chatId = null
-                            lastReplyId = null
-                            note = null
-                            heard = ""
-                            if (ongoing) Prefs.setAssistChat(this@AskActivity, null)
-                            phase = Phase.IDLE
-                            if (!typing) listen(false)
-                        }) { Icon(Icons.Outlined.AddComment, "New conversation") }
-                        if (!locked.value) Box {
+                        if (a.turns.isNotEmpty() || a.chatId != null) IconButton(onClick = a.newConversation) {
+                            Icon(Icons.Outlined.AddComment, "New conversation")
+                        }
+                        if (!a.locked) Box {
                             IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.AddAPhoto, "Show Lena a photo") }
                             DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
-                                DropdownMenuItem(text = { Text("Take a photo") }, onClick = {
-                                    photoMenu = false
-                                    runCatching { takePhoto.launch(Photos.cameraUri(this@AskActivity)) }
-                                        .onFailure { note = "No camera app to take a photo with." }
-                                })
-                                DropdownMenuItem(text = { Text("Choose a photo") }, onClick = {
-                                    photoMenu = false
-                                    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                })
+                                DropdownMenuItem(text = { Text("Take a photo") }, onClick = { photoMenu = false; a.takePhoto() })
+                                DropdownMenuItem(text = { Text("Choose a photo") }, onClick = { photoMenu = false; a.choosePhoto() })
                             }
                         }
-                        IconButton(onClick = {
-                            if (typing) listen(false) else {
-                                job?.takeIf { phase == Phase.LISTENING }?.cancel()
-                                ear?.release()
-                                ear = null
-                                if (phase == Phase.LISTENING) phase = Phase.IDLE
-                                typing = true
-                            }
-                        }) {
-                            Icon(if (typing) Icons.Rounded.Mic else Icons.Outlined.Keyboard, if (typing) "Talk" else "Type")
+                        IconButton(onClick = a.toggleTyping) {
+                            Icon(if (a.typing) Icons.Rounded.Mic else Icons.Outlined.Keyboard, if (a.typing) "Talk" else "Type")
                         }
                         // Less-used actions, out of the way so her name and mood have room.
-                        Box {
-                            IconButton(onClick = { moreMenu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
-                            DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Voice call") },
-                                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
-                                    onClick = { moreMenu = false; forward(MainActivity.ACTION_CALL) },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(if (chatId != null) "Open this chat in Lena" else "Open Lena") },
-                                    leadingIcon = { Icon(Icons.Outlined.OpenInFull, null) },
-                                    onClick = {
-                                        moreMenu = false
-                                        val id = chatId
-                                        if (id != null) openChat(id) else unlockThen {
-                                            startActivity(Intent(this@AskActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                            finish()
-                                        }
-                                    },
-                                )
-                            }
-                        }
+                        MoreMenu(a, MaterialTheme.colorScheme.onSurfaceVariant, everything = false)
                     }
 
-                    if (startedLocked && turns.isEmpty()) {
+                    if (a.lockedHint) {
                         Text(
                             "Your phone is locked, so earlier conversations stay hidden and she won't open or unlock anything. Unlock to see everything.",
                             style = MaterialTheme.typography.bodySmall,
@@ -614,9 +925,9 @@ class AskActivity : ComponentActivity() {
                     }
 
                     // The conversation so far
-                    if (turns.isNotEmpty()) {
-                        Column(Modifier.weight(1f, fill = false).verticalScroll(scroll).padding(end = 8.dp)) {
-                            turns.forEachIndexed { i, t ->
+                    if (a.turns.isNotEmpty()) {
+                        Column(Modifier.weight(1f, fill = false).verticalScroll(a.scroll).padding(end = 8.dp)) {
+                            a.turns.forEachIndexed { i, t ->
                                 Spacer(Modifier.height(if (i == 0) 8.dp else 16.dp))
                                 t.image?.let {
                                     Image(it, "Your photo", contentScale = ContentScale.Crop,
@@ -624,37 +935,21 @@ class AskActivity : ComponentActivity() {
                                 }
                                 Text(t.question, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
-                                val shown = Markdown.clean(t.answer)
-                                if (!t.done && shown.isBlank()) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                        Text(
-                                            if (t.answer.isBlank()) "Thinking…" else "Using tools…",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                } else if (shown.isNotBlank()) {
-                                    Text(Markdown.render(t.answer, codeBg), style = MaterialTheme.typography.bodyLarge)
-                                }
+                                Answer(t, MaterialTheme.typography.bodyLarge, MaterialTheme.colorScheme.onSurface, codeBg)
                             }
                         }
                     }
 
-                    note?.let {
+                    a.note?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 8.dp))
                     }
 
                     // Continue / copy once there's an answer
-                    val last = turns.lastOrNull()
-                    if (last != null && last.done && phase == Phase.IDLE) {
+                    if (a.answered) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                            chatId?.let { id -> TextButton(onClick = { openChat(id) }) { Text("Continue in Lena") } }
-                            TextButton(onClick = {
-                                getSystemService(ClipboardManager::class.java)
-                                    .setPrimaryClip(ClipData.newPlainText("Lena", Markdown.plain(last.answer)))
-                            }) {
+                            if (a.chatId != null) TextButton(onClick = a.open) { Text("Continue in Lena") }
+                            TextButton(onClick = a.copy) {
                                 Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Copy")
@@ -662,44 +957,10 @@ class AskActivity : ComponentActivity() {
                         }
                     }
 
-                    photo?.let { p ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                            Image(p.preview, null, contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
-                            Text(
-                                if (typing) "Photo attached. Ask about it, or just send." else "Photo attached. Tap the mic and ask about it.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                            )
-                            IconButton(onClick = { photo = null }) { Icon(Icons.Outlined.Close, "Remove the photo") }
-                        }
-                    }
+                    if (a.photo != null) Box(Modifier.padding(top = 8.dp)) { PhotoChip(a, MaterialTheme.colorScheme.onSurface) }
 
-                    if (typing) {
-                        if (turns.isEmpty() && prompts.isNotEmpty()) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp, end = 8.dp)) {
-                                prompts.forEach { p -> AssistChip(onClick = { send(p, spoken = false) }, label = { Text(p, maxLines = 1) }) }
-                            }
-                        }
-                        OutlinedTextField(
-                            value = text,
-                            onValueChange = { text = it },
-                            placeholder = { Text(if (turns.isEmpty()) "Ask anything" else "Reply") },
-                            shape = RoundedCornerShape(28.dp),
-                            maxLines = 5,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { if (phase == Phase.IDLE) send(text, spoken = false) }),
-                            trailingIcon = {
-                                IconButton(onClick = { send(text, spoken = false) }, enabled = (text.isNotBlank() || photo != null) && phase == Phase.IDLE) {
-                                    Icon(Icons.AutoMirrored.Rounded.Send, "Send")
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, end = 8.dp).focusRequester(focus),
-                        )
-                    } else {
-                        VoiceBar(phase, heard, level, onTap = { tapOrb() })
-                    }
+                    if (a.typing) TypeBar(a, Modifier.padding(top = 12.dp, end = 8.dp))
+                    else VoiceBar(a.phase, a.heard, a.level, onTap = a.tapOrb)
                 }
             }
         }
@@ -757,6 +1018,371 @@ class AskActivity : ComponentActivity() {
                 }
             }
             Spacer(Modifier.height(8.dp))
+        }
+    }
+
+    // ---- 2. Glow: light around the edges of the screen, like Siri ------------------------------
+
+    @Composable
+    private fun GlowLook(a: AskUi) {
+        val view = LocalView.current
+        val density = LocalDensity.current
+        // Follow the screen's own rounded corners, so the glow hugs the glass.
+        val corner = remember(view) {
+            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat()
+        } ?: with(density) { 36.dp.toPx() }
+        val spin = rememberInfiniteTransition(label = "spin")
+        val turn by spin.animateFloat(
+            0f, 360f,
+            infiniteRepeatable(tween(if (a.phase == Phase.THINKING) 1400 else 4200, easing = LinearEasing)),
+            label = "turn",
+        )
+        val breathe by spin.animateFloat(0.75f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "breathe")
+        val strength by animateFloatAsState(
+            when (a.phase) {
+                Phase.LISTENING -> 0.55f + a.level * 0.45f
+                Phase.THINKING -> 0.8f
+                Phase.SPEAKING -> breathe
+                Phase.IDLE -> 0.45f
+            },
+            animationSpec = tween(180), label = "strength",
+        )
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)).closesOnTap(a)) {
+            // Soft outer glow, then a crisp line on the edge.
+            Canvas(Modifier.fillMaxSize().blur(28.dp, BlurredEdgeTreatment.Unbounded)) {
+                drawGlowFrame(turn, corner, with(density) { (14 + 22 * strength).dp.toPx() }, strength)
+            }
+            Canvas(Modifier.fillMaxSize()) { drawGlowFrame(turn, corner, with(density) { 3.dp.toPx() }, strength) }
+
+            // A small floating caption above the navigation bar.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 20.dp),
+            ) {
+                val showCard = a.turns.isNotEmpty() || a.phase == Phase.LISTENING || a.note != null || a.lockedHint || a.photo != null
+                if (showCard) Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                    modifier = Modifier.fillMaxWidth().keepsTaps(),
+                ) {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val last = a.last
+                        when {
+                            a.phase == Phase.LISTENING -> Text(a.heard.ifBlank { "Listening…" }, style = MaterialTheme.typography.titleMedium,
+                                color = if (a.heard.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            last != null -> {
+                                Text(last.question, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                FollowingScroll(a, Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.4f).dp)) {
+                                    Answer(last, MaterialTheme.typography.bodyLarge, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.surfaceVariant)
+                                }
+                            }
+                        }
+                        PhotoChip(a, MaterialTheme.colorScheme.onSurface)
+                        Notes(a, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.error)
+                    }
+                }
+                if (a.typing) TypeBar(a, Modifier.keepsTaps(), leading = { MoreMenu(a, MaterialTheme.colorScheme.onSurfaceVariant) })
+                else Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.keepsTaps(),
+                ) {
+                    MoreMenu(a, Color.White)
+                    TalkButton(a, 56.dp, Color.White.copy(alpha = 0.92f), Color.Black)
+                    IconButton(onClick = a.toggleTyping) { Icon(Icons.Outlined.Keyboard, "Type", tint = Color.White) }
+                }
+            }
+        }
+    }
+
+    /** Lena's colours swept round the screen's edge, turning with [turn]. */
+    private fun DrawScope.drawGlowFrame(turn: Float, corner: Float, width: Float, strength: Float) {
+        drawRoundRect(
+            brush = Brush.sweepGradient(glowColors.shifted(turn), center = center),
+            topLeft = Offset(width / 2, width / 2),
+            size = Size(size.width - width, size.height - width),
+            cornerRadius = CornerRadius(corner, corner),
+            style = Stroke(width),
+            alpha = strength.coerceIn(0f, 1f),
+        )
+    }
+
+    /** The colour wheel turned by [degrees]: the same colours, starting further round. */
+    private fun List<Color>.shifted(degrees: Float): List<Color> {
+        val steps = size - 1 // the last colour repeats the first, closing the circle
+        val f = ((degrees / 360f) * steps) % steps
+        val whole = f.toInt()
+        val part = f - whole
+        val ring = dropLast(1)
+        return (0..steps).map { i -> lerp(ring[(i + whole) % ring.size], ring[(i + whole + 1) % ring.size], part) }
+    }
+
+    // ---- 3. Bar: a compact bar at the bottom, like Google's assistant ---------------------------
+
+    @Composable
+    private fun BarLook(a: AskUi) {
+        var photoMenu by remember { mutableStateOf(false) }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).closesOnTap(a)) {
+            Surface(
+                shape = RoundedCornerShape(32.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 2.dp,
+                shadowElevation = 8.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .navigationBarsPadding().imePadding().padding(12.dp).keepsTaps(),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Her answer, in a card that grows above the bar.
+                    val last = a.last
+                    if (last != null) Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                LenaAvatar(22.dp)
+                                Text(last.question, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            }
+                            FollowingScroll(a, Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.45f).dp)) {
+                                Answer(last, MaterialTheme.typography.bodyLarge, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.surfaceVariant)
+                            }
+                            if (a.answered) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AssistChip(onClick = a.copy, label = { Text("Copy") }, leadingIcon = { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)) })
+                                if (a.chatId != null) AssistChip(onClick = a.open, label = { Text("Open in Lena") },
+                                    leadingIcon = { Icon(Icons.Outlined.OpenInFull, null, Modifier.size(18.dp)) })
+                                AssistChip(onClick = a.newConversation, label = { Text("New") },
+                                    leadingIcon = { Icon(Icons.Outlined.AddComment, null, Modifier.size(18.dp)) })
+                            }
+                        }
+                    }
+                    PhotoChip(a, MaterialTheme.colorScheme.onSurface)
+                    Notes(a, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.error)
+
+                    // The bar: listening shows your words and a wave; otherwise a box to type in.
+                    if (a.phase == Phase.LISTENING) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 18.dp, end = 6.dp),
+                        ) {
+                            Wave(a, MaterialTheme.colorScheme.primary)
+                            Text(a.heard.ifBlank { "Listening…" }, style = MaterialTheme.typography.bodyLarge, maxLines = 2,
+                                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                                color = if (a.heard.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            TalkButton(a, 44.dp, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TypeBar(
+                                a, Modifier.weight(1f),
+                                leading = if (a.locked) null else ({
+                                    Box {
+                                        IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.AddAPhoto, "Show Lena a photo") }
+                                        DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
+                                            DropdownMenuItem(text = { Text("Take a photo") }, onClick = { photoMenu = false; a.takePhoto() })
+                                            DropdownMenuItem(text = { Text("Choose a photo") }, onClick = { photoMenu = false; a.choosePhoto() })
+                                        }
+                                    }
+                                }),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            TalkButton(
+                                a, 52.dp,
+                                if (a.phase == Phase.SPEAKING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                                if (a.phase == Phase.SPEAKING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            MoreMenu(a, MaterialTheme.colorScheme.onSurfaceVariant, everything = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- 4. Orb: her logo, alive in the middle of the screen ------------------------------------
+
+    @Composable
+    private fun OrbLook(a: AskUi) {
+        val white = Color.White
+        val dim = Color.White.copy(alpha = 0.7f)
+        val pulse = rememberInfiniteTransition(label = "orb")
+        val breathe by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1600), RepeatMode.Reverse), label = "breathe")
+        val ripple by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "ripple")
+        val grow by animateFloatAsState(
+            when (a.phase) {
+                Phase.LISTENING -> 1f + a.level * 0.3f
+                Phase.SPEAKING -> 1f + breathe * 0.08f
+                Phase.THINKING -> 0.9f + breathe * 0.05f
+                Phase.IDLE -> 1f
+            },
+            label = "grow",
+        )
+        val accent = glowColors[2]
+
+        Box(Modifier.fillMaxSize().background(Color(0xE6050513)).closesOnTap(a)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 24.dp),
+            ) {
+                // Who, and how she feels
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 24.dp)) {
+                    Text("Lena", style = MaterialTheme.typography.titleLarge, color = white)
+                    a.feelings?.let { f ->
+                        Text(listOfNotNull(f.mood, f.energy.ifBlank { null }, f.moment).joinToString(" · "),
+                            style = MaterialTheme.typography.labelLarge, color = dim)
+                    }
+                }
+                Spacer(Modifier.weight(0.8f))
+
+                // The orb, with rings that spread while she listens or speaks
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val base = 70.dp.toPx() * grow
+                        val active = a.phase == Phase.LISTENING || a.phase == Phase.SPEAKING
+                        drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.55f), Color.Transparent), radius = base * 1.9f), base * 1.9f)
+                        if (active) for (k in 0..1) {
+                            val p = (ripple + k * 0.5f) % 1f
+                            drawCircle(glowColors[k * 3].copy(alpha = (1 - p) * 0.5f), base * (1f + p * 0.8f), style = Stroke(2.dp.toPx()))
+                        }
+                    }
+                    Box(
+                        Modifier.size(140.dp).graphicsLayer { scaleX = grow; scaleY = grow }.clip(CircleShape)
+                            .clickable(enabled = a.phase != Phase.THINKING, onClickLabel = "Talk or stop", onClick = a.tapOrb),
+                    ) { LenaAvatar(140.dp) }
+                }
+                Spacer(Modifier.height(24.dp))
+
+                // Her words, as captions
+                val last = a.last
+                FollowingScroll(a, Modifier.weight(1f).fillMaxWidth()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        when {
+                            a.phase == Phase.LISTENING -> Text(a.heard.ifBlank { "Listening…" }, style = MaterialTheme.typography.headlineSmall,
+                                color = if (a.heard.isBlank()) dim else white, textAlign = TextAlign.Center)
+                            last != null -> Answer(last, MaterialTheme.typography.titleLarge, white, Color.White.copy(alpha = 0.12f), TextAlign.Center)
+                            else -> Text(if (a.typing) "Type to Lena" else "Tap me to talk", style = MaterialTheme.typography.titleMedium,
+                                color = dim, textAlign = TextAlign.Center)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        PhotoChip(a, white)
+                        Notes(a, white, Color(0xFFFFB4AB), TextAlign.Center)
+                    }
+                }
+
+                if (a.typing) TypeBar(a, Modifier.padding(bottom = 12.dp).keepsTaps(), leading = { MoreMenu(a, MaterialTheme.colorScheme.onSurfaceVariant) })
+                else Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    modifier = Modifier.padding(bottom = 16.dp).keepsTaps(),
+                ) {
+                    IconButton(onClick = a.toggleTyping) { Icon(Icons.Outlined.Keyboard, "Type", tint = white) }
+                    IconButton(onClick = a.close) { Icon(Icons.Outlined.Close, "Close", tint = white) }
+                    MoreMenu(a, white)
+                }
+            }
+        }
+    }
+
+    // ---- 5. Island: a small pill at the top that grows into a card -------------------------------
+
+    @Composable
+    private fun IslandLook(a: AskUi) {
+        val ink = Color.White
+        val last = a.last
+        val expanded = last != null || a.note != null || a.lockedHint || a.photo != null
+        Box(Modifier.fillMaxSize().closesOnTap(a)) {
+            Surface(
+                shape = RoundedCornerShape(if (expanded) 32.dp else 28.dp),
+                color = Color.Black,
+                shadowElevation = 12.dp,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp, start = 12.dp, end = 12.dp)
+                    .animateContentSize().then(if (expanded) Modifier.fillMaxWidth() else Modifier.widthIn(min = 220.dp)).keepsTaps(),
+            ) {
+                Column(Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.clip(CircleShape).clickable(enabled = a.phase != Phase.THINKING, onClickLabel = "Talk or stop", onClick = a.tapOrb)) {
+                            LenaAvatar(32.dp)
+                        }
+                        Text(
+                            if (a.phase == Phase.IDLE && last?.done == true) "Lena" else a.status,
+                            style = MaterialTheme.typography.titleSmall, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = expanded),
+                        )
+                        if (a.phase == Phase.THINKING) CircularProgressIndicator(Modifier.size(16.dp), color = glowColors[0], strokeWidth = 2.dp)
+                        else Wave(a, glowColors[0], bars = 4, height = 16.dp)
+                        MoreMenu(a, ink)
+                    }
+                    if (expanded) Column(
+                        Modifier.padding(start = 6.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (last != null) FollowingScroll(a, Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.45f).dp)) {
+                            Text(last.question, style = MaterialTheme.typography.bodySmall, color = ink.copy(alpha = 0.6f), maxLines = 2)
+                            Spacer(Modifier.height(6.dp))
+                            Answer(last, MaterialTheme.typography.bodyLarge, ink, Color.White.copy(alpha = 0.14f))
+                        }
+                        PhotoChip(a, ink)
+                        Notes(a, ink, Color(0xFFFFB4AB))
+                        if (a.answered) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = a.tapOrb) { Text("Reply", color = glowColors[0]) }
+                            TextButton(onClick = a.copy) { Text("Copy", color = glowColors[0]) }
+                            if (a.chatId != null) TextButton(onClick = a.open) { Text("Open", color = glowColors[0]) }
+                        }
+                    }
+                }
+            }
+            if (a.typing) TypeBar(
+                a, Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().imePadding().padding(12.dp).keepsTaps(),
+            )
+        }
+    }
+
+    // ---- 6. Subtitles: her words at the bottom of the screen, nothing else ----------------------
+
+    @Composable
+    private fun SubtitlesLook(a: AskUi) {
+        val ink = Color.White
+        val shadow = Shadow(Color.Black, Offset(0f, 2f), 8f)
+        val last = a.last
+        Box(Modifier.fillMaxSize().closesOnTap(a)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f), Color.Black.copy(alpha = 0.88f))))
+                    .navigationBarsPadding().imePadding().padding(start = 24.dp, end = 24.dp, top = 96.dp, bottom = 12.dp),
+            ) {
+                Text("LENA", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 3.sp, shadow = shadow), color = glowColors[0])
+                FollowingScroll(a, Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.4f).dp).fillMaxWidth()) {
+                    val big = MaterialTheme.typography.titleLarge.copy(shadow = shadow, lineHeight = 30.sp)
+                    when {
+                        a.phase == Phase.LISTENING -> Text(
+                            a.heard.ifBlank { "Listening…" }, style = big.copy(fontStyle = FontStyle.Italic),
+                            color = ink.copy(alpha = 0.75f), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                        )
+                        last != null -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Answer(last, big, ink, Color.White.copy(alpha = 0.16f), TextAlign.Center)
+                        }
+                        else -> Text(if (a.typing) "Type to Lena" else "Tap the mic to talk", style = big, color = ink.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                PhotoChip(a, ink)
+                Notes(a, ink, Color(0xFFFFB4AB), TextAlign.Center)
+                if (a.typing) TypeBar(a, Modifier.keepsTaps(), leading = { MoreMenu(a, MaterialTheme.colorScheme.onSurfaceVariant) })
+                else Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.keepsTaps(),
+                ) {
+                    IconButton(onClick = a.toggleTyping) { Icon(Icons.Outlined.Keyboard, "Type", tint = ink.copy(alpha = 0.8f)) }
+                    Box(contentAlignment = Alignment.Center) {
+                        TalkButton(a, 48.dp, Color.White.copy(alpha = 0.16f), ink)
+                    }
+                    MoreMenu(a, ink.copy(alpha = 0.8f))
+                }
+            }
         }
     }
 }
