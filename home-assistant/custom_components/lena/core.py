@@ -173,6 +173,8 @@ class LenaCore:
             f.energy = change.energy
         if change.mood and change.mood != f.mood:
             f.mood, f.mood_reason, f.mood_since = change.mood, change.mood_reason, now
+        elif change.reason is not None:
+            f.mood_reason = change.reason
         if change.moment is not None:
             f.moment = change.moment
             f.moment_reason = change.moment_reason if change.moment != brain.NOTHING else ""
@@ -269,6 +271,13 @@ class LenaCore:
         state = self.hass.states.get(self.weather_entity) if self.weather_entity else None
         return state.state if state else None
 
+    def _daylight(self) -> bool:
+        """Whether the sun's up: Home Assistant's sun, or the clock if that's not there."""
+        sun = self.hass.states.get("sun.sun")
+        if sun and sun.state in ("above_horizon", "below_horizon"):
+            return sun.state == "above_horizon"
+        return 7 <= dt_util.now().hour < 19
+
     def _home_counts(self) -> tuple[int, int]:
         states = [self.hass.states.get(p) for p in self.people]
         return sum(1 for s in states if s and s.state == STATE_HOME), len(self.people)
@@ -293,7 +302,8 @@ class LenaCore:
                             special.append(summary)
             except Exception:  # noqa: BLE001 - a calendar problem shouldn't stop her waking up
                 _LOGGER.warning("Couldn't read the special days calendars", exc_info=True)
-        self.apply(brain.morning(self.feelings, self.catalog, special, self._weather(), self._rng), "morning")
+        self.apply(brain.morning(self.feelings, self.catalog, special, self._weather(), self._rng, self._daylight()),
+                   "morning")
 
     @callback
     def _on_bedtime(self, now: datetime) -> None:
@@ -306,6 +316,7 @@ class LenaCore:
         change = brain.hourly(
             self.feelings, self.catalog, dt_util.now(), wake, bed, self._weather(), home, total,
             float(self.opt(CONF_MOOD_HOLD_HOURS)), int(self.opt(CONF_MOOD_CHANGE_CHANCE)), self._rng,
+            self._daylight(),
         )
         self.apply(change, "hourly")
 
@@ -352,7 +363,7 @@ class LenaCore:
             self._timers.pop("weather", None)
             if self._weather() == after:
                 change = brain.weather_turned(self.feelings, self.catalog, before, after,
-                                              int(self.opt(CONF_WEATHER_CHANCE)), self._rng)
+                                              int(self.opt(CONF_WEATHER_CHANCE)), self._rng, self._daylight())
                 self.apply(change, "weather")
 
         self._timers["weather"] = async_call_later(self.hass, timedelta(minutes=15), settled)

@@ -10,7 +10,7 @@ Lena's feelings change for real reasons: the time of day, the weather, people co
 | **Energy** | Follows her day | Waking up, the afternoon, bedtime |
 | **Moment** | A few minutes | Something that just happened: someone came home, a leak, a thank-you, an insult |
 
-Mood and Moment come with a **reason**, so she knows *why* she feels that way and can mention it naturally ("this rain has me in a mood").
+Mood and Moment come with a **reason**, so she knows *why* she feels that way and can mention it naturally ("this rain has me in a mood"). A mood's reason is checked every hour: "It just started raining" becomes "It's raining." after an hour, and a reason that's stopped being true is dropped, while the mood itself lingers.
 
 ## Only the current feeling reaches her
 
@@ -44,7 +44,7 @@ How she acts on it is part of her baseline in the Modelfile: show it, don't anno
 | **Every hour** | Energy follows her day: groggy just after waking, steady or wired through the day, a dip after lunch, drained near bedtime. Once her mood has lasted a few hours, it may drift, but only to a **neighbouring** mood, so she changes gradually the way a person does. Her energy, the weather and the house pull her toward some moods: rain toward Wistful or cozy-Content, everyone home toward Fond, an empty house toward Restless. |
 | **Someone comes home** after hours away | Moment: Delighted, with who and how long. After a day or more, her mood turns Fond. |
 | **The house is empty** for hours | Mood: Restless or Wistful. |
-| **The weather turns** (rain, storm, snow, sun, fog, wind) and stays that way for a quarter of an hour | She may react: a storm can make her Uneasy, snow Cheerful. |
+| **The weather turns** (rain, storm, snow, sun, a clear night, fog, wind) and stays that way for a quarter of an hour | She may react: a storm can make her Uneasy, snow Cheerful. After dark, "sunny" counts as a clear night (she checks Home Assistant's sun), and sunset itself isn't news. |
 | **A worry sensor turns on** (leak, smoke, a door left open) for two minutes | Moment: Worried, naming what. It stays until the sensor clears, then she's Relieved. |
 | **Someone treats her a certain way** | She records her own moment with her `record_feeling` tool (Pleased, Amused, Proud, Touched, Delighted, Exasperated, Offended), in Home Assistant or Open WebUI. |
 | **Bedtime** | She's Drained. |

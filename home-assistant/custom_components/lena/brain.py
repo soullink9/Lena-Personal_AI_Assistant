@@ -54,24 +54,34 @@ WEATHER_GROUPS = {
     "rainy": "rain", "pouring": "rain",
     "lightning": "storm", "lightning-rainy": "storm", "hail": "storm",
     "snowy": "snow", "snowy-rainy": "snow",
-    "sunny": "sun", "fog": "fog", "windy": "wind", "windy-variant": "wind",
+    "sunny": "sun", "clear-night": "clear", "fog": "fog", "windy": "wind", "windy-variant": "wind",
 }
+# Sunshine and a clear night sky are the same weather, by day and by night.
+CLEAR_SKIES = {"sun", "clear"}
 WEATHER_PULL = {
     "rain": ["Wistful", "Content", "Fond"],
     "storm": ["Uneasy", "Restless", "Curious"],
     "snow": ["Cheerful", "Fond", "Playful"],
     "sun": ["Cheerful", "Playful", "Content"],
+    "clear": ["Content", "Wistful", "Curious"],
     "fog": ["Wistful", "Curious"],
     "wind": ["Restless", "Uneasy"],
 }
 WEATHER_WHY = {
     "rain": "It's raining.", "storm": "There's a storm outside.", "snow": "It's snowing.",
-    "sun": "It's sunny out.", "fog": "It's foggy out.", "wind": "It's blowing a gale outside.",
+    "sun": "It's sunny out.", "clear": "It's a clear night.", "fog": "It's foggy out.",
+    "wind": "It's blowing a gale outside.",
 }
 WEATHER_STARTS = {
     "rain": "It just started raining.", "storm": "A storm just rolled in.", "snow": "It just started snowing.",
-    "sun": "The sun just came out.", "fog": "Fog just rolled in.", "wind": "The wind just picked up.",
+    "sun": "The sun just came out.", "clear": "The sky just cleared.", "fog": "Fog just rolled in.",
+    "wind": "The wind just picked up.",
 }
+# Which weather a reason is about, so it can be checked later.
+_WEATHER_OF_REASON = {**{v: k for k, v in WEATHER_WHY.items()}, **{v: k for k, v in WEATHER_STARTS.items()}}
+HOUSE_EMPTY_WHY = "The house is empty."
+HOUSE_EMPTY_LONG_WHY = "The house has been empty for hours."
+EVERYONE_HOME_WHY = "Everyone's home."
 
 # What a worry sensor means, by its device class.
 WORRY_WORDS = {
@@ -117,9 +127,11 @@ class Change:
     energy: str | None = None
     moment: str | None = None
     moment_reason: str = ""
+    # A new reason for the mood she's already in (it went stale); None leaves it alone.
+    reason: str | None = None
 
     def __bool__(self) -> bool:
-        return self.mood is not None or self.energy is not None or self.moment is not None
+        return self.mood is not None or self.energy is not None or self.moment is not None or self.reason is not None
 
 
 @dataclass
@@ -145,17 +157,49 @@ def _pick(pool: list[str], known: dict[str, str], avoid: str | None, rng: random
     return rng.choice(choices) if choices else None
 
 
-def weather_group(condition: str | None) -> str | None:
-    return WEATHER_GROUPS.get(condition or "")
+def weather_group(condition: str | None, daylight: bool = True) -> str | None:
+    """The kind of weather she notices. Some weather services still say "sunny" after dark; that's a clear night."""
+    group = WEATHER_GROUPS.get(condition or "")
+    if group in CLEAR_SKIES:
+        return "sun" if daylight and condition == "sunny" else "clear"
+    return group
+
+
+def _same_weather(a: str | None, b: str | None) -> bool:
+    return a == b or (a in CLEAR_SKIES and b in CLEAR_SKIES)
+
+
+def still_true(
+    f: Feelings, now: datetime, weather: str | None, daylight: bool, people_home: int, people_total: int, energy: str,
+) -> str:
+    """Her mood's reason as it stands now: news ("it just started raining") becomes how things are once an
+    hour has passed, and a reason that's no longer true (the sun's gone down, someone came home) is dropped.
+    The mood itself stays; moods linger after their cause."""
+    reason = f.mood_reason
+    age = (now - f.mood_since).total_seconds() / 3600 if f.mood_since else 99
+    if (was := _WEATHER_OF_REASON.get(reason)) is not None:
+        group = weather_group(weather, daylight)
+        if not _same_weather(was, group):
+            return ""
+        if reason == WEATHER_STARTS.get(was) and age < 1:
+            return reason
+        return WEATHER_WHY[group]
+    if reason in (HOUSE_EMPTY_WHY, HOUSE_EMPTY_LONG_WHY) and people_home > 0:
+        return ""
+    if reason == EVERYONE_HOME_WHY and not (people_total > 1 and people_home == people_total):
+        return ""
+    if reason in ENERGY_WHY.values() and reason != ENERGY_WHY.get(energy):
+        return ""
+    return reason
 
 
 def _house_pull(people_home: int, people_total: int) -> tuple[list[str], str]:
     if people_total == 0:
         return [], ""
     if people_home == 0:
-        return ["Restless", "Wistful"], "The house is empty."
+        return ["Restless", "Wistful"], HOUSE_EMPTY_WHY
     if people_home == people_total and people_total > 1:
-        return ["Fond", "Cheerful"], "Everyone's home."
+        return ["Fond", "Cheerful"], EVERYONE_HOME_WHY
     return [], ""
 
 
@@ -182,14 +226,16 @@ def energy_pool(now: datetime, wake: time, bed: time) -> list[str]:
 
 # ---- Events -----------------------------------------------------------------------------------
 
-def morning(f: Feelings, cat: Catalog, special_days: list[str], weather: str | None, rng: random.Random) -> Change:
+def morning(
+    f: Feelings, cat: Catalog, special_days: list[str], weather: str | None, rng: random.Random, daylight: bool = True,
+) -> Change:
     """She wakes up Groggy, in a mood of her own; a special day cheers her up and she knows why."""
     change = Change(energy="Groggy" if "Groggy" in cat.energies else None)
     if special_days and "Cheerful" in cat.moods:
         change.mood = "Cheerful"
         change.mood_reason = f"It's {' and '.join(special_days)} today."
         return change
-    group = weather_group(weather)
+    group = weather_group(weather, daylight)
     pull = WEATHER_PULL.get(group or "", [])
     change.mood = _pick(MORNING_MOODS + pull, cat.moods, None, rng)
     if change.mood in pull and group:
@@ -204,20 +250,25 @@ def bedtime(cat: Catalog) -> Change:
 def hourly(
     f: Feelings, cat: Catalog, now: datetime, wake: time, bed: time, weather: str | None,
     people_home: int, people_total: int, hold_hours: float, change_chance: int, rng: random.Random,
+    daylight: bool = True,
 ) -> Change:
-    """Energy follows her day; once a mood has lasted, it may drift to a neighbouring one."""
+    """Energy follows her day; her mood's reason is kept true; once a mood has lasted, it may drift."""
     change = Change()
     pool = [e for e in energy_pool(now, wake, bed) if e in cat.energies]
     choices = [e for e in pool if e != f.energy]
     if choices and (f.energy not in pool or rng.randrange(100) < 40):
         change.energy = rng.choice(choices)
+    if f.mood_reason:
+        fresh = still_true(f, now, weather, daylight, people_home, people_total, change.energy or f.energy)
+        if fresh != f.mood_reason:
+            change.reason = fresh
 
     age = (now - f.mood_since).total_seconds() / 3600 if f.mood_since else 99
     if age < hold_hours or rng.randrange(100) >= change_chance:
         return change
     feeling_energy = change.energy or f.energy
     pull_energy = ENERGY_PULL.get(feeling_energy, [])
-    group = weather_group(weather)
+    group = weather_group(weather, daylight)
     pull_weather = WEATHER_PULL.get(group or "", [])
     pull_house, house_why = _house_pull(people_home, people_total)
     pool = NEIGHBOURS.get(f.mood, BASELINE) + BASELINE + pull_energy + pull_weather + pull_house
@@ -259,13 +310,16 @@ def house_empty(f: Feelings, cat: Catalog, rng: random.Random) -> Change:
     if f.mood in ("Restless", "Wistful"):
         return Change()
     mood = _pick(["Restless", "Restless", "Wistful"], cat.moods, None, rng)
-    return Change(mood=mood, mood_reason="The house has been empty for hours." if mood else "")
+    return Change(mood=mood, mood_reason=HOUSE_EMPTY_LONG_WHY if mood else "")
 
 
-def weather_turned(f: Feelings, cat: Catalog, before: str | None, after: str | None, chance: int, rng: random.Random) -> Change:
-    """The weather changed to something she'd notice."""
-    was, now = weather_group(before), weather_group(after)
-    if not now or now == was or rng.randrange(100) >= chance:
+def weather_turned(
+    f: Feelings, cat: Catalog, before: str | None, after: str | None, chance: int, rng: random.Random,
+    daylight: bool = True,
+) -> Change:
+    """The weather changed to something she'd notice. Sunset (sunny to a clear night) isn't news."""
+    was, now = weather_group(before, daylight), weather_group(after, daylight)
+    if not now or _same_weather(now, was) or rng.randrange(100) >= chance:
         return Change()
     mood = _pick(WEATHER_PULL[now], cat.moods, f.mood, rng)
     return Change(mood=mood, mood_reason=WEATHER_STARTS[now] if mood else "")

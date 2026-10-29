@@ -26,3 +26,7 @@ secrets.yaml
 ollama-data/
 piper-data/
 
+
+# Python caches
+__pycache__/
+*.pyc

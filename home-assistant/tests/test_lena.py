@@ -180,6 +180,59 @@ async def test_hourly_drift(hass: HomeAssistant) -> None:
     assert hass.states.get("select.lena_mood").state != before
 
 
+async def test_no_sunshine_after_dark(hass: HomeAssistant) -> None:
+    """A weather service that still says "sunny" at night gets a clear night, not "the sun came out"."""
+    await setup(hass)
+    hass.states.async_set("sun.sun", "below_horizon")
+    hass.states.async_set("weather.home", "sunny", {"temperature": 50, "temperature_unit": "°F"})
+    await hass.async_block_till_done()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=16))
+    await hass.async_block_till_done()
+    reason = hass.states.get("select.lena_mood").attributes.get("reason")
+    assert reason in (None, "The sky just cleared.")
+
+
+async def test_sunset_is_not_news(hass: HomeAssistant) -> None:
+    await setup(hass)
+    core = hass.data[DOMAIN]
+    hass.states.async_set("sun.sun", "above_horizon")
+    hass.states.async_set("weather.home", "sunny", {"temperature": 60})
+    await hass.async_block_till_done()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=16))
+    await hass.async_block_till_done()
+    core.feelings.mood_reason = "keep"
+    hass.states.async_set("sun.sun", "below_horizon")
+    hass.states.async_set("weather.home", "clear-night", {"temperature": 55})
+    await hass.async_block_till_done()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=40))
+    await hass.async_block_till_done()
+    assert core.feelings.mood_reason == "keep"
+
+
+@pytest.mark.parametrize(
+    ("sun", "weather", "reason", "expected"),
+    [
+        ("below_horizon", "cloudy", "The sun just came out.", None),  # no longer true: dropped
+        ("below_horizon", "sunny", "The sun just came out.", "It's a clear night."),
+        ("above_horizon", "rainy", "It just started raining.", "It's raining."),  # news becomes how it is
+        ("above_horizon", "rainy", "It's raining.", "It's raining."),
+    ],
+)
+async def test_mood_reason_stays_true(hass: HomeAssistant, sun, weather, reason, expected) -> None:
+    await setup(hass, dict(OPTIONS, mood_change_chance=0))
+    core = hass.data[DOMAIN]
+    hass.states.async_set("sun.sun", sun)
+    hass.states.async_set("weather.home", weather, {"temperature": 60})
+    core.feelings.mood, core.feelings.mood_reason = "Playful", reason
+    core.feelings.mood_since = dt_util.now() - timedelta(hours=1, minutes=5)
+    core._changed()
+    core._on_hour(dt_util.now())
+    await hass.async_block_till_done()
+    mood = hass.states.get("select.lena_mood")
+    assert mood.state == "Playful"  # the mood lingers; only its reason changes
+    assert mood.attributes.get("reason") == expected
+
+
 async def test_context_view(hass: HomeAssistant, hass_client) -> None:
     await setup(hass)
     client = await hass_client()

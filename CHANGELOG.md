@@ -162,6 +162,11 @@ First release.
 
 ## Personality
 
+### 3.2.1 (2026-10-28)
+
+- **No sunshine after dark.** Some weather services still report "sunny" at night; the Lena integration (1.2.1) now checks Home Assistant's sun (or the clock), calls it a clear night, and doesn't treat sunset (sunny to clear night) as news. She used to say "The sun just came out." at 8 PM.
+- **Her mood's reason stays true.** Every hour it's checked: news like "It just started raining" becomes "It's raining." after an hour, and a reason that's no longer true (the weather changed, someone came home, her energy moved on) is dropped. The mood itself lingers, the way moods do. Copy the new `custom_components/lena` folder over the old one and restart.
+
 ### 3.2.0 (2026-10-28)
 
 - The Lena integration (1.2.0) adds `/api/lena/media`: Home Assistant's media folders and photos (Immich albums included) for the app's photo slideshow. Copy the new `custom_components/lena` folder over the old one and restart.
