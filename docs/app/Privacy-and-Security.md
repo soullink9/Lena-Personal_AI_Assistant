@@ -14,9 +14,11 @@ Links to other sites open in your normal browser, not in Lena, so those sites ne
 
 When you sign in inside Lena, Open WebUI stores your session in a cookie for your server's address. The drawer, Ask sheet, notifications and scheduled prompts read that cookie from Lena's own storage and send it only to your Open WebUI address, the same way the page does. If a proxy such as Authentik sits in front of Open WebUI, its cookie for that address is sent too.
 
-- Lena never sees your password, and there's no API key to store.
+- Lena never sees your password, and there's no API key to store, unless you turn on **Sign in by herself** (Settings → Open WebUI), below.
 - Signing out of Open WebUI (turn on **Open WebUI's own menus** in Settings to reach it) signs out the native features too.
 - If a request is redirected to a sign-in page, Lena stops and asks you to sign in again rather than following it.
+
+**Sign in by herself** (off by default) is for when Open WebUI signs every device out as it restarts, which strands a wall tablet. You give Lena your Open WebUI email (or LDAP user name) and password once; they're encrypted with the same kind of keystore key as the Home Assistant token, which can't be copied off the phone, and sent only to your Open WebUI's own sign-in address, and only when its session has really ended (a request was refused and a check of the session confirms it). A failed sign-in isn't retried for half a minute. The session it gets is stored the same way as when you sign in yourself. If you'd rather not keep a password on the device, give your Open WebUI server a fixed `WEBUI_SECRET_KEY` instead, so restarts don't sign anyone out.
 
 ## Home Assistant (optional)
 
@@ -50,6 +52,7 @@ Checking and downloading happen only when you tap them. The GitHub token is stor
 | Your addresses, model, gesture choice, quick prompts and scheduled prompts | Lena's private app settings |
 | Your Open WebUI sign-in, and anything Open WebUI keeps in the browser | Lena's private web view storage |
 | Your Home Assistant token, if you add one | Lena's private storage, encrypted with a keystore key |
+| Your Open WebUI email and password, only if you turn on Sign in by herself | Lena's private storage, encrypted with a keystore key |
 | Pending background checks | Lena's private WorkManager database |
 
 All of it stays on the phone. Lena turns off Android backups and phone-to-phone transfer for all of its data, so your sign-in never reaches Google's cloud or a new phone. Uninstalling Lena deletes everything.
@@ -91,7 +94,7 @@ When you talk to Lena in the sheet:
 - **Your server** records until you stop talking and sends the recording to your Open WebUI's speech-to-text.
 - Spoken replies are made by your Open WebUI's text-to-speech (the reply text goes to your server, which already wrote it), or by the phone's own voice if you choose.
 
-The sheet only listens while it shows "Listening…". The wake word (off unless you turn it on) listens the whole time the wall display or the screen saver is showing, but on the device only: the sound goes through a small model a few times a second and is thrown away, and nothing is recorded or sent until it hears her name and hands over to the sheet. In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
+The sheet only listens while it shows "Listening…". The wake word (off unless you turn it on) listens the whole time the wall display or the screen saver is showing, but on the device only: the sound goes through two small models a few times a second (the wake word and a voice check) and is thrown away, and nothing is recorded or sent until it hears her name and hands over to the sheet. In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
 
 Android blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 

@@ -245,13 +245,34 @@ class LenaCore:
 
     # ---- What she's told -------------------------------------------------------------------
 
+    def _clock(self, value: str | None) -> str | None:
+        """An ISO time from the sun's attributes as a local clock time ("5:41 PM")."""
+        when = dt_util.parse_datetime(value) if isinstance(value, str) else None
+        return dt_util.as_local(when).strftime("%I:%M %p").lstrip("0") if when else None
+
+    def time_of_day(self) -> str:
+        """The time, said so it can't be misread: the part of the day, and whether it's light out."""
+        now = dt_util.now()
+        line = f"It's {now.strftime('%A, %B')} {now.day}, {now.year}, {now.strftime('%I:%M %p').lstrip('0')}: {brain.part_of_day(now.hour)}"
+        light = self._daylight()
+        sun = self.hass.states.get("sun.sun")
+        if sun is not None and sun.state in ("above_horizon", "below_horizon"):
+            if light and (sets := self._clock(sun.attributes.get("next_setting"))):
+                line += f", and light out (the sun sets at {sets})."
+            elif not light and (rises := self._clock(sun.attributes.get("next_rising"))):
+                line += f", and dark out (the sun rises at {rises})."
+            else:
+                line += ", and light out." if light else ", and dark out."
+        else:
+            line += "."
+        return line
+
     def context(self, with_reasons: bool = True, memory: bool = True) -> str:
         """The time, who's home, how she feels and what she remembers."""
-        now = dt_util.now()
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
         parts = [
             "## Right now\n"
-            f"It's {now.strftime('%A, %B')} {now.day}, {now.year}, {now.strftime('%I:%M %p').lstrip('0')}.\n"
+            f"{self.time_of_day()}\n"
             f"At home: {', '.join(home) if home else 'nobody'}.",
             brain.describe(self.feelings, self.catalog, with_reasons),
         ]

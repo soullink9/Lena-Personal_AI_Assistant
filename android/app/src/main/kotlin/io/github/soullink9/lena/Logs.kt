@@ -117,6 +117,7 @@ class LenaApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Logs.init(this)
+        Prefs.migrate(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             Logs.crash(thread.name, error)

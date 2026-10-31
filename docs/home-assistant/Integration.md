@@ -28,7 +28,7 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
 3. **Assist's part**: the devices and areas she can see, and how to control them.
 4. **Lena's part**:
    - that her replies are usually spoken;
-   - the date and time, and who's home;
+   - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), and who's home;
    - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason;
    - what she remembers, and when to remember or forget something.
 5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact` and `record_feeling`.
@@ -62,7 +62,7 @@ Returns:
 
 ```json
 {
-  "context": "## Right now\nIt's Tuesday, October 27, 2026, 6:40 PM.\nAt home: Alex.\n\n## How you feel right now\n...",
+  "context": "## Right now\nIt's Tuesday, October 27, 2026, 6:40 PM: evening, and dark out (the sun rises at 7:12 AM).\nAt home: Alex.\n\n## How you feel right now\n...",
   "feelings": {"mood": "Grumpy", "mood_reason": "It just started raining.", "energy": "Steady", "moment": "Nothing", "moment_reason": ""},
   "memory": ["Alex likes the office at seventy degrees."],
   "weather": {"condition": "rainy", "temperature": 52, "unit": "°F"}

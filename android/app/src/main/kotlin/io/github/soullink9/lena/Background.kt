@@ -143,10 +143,18 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val id = inputData.getString("schedule_id") ?: return Result.failure()
         val schedule = Prefs.schedules(c).firstOrNull { it.id == id && it.enabled } ?: return Result.success()
         val api = Api.from(c) ?: return Result.failure()
-        val title = schedule.prompt.lineSequence().first().take(60)
+        val title = schedule.title
         return try {
             val model = api.defaultModel(c) ?: return Result.success()
-            val started = api.ask(schedule.prompt, model)
+            // With a chat name, every run goes into that chat (made the first time), so several
+            // prompts can share one history; otherwise each run is a chat of its own.
+            val chatName = schedule.chat.trim()
+            val existing = if (chatName.isEmpty()) null else api.chatTitled(chatName)?.id
+            val started = api.ask(
+                schedule.prompt, model, chatId = existing,
+                newTitle = chatName.ifEmpty { null },
+                contextTokens = Prefs.contextTokens(c),
+            )
             var last = Reply("", false)
             api.follow(started.chatId, started.messageId).collect { last = it }
             val text = Markdown.plain(last.content).take(900).ifBlank { "Lena answered. Tap to read it." }
@@ -168,8 +176,8 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 }
 
 /**
- * Daily alarms for scheduled prompts. They're inexact (Android may run them a few minutes late
- * to save battery), which needs no special permission.
+ * Alarms for scheduled prompts: each one's next time, set again after it runs. They're inexact
+ * (Android may run them a few minutes late to save battery), which needs no special permission.
  */
 object Schedules {
     private const val ACTION_FIRE = "io.github.soullink9.lena.SCHEDULE"
@@ -191,16 +199,41 @@ object Schedules {
         current.forEach { s ->
             val pi = pending(c, s.id)
             alarms.cancel(pi)
-            if (s.enabled && s.prompt.isNotBlank()) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next(s), pi)
+            val at = if (s.enabled && s.prompt.isNotBlank()) next(s) else null
+            if (at != null) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
         }
         prefs.edit().putStringSet("ids", current.map { it.id }.toSet()).apply()
     }
 
-    private fun next(s: Schedule): Long {
-        val now = ZonedDateTime.now()
-        var t = now.withHour(s.hour).withMinute(s.minute).withSecond(0).withNano(0)
-        if (!t.isAfter(now)) t = t.plusDays(1)
-        return t.toInstant().toEpochMilli()
+    /** When [s] runs next, after [from]; null if it won't again (a one-off that's past, or no days picked). */
+    fun next(s: Schedule, from: ZonedDateTime = ZonedDateTime.now()): Long? {
+        fun at(day: java.time.LocalDate, hour: Int = s.hour) =
+            day.atTime(hour, s.minute).atZone(from.zone)
+        val today = from.toLocalDate()
+        val t: ZonedDateTime? = when (s.repeat) {
+            Repeat.ONCE -> at(java.time.LocalDate.ofEpochDay(s.date)).takeIf { it.isAfter(from) }
+            Repeat.HOURS -> {
+                val step = s.everyHours.coerceIn(1, 12)
+                (s.hour until 24 step step).map { at(today, it) }.firstOrNull { it.isAfter(from) }
+                    ?: at(today.plusDays(1))
+            }
+            Repeat.MONTHLY -> (0L..12L).asSequence().map { m ->
+                val month = java.time.YearMonth.from(today).plusMonths(m)
+                at(month.atDay(minOf(s.dayOfMonth, month.lengthOfMonth())))
+            }.firstOrNull { it.isAfter(from) }
+            else -> {
+                val days = when (s.repeat) {
+                    Repeat.WEEKDAYS -> setOf(1, 2, 3, 4, 5)
+                    Repeat.WEEKENDS -> setOf(6, 7)
+                    Repeat.DAYS -> s.days
+                    else -> (1..7).toSet()
+                }
+                (0L..7L).asSequence().map { today.plusDays(it) }
+                    .filter { it.dayOfWeek.value in days }
+                    .map { at(it) }.firstOrNull { it.isAfter(from) }
+            }
+        }
+        return t?.toInstant()?.toEpochMilli()
     }
 
     fun isFire(intent: Intent) = intent.action == ACTION_FIRE

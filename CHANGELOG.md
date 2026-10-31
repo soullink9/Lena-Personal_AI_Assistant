@@ -7,6 +7,34 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.17.0 (2026-10-31)
+
+**Wall display**
+- **One bar.** Home Assistant's own header is gone; Lena's bar has its back and menu (sidebar) buttons, the time and weather, the dashboard's views as tabs, her mood and talk button, and Chats, Reload, Apps and Settings. The dashboard's name isn't shown. With several dashboards set up, a dashboards button replaces the old tab row. Editing a dashboard brings Home Assistant's header back while you edit.
+- **No more listening by itself.** The wake word could set itself off the moment the wall display came up (after a reboot, say), before its sound features had settled. Now she can't be woken in her first second of listening, nor again until she's calmed down, as on ESPHome's voice devices.
+- **Your chats give way back to it.** Opened from the wall display and left alone (a minute by default), your chats go back to the dashboards and straight to the screen saver; not while you type, call or she's answering.
+- **Screen saver after** now goes from 30 seconds to an hour.
+- **Photo frame framing.** **Smart** (the default) shows portrait photos, panoramas and other odd shapes whole instead of cropping their middles (heads included), and every cropped photo is centred on its faces, found on the device. **Fill the screen** and **Whole photo** are the other choices.
+
+**Wake word**
+- **"Hey Lena"**, Tater Totterson's microWakeWord model, is in the app and the default for new setups: about one false start in ten hours of background sound.
+- **Fewer false starts:** ESPHome's voice check must agree someone is speaking, each model's own cutoff and window are read from its file, and **How sure she must be** (Fewer false starts, Balanced, Easier to wake) is a setting. The logs say how sure she was each time.
+
+**Open WebUI**
+- **Sign in by herself** (Settings → Open WebUI): when Open WebUI ends her session, as it can on restart, Lena signs in again with your saved email (or LDAP user) and password, encrypted on the phone, everywhere from the chat page to scheduled prompts.
+- **"Assistant Lena".** Talking to her always uses one chat by that name, found by name on any phone; the old "Lena" chat is renamed. New conversation keeps the old one, dated and unpinned.
+- **Pinned chats** show at the top of the menu (up to five, then View all), and long-press has **Pin**.
+- **The orb and slim groups** are the defaults and come first; anyone still on the old defaults moves to them.
+- **She knows the time of day:** the phone's time and part of the day go with every question.
+
+**Scheduled prompts**
+- Each has a **name**, shown in Settings; tap it to open it.
+- **A chat to go into:** prompts with the same chat name share one history (a morning and an evening briefing, say).
+- **Repeats** every day, on weekdays, weekends or the days you pick, every few hours, once a month, or once. **Run it now** tries one out.
+
+**Updates**
+- **Re-download and install** gets the latest release again, to repair an install or after a version reset. Downloads are judged by build number, so a reset version name still updates, and a lower build number is refused with a clear reason.
+
 ### 2.16.0 (2026-10-28)
 
 - **She goes back to the wall display by herself.** Called by her name (or the talk button) from the dashboard or the screen saver, she returns to it when the conversation's over: when you say nothing, when she's answered and isn't listening for more, or straight away on "thanks", "that's all", "never mind", "stop" and the like. The wake word then works again; before, the sheet stayed open on top and it stopped listening. A touch keeps her open.
@@ -161,6 +189,10 @@ First release.
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
 ## Personality
+
+### 3.3.0 (2026-10-31)
+
+- **Time of day she can't get wrong.** The Lena integration (1.3.0) now tells her the part of the day and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun ("8:05 PM: evening, and dark out (the sun rises at 7:16 AM)"), and the Modelfile tells her to go by it for greetings and anything about the time of day. Rebuild the model, copy the new `custom_components/lena` folder over the old one, and restart.
 
 ### 3.2.1 (2026-10-28)
 

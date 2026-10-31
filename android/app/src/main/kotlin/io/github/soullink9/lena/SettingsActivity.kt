@@ -82,6 +82,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -106,6 +108,10 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,13 +140,15 @@ class SettingsActivity : ComponentActivity() {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
         SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), UPDATES("Updates"),
-        WALL("Wall display"), WALL_DASHBOARDS("Dashboards"), WALL_IDLE("When no one's around"), WAKE("Wake word");
+        WALL("Wall display"), WALL_DASHBOARDS("Dashboards"), WALL_IDLE("When no one's around"), WAKE("Wake word"),
+        SCHEDULE("Scheduled prompt");
 
         /** Where back goes: the wall display's own pages sit under it. */
         val parent: Page?
             get() = when (this) {
                 MAIN -> null
                 WALL_DASHBOARDS, WALL_IDLE, WAKE -> WALL
+                SCHEDULE -> SCHEDULED
                 else -> MAIN
             }
 
@@ -180,6 +188,7 @@ class SettingsActivity : ComponentActivity() {
     private fun Screen() {
         var s by remember { mutableStateOf(original) }
         var page by remember { mutableStateOf(Page.MAIN) }
+        var editing by remember { mutableStateOf<String?>(null) }
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
         val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -247,7 +256,8 @@ class SettingsActivity : ComponentActivity() {
                         Page.VOICE -> VoicePage(s, ::set)
                         Page.CONVERSATION -> ConversationPage(s, ::set)
                         Page.QUICK -> QuickPage(s, ::set)
-                        Page.SCHEDULED -> ScheduledPage(s, ::set)
+                        Page.SCHEDULED -> ScheduledPage(s, ::set) { id -> editing = id; page = Page.SCHEDULE }
+                        Page.SCHEDULE -> SchedulePage(s, editing, ::set) { page = Page.SCHEDULED }
                         Page.PHONE -> PhonePage(s, ::set)
                         Page.APPEARANCE -> AppearancePage(s, ::set)
                         Page.WALL -> WallPage(s) { page = it }
@@ -282,14 +292,14 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.RecordVoiceOver, "Voice", voiceLabel(s)) { open(Page.VOICE) }
             Item(Icons.Outlined.Palette, "Appearance", "${s.askStyle.label} · ${s.chatList.label.lowercase()}") { open(Page.APPEARANCE) }
             Item(Icons.Outlined.Forum, "Conversation",
-                if (s.ongoing) "One ongoing conversation · %,d tokens".format(s.contextTokens) else "A new chat each time") {
+                "“$ASSISTANT_CHAT” · %,d tokens".format(s.contextTokens)) {
                 open(Page.CONVERSATION)
             }
         }
         Group {
             Item(Icons.Outlined.Bolt, "Quick prompts", count(s.quickPrompts.size, "prompt", "None yet")) { open(Page.QUICK) }
             Item(Icons.Outlined.Schedule, "Scheduled prompts",
-                count(s.schedules.count { it.enabled }, "daily prompt", if (s.schedules.isEmpty()) "None yet" else "All paused")) {
+                if (s.schedules.isEmpty()) "None yet" else s.schedules.filter { it.enabled }.joinToString(", ") { it.title }.ifBlank { "All paused" }) {
                 open(Page.SCHEDULED)
             }
         }
@@ -361,7 +371,12 @@ class SettingsActivity : ComponentActivity() {
                 val installed = Updates.installed(this@SettingsActivity)
                 val newer = Updates.newer(r.version, installed)
                 upd.available = if (newer) "${r.version} is available" else null
-                upd.status = if (newer) "Lena ${r.version} is available" else "You have the latest ($installed)"
+                upd.status = when {
+                    newer -> "Lena ${r.version} is available"
+                    Updates.different(r.version, this@SettingsActivity) ->
+                        "The latest release is ${r.version} (you have $installed). After a version reset, use Re-download and install."
+                    else -> "You have the latest ($installed)"
+                }
             } catch (e: Exception) {
                 Logs.w("Updates", "Couldn't check for updates", e)
                 upd.status = e.message ?: "Couldn't reach GitHub."
@@ -369,12 +384,12 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    private fun download(r: Updates.Release, done: () -> Unit) {
+    private fun download(r: Updates.Release, reinstall: Boolean = false, done: () -> Unit) {
         if (upd.progress != null) return
         lifecycleScope.launch {
             upd.progress = 0f
             try {
-                Updates.download(this@SettingsActivity, r) { upd.progress = it }
+                Updates.download(this@SettingsActivity, r, reinstall) { upd.progress = it }
                 upd.status = "Downloaded and checked ${r.version}"
                 done()
             } catch (e: Exception) {
@@ -471,6 +486,29 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+        if (pending == null) Group {
+            val p = upd.progress
+            val r = upd.release
+            Item(
+                Icons.Outlined.Replay,
+                if (p != null && r != null) "Downloading ${r.version}… ${(p * 100).toInt()}%" else "Re-download and install",
+                "Gets the latest release again even if you have it: to repair Lena, or after the version number was reset. Checked the same way.",
+                trailing = if (p != null) { { LinearProgressIndicator(progress = { p }, modifier = Modifier.width(72.dp).padding(end = 12.dp)) } } else null,
+            ) {
+                val again = { rel: Updates.Release -> download(rel, reinstall = true) { pending = Updates.pending(this@SettingsActivity) } }
+                if (r != null) again(r) else lifecycleScope.launch {
+                    upd.status = "Checking…"
+                    try {
+                        val latest = Updates.latest(this@SettingsActivity)
+                        upd.release = latest
+                        upd.status = "The latest release is ${latest.version}"
+                        again(latest)
+                    } catch (e: Exception) {
+                        upd.status = e.message ?: "Couldn't reach GitHub."
+                    }
+                }
+            }
+        }
 
         Section("Your repository") {
             FieldItem {
@@ -536,6 +574,76 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote("Changing these signs you in again when you leave settings.")
+
+        AutoSignInSection(s, set)
+    }
+
+    /** Signing in again by itself when Open WebUI ends the session, with details kept encrypted on the phone. */
+    @Composable
+    private fun AutoSignInSection(s: Settings, set: (Settings) -> Unit) {
+        val scope = rememberCoroutineScope()
+        var user by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+        var userSaved by remember { mutableStateOf(Secrets.has(this, OpenWebUiSignIn.USER)) }
+        var passwordSaved by remember { mutableStateOf(Secrets.has(this, OpenWebUiSignIn.PASSWORD)) }
+        var check by remember { mutableStateOf<String?>(null) }
+        Section("Sign in by herself") {
+            PickItem(Icons.Outlined.Key, "When Open WebUI signs her out", AutoSignIn.entries.map { it to it.label }, s.autoSignIn) {
+                set(s.copy(autoSignIn = it))
+                check = null
+            }
+            if (s.autoSignIn != AutoSignIn.OFF) {
+                FieldItem {
+                    OutlinedTextField(
+                        value = user,
+                        onValueChange = {
+                            user = it
+                            check = null
+                            if (it.isNotBlank()) { Secrets.put(this@SettingsActivity, OpenWebUiSignIn.USER, it.trim()); userSaved = true }
+                        },
+                        label = { Text((if (s.autoSignIn == AutoSignIn.LDAP) "User name" else "Email") + if (userSaved && user.isBlank()) " (saved)" else "") },
+                        placeholder = { Text(if (userSaved) "Type a new one to replace it" else "") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = if (s.autoSignIn == AutoSignIn.LDAP) KeyboardType.Text else KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                FieldItem {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            check = null
+                            if (it.isNotEmpty()) { Secrets.put(this@SettingsActivity, OpenWebUiSignIn.PASSWORD, it); passwordSaved = true }
+                        },
+                        label = { Text(if (passwordSaved && password.isEmpty()) "Password (saved)" else "Password") },
+                        placeholder = { Text(if (passwordSaved) "Type a new one to replace it" else "") },
+                        supportingText = { Text("Stored encrypted on this phone and sent only to your Open WebUI.") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            if (userSaved || passwordSaved) IconButton(onClick = {
+                                Secrets.put(this@SettingsActivity, OpenWebUiSignIn.USER, null)
+                                Secrets.put(this@SettingsActivity, OpenWebUiSignIn.PASSWORD, null)
+                                userSaved = false; passwordSaved = false; user = ""; password = ""; check = null
+                            }) { Icon(Icons.Outlined.Delete, "Forget the saved sign-in") }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Item(null, "Test", check ?: "Signs in once with these details") {
+                    scope.launch {
+                        check = "Signing in…"
+                        check = OpenWebUiSignIn.test(this@SettingsActivity)
+                    }
+                }
+            }
+        }
+        Footnote("When Open WebUI restarts it can sign out every device, which leaves a wall tablet stuck on its sign-in page. " +
+            "With this on, Lena signs in again by herself, in the app and for scheduled prompts and the wall display. " +
+            "It can't do single sign-on (Authentik, Google). Better still: set WEBUI_SECRET_KEY on your Open WebUI server, " +
+            "so a restart doesn't sign anyone out in the first place.")
     }
 
     @Composable
@@ -695,10 +803,8 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun ConversationPage(s: Settings, set: (Settings) -> Unit) {
         Group {
-            SwitchItem(null, "One ongoing conversation", "Talking to Lena continues the same chat, so she remembers earlier conversations", s.ongoing) {
-                set(s.copy(ongoing = it))
-            }
-            if (s.ongoing) FieldItem {
+            Item(Icons.Outlined.Forum, "“$ASSISTANT_CHAT”", "Talking to Lena always continues this one chat, so she's the same Lena with the same history on every screen") { }
+            FieldItem {
                 var text by remember { mutableStateOf(s.contextTokens.toString()) }
                 OutlinedTextField(
                     value = text,
@@ -712,7 +818,8 @@ class SettingsActivity : ComponentActivity() {
                 )
             }
         }
-        Footnote("Start over any time with New conversation in the sheet. The old chat stays in your history.")
+        Footnote("It's found by its name, so it's the same chat after reinstalling or on another phone. Start over with New conversation: " +
+            "the old one is kept in your history, named with the date, and a new “$ASSISTANT_CHAT” begins.")
     }
 
     @Composable
@@ -746,44 +853,138 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** Your scheduled prompts by name; tap one to change it. */
     @Composable
-    private fun ScheduledPage(s: Settings, set: (Settings) -> Unit) {
-        Footnote("Lena asks these on her own every day and notifies you with the answer. They're saved as chats.")
-        s.schedules.forEachIndexed { i, sch ->
-            Group {
-                Column(rowModifier().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            TimePickerDialog(
-                                this@SettingsActivity,
-                                { _, h, m -> set(s.copy(schedules = s.schedules.mapIndexed { j, o -> if (j == i) o.copy(hour = h, minute = m) else o })) },
-                                sch.hour, sch.minute, DateFormat.is24HourFormat(this@SettingsActivity),
-                            ).show()
-                        }) { Text(timeLabel(sch.hour, sch.minute), style = MaterialTheme.typography.headlineSmall) }
-                        Text("every day", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Switch(checked = sch.enabled, onCheckedChange = { on ->
-                            set(s.copy(schedules = s.schedules.mapIndexed { j, o -> if (j == i) o.copy(enabled = on) else o }))
+    private fun ScheduledPage(s: Settings, set: (Settings) -> Unit, open: (String) -> Unit) {
+        Footnote("Lena asks these on her own and notifies you with the answer. Give several the same chat to keep them in one history, like a morning and an evening briefing.")
+        if (s.schedules.isNotEmpty()) Group {
+            s.schedules.forEach { sch ->
+                Item(Icons.Outlined.Schedule, sch.title, scheduleSummary(sch),
+                    trailing = {
+                        Switch(checked = sch.enabled, modifier = Modifier.padding(end = 12.dp), onCheckedChange = { on ->
+                            set(s.copy(schedules = s.schedules.map { if (it.id == sch.id) it.copy(enabled = on) else it }))
                         })
-                        IconButton(onClick = { set(s.copy(schedules = s.schedules.filterIndexed { j, _ -> j != i })) }) {
-                            Icon(Icons.Outlined.Delete, "Remove")
-                        }
-                    }
-                    OutlinedTextField(
-                        value = sch.prompt,
-                        onValueChange = { t -> set(s.copy(schedules = s.schedules.mapIndexed { j, o -> if (j == i) o.copy(prompt = t) else o })) },
-                        label = { Text("Prompt") },
-                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                    )
-                }
+                    },
+                ) { open(sch.id) }
             }
         }
         Group {
             Item(Icons.Outlined.Add, "Add a scheduled prompt", null) {
-                set(s.copy(schedules = s.schedules + Schedule(prompt = "Give me my morning briefing.")))
+                val n = Schedule(name = "Morning briefing", prompt = "Give me my morning briefing.")
+                set(s.copy(schedules = s.schedules + n))
+                open(n.id)
             }
         }
     }
+
+    /** One scheduled prompt: its name, what she's asked, when, and which chat it goes into. */
+    @Composable
+    private fun SchedulePage(s: Settings, id: String?, set: (Settings) -> Unit, done: () -> Unit) {
+        val sch = s.schedules.firstOrNull { it.id == id } ?: run { Footnote("That scheduled prompt was removed."); return }
+        fun put(n: Schedule) = set(s.copy(schedules = s.schedules.map { if (it.id == sch.id) n else it }))
+        Group {
+            FieldItem {
+                OutlinedTextField(value = sch.name, onValueChange = { put(sch.copy(name = it)) }, label = { Text("Name") },
+                    placeholder = { Text("e.g. Morning briefing") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+            FieldItem {
+                OutlinedTextField(value = sch.prompt, onValueChange = { put(sch.copy(prompt = it)) }, label = { Text("What she's asked") },
+                    minLines = 2, modifier = Modifier.fillMaxWidth())
+            }
+            SwitchItem(null, "On", if (sch.enabled) Schedules.next(sch)?.let { "Next: " + nextLabel(it) } ?: "Won't run again" else "Paused", sch.enabled) {
+                put(sch.copy(enabled = it))
+            }
+        }
+
+        Section("When") {
+            Item(Icons.Outlined.Timer, if (sch.repeat == Repeat.HOURS) "Starting at" else "Time", timeLabel(sch.hour, sch.minute)) {
+                TimePickerDialog(this@SettingsActivity, { _, h, m -> put(sch.copy(hour = h, minute = m)) },
+                    sch.hour, sch.minute, DateFormat.is24HourFormat(this@SettingsActivity)).show()
+            }
+            PickItem(Icons.Outlined.Schedule, "Repeats", Repeat.entries.map { it to it.label }, sch.repeat) {
+                put(sch.copy(repeat = it, date = if (it == Repeat.ONCE && sch.date == 0L) java.time.LocalDate.now().toEpochDay() else sch.date))
+            }
+            when (sch.repeat) {
+                Repeat.DAYS -> FieldItem {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        java.time.DayOfWeek.entries.forEach { d ->
+                            val on = d.value in sch.days
+                            FilterChip(
+                                selected = on,
+                                onClick = { put(sch.copy(days = if (on) sch.days - d.value else sch.days + d.value)) },
+                                label = { Text(d.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.getDefault())) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+                Repeat.HOURS -> PickItem(null, "Every", listOf(1, 2, 3, 4, 6, 8, 12).map { it to if (it == 1) "Hour, until midnight" else "$it hours, until midnight" },
+                    sch.everyHours) { put(sch.copy(everyHours = it)) }
+                Repeat.MONTHLY -> PickItem(null, "On the", (1..31).map { it to if (it >= 29) "${ordinal(it)} (or the month's last day)" else ordinal(it) },
+                    sch.dayOfMonth) { put(sch.copy(dayOfMonth = it)) }
+                Repeat.ONCE -> {
+                    val day = if (sch.date > 0) java.time.LocalDate.ofEpochDay(sch.date) else java.time.LocalDate.now()
+                    Item(null, "On", java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.LONG).format(day)) {
+                        android.app.DatePickerDialog(this@SettingsActivity, { _, y, m, d ->
+                            put(sch.copy(date = java.time.LocalDate.of(y, m + 1, d).toEpochDay()))
+                        }, day.year, day.monthValue - 1, day.dayOfMonth).show()
+                    }
+                }
+                else -> Unit
+            }
+        }
+
+        Section("Where it goes") {
+            FieldItem {
+                OutlinedTextField(
+                    value = sch.chat, onValueChange = { put(sch.copy(chat = it)) },
+                    label = { Text("Chat (optional)") }, placeholder = { Text("e.g. Daily briefings") }, singleLine = true,
+                    supportingText = { Text("Every run goes into the chat with this name, made the first time. Give several prompts the same one to share a history. Empty: a new chat each time.") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            val others = s.schedules.map { it.chat.trim() }.filter { it.isNotEmpty() && it != sch.chat.trim() }.distinct()
+            if (others.isNotEmpty()) FieldItem {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    others.take(4).forEach { name -> AssistChip(onClick = { put(sch.copy(chat = name)) }, label = { Text(name) }) }
+                }
+            }
+        }
+
+        Group {
+            Item(Icons.Outlined.PlayArrow, "Run it now", "Asks her straight away and notifies you with the answer") {
+                PromptWorker.enqueue(this@SettingsActivity, sch.id)
+                Toast.makeText(this@SettingsActivity, "Asked. The answer comes as a notification.", Toast.LENGTH_SHORT).show()
+            }
+            Item(Icons.Outlined.Delete, "Delete", null) {
+                set(s.copy(schedules = s.schedules.filter { it.id != sch.id }))
+                done()
+            }
+        }
+    }
+
+    private fun ordinal(n: Int) = "$n" + if (n in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
+
+    /** "7:00 AM · Weekdays · into Daily briefings" */
+    private fun scheduleSummary(sch: Schedule): String {
+        val time = timeLabel(sch.hour, sch.minute)
+        val days = java.time.DayOfWeek.entries.filter { it.value in sch.days }
+            .joinToString(" ") { it.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) }
+        val whenText = when (sch.repeat) {
+            Repeat.DAILY -> "$time every day"
+            Repeat.WEEKDAYS -> "$time on weekdays"
+            Repeat.WEEKENDS -> "$time at weekends"
+            Repeat.DAYS -> "$time · ${days.ifBlank { "no days picked" }}"
+            Repeat.HOURS -> "Every ${if (sch.everyHours == 1) "hour" else "${sch.everyHours} hours"} from $time"
+            Repeat.MONTHLY -> "$time on the ${ordinal(sch.dayOfMonth)} of each month"
+            Repeat.ONCE -> "Once, " + (if (sch.date > 0) java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+                .format(java.time.LocalDate.ofEpochDay(sch.date)) else "date not set") + " at $time"
+        }
+        return whenText + if (sch.chat.isNotBlank()) " · into “${sch.chat.trim()}”" else ""
+    }
+
+    private fun nextLabel(millis: Long): String =
+        DateFormat.format(if (DateFormat.is24HourFormat(this)) "EEE, MMM d, HH:mm" else "EEE, MMM d, h:mm a", millis).toString()
 
     @Composable
     private fun PhonePage(s: Settings, set: (Settings) -> Unit) {
@@ -800,7 +1001,16 @@ class SettingsActivity : ComponentActivity() {
 
     private fun hasHouse() = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
 
-    private fun dimLabel(m: Int) = if (m == 0) "Never" else "After $m minutes without a touch"
+    private fun duration(seconds: Int): String = when {
+        seconds == 0 -> "Never"
+        seconds < 60 -> "$seconds seconds"
+        seconds == 60 -> "1 minute"
+        seconds < 3600 -> "${seconds / 60} minutes"
+        seconds == 3600 -> "1 hour"
+        else -> "${seconds / 3600} hours"
+    }
+
+    private val screenSaverDelays = listOf(30, 60, 120, 300, 600, 900, 1800, 3600, 0)
 
     /**
      * The wall display: one place for a tablet on the wall. Your Home Assistant dashboards while
@@ -833,7 +1043,7 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.PhotoAlbum, "When no one's around",
                 (if (sl.on && sl.albumName.isNotBlank()) "Photo frame: ${sl.albumName}" else "Her clock") +
-                    if (s.dimMinutes == 0) " · never steps aside" else " · after ${s.dimMinutes} min") {
+                    if (s.dimSeconds == 0) " · never on its own" else " · after ${duration(s.dimSeconds).lowercase()}") {
                 open(Page.WALL_IDLE)
             }
             Item(Icons.Outlined.Hearing, "Wake word", if (s.wakeWord) "Listens for \u201C${s.wakePhrase.label}\u201D" else "Off") { open(Page.WAKE) }
@@ -880,7 +1090,7 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.Add, "Add a dashboard", null) { set(s.copy(dashboards = s.dashboards + Dashboard("", ""))) }
         }
-        Footnote("Lena's strip across the top shows the time, the weather and how she feels, with buttons to talk to her, open your chats, your other apps and settings. When she's worried about something at home it turns into a banner saying what's wrong.")
+        Footnote("Home Assistant's own header is replaced by Lena's bar: back and Home Assistant's menu, the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons for your chats, reload, your other apps and settings. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
     }
 
     /** What it shows when no one's using it, and what wakes it up. Also the screen saver. */
@@ -891,12 +1101,18 @@ class SettingsActivity : ComponentActivity() {
         var picking by remember { mutableStateOf(false) }
         val house = hasHouse()
 
-        Footnote("After a while without a touch the dashboards step aside for this. The screen saver shows it too.")
+        Footnote("After a while without a touch the dashboards give way to this screen saver. Android's own screen saver shows it too.")
         Group {
-            PickItem(Icons.Outlined.Timer, "Step aside", listOf(2, 5, 10, 30, 0).map { it to dimLabel(it) }, s.dimMinutes) {
-                set(s.copy(dimMinutes = it))
+            PickItem(Icons.Outlined.Timer, "Screen saver after",
+                screenSaverDelays.map { it to if (it == 0) "Never" else "${duration(it)} without a touch" }, s.dimSeconds) {
+                set(s.copy(dimSeconds = it))
+            }
+            PickItem(Icons.Outlined.Forum, "Back from your chats after",
+                listOf(30, 60, 120, 300, 600, 0).map { it to if (it == 0) "Never" else "${duration(it)} without a touch" }, s.returnSeconds) {
+                set(s.copy(returnSeconds = it))
             }
         }
+        Footnote("Opened your chats from the wall display and walked away? After this long it goes back to the dashboards and straight to the screen saver. Not while you're typing, in a voice call, or while she's still answering.")
 
         SectionTitle("Show")
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -924,7 +1140,7 @@ class SettingsActivity : ComponentActivity() {
             }
             Group {
                 SwitchItem(null, "Shuffle", "Otherwise in the album's order", sl.shuffle) { put(sl.copy(shuffle = it)) }
-                SwitchItem(null, "Fill the screen", "Crops the edges. Off shows the whole photo on a blurred copy of itself.", sl.fill) { put(sl.copy(fill = it)) }
+                PickItem(Icons.Outlined.Crop, "Fit", Framing.entries.map { it to "${it.label}: ${it.detail}" }, sl.framing) { put(sl.copy(framing = it)) }
                 SwitchItem(null, "Time and her mood on top", null, sl.overlay) { put(sl.copy(overlay = it)) }
                 SwitchItem(null, "Her dim clock at night", "10 PM to 6 AM, and when she's drained, so it doesn't light up the room", sl.clockAtNight) {
                     put(sl.copy(clockAtNight = it))
@@ -974,6 +1190,14 @@ class SettingsActivity : ComponentActivity() {
                 ChoiceItem(w.label, if (there) w.detail else "Not in this build", s.wakePhrase == w) { if (there) set(s.copy(wakePhrase = w)) }
             }
         }
+        Section("How sure she must be") {
+            WakeSensitivity.entries.forEach { v ->
+                ChoiceItem(v.label, v.detail, s.wakeSensitivity == v) { set(s.copy(wakeSensitivity = v)) }
+            }
+        }
+        Footnote("Started by mistake? “Hey Lena” is far less likely to be heard in ordinary talk or on TV than “Lena” on its own, and " +
+            "Fewer false starts makes any of them stricter. She also ignores her name until she's been listening for a second, and when " +
+            "a voice check says nobody's speaking (music, a jingle, a clatter). Each start is in Settings → Logs with how sure she was.")
         Footnote("Some phones don't let an app use the microphone from the screen saver; it then says so and you tap to talk.")
     }
 
@@ -1023,6 +1247,12 @@ class SettingsActivity : ComponentActivity() {
         Section("Chat list") {
             ChatListStyle.entries.forEach { c -> ChoiceItem(c.label, c.detail, s.chatList == c) { set(s.copy(chatList = c)) } }
         }
+        Group {
+            PickItem(Icons.Outlined.PushPin, "Pinned chats in the menu", listOf(3, 5, 8, 12).map { it to "Up to $it, then View all" }, s.pinnedShown) {
+                set(s.copy(pinnedShown = it))
+            }
+        }
+        Footnote("Pin a chat by long-pressing it in the menu. Pinned chats sit at the top.")
     }
 
     // ---- Words for the list -----------------------------------------------------------------

@@ -26,6 +26,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +46,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
@@ -56,9 +61,11 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -101,6 +108,68 @@ import java.util.Date
  */
 class DashboardActivity : ComponentActivity() {
 
+    companion object {
+        /** Go straight to the screen saver (coming back from your chats after a while). */
+        const val EXTRA_IDLE = "idle"
+
+        /**
+         * Home Assistant's own header goes, so Lena's bar is the only one: the dashboard's views,
+         * back and the sidebar menu move into it. Edit mode keeps the header (its save button lives
+         * there). The page tells Lena its views as they change.
+         */
+        private const val HEADER_CSS =
+            "div:not(.edit-mode)>.header{display:none!important}" +
+                "div:not(.edit-mode)>hui-view-container{padding-top:var(--safe-area-inset-top,0px)!important}"
+
+        private val HEADER_SCRIPT = """
+            (function () {
+              if (window.__lena) return; window.__lena = true;
+              var post = function (kind, payload) { try { lenaBridge.postMessage(JSON.stringify({kind: kind, payload: payload})); } catch (e) {} };
+              var sr = function (el) { return el && el.shadowRoot; };
+              window.lenaMain = function () {
+                var ha = document.querySelector('home-assistant');
+                return sr(ha) && ha.shadowRoot.querySelector('home-assistant-main');
+              };
+              window.lenaRoot = function () {
+                var main = window.lenaMain();
+                var panel = sr(main) && main.shadowRoot.querySelector('ha-panel-lovelace');
+                return sr(panel) && panel.shadowRoot.querySelector('hui-root');
+              };
+              var last = '';
+              setInterval(function () {
+                var state = {found: false};
+                try {
+                  var r = window.lenaRoot();
+                  if (r && r.shadowRoot) {
+                    if (!r.shadowRoot.getElementById('lena-header')) {
+                      var st = document.createElement('style'); st.id = 'lena-header'; st.textContent = '$HEADER_CSS';
+                      r.shadowRoot.appendChild(st);
+                    }
+                    var cfg = (r.lovelace && r.lovelace.config) || {};
+                    var all = (cfg.views || []).map(function (v, i) {
+                      return {i: i, title: v.title || '', path: String(v.path || i), sub: !!v.subview, hidden: v.visible === false};
+                    });
+                    var cur = typeof r._curView === 'number' ? r._curView : 0;
+                    state = {found: true, current: cur, subview: !!(all[cur] && all[cur].sub), edit: !!(r.lovelace && r.lovelace.editMode),
+                      views: all.filter(function (v) { return !v.sub && !v.hidden; })};
+                  }
+                } catch (e) {}
+                var s = JSON.stringify(state);
+                if (s !== last) { last = s; post('header', s); }
+              }, 600);
+            })();
+        """.trimIndent()
+    }
+
+    /** One of the dashboard's views, as a tab in Lena's bar. */
+    private data class View(val index: Int, val title: String, val path: String)
+
+    /** What Home Assistant's header would have shown. */
+    private data class Header(val views: List<View> = emptyList(), val current: Int = 0, val subview: Boolean = false)
+
+    private val header = mutableStateOf(Header())
+    private val canGoBack = mutableStateOf(false)
+
     private lateinit var web: WebView
     private lateinit var house: HomeAssistant
     private lateinit var base: Uri
@@ -140,6 +209,7 @@ class DashboardActivity : ComponentActivity() {
         web = createWebView()
         open(Prefs.dashboards(this).first(), reload = true)
         setContent { LenaTheme { Screen() } }
+        if (intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
     }
 
     // ---- Home Assistant in a web view ------------------------------------------------------
@@ -176,6 +246,11 @@ class DashboardActivity : ComponentActivity() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 loaded = true
+                canGoBack.value = view.canGoBack()
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                canGoBack.value = view.canGoBack()
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
@@ -219,6 +294,18 @@ class DashboardActivity : ComponentActivity() {
                     val auth = JSONObject().put("access_token", token).put("expires_in", 1800)
                     v.evaluateJavascript("window.$callback(true, $auth);", null)
                 }
+                "header" -> {
+                    val h = runCatching { JSONObject(m.optString("payload", "{}")) }.getOrNull() ?: return@addWebMessageListener
+                    val views = h.optJSONArray("views")
+                    header.value = Header(
+                        views = List(views?.length() ?: 0) { i ->
+                            val v = views!!.getJSONObject(i)
+                            View(v.optInt("i"), v.optString("title").ifBlank { v.optString("path") }, v.optString("path"))
+                        },
+                        current = h.optInt("current"),
+                        subview = h.optBoolean("subview"),
+                    )
+                }
                 "revoke" -> {
                     val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthRevokeToken" }
                     if (callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) v.evaluateJavascript("window.$callback(true);", null)
@@ -251,6 +338,32 @@ class DashboardActivity : ComponentActivity() {
             })();
             """.trimIndent(),
             origins,
+        )
+        WebViewCompat.addDocumentStartJavaScript(view, HEADER_SCRIPT, origins)
+    }
+
+    /** Home Assistant's back: up from a subview, otherwise back through what you opened. */
+    private fun back() {
+        if (header.value.subview) web.evaluateJavascript("(function(){var r=window.lenaRoot&&lenaRoot();if(r&&r._goBack)r._goBack();else history.back();})();", null)
+        else if (web.canGoBack()) web.goBack()
+    }
+
+    /** Home Assistant's sidebar: every dashboard, settings and the rest. */
+    private fun menu() {
+        web.evaluateJavascript(
+            "(function(){var m=window.lenaMain&&lenaMain();if(m)m.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));})();",
+            null,
+        )
+    }
+
+    /** One of the dashboard's views, the way its own tabs switch. */
+    private fun showView(v: View) {
+        val path = JSONObject.quote(v.path)
+        web.evaluateJavascript(
+            "(function(){var r=window.lenaRoot&&lenaRoot();if(r&&r._navigateToView){r._navigateToView($path);return;}" +
+                "var p=(r&&r.route&&r.route.prefix)||location.pathname.split('/').slice(0,2).join('/');" +
+                "history.pushState(null,'',p+'/'+$path);window.dispatchEvent(new CustomEvent('location-changed',{detail:{replace:false}}));})();",
+            null,
         )
     }
 
@@ -336,6 +449,11 @@ class DashboardActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Back from your chats after a while: straight to the screen saver.
+        if (intent.getBooleanExtra(EXTRA_IDLE, false) && ::web.isInitialized) {
+            dim()
+            return
+        }
         // Pressing home while it's the home screen: back to the first dashboard.
         if (intent.hasCategory(Intent.CATEGORY_HOME) && ::web.isInitialized) {
             wakeUp()
@@ -377,13 +495,13 @@ class DashboardActivity : ComponentActivity() {
                 delay(60_000)
             }
         }
-        // Dim after a while without a touch; while dimmed, watch the motion sensor.
+        // The screen saver after a while without a touch; while it shows, watch the motion sensor.
         LaunchedEffect(Unit) {
-            val minutes = Prefs.dimMinutes(this@DashboardActivity)
+            val seconds = Prefs.dimSeconds(this@DashboardActivity)
             val motion = Prefs.motionEntity(this@DashboardActivity).trim()
             while (true) {
                 delay(3_000)
-                if (!dimmed.value && minutes > 0 && System.currentTimeMillis() - lastTouch.longValue > minutes * 60_000L &&
+                if (!dimmed.value && seconds > 0 && System.currentTimeMillis() - lastTouch.longValue > seconds * 1000L &&
                     now.feelings?.moment != "Worried") dim()
                 if (dimmed.value && motion.isNotEmpty()) {
                     val state = runCatching { house.state(motion) }.getOrNull()
@@ -394,7 +512,7 @@ class DashboardActivity : ComponentActivity() {
         BackHandler(enabled = true) {
             when {
                 apps -> apps = false
-                web.canGoBack() -> web.goBack()
+                header.value.subview || web.canGoBack() -> back()
                 // As the home screen, back has nowhere to go; otherwise it leaves.
                 !isHome() -> finish()
             }
@@ -404,14 +522,7 @@ class DashboardActivity : ComponentActivity() {
             Column(Modifier.fillMaxSize()) {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
-                else Strip(now, clock, onTalk = ::talk, onApps = { apps = true })
-                if (dashboards.size > 1) {
-                    PrimaryScrollableTabRow(selectedTabIndex = tab.intValue, containerColor = MaterialTheme.colorScheme.surface, edgePadding = 12.dp) {
-                        dashboards.forEachIndexed { i, d ->
-                            Tab(selected = tab.intValue == i, onClick = { tab.intValue = i; open(d) }, text = { Text(d.name.ifBlank { d.path }) })
-                        }
-                    }
-                }
+                else Strip(now, clock, dashboards, onTalk = ::talk, onApps = { apps = true })
                 AndroidView(factory = { web }, modifier = Modifier.fillMaxWidth().weight(1f))
             }
             // Dimmed: Lena's night clock over everything, at the lowest brightness.
@@ -427,26 +538,56 @@ class DashboardActivity : ComponentActivity() {
         return home?.activityInfo?.packageName == packageName
     }
 
+    /**
+     * The one bar across the top: Home Assistant's back and menu, the time and weather, the
+     * dashboard's views, how she feels (tap to talk), and your chats, reload, apps and settings.
+     */
     @Composable
-    private fun Strip(now: HouseNow, clock: Date, onTalk: () -> Unit, onApps: () -> Unit) {
+    private fun Strip(now: HouseNow, clock: Date, dashboards: List<Dashboard>, onTalk: () -> Unit, onApps: () -> Unit) {
+        val h = header.value
+        var pickDashboard by remember { mutableStateOf(false) }
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
-                Text(
-                    DateFormat.getTimeFormat(this@DashboardActivity).format(clock),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                Column(Modifier.weight(1f)) {
-                    Text(DateFormat.format("EEEE, MMMM d", clock).toString(), style = MaterialTheme.typography.titleSmall)
-                    now.weather?.let { w ->
-                        Text(
-                            listOfNotNull(w.temperature?.let { "%.0f%s".format(it, w.unit.ifBlank { "°" }) },
-                                w.condition.replace('-', ' ').replaceFirstChar { it.uppercase() }).joinToString(" · "),
-                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                IconButton(onClick = ::back, enabled = h.subview || canGoBack.value) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
+                Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
+                    Text(DateFormat.getTimeFormat(this@DashboardActivity).format(clock), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        listOfNotNull(
+                            DateFormat.format("EEE, MMM d", clock).toString(),
+                            now.weather?.let { w ->
+                                listOfNotNull(w.temperature?.let { "%.0f%s".format(it, w.unit.ifBlank { "°" }) },
+                                    w.condition.replace('-', ' ').replaceFirstChar { it.uppercase() }).joinToString(" ")
+                            },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                    )
+                }
+                // The dashboard's views, where Home Assistant's tabs were.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                ) {
+                    if (h.views.size > 1) h.views.forEach { v ->
+                        val on = v.index == h.current && !h.subview
+                        FilterChip(selected = on, onClick = { showView(v) }, label = { Text(v.title, maxLines = 1) })
+                    }
+                }
+                if (dashboards.size > 1) Box {
+                    IconButton(onClick = { pickDashboard = true }) { Icon(Icons.Outlined.Dashboard, "Dashboards") }
+                    DropdownMenu(expanded = pickDashboard, onDismissRequest = { pickDashboard = false }) {
+                        dashboards.forEachIndexed { i, d ->
+                            DropdownMenuItem(
+                                text = { Text(d.name.ifBlank { d.path }) },
+                                leadingIcon = { RadioButton(selected = tab.intValue == i, onClick = null) },
+                                onClick = { pickDashboard = false; tab.intValue = i; open(d) },
+                            )
+                        }
                     }
                 }
                 // How she feels, and a tap to talk to her.
@@ -454,10 +595,10 @@ class DashboardActivity : ComponentActivity() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.clip(RoundedCornerShape(28.dp)).clickable(onClick = onTalk)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 6.dp, end = 14.dp, top = 5.dp, bottom = 5.dp),
                 ) {
-                    LenaAvatar(36.dp)
-                    Column(Modifier.width(220.dp)) {
+                    LenaAvatar(32.dp)
+                    Column(Modifier.width(180.dp)) {
                         val f = now.feelings
                         Text(listOfNotNull("Lena", f?.mood, f?.moment).joinToString(" · "), style = MaterialTheme.typography.titleSmall,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -471,7 +612,10 @@ class DashboardActivity : ComponentActivity() {
                     Icon(Icons.Rounded.Mic, "Talk to Lena", tint = MaterialTheme.colorScheme.primary)
                 }
                 FilledTonalIconButton(onClick = {
-                    startActivity(Intent(this@DashboardActivity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    startActivity(
+                        Intent(this@DashboardActivity, MainActivity::class.java)
+                            .putExtra(MainActivity.EXTRA_FROM_WALL, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
                 }) { Icon(Icons.Outlined.Forum, "Chats") }
                 FilledTonalIconButton(onClick = { web.reload() }) { Icon(Icons.Outlined.Refresh, "Reload the dashboard") }
                 FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }

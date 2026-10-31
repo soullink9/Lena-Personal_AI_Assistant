@@ -22,9 +22,9 @@ enum class FollowUp { ALWAYS, QUESTIONS, OFF }
 
 /** How the drawer lists your chats. */
 enum class ChatListStyle(val label: String, val detail: String) {
+    SLIM("Slim groups", "Rounded groups, but tighter"),
     GROUPS("Rounded groups", "Each day in its own rounded group"),
     FLAT("Flat list", "Plain rows, only the open chat highlighted. Fits the most."),
-    SLIM("Slim groups", "Rounded groups, but tighter"),
     TIMED("Title and time", "Plain rows with when you last used each chat"),
     TIMELINE("Timeline", "Your days on a line down the side"),
     FOLDING("Folding days", "Tap a day to open or close it"),
@@ -32,16 +32,23 @@ enum class ChatListStyle(val label: String, val detail: String) {
 
 /** What talking to Lena looks like over other apps. */
 enum class AskStyle(val label: String, val detail: String) {
+    ORB("Orb", "Her logo pulses in the middle of a darkened screen, with her words underneath"),
     SHEET("Sheet", "A panel from the bottom with your conversation"),
     GLOW("Glow", "Light around the edges of the screen that follows your voice, with a small caption"),
     BAR("Bar", "A small bar at the bottom; her answer pops up in a card above it"),
-    ORB("Orb", "Her logo pulses in the middle of a darkened screen, with her words underneath"),
     ISLAND("Island", "A small pill at the top; her answer drops down under it"),
     SUBTITLES("Subtitles", "No panel: her words appear at the bottom like film subtitles"),
 }
 
 /** How one photo gives way to the next in the slideshow. */
 enum class SlideTransition(val label: String) { FADE("Fade"), SLIDE("Slide"), ZOOM("Slow zoom and fade"), NONE("None") }
+
+/** How a photo fits the screen. */
+enum class Framing(val label: String, val detail: String) {
+    SMART("Smart", "Fills the screen when little would be cut off, keeping faces in; portrait and panorama photos show whole"),
+    FILL("Fill the screen", "Always fills it, cropping the edges around the faces it finds"),
+    WHOLE("Whole photo", "Every photo shown whole, on a blurred copy of itself"),
+}
 
 /** The photo slideshow in the screen saver, display mode and dashboard mode's idle screen. */
 data class Slides(
@@ -51,7 +58,7 @@ data class Slides(
     val seconds: Int = 15,
     val transition: SlideTransition = SlideTransition.FADE,
     val shuffle: Boolean = true,
-    val fill: Boolean = true,
+    val framing: Framing = Framing.SMART,
     val overlay: Boolean = true,
     val clockAtNight: Boolean = true,
 )
@@ -61,18 +68,49 @@ data class Dashboard(val name: String, val path: String)
 
 /** The word that wakes her in display mode, and the model file the build adds for it. */
 enum class WakePhrase(val label: String, val file: String, val detail: String) {
-    LENA("Lena", "lena.tflite", "A microWakeWord model, the kind Home Assistant's voice satellites use"),
+    HEY_LENA("Hey Lena", "hey_lena.tflite", "Two words, so far fewer false starts. A microWakeWord model, like Home Assistant's voice satellites."),
+    LENA("Lena", "lena.tflite", "Just her name: quicker to say, but ordinary speech wakes her more often"),
     JARVIS("Hey Jarvis", "hey_jarvis_v0.1.tflite", "openWakeWord's model, free for personal, non-commercial use"),
 }
 
-/** A prompt Lena sends on her own every day at [hour]:[minute]. */
+/** How often a scheduled prompt runs. */
+enum class Repeat(val label: String) {
+    DAILY("Every day"), WEEKDAYS("Weekdays"), WEEKENDS("Weekends"), DAYS("On the days you pick"),
+    HOURS("Every few hours"), MONTHLY("Once a month"), ONCE("Once"),
+}
+
+/**
+ * A prompt Lena sends on her own at [hour]:[minute], as often as [repeat] says. With a [chat]
+ * name, every run goes into the chat of that name (made the first time), so a morning and an
+ * evening briefing can share one history; without one, each run is a new chat.
+ */
 data class Schedule(
     val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
     val hour: Int = 7,
     val minute: Int = 0,
     val prompt: String = "",
     val enabled: Boolean = true,
-)
+    val chat: String = "",
+    val repeat: Repeat = Repeat.DAILY,
+    /** For [Repeat.DAYS]: ISO days of the week, 1 = Monday ... 7 = Sunday. */
+    val days: Set<Int> = setOf(1, 2, 3, 4, 5),
+    /** For [Repeat.HOURS]: every this many hours, from [hour]:[minute] until midnight. */
+    val everyHours: Int = 3,
+    /** For [Repeat.MONTHLY]: the day of the month (the last day, in shorter months). */
+    val dayOfMonth: Int = 1,
+    /** For [Repeat.ONCE]: the date, as days since 1970-01-01. */
+    val date: Long = 0,
+) {
+    /** What it's called in Settings: its name, or the start of its prompt. */
+    val title: String get() = name.trim().ifBlank { prompt.lineSequence().firstOrNull()?.take(40)?.ifBlank { null } ?: "Scheduled prompt" }
+}
+
+/** Signing in to Open WebUI by itself when its session ends (for example when the server restarts). */
+enum class AutoSignIn(val label: String) { OFF("Off"), PASSWORD("Email and password"), LDAP("LDAP") }
+
+/** The chat that talking to Lena always uses. */
+const val ASSISTANT_CHAT = "Assistant Lena"
 
 /** Everything on the settings screen. */
 data class Settings(
@@ -93,13 +131,19 @@ data class Settings(
     val widgetMood: Boolean = false,
     val lockScreen: Boolean = false,
     val openWebUiMenus: Boolean = false,
-    val chatList: ChatListStyle = ChatListStyle.GROUPS,
-    val askStyle: AskStyle = AskStyle.SHEET,
+    val chatList: ChatListStyle = ChatListStyle.SLIM,
+    val askStyle: AskStyle = AskStyle.ORB,
     val alerts: Boolean = false,
     val wakeWord: Boolean = false,
-    val wakePhrase: WakePhrase = WakePhrase.LENA,
+    val wakePhrase: WakePhrase = WakePhrase.HEY_LENA,
+    val wakeSensitivity: WakeSensitivity = WakeSensitivity.BALANCED,
     val dashboards: List<Dashboard> = listOf(Dashboard("Home", "lovelace")),
-    val dimMinutes: Int = 5,
+    /** Seconds without a touch before the wall display's screen saver; 0 never. */
+    val dimSeconds: Int = 300,
+    /** Seconds without a touch in your chats, opened from the wall display, before it goes back; 0 never. */
+    val returnSeconds: Int = 60,
+    val pinnedShown: Int = 5,
+    val autoSignIn: AutoSignIn = AutoSignIn.OFF,
     val motionEntity: String = "",
     val slides: Slides = Slides(),
 )
@@ -158,8 +202,9 @@ object Prefs {
         return if (p(c).getBoolean("follow_ups", true)) FollowUp.ALWAYS else FollowUp.OFF // 2.1.0 setting
     }
 
-    /** One ongoing conversation for talking to Lena, instead of a new chat each time. */
-    fun ongoing(c: Context): Boolean = p(c).getBoolean("ongoing", true)
+    /** Talking to Lena always continues the "Assistant Lena" chat (a setting before 2.17.0; now always on). */
+    @Suppress("UNUSED_PARAMETER")
+    fun ongoing(c: Context): Boolean = true
 
     /** The model's context size in tokens; half of it holds the ongoing conversation. */
     fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", 32_768)
@@ -177,12 +222,20 @@ object Prefs {
         val a = runCatching { JSONArray(p(c).getString("schedules", "[]")) }.getOrDefault(JSONArray())
         return List(a.length()) { i ->
             val o = a.getJSONObject(i)
+            val days = o.optJSONArray("days")
             Schedule(
                 id = o.getString("id"),
+                name = o.optString("name"),
                 hour = o.getInt("hour"),
                 minute = o.getInt("minute"),
                 prompt = o.getString("prompt"),
                 enabled = o.optBoolean("enabled", true),
+                chat = o.optString("chat"),
+                repeat = runCatching { Repeat.valueOf(o.optString("repeat", "DAILY")) }.getOrDefault(Repeat.DAILY),
+                days = if (days == null) setOf(1, 2, 3, 4, 5) else List(days.length()) { days.optInt(it) }.filter { it in 1..7 }.toSet(),
+                everyHours = o.optInt("every_hours", 3).coerceIn(1, 12),
+                dayOfMonth = o.optInt("day_of_month", 1).coerceIn(1, 31),
+                date = o.optLong("date", 0),
             )
         }
     }
@@ -210,8 +263,12 @@ object Prefs {
         alerts = alerts(c),
         wakeWord = wakeWord(c),
         wakePhrase = wakePhrase(c),
+        wakeSensitivity = wakeSensitivity(c),
         dashboards = dashboards(c),
-        dimMinutes = dimMinutes(c),
+        dimSeconds = dimSeconds(c),
+        returnSeconds = returnSeconds(c),
+        pinnedShown = pinnedShown(c),
+        autoSignIn = autoSignIn(c),
         motionEntity = motionEntity(c),
         slides = slides(c),
     )
@@ -220,8 +277,10 @@ object Prefs {
         val schedules = JSONArray()
         s.schedules.forEach {
             schedules.put(
-                JSONObject().put("id", it.id).put("hour", it.hour).put("minute", it.minute)
-                    .put("prompt", it.prompt).put("enabled", it.enabled)
+                JSONObject().put("id", it.id).put("name", it.name).put("hour", it.hour).put("minute", it.minute)
+                    .put("prompt", it.prompt).put("enabled", it.enabled).put("chat", it.chat.trim())
+                    .put("repeat", it.repeat.name).put("days", JSONArray(it.days.sorted()))
+                    .put("every_hours", it.everyHours).put("day_of_month", it.dayOfMonth).put("date", it.date)
             )
         }
         p(c).edit()
@@ -247,10 +306,14 @@ object Prefs {
             .putBoolean("alerts", s.alerts)
             .putBoolean("wake_word", s.wakeWord)
             .putString("wake_phrase", s.wakePhrase.name)
+            .putString("wake_sensitivity", s.wakeSensitivity.name)
+            .putInt("return_seconds", s.returnSeconds)
+            .putInt("pinned_shown", s.pinnedShown)
+            .putString("auto_sign_in", s.autoSignIn.name)
             .putString("dashboards", JSONArray().apply {
                 s.dashboards.filter { it.path.isNotBlank() }.forEach { put(JSONObject().put("name", it.name).put("path", it.path)) }
             }.toString())
-            .putInt("dim_minutes", s.dimMinutes)
+            .putInt("dim_seconds", s.dimSeconds)
             .putString("motion_entity", s.motionEntity.trim())
             .putBoolean("slides_on", s.slides.on)
             .putString("slides_album", s.slides.album)
@@ -258,7 +321,7 @@ object Prefs {
             .putInt("slides_seconds", s.slides.seconds)
             .putString("slides_transition", s.slides.transition.name)
             .putBoolean("slides_shuffle", s.slides.shuffle)
-            .putBoolean("slides_fill", s.slides.fill)
+            .putString("slides_framing", s.slides.framing.name)
             .putBoolean("slides_overlay", s.slides.overlay)
             .putBoolean("slides_night", s.slides.clockAtNight)
             .apply()
@@ -292,25 +355,51 @@ object Prefs {
         transition = runCatching { SlideTransition.valueOf(p(c).getString("slides_transition", null) ?: "FADE") }
             .getOrDefault(SlideTransition.FADE),
         shuffle = p(c).getBoolean("slides_shuffle", true),
-        fill = p(c).getBoolean("slides_fill", true),
+        framing = p(c).getString("slides_framing", null)?.let { v -> runCatching { Framing.valueOf(v) }.getOrNull() }
+            ?: if (p(c).getBoolean("slides_fill", true)) Framing.SMART else Framing.WHOLE, // before 2.17.0: a switch
         overlay = p(c).getBoolean("slides_overlay", true),
         clockAtNight = p(c).getBoolean("slides_night", true),
     )
 
-    /** Minutes without a touch before dashboard mode dims to the clock; 0 never dims. */
-    fun dimMinutes(c: Context): Int = p(c).getInt("dim_minutes", 5)
+    /** Seconds without a touch before the wall display's screen saver; 0 never (minutes before 2.17.0). */
+    fun dimSeconds(c: Context): Int = if (p(c).contains("dim_seconds")) p(c).getInt("dim_seconds", 300) else p(c).getInt("dim_minutes", 5) * 60
+
+    /** Seconds without a touch in your chats, opened from the wall display, before it goes back to it; 0 never. */
+    fun returnSeconds(c: Context): Int = p(c).getInt("return_seconds", 60)
+
+    /** How many pinned chats the menu shows before "View all". */
+    fun pinnedShown(c: Context): Int = p(c).getInt("pinned_shown", 5)
+
+    fun autoSignIn(c: Context): AutoSignIn =
+        runCatching { AutoSignIn.valueOf(p(c).getString("auto_sign_in", null) ?: "OFF") }.getOrDefault(AutoSignIn.OFF)
+
+    fun wakeSensitivity(c: Context): WakeSensitivity =
+        runCatching { WakeSensitivity.valueOf(p(c).getString("wake_sensitivity", null) ?: "BALANCED") }.getOrDefault(WakeSensitivity.BALANCED)
+
+    /**
+     * Once, on 2.17.0: talking to Lena now opens as the orb and the chat list as slim groups, so
+     * anyone still on the old defaults (the sheet, rounded groups) moves to the new ones.
+     */
+    fun migrate(c: Context) {
+        val prefs = p(c)
+        if (prefs.getInt("migrated", 0) >= 1) return
+        val e = prefs.edit()
+        if ((prefs.getString("ask_style", null) ?: "SHEET") == "SHEET") e.putString("ask_style", "ORB")
+        if ((prefs.getString("chat_list", null) ?: "GROUPS") == "GROUPS") e.putString("chat_list", "SLIM")
+        e.putInt("migrated", 1).apply()
+    }
 
     /** A motion or presence sensor that wakes dashboard mode, or blank. */
     fun motionEntity(c: Context): String = p(c).getString("motion_entity", "") ?: ""
 
     fun wakePhrase(c: Context): WakePhrase =
-        runCatching { WakePhrase.valueOf(p(c).getString("wake_phrase", null) ?: "LENA") }.getOrDefault(WakePhrase.LENA)
+        runCatching { WakePhrase.valueOf(p(c).getString("wake_phrase", null) ?: "HEY_LENA") }.getOrDefault(WakePhrase.HEY_LENA)
 
     fun chatList(c: Context): ChatListStyle =
-        runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "GROUPS") }.getOrDefault(ChatListStyle.GROUPS)
+        runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "SLIM") }.getOrDefault(ChatListStyle.SLIM)
 
     fun askStyle(c: Context): AskStyle =
-        runCatching { AskStyle.valueOf(p(c).getString("ask_style", null) ?: "SHEET") }.getOrDefault(AskStyle.SHEET)
+        runCatching { AskStyle.valueOf(p(c).getString("ask_style", null) ?: "ORB") }.getOrDefault(AskStyle.ORB)
 
     /**
      * A random secret only Lena knows. Lena's own widget and shortcuts include it, so a prompt

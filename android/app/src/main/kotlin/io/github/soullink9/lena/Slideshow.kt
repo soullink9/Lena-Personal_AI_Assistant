@@ -1,7 +1,10 @@
 package io.github.soullink9.lena
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.graphics.PointF
+import android.media.FaceDetector
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -19,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,11 +60,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -70,10 +78,29 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.util.Date
-import kotlin.random.Random
+import kotlin.math.roundToInt
 
-/** One photo on screen, with a number so the same photo twice in a row still animates. */
-private data class Shown(val bitmap: ImageBitmap, val n: Int)
+/**
+ * One photo on screen, with a number so the same photo twice in a row still animates, and the
+ * point to keep in view when it's cropped ([fx], [fy], 0 to 1 across and down): the faces in it,
+ * or a little above the middle if there are none.
+ */
+private data class Shown(val bitmap: ImageBitmap, val n: Int, val fx: Float, val fy: Float)
+
+/** A photo as loaded: the picture and its focus point. */
+private class Loaded(val bitmap: ImageBitmap, val fx: Float, val fy: Float)
+
+/**
+ * Places a cropped photo so its focus point is as near the middle as it can be without showing
+ * an edge; a photo smaller than the space is centred.
+ */
+private class FocusAlignment(private val fx: Float, private val fy: Float) : Alignment {
+    override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
+        fun axis(content: Int, room: Int, f: Float): Int =
+            if (content <= room) (room - content) / 2 else (room / 2f - f * content).roundToInt().coerceIn(room - content, 0)
+        return IntOffset(axis(size.width, space.width, fx), axis(size.height, space.height, fy))
+    }
+}
 
 /**
  * The photo slideshow: an album from Home Assistant's media (Immich, a local folder...) through
@@ -106,12 +133,12 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
                 }
             }
             val started = System.currentTimeMillis()
-            val bitmap = runCatching { load(context, ha, list[at % list.size]) }
+            val photo = runCatching { load(context, ha, list[at % list.size]) }
                 .onFailure { Logs.w("Slideshow", "Couldn't show a photo", it) }.getOrNull()
             at++
-            if (bitmap != null) {
+            if (photo != null) {
                 problem = null
-                shown = Shown(bitmap, n++)
+                shown = Shown(photo.bitmap, n++, photo.fx, photo.fy)
                 delay((slides.seconds * 1000L - (System.currentTimeMillis() - started)).coerceAtLeast(1_000))
             } else {
                 delay(1_000) // skip a photo that won't load
@@ -148,24 +175,45 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
 @Composable
 private fun Photo(s: Shown?, slides: Slides) {
     if (s == null) return
-    // Slow zoom: each photo drifts in a little over the time it's shown (Ken Burns).
-    val zoom = remember(s.n) { Animatable(1f) }
-    val drift = remember(s.n) { Random.nextFloat() * 2 - 1 to Random.nextFloat() * 2 - 1 }
-    if (slides.transition == SlideTransition.ZOOM) {
-        LaunchedEffect(s.n) { zoom.animateTo(1.12f, tween(slides.seconds * 1000 + 1500, easing = LinearEasing)) }
-    }
-    val moving = Modifier.fillMaxSize().graphicsLayer {
-        scaleX = zoom.value
-        scaleY = zoom.value
-        translationX = drift.first * (zoom.value - 1f) * size.width / 2
-        translationY = drift.second * (zoom.value - 1f) * size.height / 2
-    }
-    Box(Modifier.fillMaxSize()) {
-        if (slides.fill) {
-            Image(s.bitmap, null, contentScale = ContentScale.Crop, modifier = moving)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val room = constraints
+        val bw = s.bitmap.width.toFloat()
+        val bh = s.bitmap.height.toFloat()
+        // How much of the photo filling the screen would cut off: a portrait photo on a landscape
+        // screen loses about half, which is where heads went missing.
+        val photoShape = bw / bh
+        val screenShape = room.maxWidth.toFloat() / room.maxHeight.coerceAtLeast(1)
+        val lost = 1f - minOf(photoShape, screenShape) / maxOf(photoShape, screenShape)
+        val crop = when (slides.framing) {
+            Framing.FILL -> true
+            Framing.WHOLE -> false
+            Framing.SMART -> lost <= 0.3f
+        }
+        // Where the focus point lands on screen, so the slow zoom moves in on the faces.
+        val scale = if (crop) maxOf(room.maxWidth / bw, room.maxHeight / bh) else minOf(room.maxWidth / bw, room.maxHeight / bh)
+        fun pivot(content: Float, space: Int, f: Float): Float {
+            if (space <= 0) return 0.5f
+            val offset = if (content <= space) (space - content) / 2 else (space / 2f - f * content).coerceIn(space - content, 0f)
+            return ((offset + f * content) / space).coerceIn(0f, 1f)
+        }
+        val origin = TransformOrigin(pivot(bw * scale, room.maxWidth, s.fx), pivot(bh * scale, room.maxHeight, s.fy))
+
+        // Slow zoom: each photo drifts in a little over the time it's shown (Ken Burns), towards its faces.
+        val zoom = remember(s.n) { Animatable(1f) }
+        if (slides.transition == SlideTransition.ZOOM) {
+            LaunchedEffect(s.n) { zoom.animateTo(1.12f, tween(slides.seconds * 1000 + 1500, easing = LinearEasing)) }
+        }
+        val moving = Modifier.fillMaxSize().graphicsLayer {
+            scaleX = zoom.value
+            scaleY = zoom.value
+            transformOrigin = origin
+        }
+        val focus = remember(s.n) { FocusAlignment(s.fx, s.fy) }
+        if (crop) {
+            Image(s.bitmap, null, contentScale = ContentScale.Crop, alignment = focus, modifier = moving)
         } else {
             // The whole photo, on a blurred, darkened copy of itself instead of black bars.
-            Image(s.bitmap, null, contentScale = ContentScale.Crop,
+            Image(s.bitmap, null, contentScale = ContentScale.Crop, alignment = focus,
                 modifier = Modifier.fillMaxSize().blur(40.dp).graphicsLayer { alpha = 0.55f })
             Image(s.bitmap, null, contentScale = ContentScale.Fit, modifier = moving)
         }
@@ -216,17 +264,52 @@ private fun Overlay(now: Date, house: HouseNow?, locked: Boolean, listening: Lis
     }
 }
 
-/** Downloads a photo from Home Assistant and decodes it at about screen size, the right way up. */
-private suspend fun load(context: Context, ha: HomeAssistant, path: String): ImageBitmap = withContext(Dispatchers.IO) {
+/** Downloads a photo from Home Assistant, decodes it at about screen size, the right way up, and finds its faces. */
+private suspend fun load(context: Context, ha: HomeAssistant, path: String): Loaded = withContext(Dispatchers.IO) {
     val bytes = ha.bytes(path)
     val screen = context.resources.displayMetrics
     val longest = maxOf(screen.widthPixels, screen.heightPixels).coerceAtLeast(1280)
-    ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+    val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE // readable, for finding faces
         val w = info.size.width
         val h = info.size.height
         val scale = longest.toFloat() / maxOf(w, h)
         if (scale < 1f) decoder.setTargetSize((w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1))
-    }.asImageBitmap()
+    }
+    val (fx, fy) = focusOf(bitmap)
+    Loaded(bitmap.asImageBitmap(), fx, fy)
+}
+
+/**
+ * Where to keep a photo's middle when it's cropped: the faces in it (Android's own face finder,
+ * on the device), between the eyes and the chin and weighted by how sure it is; without faces,
+ * the upper third of a portrait photo (where heads usually are) or just above the middle.
+ */
+private fun focusOf(b: Bitmap): Pair<Float, Float> {
+    val fallback = 0.5f to if (b.height > b.width) 0.33f else 0.45f
+    return runCatching {
+        val scale = 480f / maxOf(b.width, b.height)
+        val w = ((b.width * minOf(scale, 1f)).toInt() / 2 * 2).coerceAtLeast(2) // the face finder needs an even width
+        val h = (b.height * minOf(scale, 1f)).toInt().coerceAtLeast(1)
+        val small = Bitmap.createScaledBitmap(b, w, h, true).copy(Bitmap.Config.RGB_565, false)
+        val faces = arrayOfNulls<FaceDetector.Face>(8)
+        val found = FaceDetector(w, h, faces.size).findFaces(small, faces)
+        small.recycle()
+        if (found <= 0) return fallback
+        var x = 0f
+        var y = 0f
+        var total = 0f
+        val mid = PointF()
+        for (i in 0 until found) {
+            val f = faces[i] ?: continue
+            f.getMidPoint(mid)
+            val weight = f.confidence().coerceAtLeast(0.1f)
+            x += mid.x * weight
+            y += (mid.y + f.eyesDistance() * 0.3f) * weight
+            total += weight
+        }
+        if (total == 0f) fallback else (x / total / w).coerceIn(0f, 1f) to (y / total / h).coerceIn(0f, 1f)
+    }.getOrDefault(fallback)
 }
 
 /**

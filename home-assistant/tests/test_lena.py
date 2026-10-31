@@ -245,6 +245,16 @@ async def test_context_view(hass: HomeAssistant, hass_client) -> None:
     assert body["weather"] == {"condition": "cloudy", "temperature": 61, "unit": "°F"}
 
 
+async def test_time_of_day_in_context(hass: HomeAssistant, freezer) -> None:
+    """She's told the part of the day and whether it's dark, so 8 PM isn't sunny."""
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to("2026-10-31 00:05:00+00:00")  # 8:05 PM in New York
+    await setup(hass)
+    hass.states.async_set("sun.sun", "below_horizon", {"next_rising": "2026-10-31T11:16:00+00:00"})
+    text = hass.data[DOMAIN].context()
+    assert "8:05 PM: evening, and dark out (the sun rises at 7:16 AM)." in text
+
+
 async def test_options_flow(hass: HomeAssistant) -> None:
     entry = await setup(hass, options={})
     result = await hass.config_entries.options.async_init(entry.entry_id)

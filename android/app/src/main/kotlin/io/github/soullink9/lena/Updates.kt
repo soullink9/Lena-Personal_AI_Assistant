@@ -44,6 +44,10 @@ object Updates {
     fun installed(c: Context): String =
         runCatching { c.packageManager.getPackageInfo(c.packageName, 0).versionName }.getOrNull() ?: "0"
 
+    /** The build number Android compares when updating (versionCode); it has to go up, whatever the version name says. */
+    fun installedCode(c: Context): Long =
+        runCatching { c.packageManager.getPackageInfo(c.packageName, 0).longVersionCode }.getOrDefault(0L)
+
     /** True if [a] is a later version than [b] ("2.14.0" > "2.13.2"). */
     fun newer(a: String, b: String): Boolean {
         val x = a.removePrefix("v").split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
@@ -137,8 +141,12 @@ object Updates {
         }
     }
 
-    /** Downloads and checks the release's APK; it's then waiting in [pending]. */
-    suspend fun download(c: Context, r: Release, progress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+    /**
+     * Downloads and checks the release's APK; it's then waiting in [pending]. With [reinstall] it
+     * may be the same build you have (to repair an install, or after the version name was reset);
+     * an older build is refused either way, because Android won't install one over a newer one.
+     */
+    suspend fun download(c: Context, r: Release, reinstall: Boolean = false, progress: (Float) -> Unit) = withContext(Dispatchers.IO) {
         val d = dir(c).apply { deleteRecursively(); mkdirs() }
         val apk = File(d, "lena-${r.version}.apk")
         try {
@@ -165,14 +173,19 @@ object Updates {
                 ?: throw IOException("That file isn't an app.")
             if (archive.packageName != c.packageName) throw IOException("That APK isn't Lena.")
             val mine = pm.getPackageInfo(c.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
-            if (archive.longVersionCode <= mine.longVersionCode) throw IOException("That APK isn't newer than the Lena you have.")
+            if (archive.longVersionCode < mine.longVersionCode) throw IOException(
+                "That APK's build number (${archive.longVersionCode}) is lower than this Lena's (${mine.longVersionCode}), and Android won't " +
+                    "install an older build over a newer one. Keep versionCode going up when you reset the version name, or uninstall Lena first."
+            )
+            if (archive.longVersionCode == mine.longVersionCode && !reinstall) throw IOException("That APK isn't newer than the Lena you have.")
             val sha = { b: ByteArray -> MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) } }
             val theirs = archive.signingInfo?.apkContentsSigners?.map { sha(it.toByteArray()) }?.toSet() ?: emptySet()
             val ours = mine.signingInfo?.apkContentsSigners?.map { sha(it.toByteArray()) }?.toSet() ?: emptySet()
             if (theirs.isEmpty() || theirs != ours) throw IOException("That APK isn't signed with your key, so it was thrown away.")
 
-            p(c).edit().putString("pending_version", archive.versionName ?: r.version).putString("pending_file", apk.name).apply()
-            Logs.i(TAG, "Downloaded and checked ${r.version}")
+            p(c).edit().putString("pending_version", archive.versionName ?: r.version).putString("pending_file", apk.name)
+                .putLong("pending_code", archive.longVersionCode).putBoolean("pending_reinstall", reinstall).apply()
+            Logs.i(TAG, "Downloaded and checked ${r.version}" + if (reinstall) " (to install again)" else "")
         } catch (e: Exception) {
             d.deleteRecursively()
             Logs.w(TAG, "Download of ${r.version} failed", e)
@@ -180,26 +193,36 @@ object Updates {
         }
     }
 
-    /** A checked update waiting to be installed: its version and file. */
+    /** A checked update waiting to be installed: its version and file. Judged by build number, so a reset version name still works. */
     fun pending(c: Context): Pair<String, File>? {
         val version = p(c).getString("pending_version", null) ?: return null
         val file = File(dir(c), p(c).getString("pending_file", null) ?: return null)
-        return if (file.exists() && newer(version, installed(c))) version to file else null
+        if (!file.exists()) return null
+        val code = p(c).getLong("pending_code", -1)
+        val still = when {
+            code < 0 -> newer(version, installed(c)) // downloaded before 2.17.0
+            p(c).getBoolean("pending_reinstall", false) -> code >= installedCode(c)
+            else -> code > installedCode(c)
+        }
+        return if (still) version to file else null
     }
+
+    /** True if [release] isn't the version you have: newer, or (after a reset) just different. */
+    fun different(release: String, c: Context) = release.removePrefix("v") != installed(c).removePrefix("v")
 
     /** Deletes a downloaded update that's no longer needed (installed, or no longer newer). */
     fun cleanUp(c: Context) {
         val version = p(c).getString("pending_version", null)
         if (version != null && pending(c) == null) {
             dir(c).deleteRecursively()
-            p(c).edit().remove("pending_version").remove("pending_file").apply()
+            p(c).edit().remove("pending_version").remove("pending_file").remove("pending_code").remove("pending_reinstall").apply()
             Logs.i(TAG, "Removed the downloaded update ($version is installed or no longer needed)")
         }
     }
 
     fun discard(c: Context) {
         dir(c).deleteRecursively()
-        p(c).edit().remove("pending_version").remove("pending_file").apply()
+        p(c).edit().remove("pending_version").remove("pending_file").remove("pending_code").remove("pending_reinstall").apply()
     }
 
     // ---- Installing -----------------------------------------------------------------------
@@ -234,7 +257,8 @@ object Updates {
 
     /** After an update: tidy up, and the Play Protect reminder if you paused it. */
     fun afterUpdate(c: Context) {
-        cleanUp(c)
+        // Whatever was waiting has just been installed (or replaced by another install): it's not needed now.
+        if (p(c).contains("pending_version")) discard(c)
         Logs.i(TAG, "Updated to ${installed(c)}")
         if (!p(c).getBoolean("remind_play_protect", false)) return
         remindPlayProtect(c, false)

@@ -35,12 +35,12 @@ data class Reply(val content: String, val done: Boolean)
  * If a sign-in proxy such as Authentik sits in front of Open WebUI, its cookie for your server's
  * address is sent along too, exactly as the web view would.
  */
-class Api(server: String) {
+class Api(server: String, private val context: Context? = null) {
 
     private val base = server.trimEnd('/')
 
     companion object {
-        fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it) }
+        fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it, c.applicationContext) }
 
         /**
          * A conversation that never ends outgrows any model. Lena gives it half of the model's
@@ -76,6 +76,11 @@ class Api(server: String) {
     /** True when Lena holds a sign-in for your server. */
     suspend fun signedIn(): Boolean = tokenFrom(cookies()) != null
 
+    /**
+     * One request. Signed out (Open WebUI restarted, say) with automatic sign-in on: sign in again
+     * and try once more. Open WebUI also answers some missing things as "signed out", so the
+     * session is checked first and only an ended one is renewed.
+     */
     private suspend fun call(
         method: String,
         path: String,
@@ -84,6 +89,26 @@ class Api(server: String) {
         auth: Boolean = true,
         readTimeoutMs: Int = 30_000,
         accept: String = "application/json",
+    ): ByteArray = try {
+        callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+    } catch (e: AuthException) {
+        val c = context
+        if (!auth || c == null || !OpenWebUiSignIn.configured(c)) throw e
+        val ended = tokenFrom(cookies()) == null ||
+            runCatching { callOnce("GET", "/api/v1/auths/", null, "application/json", true, 15_000, "application/json") }
+                .exceptionOrNull() is AuthException
+        if (!ended || OpenWebUiSignIn.signIn(c) == null) throw e
+        callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+    }
+
+    private suspend fun callOnce(
+        method: String,
+        path: String,
+        body: ByteArray?,
+        contentType: String,
+        auth: Boolean,
+        readTimeoutMs: Int,
+        accept: String,
     ): ByteArray {
         val cookies = cookies()
         val token = tokenFrom(cookies)
@@ -170,7 +195,23 @@ class Api(server: String) {
         return all.firstOrNull { it.id == wanted } ?: Prefs.lenaIn(all) ?: all.firstOrNull()
     }
 
+    /** Your chats, newest first: not the pinned ones (see [pinned]) or those in folders, as in Open WebUI's sidebar. */
     suspend fun chats(): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/?page=1"))
+
+    /** Your pinned chats. */
+    suspend fun pinned(): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/pinned"))
+
+    /** Pins a chat, or unpins it if it's pinned. */
+    suspend fun togglePin(id: String) {
+        request("POST", "/api/v1/chats/${enc(id)}/pin")
+    }
+
+    /** Your most recently used chat with exactly this title (pinned ones first), or null. */
+    suspend fun chatTitled(title: String): ChatItem? {
+        val pinned = runCatching { pinned() }.getOrDefault(emptyList())
+        pinned.filter { it.title == title }.maxByOrNull { it.updatedMillis }?.let { return it }
+        return search(title).filter { it.title == title }.maxByOrNull { it.updatedMillis }
+    }
 
     suspend fun search(text: String): List<ChatItem> =
         parseChats(request("GET", "/api/v1/chats/search?text=${enc(text)}"))
@@ -344,9 +385,15 @@ class Api(server: String) {
 
         // Spoken turns: tell her the reply will be read aloud, so she uses her spoken style (no lists or
         // formatting, short). Sent with this request only; it isn't saved in the chat.
+        // The phone's own clock, said plainly, so she never greets the evening with sunshine (and
+        // knows the time even without Home Assistant).
         // On the lock screen the person may not be the phone's owner. This asks her to be careful; it
         // isn't a lock, which is why lock-screen mode is off unless you turn it on.
+        val local = java.time.ZonedDateTime.now()
+        val part = when (local.hour) { in 5..11 -> "morning"; in 12..16 -> "afternoon"; in 17..20 -> "evening"; else -> "night" }
+        val clock = local.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, h:mm a", java.util.Locale.US))
         val hints = listOfNotNull(
+            "The time on the phone: $clock ($part).",
             if (spoken) "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken." else null,
             if (locked) "The phone is locked, so this may not be its owner. Don't unlock, open or disarm anything, " +
                 "and don't share personal details, earlier conversations or what you remember about people. " +

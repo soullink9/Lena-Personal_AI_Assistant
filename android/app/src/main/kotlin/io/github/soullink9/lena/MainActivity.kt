@@ -61,6 +61,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -134,6 +135,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /** Open WebUI inside a native shell: top bar, drawer with your chats, and the locks around the page. */
 class MainActivity : ComponentActivity() {
@@ -146,6 +148,9 @@ class MainActivity : ComponentActivity() {
         const val ACTION_SETTINGS = "io.github.soullink9.lena.SETTINGS"
         const val EXTRA_CHAT_ID = "chat_id"
         const val EXTRA_TEXT = "text"
+        /** Opened from the wall display: after a while without a touch, go back to it. */
+        const val EXTRA_FROM_WALL = "from_wall"
+        private const val PINNED = "Pinned"
 
         /** Hides Open WebUI's own header and sidebar; the drawer and top bar replace them. */
         private const val HIDE_CSS =
@@ -169,7 +174,10 @@ class MainActivity : ComponentActivity() {
     private val currentUrl = mutableStateOf("")
     private val canGoBack = mutableStateOf(false)
     private val showMenus = mutableStateOf(false)
-    private val chatStyle = mutableStateOf(ChatListStyle.GROUPS)
+    private val chatStyle = mutableStateOf(ChatListStyle.SLIM)
+
+    private var fromWall = false
+    private var lastInteraction = System.currentTimeMillis()
 
     private var pendingMic: PermissionRequest? = null
     private var pendingFiles: ValueCallback<Array<Uri>>? = null
@@ -200,7 +208,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         server = Uri.parse(url)
-        api = Api(url)
+        api = Api(url, applicationContext)
         Prefs.signIn(this).split(" ").filter { it.isNotBlank() }.forEach { signIn += Uri.parse(it) }
         showMenus.value = Prefs.showOpenWebUiMenus(this)
         chatStyle.value = Prefs.chatList(this)
@@ -213,6 +221,50 @@ class MainActivity : ComponentActivity() {
         val restored = savedInstanceState?.getString("url")?.takeIf { isServer(Uri.parse(it)) }
         if (restored != null) web.loadUrl(restored) else handle(intent, fresh = true)
         askForNotificationsOnce()
+        fromWall = intent?.getBooleanExtra(EXTRA_FROM_WALL, false) == true || wallIsHome()
+        watchForIdle()
+    }
+
+    /** The wall display is this tablet's home screen, so your chats are a visit from it. */
+    private fun wallIsHome(): Boolean {
+        val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo
+        return home?.packageName == packageName && home.name == DashboardActivity::class.java.name
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        lastInteraction = System.currentTimeMillis()
+    }
+
+    /**
+     * Opened from the wall display and then left alone for a while (Settings → Wall display → When
+     * no one's around): back to the dashboards, straight to the screen saver. Not while the
+     * keyboard is up, during a voice call, or while she's still answering.
+     */
+    private fun watchForIdle() {
+        lifecycleScope.launch {
+            while (true) {
+                delay(5_000)
+                val seconds = Prefs.returnSeconds(this@MainActivity)
+                if (!fromWall || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
+                val typing = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView)
+                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+                val calling = Uri.parse(currentUrl.value).getQueryParameter("call") == "true"
+                if (typing || calling) { lastInteraction = System.currentTimeMillis(); continue }
+                if (System.currentTimeMillis() - lastInteraction < seconds * 1000L) continue
+                val answering = chatIdOf(currentUrl.value)?.let { id -> runCatching { api.runningTasks(id) }.getOrDefault(0) > 0 } == true
+                if (answering) { lastInteraction = System.currentTimeMillis(); continue }
+                Logs.i("Chats", "Left alone for a while; back to the wall display")
+                startActivity(
+                    Intent(this@MainActivity, DashboardActivity::class.java)
+                        .putExtra(DashboardActivity.EXTRA_IDLE, true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                )
+                fromWall = false
+                finish()
+                return@launch
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -233,6 +285,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        fromWall = intent.getBooleanExtra(EXTRA_FROM_WALL, false) || wallIsHome()
+        lastInteraction = System.currentTimeMillis()
         handle(intent, fresh = false)
     }
 
@@ -349,6 +403,7 @@ class MainActivity : ComponentActivity() {
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             currentUrl.value = url ?: ""
             canGoBack.value = view.canGoBack()
+            maybeSignIn(url)
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
@@ -388,6 +443,31 @@ class MainActivity : ComponentActivity() {
                 pendingFiles = null
                 false
             }
+        }
+    }
+
+    private var signingIn = false
+
+    /**
+     * Open WebUI sent the page to its sign-in screen (its session ended, for example because the
+     * server restarted). With automatic sign-in on, sign in with the saved details, hand the page
+     * its new session the way its own sign-in does, and go back to where it was.
+     */
+    private fun maybeSignIn(url: String?) {
+        val u = url?.let { Uri.parse(it) } ?: return
+        val base = server.path?.trimEnd('/') ?: ""
+        if (signingIn || !isServer(u) || u.path?.trimEnd('/') != "$base/auth" || !OpenWebUiSignIn.configured(this)) return
+        signingIn = true
+        lifecycleScope.launch {
+            val token = OpenWebUiSignIn.signIn(this@MainActivity)
+            signingIn = false
+            if (token == null) return@launch
+            val back = u.getQueryParameter("redirect")?.takeIf { it.startsWith("/") && !it.startsWith("//") }
+            val target = serverOrigin() + (back ?: "$base/")
+            web.evaluateJavascript(
+                "try{localStorage.setItem('token',${JSONObject.quote(token)});}catch(e){}location.replace(${JSONObject.quote(target)});",
+                null,
+            )
         }
     }
 
@@ -445,6 +525,8 @@ class MainActivity : ComponentActivity() {
         val drawer = rememberDrawerState(DrawerValue.Closed)
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
         var chats by remember { mutableStateOf<List<ChatItem>?>(null) }
+        var pinned by remember { mutableStateOf<List<ChatItem>>(emptyList()) }
+        var allPinned by remember { mutableStateOf(false) }
         var chatsError by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") }
         var version by remember { mutableStateOf<String?>(null) }
@@ -481,6 +563,7 @@ class MainActivity : ComponentActivity() {
             feelings = HomeAssistant.from(this@MainActivity)?.let { runCatching { it.feelings() }.getOrNull() }
             try {
                 chats = if (query.isBlank()) api.chats() else api.search(query.trim())
+                pinned = if (query.isBlank()) runCatching { api.pinned() }.getOrDefault(pinned) else emptyList()
                 chatsError = null
             } catch (_: AuthException) {
                 chatsError = "Sign in to see your chats"
@@ -521,7 +604,16 @@ class MainActivity : ComponentActivity() {
                         SearchField(query, "Search chats", Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) { query = it }
                         ChatList(
                             chats, chatsError, query.isNotBlank(), chatId, chatStyle.value, Modifier.weight(1f),
+                            pinned = pinned,
+                            pinnedLimit = if (allPinned) Int.MAX_VALUE else Prefs.pinnedShown(this@MainActivity),
+                            onAllPinned = { allPinned = !allPinned },
                             onOpen = { id -> closeThen { openChat(id) } },
+                            onPin = { c ->
+                                scope.launch {
+                                    if (runCatching { api.togglePin(c.id) }.isFailure) toast("Couldn't pin the chat")
+                                    refresh++
+                                }
+                            },
                             onRename = { renaming = it },
                             onDelete = { deleting = it },
                         )
@@ -698,11 +790,16 @@ class MainActivity : ComponentActivity() {
         currentId: String?,
         style: ChatListStyle,
         modifier: Modifier,
+        pinned: List<ChatItem>,
+        pinnedLimit: Int,
+        onAllPinned: () -> Unit,
         onOpen: (String) -> Unit,
+        onPin: (ChatItem) -> Unit,
         onRename: (ChatItem) -> Unit,
         onDelete: (ChatItem) -> Unit,
     ) {
         val folded = remember { mutableStateMapOf<String, Boolean>() } // folding days: which are open
+        val pinnedIds = pinned.map { it.id }.toSet()
         val side = when (style) {
             ChatListStyle.GROUPS, ChatListStyle.SLIM -> 12.dp
             ChatListStyle.TIMED -> 0.dp
@@ -712,12 +809,15 @@ class MainActivity : ComponentActivity() {
             when {
                 error != null -> item { Hint(error) }
                 chats == null -> item { Hint("Loading…") }
-                chats.isEmpty() -> item { Hint(if (searching) "No matching chats" else "No chats yet") }
+                chats.isEmpty() && (searching || pinned.isEmpty()) -> item { Hint(if (searching) "No matching chats" else "No chats yet") }
                 else -> {
-                    val groups = if (searching) listOf("Results" to chats) else group(chats)
+                    // Pinned chats first, as their own group: up to the limit, then "View all".
+                    val shownPinned = pinned.take(pinnedLimit)
+                    val groups = if (searching) listOf("Results" to chats)
+                    else (if (shownPinned.isNotEmpty()) listOf(PINNED to shownPinned) else emptyList()) + group(chats)
                     groups.forEachIndexed { index, (label, list) ->
                         val row: @Composable (ChatItem, @Composable (ChatItem, () -> Unit) -> Unit) -> Unit = { c, look ->
-                            WithChatMenu({ onRename(c) }, { onDelete(c) }) { longPress -> look(c, longPress) }
+                            WithChatMenu(c.id in pinnedIds, { onPin(c) }, { onRename(c) }, { onDelete(c) }) { longPress -> look(c, longPress) }
                         }
                         when (style) {
                             ChatListStyle.GROUPS -> item(key = "g-$label") {
@@ -801,13 +901,21 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             ChatListStyle.FOLDING -> {
-                                val open = folded[label] ?: (searching || label == "Today" || label == "Yesterday")
-                                item(key = "f-$label") { FoldHeader(label, list.size, open) { folded[label] = !open } }
+                                val open = folded[label] ?: (searching || label == PINNED || label == "Today" || label == "Yesterday")
+                                item(key = "f-$label") { FoldHeader(label, if (label == PINNED) pinned.size else list.size, open) { folded[label] = !open } }
                                 if (open) items(list, key = { it.id }) { c ->
                                     row(c) { it, longPress ->
                                         ChatLine(it, it.id == currentId, null, 40.dp, 24.dp, RoundedCornerShape(20.dp),
                                             Color.Transparent, { onOpen(it.id) }, longPress)
                                     }
+                                }
+                            }
+                        }
+                        if (label == PINNED && (pinned.size > pinnedLimit || pinnedLimit == Int.MAX_VALUE && pinned.size > Prefs.pinnedShown(this@MainActivity))) {
+                            item(key = "pinned-more") {
+                                val all = pinnedLimit == Int.MAX_VALUE
+                                TextButton(onClick = onAllPinned, modifier = Modifier.padding(start = 4.dp)) {
+                                    Text(if (all) "Show fewer" else "View all ${pinned.size} pinned")
                                 }
                             }
                         }
@@ -817,9 +925,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Long-press any chat to rename or delete it. */
+    /** Long-press any chat to pin, rename or delete it. */
     @Composable
-    private fun WithChatMenu(onRename: () -> Unit, onDelete: () -> Unit, content: @Composable (longPress: () -> Unit) -> Unit) {
+    private fun WithChatMenu(
+        pinned: Boolean, onPin: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit,
+        content: @Composable (longPress: () -> Unit) -> Unit,
+    ) {
         var menu by remember { mutableStateOf(false) }
         val haptics = LocalHapticFeedback.current
         Box {
@@ -828,6 +939,11 @@ class MainActivity : ComponentActivity() {
                 menu = true
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (pinned) "Unpin" else "Pin") },
+                    leadingIcon = { Icon(Icons.Outlined.PushPin, null) },
+                    onClick = { menu = false; onPin() },
+                )
                 DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Outlined.Edit, null) },

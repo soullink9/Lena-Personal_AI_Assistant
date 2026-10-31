@@ -165,6 +165,17 @@ def weather_group(condition: str | None, daylight: bool = True) -> str | None:
     return group
 
 
+def part_of_day(hour: int) -> str:
+    """Morning, afternoon, evening or night, by the clock."""
+    if 5 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 17:
+        return "afternoon"
+    if 17 <= hour < 21:
+        return "evening"
+    return "night"
+
+
 def _same_weather(a: str | None, b: str | None) -> bool:
     return a == b or (a in CLEAR_SKIES and b in CLEAR_SKIES)
 

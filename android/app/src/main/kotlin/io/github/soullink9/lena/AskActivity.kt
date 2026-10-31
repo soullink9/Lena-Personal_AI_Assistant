@@ -220,7 +220,7 @@ class AskActivity : ComponentActivity() {
     private var working = false
     private val restart = mutableIntStateOf(0) // bumped when the gesture is used again while the sheet is open
     private var startTalking = false
-    private var style = AskStyle.SHEET
+    private var style = AskStyle.ORB
 
     /** Opened over the lock screen and still locked: private mode (see [unlockThen]). */
     private val locked = mutableStateOf(false)
@@ -234,7 +234,7 @@ class AskActivity : ComponentActivity() {
             finish()
             return
         }
-        api = Api(server)
+        api = Api(server, applicationContext)
 
         // The assistant gesture can open a call or a chat instead of the sheet.
         if (intent.action == Intent.ACTION_ASSIST) {
@@ -442,7 +442,7 @@ class AskActivity : ComponentActivity() {
                         ?: throw IllegalStateException("No models on your server.")
                     val started = api.ask(
                         turn.question, m, chatId, lastReplyId,
-                        newTitle = if (ongoing) "Lena" else if (startedLocked) "Lena (lock screen)" else null,
+                        newTitle = if (ongoing) ASSISTANT_CHAT else if (startedLocked) "Lena (lock screen)" else null,
                         pinNew = ongoing,
                         contextTokens = Prefs.contextTokens(this@AskActivity),
                         spoken = spoken,
@@ -603,21 +603,30 @@ class AskActivity : ComponentActivity() {
         }
 
         LaunchedEffect(Unit) {
-            // Pick up the ongoing conversation, and show where you left off.
+            // Pick up the "Assistant Lena" chat, and show where you left off. It's found by name too, so
+            // it's the same chat after reinstalling, on another phone, or once it was made elsewhere.
             try {
-                val saved = if (ongoing) Prefs.assistChat(this@AskActivity) else null
-                if (saved != null) {
-                    val found = runCatching { api.chatOrNull(saved) }
-                    when {
-                        found.isFailure -> chatId = saved // can't check right now; try it when you send
-                        found.getOrNull() == null -> Prefs.setAssistChat(this@AskActivity, null) // deleted: start a new one
-                        else -> {
-                            chatId = saved
-                            val earlier = api.recentTurns(found.getOrNull()!!, 50).map { (q, a) ->
-                                Turn(q).also { it.answer = a; it.done = true }
-                            }
-                            turns.addAll(0, earlier)
+                var saved = if (ongoing) Prefs.assistChat(this@AskActivity) else null
+                var found = saved?.let { id -> runCatching { api.chatOrNull(id) } }
+                if (ongoing && (saved == null || found?.getOrNull() == null && found?.isSuccess == true)) {
+                    saved = runCatching { api.chatTitled(ASSISTANT_CHAT)?.id }.getOrNull()
+                    Prefs.setAssistChat(this@AskActivity, saved)
+                    found = saved?.let { id -> runCatching { api.chatOrNull(id) } }
+                }
+                when {
+                    saved == null -> Unit // the first time: it's made when you first say something
+                    found == null || found.isFailure -> chatId = saved // can't check right now; try it when you send
+                    found.getOrNull() == null -> Prefs.setAssistChat(this@AskActivity, null) // deleted: start a new one
+                    else -> {
+                        chatId = saved
+                        val chat = found.getOrNull()!!
+                        // Before 2.17.0 it was called "Lena": give it its name.
+                        val id: String = saved
+                        if (chat.optString("title") != ASSISTANT_CHAT) runCatching { api.renameChat(id, ASSISTANT_CHAT) }
+                        val earlier = api.recentTurns(chat, 50).map { (q, a) ->
+                            Turn(q).also { it.answer = a; it.done = true }
                         }
+                        turns.addAll(0, earlier)
                     }
                 }
             } finally {
@@ -669,7 +678,15 @@ class AskActivity : ComponentActivity() {
                 }
             },
             newConversation = {
-                // Start over: the old conversation stays in your history.
+                // Start over: the old conversation stays in your history under a dated name, unpinned,
+                // and the next thing you say starts a new "Assistant Lena".
+                chatId?.takeIf { ongoing }?.let { old ->
+                    val day = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date())
+                    scope.launch {
+                        runCatching { api.renameChat(old, "$ASSISTANT_CHAT (until $day)") }
+                        runCatching { if (api.pinned().any { it.id == old }) api.togglePin(old) }
+                    }
+                }
                 job?.cancel()
                 mouth?.stop()
                 ear?.finish()

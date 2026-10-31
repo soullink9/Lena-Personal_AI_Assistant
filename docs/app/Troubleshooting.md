@@ -54,9 +54,27 @@ Memories need **Admin Panel → Settings → General → Memories** (or your acc
 
 The page didn't get Lena's token. Check **Settings → Home Assistant → Test connection**, and that the dashboard path is right (open `https://<your Home Assistant>/<path>` in a browser). Updating **Android System WebView** helps if it's very old; the sign-in needs its newer features.
 
+## The wake word starts by mistake
+
+Open **Settings → Logs** and look for "Heard …": each says how sure she was and what she needed.
+
+- Switch to **Hey Lena** (Settings → Wall display → Wake word). One word on its own, "Lena", is far easier to hear in ordinary talk and on TV.
+- Choose **Fewer false starts** under **How sure she must be**.
+- Keep the tablet away from a TV or speaker if you can. Music and jingles are turned away by the voice check ("wasn't a voice; ignored" in the logs), but a voice on TV is still a voice.
+
+Before 2.17.0 she could also wake herself the moment the wall display started (after a restart, say), while the sound features were still settling; that's fixed.
+
+## Open WebUI keeps signing me out when it restarts
+
+Open WebUI ends every session when its secret key changes, and if `WEBUI_SECRET_KEY` isn't set it may make a new one each time it starts. Set it to a long random value in your Open WebUI container's environment and restart once; after that, restarts keep everyone signed in. For anything that still slips through, turn on **Settings → Open WebUI → Sign in by herself**.
+
+## Portrait photos lose their heads in the photo frame
+
+Choose **Fit → Smart** (Settings → Wall display → When no one's around). Portrait and panorama photos then show whole on a blurred copy of themselves, and cropped photos are centred on the faces in them. **Fill the screen** crops every photo, around its faces.
+
 ## The wake word never hears me
 
-Use **Settings → Wall display → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, and try the other name to compare. In the screen saver some phones block the microphone; it says so on screen, and the wall display itself will hear you.
+Use **Settings → Wall display → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, try **Easier to wake** under **How sure she must be**, and try another name to compare. Note she ignores her name for the first second after she starts listening. In the screen saver some phones block the microphone; it says so on screen, and the wall display itself will hear you.
 
 ## Talking to Lena doesn't hear me
 
@@ -93,6 +111,8 @@ Android's web view can't use passkeys in Lena. Pick another method in your sign-
 "App not installed" or "conflicts with an existing package" means the new APK was signed with a different key from the one on your phone. This happens when going between a debug-signed test build and a properly signed one, or after changing keys.
 
 Uninstall Lena, install the new APK, and sign in again. Check that both secrets are set (see [Installation](Installation.md#2-add-the-secrets)) so future builds use the same key.
+
+"Its build number is lower than this Lena's" means the release's `versionCode` went down (after resetting the version, say). Android never installs a lower build number over a higher one: raise `versionCode` above the installed one and build again, or uninstall Lena first.
 
 ## The build fails
 

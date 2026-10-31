@@ -14,7 +14,8 @@ Lena is a Jarvis-style assistant that runs entirely on your own servers. She's o
 - **Feelings with reasons.** Home Assistant gives her a mood, an energy level and short-lived reactions that change with her day, the weather, people coming and going, worries in the house and how she's treated. Only how she feels right now reaches her, and she knows why.
 - **Voice control for your home.** Short spoken replies, honest reporting of what actually happened, and real help beyond switching lights.
 - **One shared memory.** Tell her something in the kitchen and she knows it on your phone.
-- **Your phone's assistant.** The **Lena** Android app (Android 16) puts your Open WebUI, with all its tools, in a native shell. The assistant gesture opens a sheet that's already listening, she answers out loud, and it's one ongoing conversation.
+- **Your phone's assistant.** The **Lena** Android app (Android 16) puts your Open WebUI, with all its tools, in a native shell. The assistant gesture opens her already listening, she answers out loud, and it's one ongoing conversation, "Assistant Lena".
+- **A Home Assistant dashboard and photo frame for the wall.** On a tablet, the app becomes an always-on Home Assistant dashboard (it can be the tablet's home screen) that turns into a photo frame when no one's around, and you call her by name ("Hey Lena") from across the room. The photos come from any album in Home Assistant's media: add the **Immich** integration to Home Assistant and your Immich albums, people and favorites show up there, ready to pick.
 - **Your own voice stack.** Piper and Whisper speak and listen for Home Assistant, and a small bridge lets Open WebUI and the app use the same voices.
 - **Nothing leaves your network.** No cloud model, no analytics, no third-party apps holding your data.
 
@@ -72,7 +73,7 @@ This project builds on, and wouldn't exist without:
 - [Piper](https://docs.linuxserver.io/images/docker-piper/) text-to-speech and [Whisper](https://github.com/openai/whisper) speech-to-text, packaged as containers by [LinuxServer.io](https://www.linuxserver.io/), and the [Wyoming protocol](https://github.com/OHF-Voice/wyoming) the bridge speaks to them.
 - [FFmpeg](https://ffmpeg.org/), which the voice bridge uses to convert audio.
 - Google's open-source [Android Jetpack](https://developer.android.com/jetpack) libraries (Compose, Material 3, WebKit, WorkManager and Glance) and JetBrains' [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines), all Apache License 2.0.
-- [microWakeWord](https://github.com/kahrendt/microWakeWord) and [Tater Totterson's "Lena" wake word model](https://github.com/TaterTotterson/microWakeWords); TensorFlow Lite Micro's audio front end (Apache 2.0) and [KISS FFT](https://github.com/mborgerding/kissfft) (BSD), ported to the app.
+- [microWakeWord](https://github.com/kahrendt/microWakeWord) and Tater Totterson's ["Hey Lena"](https://github.com/TaterTotterson/Tater-Wake-Words) and ["Lena"](https://github.com/TaterTotterson/microWakeWords) wake word models (MIT); ESPHome's voice activity model from the [Open Home Foundation's model collection](https://github.com/esphome/micro-wake-word-models) (Apache 2.0); TensorFlow Lite Micro's audio front end (Apache 2.0) and [KISS FFT](https://github.com/mborgerding/kissfft) (BSD), ported to the app.
 - [openWakeWord](https://github.com/dscripka/openWakeWord) for the alternative "Hey Jarvis" wake word (code Apache 2.0; the wake word model CC BY-NC-SA 4.0, for non-commercial use), run with Google's [LiteRT](https://ai.google.dev/edge/litert) (Apache 2.0).
 - Glyphs from Google's [Material Icons](https://github.com/google/material-design-icons) (Apache License 2.0).
 - [curl](https://curl.se/), used by the Ollama watchdog example.
