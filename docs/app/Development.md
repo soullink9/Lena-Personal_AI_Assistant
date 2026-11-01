@@ -13,7 +13,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar and drawer (pinned and recent chats), hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
 | `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat, speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
-| `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, knowledge, speech, and starting and following an answer. |
+| `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
 | `SignIn.kt` | Signing in to Open WebUI by herself with details kept encrypted. |
 | `SettingsActivity.kt` | The settings screen and all its pages. |
 | `Ui.kt` | The shared rows and groups the settings and lists are built from. |
@@ -25,7 +25,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |
 | `java/…/MicroFrontend.java` | A line-for-line port of TensorFlow Lite Micro's audio front end, checked bit for bit against the C on every build. |
-| `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories and knowledge collections. |
+| `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |
 | `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
@@ -75,8 +75,9 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | `POST /api/v1/auths/signin`, `POST /api/v1/auths/ldap` | Signing in by herself, only if you turn it on |
 | `GET /api/v1/users/user/settings`, `GET /api/config` | Whether to use Open WebUI's memory feature (your setting, or the server default) |
 | `GET /api/v1/memories/`, `POST /api/v1/memories/add`, `POST /api/v1/memories/{id}/update`, `DELETE /api/v1/memories/{id}` | Memories |
+| `GET /api/v1/notes/?page=`, `GET /api/v1/notes/{id}`, `POST /api/v1/notes/create`, `POST /api/v1/notes/{id}/update`, `POST /api/v1/notes/{id}/pin`, `DELETE /api/v1/notes/{id}/delete` | Notes: the list, opening, writing, changing (with the page's revision, so a change made in the browser meanwhile is answered with HTTP 409 instead of being overwritten), pinning and deleting |
 | `GET /api/v1/knowledge/`, `GET /api/v1/knowledge/{id}/files`, `POST /api/v1/knowledge/{id}/file/remove` | Knowledge collections and their documents |
-| `GET /api/v1/auths/` | Telling a deleted chat apart from an expired sign-in (Open WebUI answers both the same way) |
+| `GET /api/v1/auths/` | After an HTTP 401, telling an expired sign-in apart from a missing chat or a feature your account isn't allowed to use (Open WebUI answers all three with 401) |
 | `DELETE /api/v1/chats/{id}` | Deleting a chat |
 | `POST /api/v1/audio/transcriptions`, `POST /api/v1/audio/speech` | Your server's speech-to-text and voice for the sheet |
 

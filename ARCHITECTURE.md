@@ -74,7 +74,7 @@ flowchart TB
 
 - **The filter** (`inlet`) runs before every request to the `lena` model: it fetches `/api/lena/context` (cached for a minute) and appends it to the system message. If Home Assistant is down she simply chats without it.
 - **The tool** exposes `remember`, `forget` and `feel` to the model; each calls a Home Assistant action over REST, so the memory list and feelings stay in one place.
-- Open WebUI keeps your chats, tools, knowledge and speech settings. The app reuses all of that rather than reimplementing it.
+- Open WebUI keeps your chats, memories, notes, tools, knowledge and speech settings. The app reuses all of that through Open WebUI's own API rather than reimplementing it.
 
 ## The Android app
 

@@ -12,11 +12,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,11 +29,14 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -65,8 +71,9 @@ import kotlinx.coroutines.launch
 
 /**
  * What Lena knows: her own memory in Home Assistant (if you've connected it), the memories
- * Open WebUI keeps about you, and your knowledge collections. Fix or forget a memory, or take a
- * document out of a collection, when something went in by mistake.
+ * Open WebUI keeps about you, your Open WebUI notes, and your knowledge collections. Fix or forget
+ * a memory, write or change a note, or take a document out of a collection when something went in
+ * by mistake.
  */
 class MemoryActivity : ComponentActivity() {
 
@@ -85,6 +92,9 @@ class MemoryActivity : ComponentActivity() {
 
     /** A memory as the list shows it, whichever store it came from. */
     private data class Entry(val id: String, val content: String, val detail: String)
+
+    /** The note open over the Notes tab: an existing one by id, or a new one when id is null. */
+    private data class OpenNote(val id: String?, val title: String)
 
     private val openWebUi by lazy {
         Store(
@@ -143,26 +153,54 @@ class MemoryActivity : ComponentActivity() {
         if (millis <= 0) "" else DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 
     /**
-     * Tabs for her shared memory (when Home Assistant is connected), Open WebUI's memories, and knowledge
-     * collections, with a collection's documents opening over them.
+     * Tabs for her shared memory (when Home Assistant is connected), Open WebUI's memories, notes and
+     * knowledge collections. A note, or a collection's documents, opens over them.
      */
     @Composable
     private fun Screen() {
-        // Hers (Home Assistant) first when it's connected, then Open WebUI's memories, then knowledge.
-        val tabs = remember { listOfNotNull(if (house != null) "Hers" else null, if (house != null) "Open WebUI" else "Memories", "Knowledge") }
+        // Hers (Home Assistant) first when it's connected, then Open WebUI's memories, notes and knowledge.
+        val tabs = remember {
+            listOfNotNull(
+                if (house != null) "Hers" else null,
+                if (house != null) "Open WebUI" else "Memories",
+                "Notes",
+                "Knowledge",
+            )
+        }
         var tab by remember { mutableIntStateOf(0) }
-        val knowledgeTab = tabs.size - 1
+        val notesTab = tabs.indexOf("Notes")
+        val knowledgeTab = tabs.indexOf("Knowledge")
         var openKnowledge by remember { mutableStateOf<Api.Knowledge?>(null) }
+        var openNote by remember { mutableStateOf<OpenNote?>(null) }
+        // A note being edited asks before its changes are thrown away, so it handles Back itself.
+        var noteChanged by remember { mutableStateOf(false) }
+        var askDiscard by remember { mutableStateOf(false) }
 
-        BackHandler(enabled = openKnowledge != null) { openKnowledge = null }
+        /** Back from whatever is open over the tabs, or out of the screen. */
+        fun goBack() {
+            when {
+                openNote != null && noteChanged -> askDiscard = true
+                openNote != null -> openNote = null
+                openKnowledge != null -> openKnowledge = null
+                else -> finish()
+            }
+        }
+
+        BackHandler(enabled = openKnowledge != null || openNote != null) { goBack() }
+
+        val heading = when {
+            openNote != null -> openNote!!.title.ifBlank { if (openNote!!.id == null) "New note" else "Note" }
+            openKnowledge != null -> openKnowledge!!.name
+            else -> "Memory & knowledge"
+        }
 
         Scaffold(
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(openKnowledge?.name ?: "Memory & knowledge", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    title = { Text(heading, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = {
-                        IconButton(onClick = { if (openKnowledge != null) openKnowledge = null else finish() }) {
+                        IconButton(onClick = { goBack() }) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                         }
                     },
@@ -175,19 +213,29 @@ class MemoryActivity : ComponentActivity() {
                     .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (openKnowledge == null) {
+                if (openKnowledge == null && openNote == null) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         tabs.forEachIndexed { i, name ->
                             SegmentedButton(
                                 selected = tab == i,
                                 onClick = { tab = i },
                                 shape = SegmentedButtonDefaults.itemShape(index = i, count = tabs.size),
-                            ) { Text(name, maxLines = 1) }
+                                icon = {}, // no tick: four names need the room
+                            ) { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         }
                     }
                 }
                 when {
+                    openNote != null -> key(openNote!!.id) {
+                        NoteEditor(
+                            target = openNote!!,
+                            onChanged = { noteChanged = it },
+                            onTitle = { openNote = openNote?.copy(title = it) },
+                            onClose = { noteChanged = false; openNote = null },
+                        )
+                    }
                     openKnowledge != null -> Files(openKnowledge!!)
+                    tab == notesTab -> NoteList { openNote = it; noteChanged = false }
                     tab == knowledgeTab -> Collections { openKnowledge = it }
                     else -> {
                         val store = if (house != null && tab == 0) hers else openWebUi
@@ -195,6 +243,18 @@ class MemoryActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        if (askDiscard) {
+            AlertDialog(
+                onDismissRequest = { askDiscard = false },
+                title = { Text("Discard your changes?") },
+                text = { Text("This note has changes that aren't saved.") },
+                confirmButton = {
+                    TextButton(onClick = { askDiscard = false; noteChanged = false; openNote = null }) { Text("Discard") }
+                },
+                dismissButton = { TextButton(onClick = { askDiscard = false }) { Text("Keep editing") } },
+            )
         }
     }
 
@@ -284,6 +344,197 @@ class MemoryActivity : ComponentActivity() {
                     ) { Text("Forget") }
                 },
                 dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            )
+        }
+    }
+
+    // ---- Notes ------------------------------------------------------------------------------
+
+    /** Your Open WebUI notes, pinned first; tap one to read or change it, or start a new one. */
+    @Composable
+    private fun NoteList(onOpen: (OpenNote) -> Unit) {
+        var notes by remember { mutableStateOf<List<Api.NoteItem>?>(null) }
+        var error by remember { mutableStateOf<String?>(null) }
+        var query by remember { mutableStateOf("") }
+
+        LaunchedEffect(Unit) {
+            runCatching { api.notes() }
+                .onSuccess { notes = it; error = null }
+                .onFailure { error = problem(it, "Notes") }
+        }
+
+        SearchField(query, "Search notes") { query = it }
+        Footnote("Your notes in Open WebUI, the same ones as in the browser. Tap one to read or change it.")
+        val words = query.trim()
+        val shown = notes?.filter {
+            words.isBlank() || it.title.contains(words, ignoreCase = true) || it.preview.contains(words, ignoreCase = true)
+        }
+        when {
+            error != null -> Footnote(error!!)
+            shown == null -> Loading()
+            else -> Group {
+                if (words.isBlank()) Item(Icons.Outlined.Add, "New note", null) { onOpen(OpenNote(null, "")) }
+                if (shown.isEmpty()) {
+                    Item(null, if (words.isBlank()) "No notes yet" else "No matching notes", null) {}
+                }
+                shown.forEach { n ->
+                    Item(
+                        icon = if (n.pinned) Icons.Outlined.PushPin else Icons.Outlined.EditNote,
+                        title = n.title.ifBlank { "Untitled" },
+                        summary = noteSummary(n),
+                    ) { onOpen(OpenNote(n.id, n.title)) }
+                }
+            }
+        }
+    }
+
+    /** The line under a note's title: the start of its text, then its pages (if several) and when it changed. */
+    private fun noteSummary(n: Api.NoteItem): String? {
+        val start = n.preview.lineSequence().map { it.trim().trimStart('#', '-', '*', '>', ' ') }
+            .firstOrNull { it.isNotBlank() }?.take(120)
+        val pages = if (n.pageCount > 1) "${n.pageCount} pages" else null
+        val details = listOfNotNull(start, pages, ago(n.updatedMillis).ifBlank { null })
+        return details.joinToString(" · ").ifBlank { null }
+    }
+
+    /**
+     * One note: its title and its text (Markdown, as Open WebUI keeps it), with Save, Pin and Delete.
+     * Notes with several pages, and notes shared with you view only, are shown but not edited here.
+     * onChanged tells the screen whether there are unsaved changes, so Back can ask first.
+     */
+    @Composable
+    private fun NoteEditor(target: OpenNote, onChanged: (Boolean) -> Unit, onTitle: (String) -> Unit, onClose: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val isNew = target.id == null
+        var note by remember { mutableStateOf<Api.Note?>(null) }
+        var error by remember { mutableStateOf<String?>(null) }
+        var reload by remember { mutableIntStateOf(0) }
+        var title by remember { mutableStateOf("") }
+        var text by remember { mutableStateOf("") }
+        var saving by remember { mutableStateOf(false) }
+        var deleting by remember { mutableStateOf(false) }
+
+        LaunchedEffect(reload) {
+            if (isNew) return@LaunchedEffect
+            runCatching { api.note(target.id!!) }
+                .onSuccess { note = it; title = it.title; text = it.text; error = null }
+                .onFailure { error = problem(it, "Notes") }
+        }
+
+        val loaded = note
+        val changed = if (isNew) title.isNotBlank() || text.isNotBlank()
+            else loaded != null && (title != loaded.title || text != loaded.text)
+        LaunchedEffect(changed) { onChanged(changed) }
+
+        /** Saves, then closes a new note or reloads an existing one (so the next save has the new revision). */
+        fun save() {
+            saving = true
+            scope.launch {
+                val r = runCatching {
+                    if (isNew) api.addNote(title.trim(), text) else api.updateNote(loaded!!, title.trim(), text)
+                }
+                saving = false
+                when (val e = r.exceptionOrNull()) {
+                    null -> {
+                        toast("Saved")
+                        onChanged(false)
+                        if (isNew) onClose() else { onTitle(title.trim()); reload++ }
+                    }
+                    is ConflictException -> {
+                        // Keep what you typed; take the newer version's revision so saving again is your choice.
+                        runCatching { api.note(loaded!!.id) }.onSuccess { note = it }
+                        toast("It was changed in Open WebUI meanwhile. Save again to replace that with yours.")
+                    }
+                    else -> toast(problem(e, "Notes"))
+                }
+            }
+        }
+
+        when {
+            error != null -> Footnote(error!!)
+            !isNew && loaded == null -> Loading()
+            !isNew && !loaded!!.editable -> {
+                Footnote(
+                    if (!loaded.canEdit) "This note is shared with you to read only."
+                    else "This note has ${loaded.pageCount} pages. Read it here; change it in Open WebUI."
+                )
+                Text(loaded.text.ifBlank { "This note is empty." }, style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 4.dp))
+            }
+            else -> {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Note") },
+                    minLines = 10,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Footnote("Markdown works here, as in Open WebUI: # for a heading, - for a list, **bold**.")
+                Button(
+                    enabled = changed && title.isNotBlank() && !saving,
+                    onClick = { save() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (saving) "Saving…" else "Save") }
+            }
+        }
+
+        // Pin and delete work for any note you can open, including ones with several pages.
+        if (!isNew && loaded != null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val r = runCatching { api.toggleNotePin(loaded.id) }
+                            if (r.isFailure) toast(problem(r.exceptionOrNull()!!, "Notes"))
+                            else note = loaded.copy(pinned = !loaded.pinned)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.PushPin, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (loaded.pinned) "Unpin" else "Pin")
+                }
+                if (loaded.canEdit) {
+                    OutlinedButton(
+                        onClick = { deleting = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete")
+                    }
+                }
+            }
+        }
+
+        if (deleting && loaded != null) {
+            AlertDialog(
+                onDismissRequest = { deleting = false },
+                title = { Text("Delete this note?") },
+                text = { Text("“${loaded.title.ifBlank { "Untitled" }}” will be deleted from Open WebUI, for everyone it's shared with.") },
+                confirmButton = {
+                    TextButton(
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        onClick = {
+                            deleting = false
+                            scope.launch {
+                                val r = runCatching { api.deleteNote(loaded.id) }
+                                if (r.isFailure) toast(problem(r.exceptionOrNull()!!, "Notes"))
+                                else { onChanged(false); onClose() }
+                            }
+                        },
+                    ) { Text("Delete") }
+                },
+                dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
             )
         }
     }

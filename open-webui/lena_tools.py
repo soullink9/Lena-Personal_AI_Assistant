@@ -1,7 +1,7 @@
 """
 title: Lena (remember, forget, feel)
 author: soullink9
-version: 0.5.0-beta
+version: 0.5.1-beta
 license: GPL-3.0
 description: Lets Lena save to and remove from her Home Assistant memory list, and record how something made her feel, from Open WebUI and the Lena app.
 """

@@ -42,7 +42,7 @@ Check you can open your Open WebUI in Lena's main screen. Away from home, the ph
 
 ## Memory & knowledge says a feature is turned off
 
-Memories need **Admin Panel → Settings → General → Memories** (or your account's memory permission) in Open WebUI; knowledge needs knowledge access for your account. An admin can turn these on.
+Memories need **Admin Panel → Settings → General → Memories** (or your account's memory permission) in Open WebUI; notes need Notes turned on in Open WebUI's admin settings and, for users who aren't admins, the Notes feature permission (set in **Admin Panel → Users**, for groups or as a default); knowledge needs knowledge access for your account. An admin can turn these on.
 
 ## Her feelings or the Hers tab don't show
 

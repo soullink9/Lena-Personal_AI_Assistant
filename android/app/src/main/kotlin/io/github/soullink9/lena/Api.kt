@@ -21,6 +21,9 @@ class AuthException : IOException("Signed out")
 /** Signed in, but your account isn't allowed to do this (or the feature is turned off). */
 class ForbiddenException : IOException("Not allowed")
 
+/** Someone changed it somewhere else (in the browser, say) since it was opened here: read it again first. */
+class ConflictException : IOException("Changed elsewhere")
+
 /**
  * A model on your Open WebUI, with the tools and features (web search and the like) its settings turn on by
  * default, which the sheet and scheduled prompts use the same way the page would.
@@ -92,9 +95,12 @@ class Api(server: String, private val context: Context? = null) {
     suspend fun signedIn(): Boolean = tokenFrom(cookies()) != null
 
     /**
-     * One request. Signed out (Open WebUI restarted, say) with automatic sign-in on: sign in again
-     * and try once more. Open WebUI also answers some missing things as "signed out", so the
-     * session is checked first and only an ended one is renewed.
+     * One request. Open WebUI answers "signed out" (HTTP 401) for three different things: an ended
+     * session, some missing things, and a feature your account isn't allowed to use (Notes, for one).
+     * So on a 401 the session itself is checked first:
+     * - still good: it was a permission, and it's reported as ForbiddenException;
+     * - really ended (Open WebUI restarted, say) with automatic sign-in on: sign in again and try once more;
+     * - otherwise (ended without automatic sign-in, or the check couldn't tell): signed out.
      */
     private suspend fun call(
         method: String,
@@ -107,13 +113,32 @@ class Api(server: String, private val context: Context? = null) {
     ): ByteArray = try {
         callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
     } catch (e: AuthException) {
-        val c = context
-        if (!auth || c == null || !OpenWebUiSignIn.configured(c)) throw e
-        val ended = tokenFrom(cookies()) == null ||
-            runCatching { callOnce("GET", "/api/v1/auths/", null, "application/json", true, 15_000, "application/json") }
-                .exceptionOrNull() is AuthException
-        if (!ended || OpenWebUiSignIn.signIn(c) == null) throw e
-        callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+        if (!auth) throw e
+        when (session()) {
+            Session.VALID -> throw ForbiddenException()
+            Session.UNKNOWN -> throw e
+            Session.ENDED -> {
+                val c = context
+                if (c == null || !OpenWebUiSignIn.configured(c) || OpenWebUiSignIn.signIn(c) == null) throw e
+                callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+            }
+        }
+    }
+
+    /** What a check of the session found. */
+    private enum class Session { VALID, ENDED, UNKNOWN }
+
+    /** Asks Open WebUI who you are, which works exactly when the session is still good. */
+    private suspend fun session(): Session {
+        if (tokenFrom(cookies()) == null) return Session.ENDED
+        val failure = runCatching {
+            callOnce("GET", "/api/v1/auths/", null, "application/json", true, 15_000, "application/json")
+        }.exceptionOrNull()
+        return when (failure) {
+            null -> Session.VALID
+            is AuthException -> Session.ENDED
+            else -> Session.UNKNOWN
+        }
     }
 
     /**
@@ -172,6 +197,10 @@ class Api(server: String, private val context: Context? = null) {
                 if (code == 403) {
                     Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: not allowed (HTTP 403)")
                     throw ForbiddenException()
+                }
+                if (code == 409) {
+                    Logs.i("Open WebUI", "$method ${path.substringBefore('?')}: changed elsewhere (HTTP 409)")
+                    throw ConflictException()
                 }
                 val bytes = (if (code in 200..299) conn.inputStream else conn.errorStream)
                     ?.use { it.readBytes() } ?: ByteArray(0)
@@ -604,6 +633,136 @@ class Api(server: String, private val context: Context? = null) {
     /** Removes a document from a collection (the file itself stays in Open WebUI). */
     suspend fun removeKnowledgeFile(knowledgeId: String, fileId: String) {
         request("POST", "/api/v1/knowledge/${enc(knowledgeId)}/file/remove", JSONObject().put("file_id", fileId))
+    }
+
+    // ---- Notes ----------------------------------------------------------------------------
+    //
+    // Open WebUI's Notes keep each note's text as Markdown in `data.content.md` (with the web editor's
+    // own HTML and JSON beside it). Newer notes can have several pages (`data.pages`), and the server
+    // then keeps `data.content` as all the pages joined, for searching. The app edits notes with one
+    // page and shows notes with several read-only, because joining and splitting pages here could
+    // lose someone's work.
+
+    /** A note as the list shows it: the start of its text, how many pages it has, and when it changed. */
+    data class NoteItem(
+        val id: String,
+        val title: String,
+        val preview: String,
+        val pageCount: Int,
+        val pinned: Boolean,
+        val updatedMillis: Long,
+    )
+
+    /**
+     * One note in full. For a note with one page, `text` is that page and `pageId` and `revision` are
+     * what saving needs, so a change made meanwhile in the browser is noticed instead of overwritten.
+     */
+    data class Note(
+        val id: String,
+        val title: String,
+        val text: String,
+        val pageCount: Int,
+        val pageId: String,
+        val revision: Int,
+        val canEdit: Boolean,
+        val pinned: Boolean,
+    ) {
+        /** Whether the app may change its text: yours to edit, and only one page. */
+        val editable: Boolean get() = canEdit && pageCount == 1
+    }
+
+    /** Your notes and the ones shared with you, pinned first, then newest (Open WebUI sends 60 a page). */
+    suspend fun notes(): List<NoteItem> {
+        val out = mutableListOf<NoteItem>()
+        var page = 1
+        while (page <= 20) { // at most 20 pages, so a server answering oddly can't loop forever
+            val items = JSONArray(request("GET", "/api/v1/notes/?page=$page"))
+            for (i in 0 until items.length()) {
+                val o = items.getJSONObject(i)
+                val data = o.optJSONObject("data")
+                out += NoteItem(
+                    id = o.getString("id"),
+                    title = o.optString("title"),
+                    preview = data?.optJSONObject("content")?.optString("md").orEmpty(),
+                    pageCount = data?.optInt("page_count", 1) ?: 1,
+                    pinned = o.optBoolean("is_pinned", false),
+                    updatedMillis = toMillis(o.optLong("updated_at")),
+                )
+            }
+            if (items.length() < 60) break
+            page++
+        }
+        return out.sortedWith(compareByDescending<NoteItem> { it.pinned }.thenByDescending { it.updatedMillis })
+    }
+
+    /** One note in full, with whether you may change it. */
+    suspend fun note(id: String): Note {
+        val o = JSONObject(request("GET", "/api/v1/notes/${enc(id)}"))
+        val data = o.optJSONObject("data") ?: JSONObject()
+        val pages = data.optJSONArray("pages")
+        // A note nobody has edited since pages arrived has none yet; the server treats it as one page, "main".
+        val firstPage = pages?.optJSONObject(0)
+        val pageCount = if (pages == null || pages.length() == 0) 1 else pages.length()
+        val text = if (pageCount == 1 && firstPage != null) {
+            firstPage.optJSONObject("content")?.optString("md").orEmpty()
+        } else {
+            data.optJSONObject("content")?.optString("md").orEmpty()
+        }
+        return Note(
+            id = o.getString("id"),
+            title = o.optString("title"),
+            text = text,
+            pageCount = pageCount,
+            pageId = firstPage?.optString("id")?.ifBlank { null } ?: "main",
+            revision = firstPage?.optInt("revision", 0) ?: 0,
+            canEdit = o.optBoolean("write_access", false),
+            pinned = o.optBoolean("is_pinned", false),
+        )
+    }
+
+    /**
+     * The text of a note as Open WebUI stores it. Only the Markdown is sent: the web editor shows
+     * Markdown when there's no HTML, and builds its own HTML the next time it's edited there.
+     */
+    private fun noteContent(text: String): JSONObject =
+        JSONObject().put("json", JSONObject.NULL).put("html", "").put("md", text)
+
+    /** Makes a new note, private to you, and returns its id. */
+    suspend fun addNote(title: String, text: String): String {
+        val body = JSONObject()
+            .put("title", title)
+            .put("data", JSONObject().put("content", noteContent(text)))
+            .put("meta", JSONObject.NULL)
+            .put("access_grants", JSONArray())
+        return JSONObject(request("POST", "/api/v1/notes/create", body)).optString("id")
+    }
+
+    /**
+     * Saves a changed title and text. Only what changed is sent, and the text only with the page's
+     * revision, so a note changed in the browser since it was opened throws ConflictException rather
+     * than losing that change.
+     */
+    suspend fun updateNote(note: Note, title: String, text: String) {
+        val body = JSONObject()
+        if (title != note.title) body.put("title", title)
+        if (text != note.text) {
+            check(note.editable) { "This note can't be edited here" }
+            body.put("data", JSONObject().put("content", noteContent(text)))
+            body.put("page_id", note.pageId)
+            body.put("page_revision", note.revision)
+        }
+        if (body.length() == 0) return
+        request("POST", "/api/v1/notes/${enc(note.id)}/update", body)
+    }
+
+    /** Pins a note to the top of your notes, or unpins it. */
+    suspend fun toggleNotePin(id: String) {
+        request("POST", "/api/v1/notes/${enc(id)}/pin")
+    }
+
+    /** Deletes a note from Open WebUI. */
+    suspend fun deleteNote(id: String) {
+        request("DELETE", "/api/v1/notes/${enc(id)}/delete")
     }
 
     /** Deletes a chat from Open WebUI. */

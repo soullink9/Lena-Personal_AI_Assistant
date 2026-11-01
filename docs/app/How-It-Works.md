@@ -93,6 +93,7 @@ Open it from the drawer. It shows what Lena draws on beyond the conversation, so
 
 - **Hers** (only if you've connected Home Assistant): Lena's own memory, the to-do list the Lena integration keeps in Home Assistant, which she uses in the house, in Open WebUI and here. Search, correct, forget or add, the same as below.
 - **Memories** (called **Open WebUI** when Hers is there): the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
+- **Notes**: your Open WebUI notes, the same ones as under **Notes** in the browser, pinned first. Search them, tap **New note** to write one, or open one to change its title and text (Markdown, so `#` makes a heading and `-` a list), pin it or delete it. If the note was changed in the browser while you had it open here, saving tells you, and saving again replaces that change with yours. Notes with several pages, and notes shared with you to read only, can be read and pinned here and changed in the browser.
 - **Knowledge**: your knowledge collections and the documents in each. Remove a document from a collection you can edit (by default, Open WebUI also deletes the file).
 
 Talking to Lena uses Open WebUI's memories when its memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page. Her shared memory reaches her through the Lena filter in Open WebUI; see [Lena in Open WebUI](../open-webui/Setup.md).
