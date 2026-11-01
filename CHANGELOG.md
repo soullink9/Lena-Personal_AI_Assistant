@@ -7,6 +7,10 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.18.1 (2026-11-01)
+
+- **Named chats keep their names.** On a chat's first answer, Open WebUI renamed it after its first message whenever the app said not to generate a title, so a scheduled prompt's chat ("Daily briefings") became "Good morning debrief" and the next run couldn't find it, and started another. Lena now leaves title generation out entirely when she names a chat herself, and checks the name after each scheduled run, putting it back if it changed. The same fix keeps "Assistant Lena" called that from the first time.
+
 ### 2.18.0 (2026-11-01)
 
 - **Scheduled prompts can keep their prompt out of the chat.** New **Show the prompt in the chat** switch, off by default: the chat shows only the prompt's name (say "Morning briefing") above her answer, and the prompt itself goes to her quietly with that one request, unsaved. Turn it on to see the whole prompt as before.
@@ -206,6 +210,10 @@ First release.
 - No libraries, no analytics; Safe Browsing lookups, web view usage reports and backups turned off
 
 ## Personality
+
+### 3.4.1 (2026-11-01)
+
+- **Calendar questions work every time.** She sometimes called Home Assistant's calendar tool with `calendar_id` instead of the `calendar` it asks for, and it refused. The Modelfile now tells her to use each tool's inputs exactly as it defines them and, given an input error, to fix it and try once more. Calendars are also back in **Your home** (Lena integration 1.4.1), so she has their exact names. Rebuild the model and copy the new `custom_components/lena` folder.
 
 ### 3.4.0 (2026-11-01)
 

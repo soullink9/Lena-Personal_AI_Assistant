@@ -440,8 +440,11 @@ class Api(server: String, private val context: Context? = null) {
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
+            // Title generation is only mentioned when it's wanted: Open WebUI treats "title_generation: false"
+            // on a chat's first answer as "title it after the first message", which renamed chats Lena
+            // had named herself ("Assistant Lena", a scheduled prompt's chat) so they couldn't be found again.
             .put("background_tasks", JSONObject()
-                .put("title_generation", existing == null && newTitle == null)
+                .apply { if (existing == null && newTitle == null) put("title_generation", true) }
                 .put("tags_generation", false).put("follow_up_generation", false))
         request("POST", "/api/chat/completions", body, readTimeoutMs = 120_000)
         return Started(id, replyId)

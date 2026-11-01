@@ -263,13 +263,15 @@ async def test_devices_in_context(hass: HomeAssistant, hass_client) -> None:
     async_expose_entity(hass, "conversation", entry.entity_id, True)
     async_expose_entity(hass, "conversation", "cover.garage_door", True)
     async_expose_entity(hass, "conversation", "light.secret", False)
+    hass.states.async_set("calendar.personal", "off", {"friendly_name": "Personal calendar"})
+    async_expose_entity(hass, "conversation", "calendar.personal", True)
 
     client = await hass_client()
     body = await (await client.get("/api/lena/context?devices=1")).json()
     text = body["context"]
     assert "## Your home" in text
     assert "- Living Room: cover: Living Room Curtains (also Curtains)" in text
-    assert "- No room: cover: Garage Door" in text
+    assert "- No room: calendar: Personal calendar; cover: Garage Door" in text  # calendars too: their tool wants the name
     assert "Secret Lamp" not in text  # not exposed to Assist
     assert "closed" not in text.split("## Your home")[1]  # names only, no states
     plain = (await (await client.get("/api/lena/context")).json())["context"]

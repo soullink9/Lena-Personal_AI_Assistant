@@ -283,8 +283,8 @@ class LenaCore:
         rooms: dict[str, dict[str, list[str]]] = {}
         count, more = 0, False
         for state in sorted(self.hass.states.async_all(), key=lambda s: s.name.lower()):
-            # Calendars, scripts and to-do lists have tools of their own.
-            if state.domain in ("calendar", "script", "todo"):
+            # Scripts and to-do lists have tools of their own. Calendars stay: their tool wants the exact name.
+            if state.domain in ("script", "todo"):
                 continue
             try:
                 if not async_should_expose(self.hass, "conversation", state.entity_id):

@@ -162,6 +162,15 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             )
             var last = Reply("", false)
             api.follow(started.chatId, started.messageId).collect { last = it }
+            // Belt and braces: if Open WebUI renamed the chat after answering, give it its name back,
+            // so the next run finds it.
+            val wanted = chatName.ifEmpty { if (quiet) title else "" }
+            if (wanted.isNotEmpty()) {
+                delay(3_000)
+                runCatching {
+                    if (api.chat(started.chatId).optString("title") != wanted) api.renameChat(started.chatId, wanted)
+                }
+            }
             val text = Markdown.plain(last.content).take(900).ifBlank { "Lena answered. Tap to read it." }
             Notify.show(c, Notify.SCHEDULED, title, text, started.chatId)
             Result.success()
