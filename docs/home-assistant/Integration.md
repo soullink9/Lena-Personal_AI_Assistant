@@ -69,7 +69,7 @@ Returns:
 }
 ```
 
-Add `?memory=0` to leave her memory out of `context`, or `?reasons=0` to leave out the reasons. Any user's token works; no admin rights are needed.
+Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. It lists up to 400, skipping calendars, scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
 
 ## /api/lena/media
 

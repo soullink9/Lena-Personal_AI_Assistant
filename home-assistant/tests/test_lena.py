@@ -245,6 +245,37 @@ async def test_context_view(hass: HomeAssistant, hass_client) -> None:
     assert body["weather"] == {"condition": "cloudy", "temperature": 61, "unit": "°F"}
 
 
+async def test_devices_in_context(hass: HomeAssistant, hass_client) -> None:
+    """Open WebUI's house tools match names exactly, so she's given the exact names by room."""
+    from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
+    from homeassistant.helpers import area_registry as ar, entity_registry as er
+    from homeassistant.setup import async_setup_component
+
+    assert await async_setup_component(hass, "homeassistant", {})
+    await setup(hass)
+    living = ar.async_get(hass).async_create("Living Room")
+    reg = er.async_get(hass)
+    entry = reg.async_get_or_create("cover", "test", "curtains", suggested_object_id="living_room_curtains")
+    reg.async_update_entity(entry.entity_id, area_id=living.id, aliases={"Curtains"})
+    hass.states.async_set(entry.entity_id, "closed", {"friendly_name": "Living Room Curtains"})
+    hass.states.async_set("cover.garage_door", "closed", {"friendly_name": "Garage Door"})
+    hass.states.async_set("light.secret", "off", {"friendly_name": "Secret Lamp"})
+    async_expose_entity(hass, "conversation", entry.entity_id, True)
+    async_expose_entity(hass, "conversation", "cover.garage_door", True)
+    async_expose_entity(hass, "conversation", "light.secret", False)
+
+    client = await hass_client()
+    body = await (await client.get("/api/lena/context?devices=1")).json()
+    text = body["context"]
+    assert "## Your home" in text
+    assert "- Living Room: cover: Living Room Curtains (also Curtains)" in text
+    assert "- No room: cover: Garage Door" in text
+    assert "Secret Lamp" not in text  # not exposed to Assist
+    assert "closed" not in text.split("## Your home")[1]  # names only, no states
+    plain = (await (await client.get("/api/lena/context")).json())["context"]
+    assert "## Your home" not in plain
+
+
 async def test_time_of_day_in_context(hass: HomeAssistant, freezer) -> None:
     """She's told the part of the day and whether it's dark, so 8 PM isn't sunny."""
     await hass.config.async_set_time_zone("America/New_York")

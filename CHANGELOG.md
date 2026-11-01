@@ -203,6 +203,12 @@ First release.
 
 ## Personality
 
+### 3.4.0 (2026-11-01)
+
+- **She finds devices the first time.** Home Assistant's house tools only match exact names, so "curtains" found nothing until she tried by kind and room. The Lena integration (1.4.0) can now hand her **Your home**: the exact names and aliases of everything exposed to Assist, by room and kind (never states), and the filter (2.1.0, new **devices** setting, on) adds it to her chats in Open WebUI. The Modelfile tells her to use those names, and that "the curtains" means all of that kind.
+- **Temperature 0.7** instead of Gemma's 1.0: at 1.0 she misspelled a tool's name ("homeassessment") and guessed device names.
+- To update: copy the new `custom_components/lena` folder and restart Home Assistant, paste the new `lena_filter.py` over the old one in Open WebUI (Admin Panel → Functions), and rebuild the model.
+
 ### 3.3.1 (2026-10-31)
 
 - **No more going in circles.** With thinking on, she could spend minutes redrafting a one-line answer ("They're closed. I'm not sure what you're planning…") until the reply ran out. The Modelfile now tells her to think about facts and actions only, never wordings, and caps a reply at 4096 tokens (`num_predict`) so a loop can't run on. Turn thinking off for her in Open WebUI (Workspace → Models → lena → Advanced Params → Think) too: house questions don't need it.

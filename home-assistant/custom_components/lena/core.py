@@ -19,6 +19,7 @@ import yaml
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
@@ -267,8 +268,58 @@ class LenaCore:
             line += "."
         return line
 
-    def context(self, with_reasons: bool = True, memory: bool = True) -> str:
-        """The time, who's home, how she feels and what she remembers."""
+    def devices(self, limit: int = 400) -> str:
+        """
+        The exact names of everything exposed to Assist, by room and kind, so she can ask the
+        house tools for the right thing the first time. Home Assistant matches names exactly
+        ("curtains" doesn't find "Living Room Curtains"), so without this she guesses. Names only,
+        never states: states change, and she checks those live.
+        """
+        try:
+            from homeassistant.components.homeassistant.exposed_entities import async_should_expose
+        except ImportError:
+            return ""
+        entities, devices, areas = er.async_get(self.hass), dr.async_get(self.hass), ar.async_get(self.hass)
+        rooms: dict[str, dict[str, list[str]]] = {}
+        count, more = 0, False
+        for state in sorted(self.hass.states.async_all(), key=lambda s: s.name.lower()):
+            # Calendars, scripts and to-do lists have tools of their own.
+            if state.domain in ("calendar", "script", "todo"):
+                continue
+            try:
+                if not async_should_expose(self.hass, "conversation", state.entity_id):
+                    continue
+            except KeyError:  # Home Assistant's exposure settings aren't loaded
+                return ""
+            if count >= limit:
+                more = True
+                break
+            entry = entities.async_get(state.entity_id)
+            area_id = entry.area_id if entry else None
+            if area_id is None and entry is not None and entry.device_id:
+                device = devices.async_get(entry.device_id)
+                area_id = device.area_id if device else None
+            area = areas.async_get_area(area_id) if area_id else None
+            aliases = sorted(a for a in (entry.aliases if entry else ()) if isinstance(a, str) and a and a != state.name)
+            label = state.name + (f" (also {', '.join(aliases)})" if aliases else "")
+            rooms.setdefault(area.name if area else "", {}).setdefault(state.domain, []).append(label)
+            count += 1
+        if not rooms:
+            return ""
+        lines = [
+            "## Your home",
+            "Everything you can check or control, by room and kind, with its exact name. The house tools match names "
+            "exactly, so use a name from here, or ask by kind (domain) and room. Check states live; this list has none.",
+        ]
+        for room in sorted(rooms, key=lambda r: (r == "", r.lower())):
+            kinds = "; ".join(f"{kind}: {', '.join(names)}" for kind, names in sorted(rooms[room].items()))
+            lines.append(f"- {room or 'No room'}: {kinds}")
+        if more:
+            lines.append(f"(Only the first {limit} are listed; ask by kind and room for the rest.)")
+        return "\n".join(lines)
+
+    def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False) -> str:
+        """The time, who's home, how she feels and what she remembers (and, if asked, the home's devices)."""
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
         parts = [
             "## Right now\n"
@@ -278,6 +329,8 @@ class LenaCore:
         ]
         if memory:
             parts.append(brain.remembered(self.memories()))
+        if devices and (index := self.devices()):
+            parts.append(index)
         return "\n\n".join(parts)
 
     # ---- Events ------------------------------------------------------------------------------

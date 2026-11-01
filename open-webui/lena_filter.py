@@ -1,7 +1,7 @@
 """
 title: Lena (feelings and memory)
 author: soullink9
-version: 2.0.0
+version: 2.1.0
 license: GPL-3.0
 description: Adds the time at home, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant.
 """
@@ -19,7 +19,9 @@ description: Adds the time at home, Lena's current feelings and her shared memor
 # WHAT IT DOES
 #   Before each message reaches the model, it reads /api/lena/context from
 #   the Lena integration in Home Assistant: the date and time at home, who's
-#   home, how she feels and what she remembers. It adds that to the chat's
+#   home, how she feels, what she remembers and the exact names of the devices
+#   exposed to Assist (Home Assistant's tools match names exactly, so she'd
+#   otherwise guess "curtains" for "Living Room Curtains"). It adds that to the chat's
 #   system message. Her character itself comes from the Modelfile and is
 #   always there; this only adds what's current. Answers are cached for a
 #   minute, and if Home Assistant can't be reached she simply chats without it.
@@ -58,6 +60,10 @@ class Filter:
         )
         ha_token: str = Field(default="", description="A long-lived access token from Home Assistant.")
         memory: bool = Field(default=True, description="Include her shared memory.")
+        devices: bool = Field(
+            default=True,
+            description="Include the exact names of the devices exposed to Assist, by room, so she finds them the first time.",
+        )
         cache_seconds: int = Field(default=60, description="How long to reuse Home Assistant's answer.")
         priority: int = Field(default=0, description="Order among filters (lower runs first).")
 
@@ -66,7 +72,8 @@ class Filter:
         self._cache: tuple[float, str] = (0.0, "")
 
     async def _context(self) -> str:
-        url = self.valves.ha_url.rstrip("/") + "/api/lena/context" + ("" if self.valves.memory else "?memory=0")
+        query = "&".join(q for q in ("" if self.valves.memory else "memory=0", "devices=1" if self.valves.devices else "") if q)
+        url = self.valves.ha_url.rstrip("/") + "/api/lena/context" + (f"?{query}" if query else "")
         try:
             body = await asyncio.to_thread(_get, url, self.valves.ha_token, 4)
             return (body.get("context") or "").strip()

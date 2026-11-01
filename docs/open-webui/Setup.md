@@ -44,9 +44,12 @@ Any user's token works; no admin rights are needed. A Home Assistant user just f
    | ha_url | Your Home Assistant address **as the Open WebUI container can reach it**, for example `http://homeassistant:8123` or `https://ha.example.com` |
    | ha_token | The token from step 3 |
    | memory | On, to include her shared memory |
+   | devices | On, to include the exact names of the devices you've exposed to Assist, by room (Lena integration 1.4.0 or newer) |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |
 
    The date and time come from Home Assistant, in your house's time zone; the model has no clock of its own.
+
+   **Why devices:** Home Assistant's house tools find a device only by its exact name or one of its aliases: asked for "curtains", they don't find "Living Room Curtains". With the list of names (by room and kind, never states, so it can't be out of date), she asks for the right thing the first time. It's what Home Assistant's own voice assistant gives the model too. Only what's exposed under Settings → Voice assistants → Expose is listed. For words you use a lot, add an alias to the device there as well (say "Curtains" on Living Room Curtains): it helps her and Home Assistant's own Assist.
 
 4. Workspace → Models → `lena` → **Filters**: tick **Lena (feelings and memory)**. Attach it to `lena` only, not globally, so your other models aren't affected.
 
