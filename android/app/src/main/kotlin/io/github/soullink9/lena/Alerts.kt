@@ -64,6 +64,10 @@ object Alerts {
         }
     }
 
+    /**
+     * Shows the alert on its own high-importance channel, so it can be loud while other Lena notifications
+     * stay quiet. Tapping it opens Lena listening.
+     */
     private fun show(c: Context, title: String, text: String, urgent: Boolean) {
         if (c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val nm = c.getSystemService(NotificationManager::class.java)
@@ -90,7 +94,9 @@ object Alerts {
     }
 }
 
+/** Checks Home Assistant for a worry every 15 minutes (the shortest period Android allows). */
 class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    /** Checks once. A failure is logged and the next run tries again, so it never retries in a tight loop. */
     override suspend fun doWork(): Result {
         runCatching { Alerts.check(applicationContext) }.onFailure { Logs.w("Alerts", "Couldn't check Home Assistant", it) }
         return Result.success()

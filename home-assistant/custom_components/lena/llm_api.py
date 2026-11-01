@@ -18,6 +18,9 @@ SPOKEN = "You're talking through Home Assistant, so your replies are usually spo
 
 
 def _core(hass: HomeAssistant):
+    """The running core, found through hass.data rather than passed in, because Home Assistant creates
+    the API and its tools itself.
+    """
     core = hass.data.get(DOMAIN)
     if core is None:
         raise RuntimeError("Lena isn't set up")
@@ -25,6 +28,9 @@ def _core(hass: HomeAssistant):
 
 
 class RememberTool(llm.Tool):
+    """remember_fact: she saves a fact to the shared memory (the Lena Memory to-do list), so every app
+    knows it.
+    """
     name = "remember_fact"
     integration = DOMAIN
     description = (
@@ -36,11 +42,13 @@ class RememberTool(llm.Tool):
     })
 
     async def async_call(self, hass, tool_input, llm_context):
+        """Saves the fact and tells her what was saved."""
         item = _core(hass).remember(tool_input.tool_args["fact"])
         return tool_result({"saved": item["summary"]})
 
 
 class ForgetTool(llm.Tool):
+    """forget_fact: removes the saved fact that best matches what she was asked to forget."""
     name = "forget_fact"
     integration = DOMAIN
     description = "Remove something from your memory when someone asks you to forget it."
@@ -49,11 +57,17 @@ class ForgetTool(llm.Tool):
     })
 
     async def async_call(self, hass, tool_input, llm_context):
+        """Forgets the closest match, or says nothing like it was saved, so she doesn't claim to have
+        forgotten something she never knew.
+        """
         removed = _core(hass).forget(tool_input.tool_args["fact"])
         return tool_result({"forgot": removed} if removed else {"forgot": None, "note": "Nothing like that was saved."})
 
 
 class FeelTool(llm.Tool):
+    """record_feeling: she sets a short-lived moment when something said to her genuinely lands
+    (thanks, an insult, good news).
+    """
     name = "record_feeling"
     integration = DOMAIN
     description = (
@@ -63,12 +77,16 @@ class FeelTool(llm.Tool):
     )
 
     def __init__(self, moments: list[str]) -> None:
+        """Built per request with the moments she may set herself; the ones the house sets (Worried,
+        Relieved, Delighted) are left out, so she can't fake or clear a worry.
+        """
         self.parameters = vol.Schema({
             vol.Required("moment", description="How it made you feel"): vol.In(moments),
             vol.Required("reason", description="What happened, in a few words, written to yourself"): cv.string,
         })
 
     async def async_call(self, hass, tool_input, llm_context):
+        """Sets the moment and reason; false if the moment isn't one of hers."""
         ok = _core(hass).feel(tool_input.tool_args["moment"], tool_input.tool_args.get("reason", ""))
         return tool_result({"recorded": ok})
 
@@ -77,6 +95,9 @@ class LenaAPI(llm.API):
     """Her context and tools, added to whatever else the agent uses (usually Assist)."""
 
     async def async_get_api_instance(self, llm_context: llm.LLMContext) -> llm.APIInstance:
+        """Her context (time, home, feelings, memory) as the API prompt, and her tools, for one
+        conversation.
+        """
         core = _core(self.hass)
         moments = [m for m in core.catalog.moments if m not in HOUSE_MOMENTS]
         tools: list[llm.Tool] = [RememberTool(), ForgetTool()]

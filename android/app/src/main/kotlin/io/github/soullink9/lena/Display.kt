@@ -115,7 +115,7 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
     }
     // The last thing she said in your ongoing conversation, every five minutes.
     LaunchedEffect(locked) {
-        if (locked || !Prefs.ongoing(context)) return@LaunchedEffect
+        if (locked) return@LaunchedEffect
         val api = Api.from(context) ?: return@LaunchedEffect
         while (true) {
             said = Prefs.assistChat(context)?.let { id ->
@@ -211,6 +211,7 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
     }
 }
 
+/** An icon for Home Assistant's weather condition, with night versions after dark. */
 private fun weatherIcon(condition: String, dark: Boolean): ImageVector = when (condition) {
     "sunny" -> Icons.Outlined.WbSunny
     "clear-night" -> Icons.Outlined.NightsStay
@@ -222,6 +223,10 @@ private fun weatherIcon(condition: String, dark: Boolean): ImageVector = when (c
     else -> Icons.Outlined.Cloud
 }
 
+/**
+ * Home Assistant's condition in words where its own name doesn't read well ("partlycloudy"); null means use
+ * it as it is.
+ */
 private fun weatherWords(condition: String): String? = when (condition) {
     "clear-night" -> "Clear"
     "partlycloudy" -> "Partly cloudy"
@@ -260,9 +265,14 @@ class DisplayActivity : ComponentActivity() {
     private var wake: WakeListener? = null
     private var screensaver = false
     private val unplugged = object : android.content.BroadcastReceiver() {
+        /** Unplugged while standing in for the screen saver: go away, as the real one would. */
         override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
+    /**
+     * Full screen and kept on. As the screen saver's stand-in it shows over the lock screen in its private
+     * mode and leaves when the device is unplugged.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         screensaver = intent.getBooleanExtra(EXTRA_SCREENSAVER, false)
@@ -283,11 +293,13 @@ class DisplayActivity : ComponentActivity() {
         setContent { LenaTheme { LenaDisplay(locked = locked, listening = listening.value, onTalk = ::onTalk) } }
     }
 
+    /** Stops watching for the unplug. */
     override fun onDestroy() {
         if (screensaver) runCatching { unregisterReceiver(unplugged) }
         super.onDestroy()
     }
 
+    /** Opens her listening. The wake word stops first, since only one thing can hold the microphone. */
     private fun onTalk() {
         wake?.stop()
         talk(this, if (screensaver) AskActivity.From.SCREENSAVER else AskActivity.From.DISPLAY)
@@ -295,22 +307,26 @@ class DisplayActivity : ComponentActivity() {
         if (screensaver) finish()
     }
 
+    /** Listens for the wake word whenever it's on screen. */
     override fun onResume() {
         super.onResume()
         startListening()
     }
 
+    /** The microphone was allowed (or not): try listening again. */
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         startListening()
     }
 
+    /** Starts the wake word if it's on; shows whether it's listening, or that Android won't let it here. */
     private fun startListening() {
         if (!Prefs.wakeWord(this)) return
         val w = wake ?: WakeListener(this, onHeard = ::onTalk, onSilenced = { listening.value = Listening.BLOCKED }).also { wake = it }
         listening.value = if (w.start()) Listening.ON else Listening.OFF
     }
 
+    /** Off screen: stop listening, so the microphone isn't held in the background. */
     override fun onPause() {
         wake?.stop()
         if (listening.value == Listening.ON) listening.value = Listening.OFF
@@ -332,12 +348,20 @@ class LenaDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
     override val lifecycle: Lifecycle get() = registry
     override val savedStateRegistry: SavedStateRegistry get() = saved.savedStateRegistry
 
+    /**
+     * A dream has no activity, so it provides the lifecycle and saved state that Compose needs to draw in
+     * it.
+     */
     override fun onCreate() {
         super.onCreate()
         saved.performRestore(null)
         registry.currentState = Lifecycle.State.CREATED
     }
 
+    /**
+     * Interactive (a tap talks to her) and full screen; shows her clock or the photo frame, privately if
+     * the device is locked.
+     */
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isInteractive = true
@@ -354,6 +378,7 @@ class LenaDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
         registry.currentState = Lifecycle.State.RESUMED
     }
 
+    /** Listens for the wake word while the screen saver shows, if it's on. */
     override fun onDreamingStarted() {
         super.onDreamingStarted()
         if (Prefs.wakeWord(this)) {
@@ -362,17 +387,23 @@ class LenaDream : DreamService(), LifecycleOwner, SavedStateRegistryOwner {
         }
     }
 
+    /**
+     * Opens her listening and ends the screen saver; DisplayActivity stands in for it while she talks, and
+     * comes back after.
+     */
     private fun onTalk() {
         wake?.stop()
         talk(this, AskActivity.From.SCREENSAVER)
         finish()
     }
 
+    /** The screen saver ended: stop listening. */
     override fun onDreamingStopped() {
         wake?.stop()
         super.onDreamingStopped()
     }
 
+    /** Gone from the screen: stop listening and end the Compose lifecycle. */
     override fun onDetachedFromWindow() {
         wake?.stop()
         registry.currentState = Lifecycle.State.DESTROYED

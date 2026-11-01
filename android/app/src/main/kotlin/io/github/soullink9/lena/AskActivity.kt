@@ -177,6 +177,11 @@ class AskActivity : ComponentActivity() {
             "ok thank you", "got it thanks", "perfect thanks", "great thanks", "good night", "goodnight",
         )
 
+        /**
+         * True when everything you said is just a goodbye ("thanks", "that's all", "stop"), ignoring her
+         * name and punctuation. The whole phrase must match, so "thanks, and turn off the lights" is still
+         * a request.
+         */
         fun isGoodbye(said: String): Boolean {
             val words = said.lowercase().replace('’', '\'').replace(Regex("[^a-z' ]"), " ")
                 .split(' ').filter { it.isNotBlank() && it != "lena" && it != "jarvis" && it != "hey" }
@@ -192,6 +197,7 @@ class AskActivity : ComponentActivity() {
     /** A touch on the sheet: stops it closing by itself, since you're using it. */
     private var onTouch: (() -> Unit)? = null
 
+    /** Sees every touch before the views do, so any touch counts as using the sheet. */
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
         if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) onTouch?.invoke()
         return super.dispatchTouchEvent(ev)
@@ -203,10 +209,13 @@ class AskActivity : ComponentActivity() {
         finish()
     }
 
+    /** Which wall screen an intent says called her, if any. */
     private fun fromOf(i: Intent): From? = i.getStringExtra(EXTRA_FROM)?.let { runCatching { From.valueOf(it) }.getOrNull() }
 
+    /** What the sheet is doing; it decides the mic button, the animation and whether it may close by itself. */
     private enum class Phase { IDLE, LISTENING, THINKING, SPEAKING }
 
+    /** One question and its answer as shown on the sheet. The answer fills in as it's written. */
     private class Turn(val question: String, val image: ImageBitmap? = null) {
         var answer by mutableStateOf("")
         var done by mutableStateOf(false)
@@ -226,6 +235,11 @@ class AskActivity : ComponentActivity() {
     private val locked = mutableStateOf(false)
     private val keyguard by lazy { getSystemService(KeyguardManager::class.java) }
 
+    /**
+     * Without a server, Settings first. Otherwise works out whether it's on the lock screen (and whether
+     * that's allowed), where it was called from, and whether to start listening, typing or sending a
+     * prompt.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val server = Prefs.server(this)
@@ -269,15 +283,24 @@ class AskActivity : ComponentActivity() {
         setContent { LenaTheme { Sheet(shared, auto) } }
     }
 
+    /**
+     * Whether this intent should start listening straight away: Talk to Lena, or the assistant gesture set
+     * to talk.
+     */
     private fun wantsTalk(i: Intent) = i.action == ACTION_TALK ||
         (i.action == Intent.ACTION_ASSIST && Prefs.assistAction(this) == AssistAction.ASK)
 
+    /**
+     * Called again while already open (the gesture twice, the wake word): listen again rather than open a
+     * second sheet.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         fromOf(intent)?.let { from = it }
         if (wantsTalk(intent)) restart.intValue++
     }
 
+    /** Unlocked while the sheet was open: the private lock-screen mode ends. */
     override fun onResume() {
         super.onResume()
         if (locked.value) locked.value = keyguard.isKeyguardLocked
@@ -287,6 +310,7 @@ class AskActivity : ComponentActivity() {
     private fun unlockThen(action: () -> Unit) {
         if (!keyguard.isKeyguardLocked) return action()
         keyguard.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+            /** Unlocked: leave the lock-screen mode and carry on with what was asked. */
             override fun onDismissSucceeded() {
                 locked.value = false
                 action()
@@ -294,12 +318,14 @@ class AskActivity : ComponentActivity() {
         })
     }
 
+    /** Hands over to the full app (a call, a new chat), after unlocking if needed, and closes the sheet. */
     private fun forward(action: String) {
         if (locked.value) return unlockThen { forward(action) }
         startActivity(Intent(this, MainActivity::class.java).setAction(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
     }
 
+    /** Opens a chat in the full app, after unlocking if needed, and closes the sheet. */
     private fun openChat(chatId: String) {
         if (locked.value) return unlockThen { openChat(chatId) }
         startActivity(
@@ -310,9 +336,11 @@ class AskActivity : ComponentActivity() {
         finish()
     }
 
+    /** The phone's recognizer when chosen and available, otherwise your server's speech-to-text. */
     private fun newEar(): Ear =
         if (Prefs.hearing(this) == Hearing.PHONE && PhoneEar.available(this)) PhoneEar(this) else ServerEar(api)
 
+    /** The voice chosen in Settings, or none when replies aren't read aloud. */
     private fun newMouth(): Mouth? = when (Prefs.speaking(this)) {
         Speaking.SERVER -> ServerMouth(this, api)
         Speaking.PHONE -> PhoneMouth(this)
@@ -331,12 +359,17 @@ class AskActivity : ComponentActivity() {
         if (!isChangingConfigurations) finish()
     }
 
+    /** Frees the microphone and the voice. */
     override fun onDestroy() {
         ear?.release()
         mouth?.release()
         super.onDestroy()
     }
 
+    /**
+     * The conversation: everything the sheet does (listening, sending, speaking, follow-ups, closing by
+     * itself on a wall screen), drawn by whichever look is chosen.
+     */
     @Composable
     private fun Sheet(initial: String, autoPrompt: String?) {
         val scope = rememberCoroutineScope()
@@ -359,7 +392,8 @@ class AskActivity : ComponentActivity() {
         val prompts = remember { Prefs.quickPrompts(this) }
         // Locked: a fresh, private conversation; the ongoing one (and its history) stays hidden.
         val startedLocked = remember { locked.value }
-        val ongoing = remember { Prefs.ongoing(this) && !startedLocked }
+        // Unlocked, talking to Lena always continues the one "Assistant Lena" chat.
+        val ongoing = !startedLocked
         var photo by remember { mutableStateOf<Photo?>(null) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
         val focus = remember { FocusRequester() }
@@ -370,6 +404,10 @@ class AskActivity : ComponentActivity() {
         // Called from a wall screen: when the conversation's over, she goes back to it by herself.
         val handsFree = from != null
         var closer by remember { mutableStateOf<Job?>(null) }
+        /**
+         * On a wall screen only: closes the sheet and goes back after [ms], unless something happens first
+         * (a touch, or her listening or speaking again).
+         */
         fun closeAfter(ms: Long) {
             if (!handsFree) return
             closer?.cancel()
@@ -385,12 +423,20 @@ class AskActivity : ComponentActivity() {
             onDispose { onTouch = null }
         }
 
+        /**
+         * Whether to listen again after her answer, by the Keep listening setting: always, only after a
+         * question, or never.
+         */
         fun listenAgainAfter(answer: String): Boolean = when (Prefs.followUp(this@AskActivity)) {
             FollowUp.ALWAYS -> true
             FollowUp.QUESTIONS -> answer.trimEnd().endsWith("?")
             FollowUp.OFF -> false
         }
 
+        /**
+         * Reads the answer aloud, then listens again or (on a wall screen) closes after a moment. If your
+         * server's voice fails, the phone's voice takes over for the rest of the sheet.
+         */
         fun speakThenMaybeListen(answer: String) {
             val voice = mouth ?: newMouth().also { mouth = it }
             val plain = Markdown.plain(answer)
@@ -425,6 +471,11 @@ class AskActivity : ComponentActivity() {
             }
         }
 
+        /**
+         * Sends a question (with any photo) into the Assistant Lena chat, follows the answer as it's
+         * written, then speaks it if you spoke. Errors become a short note on the sheet rather than a
+         * crash.
+         */
         fun send(q: String, spoken: Boolean) {
             val image = photo
             if (q.isBlank() && image == null) return
@@ -515,6 +566,10 @@ class AskActivity : ComponentActivity() {
             ""
         }
 
+        /**
+         * Listens once and returns what you said. Falls back to your server's speech-to-text when the
+         * phone's recognizer is still downloading or can't listen, and turns every failure into a note.
+         */
         suspend fun hear(): String {
             val onPartial = { t: String -> heard = t }
             val onLevel = { l: Float -> level = l }
@@ -586,6 +641,7 @@ class AskActivity : ComponentActivity() {
             }
         }
 
+        /** The big button: stop listening and send, stop her speaking, or start listening. */
         fun tapOrb() {
             when (phase) {
                 Phase.LISTENING -> {
@@ -620,7 +676,8 @@ class AskActivity : ComponentActivity() {
                     else -> {
                         chatId = saved
                         val chat = found.getOrNull()!!
-                        // Before 2.17.0 it was called "Lena": give it its name.
+                        // Found by its saved id but renamed (by hand, or by Open WebUI): give it its name back,
+                        // so it can still be found by name from another phone.
                         val id: String = saved
                         if (chat.optString("title") != ASSISTANT_CHAT) runCatching { api.renameChat(id, ASSISTANT_CHAT) }
                         val earlier = api.recentTurns(chat, 50).map { (q, a) ->
@@ -976,6 +1033,7 @@ class AskActivity : ComponentActivity() {
 
     // ---- 1. Sheet: the conversation in a panel from the bottom ---------------------------------
 
+    /** The Sheet look: a panel from the bottom with the whole conversation, the input row and quick prompts. */
     @Composable
     private fun SheetLook(a: AskUi) {
         val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
@@ -1077,6 +1135,7 @@ class AskActivity : ComponentActivity() {
         }
     }
 
+    /** The mic button with its status line and level ring, shared by several looks. */
     @Composable
     private fun VoiceBar(phase: Phase, heard: String, level: Float, onTap: () -> Unit) {
         val status = when (phase) {
@@ -1134,6 +1193,10 @@ class AskActivity : ComponentActivity() {
 
     // ---- 2. Glow: light around the edges of the screen, like Siri ------------------------------
 
+    /**
+     * The Glow look: Lena's colours run around the screen's edge, brighter as you speak, with a caption
+     * card.
+     */
     @Composable
     private fun GlowLook(a: AskUi) {
         val view = LocalView.current
@@ -1232,6 +1295,7 @@ class AskActivity : ComponentActivity() {
 
     // ---- 3. Bar: a compact bar at the bottom, like Google's assistant ---------------------------
 
+    /** The Bar look: a compact bar at the bottom, her answer in a card above it. */
     @Composable
     private fun BarLook(a: AskUi) {
         var photoMenu by remember { mutableStateOf(false) }
@@ -1313,6 +1377,7 @@ class AskActivity : ComponentActivity() {
 
     // ---- 4. Orb: her logo, alive in the middle of the screen ------------------------------------
 
+    /** The Orb look: her logo pulsing in the middle of a darkened screen, her words underneath. */
     @Composable
     private fun OrbLook(a: AskUi) {
         val white = Color.White
@@ -1397,6 +1462,7 @@ class AskActivity : ComponentActivity() {
 
     // ---- 5. Island: a small pill at the top that grows into a card -------------------------------
 
+    /** The Island look: a small pill at the top that drops down to show her answer. */
     @Composable
     private fun IslandLook(a: AskUi) {
         val ink = Color.White
@@ -1451,6 +1517,7 @@ class AskActivity : ComponentActivity() {
 
     // ---- 6. Subtitles: her words at the bottom of the screen, nothing else ----------------------
 
+    /** The Subtitles look: no panel, just her words at the bottom like film subtitles. */
     @Composable
     private fun SubtitlesLook(a: AskUi) {
         val ink = Color.White

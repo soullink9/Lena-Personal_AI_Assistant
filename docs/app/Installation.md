@@ -76,20 +76,16 @@ How you trigger the assistant depends on your phone and navigation style: usuall
 
 ## Updating
 
-**From the app (2.14.0 and later):** Settings → **Updates**. For a private repository, add a GitHub token first: on GitHub, Settings → Developer settings → **Fine-grained tokens** → Generate new token, choose **Only select repositories** with just this one, and under Repository permissions give **Contents** read-only access. Paste it into the token field in Lena (it's stored encrypted and sent only to GitHub). Then:
+**From the app:** Settings → **Updates**. Releases come from this repository by default (change it under **Your repository** if you build your own). For a private repository, add a GitHub token first: on GitHub, Settings → Developer settings → **Fine-grained tokens** → Generate new token, choose **Only select repositories** with just this one, and under Repository permissions give **Contents** read-only access. Paste it into the token field in Lena (it's stored encrypted and sent only to GitHub). Then:
 
 1. **Check for updates**, then **Download**. The APK is checked against the release's `SHA256SUMS`, and that it's Lena, newer, and signed with your key; anything else is thrown away.
 2. **Let Lena install apps** (Android's "Install unknown apps" for Lena) and, if **Auto Blocker** stops the install (Samsung: Settings → Security and privacy → Auto Blocker), turn it off; the button opens Security and privacy, where it's listed. You can leave for those settings and come back: the download waits.
 3. **Install**. Android asks you to confirm. Once the update is in, the downloaded APK is deleted, and if you turned Auto Blocker off, Lena reminds you to turn it back on.
 
-**Re-download and install** (2.17.0 and later) gets the latest release again even when it's the version you have, checked the same way: to repair an install, or after you've reset the version number. Android compares the **build number** (`versionCode` in `android/app/build.gradle.kts`), not the version name, so if you start the version name again from 1.0.0, keep `versionCode` going up; Android refuses to install a lower build number over a higher one, and Lena says so instead of downloading for nothing.
+**Re-download and install** gets the latest release again even when it's the version you have, checked the same way: to repair an install, or after a version number was reset. Android compares the **build number** (`versionCode` in `android/app/build.gradle.kts`), not the version name, so if the version name starts again, `versionCode` must keep going up; Android refuses to install a lower build number over a higher one, and Lena says so instead of downloading for nothing.
 
 **By hand:** install the new APK over the old one. Your settings and sign-in stay. If Android says the app isn't installed or conflicts with an existing one, see [Troubleshooting](Troubleshooting.md#an-update-wont-install).
 
 ## Changing your settings later
 
 Open the drawer and tap **Settings**, or long-press Lena's icon and tap **Settings**.
-
-## Updating from 1.x
-
-2.0 needs Android 16. Install it over 1.x as usual; your address and sign-in carry over. The assistant gesture now opens the **Ask Lena sheet** by default; switch it back to **Voice call** in Settings → Assistant gesture if you prefer.

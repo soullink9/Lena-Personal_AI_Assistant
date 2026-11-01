@@ -70,14 +70,17 @@ import java.util.Date
  */
 class LogsActivity : ComponentActivity() {
 
+    /** Edge to edge, like the rest of the app. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }
     }
 
+    /** The three views: problems only, everything Lena logged, and Android's own log for this run. */
     private enum class Tab(val label: String) { PROBLEMS("Problems"), ALL("Everything"), ANDROID("Android") }
 
+    /** The chosen view, newest first, with search, copy, share and clear in the top bar. */
     @Composable
     private fun Screen() {
         var tab by remember { mutableStateOf(Tab.PROBLEMS) }
@@ -219,5 +222,6 @@ class LogsActivity : ComponentActivity() {
         }
     }
 
+    /** An entry's time, to the second. */
     private fun stamp(t: Long): String = DateFormat.format("MMM d, HH:mm:ss", Date(t)).toString()
 }

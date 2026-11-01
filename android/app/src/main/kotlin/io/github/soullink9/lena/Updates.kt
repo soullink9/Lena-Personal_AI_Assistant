@@ -33,14 +33,23 @@ object Updates {
     const val GITHUB_TOKEN = "github_token"
     private const val TAG = "Updates"
 
+    /**
+     * The latest release: its version (the tag without the v), notes, the APK asset and the SHA256SUMS
+     * asset if there is one.
+     */
     data class Release(val version: String, val notes: String, val apkId: Long, val apkName: String, val size: Long, val sumsId: Long?)
 
+    /** Where the updater keeps its own state (the repository, what's waiting to install). */
     private fun p(c: Context) = c.getSharedPreferences("lena-updates", Context.MODE_PRIVATE)
+    /** The folder downloaded APKs wait in: private, and deleted once installed. */
     private fun dir(c: Context) = File(c.filesDir, "updates")
 
+    /** The repository releases come from: owner/name. */
     fun repo(c: Context): String = p(c).getString("repo", null)?.ifBlank { null } ?: DEFAULT_REPO
+    /** Changes the repository releases come from. */
     fun setRepo(c: Context, repo: String) = p(c).edit().putString("repo", repo.trim()).apply()
 
+    /** This Lena's version name. */
     fun installed(c: Context): String =
         runCatching { c.packageManager.getPackageInfo(c.packageName, 0).versionName }.getOrNull() ?: "0"
 
@@ -48,7 +57,7 @@ object Updates {
     fun installedCode(c: Context): Long =
         runCatching { c.packageManager.getPackageInfo(c.packageName, 0).longVersionCode }.getOrDefault(0L)
 
-    /** True if [a] is a later version than [b] ("2.14.0" > "2.13.2"). */
+    /** True if [a] is a later version than [b] ("0.5.1" > "0.5.0-beta"); anything after the numbers is ignored. */
     fun newer(a: String, b: String): Boolean {
         val x = a.removePrefix("v").split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
         val y = b.removePrefix("v").split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
@@ -61,6 +70,10 @@ object Updates {
 
     // ---- GitHub ---------------------------------------------------------------------------
 
+    /**
+     * A GitHub connection. Redirects aren't followed automatically, so the token is only ever sent to
+     * GitHub's API and not to the storage the download is handed off to.
+     */
     private fun open(url: String, accept: String, auth: String?): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = false // the file is handed off to GitHub's storage; follow that without the token
@@ -71,6 +84,7 @@ object Updates {
             if (auth != null) setRequestProperty("Authorization", "Bearer $auth")
         }
 
+    /** GitHub's refusals in words that say what to check. */
     private fun problem(code: Int): IOException = IOException(
         when (code) {
             401 -> "GitHub didn't accept the token. Check it hasn't expired."
@@ -200,7 +214,6 @@ object Updates {
         if (!file.exists()) return null
         val code = p(c).getLong("pending_code", -1)
         val still = when {
-            code < 0 -> newer(version, installed(c)) // downloaded before 2.17.0
             p(c).getBoolean("pending_reinstall", false) -> code >= installedCode(c)
             else -> code > installedCode(c)
         }
@@ -220,6 +233,7 @@ object Updates {
         }
     }
 
+    /** Deletes the waiting download and forgets it. */
     fun discard(c: Context) {
         dir(c).deleteRecursively()
         p(c).edit().remove("pending_version").remove("pending_file").remove("pending_code").remove("pending_reinstall").apply()
@@ -288,6 +302,10 @@ object Updates {
 
 /** Android's installer reports back here: it needs you to confirm, or it failed. */
 class UpdateReceiver : BroadcastReceiver() {
+    /**
+     * Android's installer reports here: when it needs you to confirm, the confirmation screen is shown; a
+     * failure becomes a message that says what to check, and goes in the log.
+     */
     override fun onReceive(context: Context, intent: Intent) {
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {

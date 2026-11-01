@@ -1,7 +1,7 @@
 """
 title: Lena (feelings and memory)
 author: soullink9
-version: 2.1.0
+version: 0.5.0-beta
 license: GPL-3.0
 description: Adds the time at home, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant.
 """
@@ -53,7 +53,11 @@ def _get(url: str, token: str, timeout: float) -> dict:
 
 
 class Filter:
+    """Open WebUI calls inlet() with every request to the model it's attached to (only lena), before
+    the model sees it.
+    """
     class Valves(BaseModel):
+        """The filter's settings, shown under its gear icon in Open WebUI and kept on the server."""
         ha_url: str = Field(
             default="http://homeassistant.local:8123",
             description="Your Home Assistant address, as Open WebUI's server can reach it.",
@@ -68,10 +72,15 @@ class Filter:
         priority: int = Field(default=0, description="Order among filters (lower runs first).")
 
     def __init__(self):
+        """Open WebUI creates the filter once and keeps it, so the cache lives across requests."""
         self.valves = self.Valves()
         self._cache: tuple[float, str] = (0.0, "")
 
     async def _context(self) -> str:
+        """Fetches her context from Home Assistant, or an empty string if it can't be reached: she
+        should still chat when Home Assistant is down. The request runs in a thread because urllib
+        blocks and Open WebUI's server is async.
+        """
         query = "&".join(q for q in ("" if self.valves.memory else "memory=0", "devices=1" if self.valves.devices else "") if q)
         url = self.valves.ha_url.rstrip("/") + "/api/lena/context" + (f"?{query}" if query else "")
         try:
@@ -82,6 +91,10 @@ class Filter:
             return ""
 
     async def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
+        """Adds her context to the request's system message (or as one, if there isn't one). Home
+        Assistant is asked at most once a minute: a chat sends many requests, and her feelings don't
+        change that fast.
+        """
         if not self.valves.ha_token:
             return body
 

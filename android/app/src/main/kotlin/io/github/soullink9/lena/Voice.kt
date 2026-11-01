@@ -47,6 +47,7 @@ interface Ear {
     /** Stop listening now and use what was heard so far. */
     fun finish()
 
+    /** Frees the microphone and any recognizer. Called when the sheet closes; an ear can't be used after it. */
     fun release()
 }
 
@@ -60,6 +61,7 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
             SpeechRecognizer.ERROR_SERVER,
         )
 
+    /** The error in plain words, for the note under the mic and the logs. */
     fun describe(): String = when (code) {
         SpeechRecognizer.ERROR_AUDIO -> "the microphone is in use"
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "no microphone permission"
@@ -76,15 +78,21 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
 class PhoneEar(private val context: Context) : Ear {
 
     companion object {
+        /** Whether this phone has an on-device recognizer at all (some don't, and then the server is used). */
         fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c)
     }
 
     private var recognizer: SpeechRecognizer? = null
 
+    /** Free-form speech with partial results, so your words appear as you speak. */
     private fun request() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
         .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
 
+    /**
+     * Listens once. If the phone's recognizer was busy or its service died (both happen after another app
+     * used it), it's released and tried once more before giving up.
+     */
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
         try {
             once(onPartial, onLevel)
@@ -95,36 +103,58 @@ class PhoneEar(private val context: Context) : Ear {
             once(onPartial, onLevel)
         }
 
+    /**
+     * One recognition, turned from the recognizer's callbacks into a suspending call that returns the text.
+     * Recognizers must be driven from the main thread.
+     */
     private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { cont ->
                 val r = recognizer ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { recognizer = it }
                 r.cancel() // clear anything left from the last turn
                 var latest = ""
+                /** Finishes with the text, once: the recognizer can call back more than once. */
                 fun done(text: String) {
                     if (cont.isActive) cont.resume(text)
                 }
+                /** Fails with the error, once. */
                 fun fail(e: Exception) {
                     if (cont.isActive) cont.resumeWithException(e)
                 }
                 r.setRecognitionListener(object : RecognitionListener {
+                    /**
+                     * The input level for the mic animation: the recognizer's dB value (about -2 to 10)
+                     * mapped to 0..1.
+                     */
+                    override fun onRmsChanged(rmsdB: Float) = onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+
+                    // Callbacks the recognizer requires but Lena doesn't need: she only uses the level,
+                    // the partial and final results, and errors.
                     override fun onReadyForSpeech(params: Bundle?) {}
                     override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) = onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
                     override fun onEvent(eventType: Int, params: Bundle?) {}
 
+                    /**
+                     * Keeps the newest partial result, both to show it and to fall back on if the final one
+                     * comes back empty.
+                     */
                     override fun onPartialResults(partialResults: Bundle?) {
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                             ?.takeIf { it.isNotBlank() }?.let { latest = it; onPartial(it) }
                     }
 
+                    /** The final text, or the last partial one if the recognizer returned nothing better. */
                     override fun onResults(results: Bundle?) {
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                         done(text?.takeIf { it.isNotBlank() } ?: latest)
                     }
 
+                    /**
+                     * No match or a timeout means you said nothing, not a failure. Anything else, after
+                     * you'd been heard, still uses what was heard.
+                     */
                     override fun onError(error: Int) {
                         when {
                             latest.isNotBlank() -> done(latest) // we heard you; use it
@@ -143,10 +173,12 @@ class PhoneEar(private val context: Context) : Ear {
             }
         }
 
+    /** Ends listening now; the recognizer then delivers what it has. */
     override fun finish() {
         recognizer?.stopListening()
     }
 
+    /** Destroys the recognizer, which holds the microphone and a connection to the speech service. */
     override fun release() {
         recognizer?.destroy()
         recognizer = null
@@ -162,6 +194,10 @@ class ServerEar(private val api: Api) : Ear {
     @Volatile
     private var finishNow = false
 
+    /**
+     * Records until you stop, then sends it to Open WebUI's speech-to-text. The text appears all at once,
+     * after you stop, unlike on the phone.
+     */
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String {
         finishNow = false
         val pcm = withContext(Dispatchers.IO) { record(onLevel) }
@@ -170,7 +206,12 @@ class ServerEar(private val api: Api) : Ear {
         return api.transcribe(wav(pcm, RATE)).trim()
     }
 
-    @SuppressLint("MissingPermission") // the Ask sheet asks for the microphone before listening
+    /**
+     * Records 16 kHz mono until 1.2 seconds of quiet after you've started talking (or 30 seconds, or
+     * finish()), so you don't have to tap to stop. "Talking" is measured against the room: the first
+     * 200 ms learn its background noise. Returns the raw audio, or nothing if you didn't speak within
+     * 7 seconds.
+     */
     private suspend fun record(onLevel: (Float) -> Unit): ByteArray {
         val frame = RATE / 50 // 20 ms
         val min = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
@@ -223,15 +264,18 @@ class ServerEar(private val api: Api) : Ear {
         return if (speaking || finishNow) out.toByteArray() else ByteArray(0)
     }
 
+    /** Stops recording at the next 20 ms frame. */
     override fun finish() {
         finishNow = true
     }
 
+    /** Nothing to free: the recorder is closed after each recording. */
     override fun release() {}
 
     companion object {
         private const val RATE = 16_000
 
+        /** Raw 16-bit mono PCM with a WAV header, which every speech-to-text engine accepts. */
         fun wav(pcm: ByteArray, rate: Int): ByteArray {
             val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
                 put("RIFF".toByteArray()); putInt(36 + pcm.size); put("WAVE".toByteArray())
@@ -264,6 +308,10 @@ data class VoiceTone(val speed: Float = 1f, val pitch: Float = 1f) {
             "Fond" to (0.97f to 1.01f),
         )
 
+        /**
+         * Her tone for how she feels: the energy and mood adjustments multiplied together. Unknown feelings
+         * change nothing.
+         */
         fun of(f: Feelings?): VoiceTone {
             if (f == null) return VoiceTone()
             val (es, ep) = energy[f.energy] ?: (1f to 1f)
@@ -273,11 +321,15 @@ data class VoiceTone(val speed: Float = 1f, val pitch: Float = 1f) {
     }
 }
 
+/** Reads Lena's replies aloud. */
 interface Mouth {
     /** Set before [say]; neutral unless "Her voice follows her mood" is on. */
     var tone: VoiceTone
+    /** Speaks the text and returns when she's finished (or was stopped). */
     suspend fun say(text: String)
+    /** Stops speaking now. */
     fun stop()
+    /** Frees the player or speech engine. */
     fun release()
 }
 
@@ -310,6 +362,10 @@ class ServerMouth(private val context: Context, private val api: Api) : Mouth {
     private var player: MediaPlayer? = null
     override var tone = VoiceTone()
 
+    /**
+     * Speaks a reply piece by piece: while one piece plays, the next is already being turned into audio, so
+     * long replies start quickly and don't pause between sentences.
+     */
     override suspend fun say(text: String) = coroutineScope {
         val parts = pieces(text)
         if (parts.isEmpty()) return@coroutineScope
@@ -321,6 +377,10 @@ class ServerMouth(private val context: Context, private val api: Api) : Mouth {
         }
     }
 
+    /**
+     * Plays one piece of audio and waits for it to end. The audio goes through a temporary file because
+     * MediaPlayer can't play from memory reliably on every phone.
+     */
     private suspend fun play(audio: ByteArray) {
         val file = File.createTempFile("lena-", ".audio", context.cacheDir)
         try {
@@ -346,10 +406,12 @@ class ServerMouth(private val context: Context, private val api: Api) : Mouth {
         }
     }
 
+    /** Stops the current piece; say() then ends. */
     override fun stop() {
         runCatching { player?.stop() }
     }
 
+    /** Frees the media player. */
     override fun release() {
         player?.release()
         player = null
@@ -367,6 +429,7 @@ class PhoneMouth(context: Context) : Mouth {
         tts.setAudioAttributes(speechAttributes)
     }
 
+    /** Speaks with the phone's engine at her tone's speed and pitch, waiting for the utterance to finish. */
     override suspend fun say(text: String) {
         if (!ready.await()) return
         tts.setSpeechRate(tone.speed)
@@ -375,16 +438,21 @@ class PhoneMouth(context: Context) : Mouth {
             suspendCancellableCoroutine { cont ->
                 val id = UUID.randomUUID().toString()
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    /** Nothing to do when an utterance starts. */
                     override fun onStart(utteranceId: String?) {}
+
+                    /** Finished: say() moves on to the next piece. */
                     override fun onDone(utteranceId: String?) {
                         if (cont.isActive) cont.resume(Unit)
                     }
 
+                    /** Older engines report failures here; a failed piece is skipped rather than stopping her. */
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
                         if (cont.isActive) cont.resume(Unit)
                     }
 
+                    /** The same, with the engine's error code. */
                     override fun onError(utteranceId: String?, errorCode: Int) {
                         if (cont.isActive) cont.resume(Unit)
                     }
@@ -395,10 +463,12 @@ class PhoneMouth(context: Context) : Mouth {
         }
     }
 
+    /** Stops speaking now. */
     override fun stop() {
         tts.stop()
     }
 
+    /** Shuts the phone's speech engine down. */
     override fun release() {
         tts.shutdown()
     }

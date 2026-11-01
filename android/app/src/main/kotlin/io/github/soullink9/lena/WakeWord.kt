@@ -30,6 +30,7 @@ data class WakeResult(
 interface WakeEngine : Closeable {
     /** At or above this (on average over the model's window), it's her name. */
     val threshold: Float
+    /** Feeds 80 ms of 16 kHz audio and says how sure it is, and whether that was her name. */
     fun listen(chunk: ShortArray): WakeResult
 }
 
@@ -45,17 +46,21 @@ object WakeWord {
     const val CHUNK = 1280 // 80 ms at 16 kHz
     private const val DIR = "wakeword"
 
+    /** Whether this build has the phrase's model (they're bundled in the app's assets). */
     fun available(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c)): Boolean =
         runCatching { c.assets.list(DIR)?.contains(phrase.file) == true }.getOrDefault(false)
 
+    /** The engine for a phrase: microWakeWord for Hey Lena and Lena, openWakeWord for Hey Jarvis. */
     fun open(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c), sensitivity: WakeSensitivity = Prefs.wakeSensitivity(c)): WakeEngine =
         when (phrase) {
             WakePhrase.HEY_LENA, WakePhrase.LENA -> MicroWakeWord(c, phrase.file, sensitivity)
             WakePhrase.JARVIS -> OpenWakeWord(c, phrase.file, sensitivity)
         }
 
+    /** Whether an asset is bundled. */
     internal fun has(c: Context, name: String) = runCatching { c.assets.list(DIR)?.contains(name) == true }.getOrDefault(false)
 
+    /** A model file in direct memory, which LiteRT needs. */
     internal fun load(c: Context, name: String): ByteBuffer {
         val bytes = c.assets.open("$DIR/$name").use { it.readBytes() }
         return ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.nativeOrder()).put(bytes).also { it.rewind() }
@@ -68,6 +73,7 @@ object WakeWord {
         micro.optDouble("probability_cutoff", cutoff.toDouble()).toFloat() to micro.optInt("sliding_window_size", window)
     }.getOrDefault(cutoff to window)
 
+    /** A direct buffer for n floats, in the device's byte order, for the models' inputs and outputs. */
     internal fun floats(n: Int): ByteBuffer = ByteBuffer.allocateDirect(4 * n).order(ByteOrder.nativeOrder())
 }
 
@@ -109,6 +115,7 @@ private class MicroModel(c: Context, file: String) : Closeable {
         return (raw - outZero) * outScale
     }
 
+    /** Frees the model. */
     override fun close() = model.close()
 }
 
@@ -138,6 +145,7 @@ private class VoiceActivity(c: Context) : Closeable {
     /** Someone spoke within the last second. */
     val speaking: Boolean get() = sinceVoice <= GRACE
 
+    /** Frees the model. */
     override fun close() = model.close()
 }
 
@@ -172,6 +180,11 @@ class MicroWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wa
     private val recent = ArrayDeque<Float>()
     private var settle = -SETTLE
 
+    /**
+     * Runs the audio through the front end, frame by frame, and decides like ESPHome: the window's average
+     * must beat the cutoff, she must have settled, and the voice check must agree. Returns the best average
+     * seen, for the meter.
+     */
     override fun listen(chunk: ShortArray): WakeResult {
         var best = 0f
         var heard = false
@@ -203,6 +216,7 @@ class MicroWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wa
         return WakeResult(best, heard, notSpeech && !heard)
     }
 
+    /** Frees both models. */
     override fun close() {
         model.close()
         voice?.close()
@@ -253,6 +267,10 @@ class OpenWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wak
     private val wordIn = WakeWord.floats(FEATURES * EMBEDDING)
     private val wordOut = WakeWord.floats(1)
 
+    /**
+     * Scores 80 ms: feeds the voice check, extends the spectrogram, makes one embedding, and scores the
+     * last 16 embeddings. Waits a second after starting, and needs the voice check to agree.
+     */
     override fun listen(chunk: ShortArray): WakeResult {
         if (voice != null) {
             var at = 0
@@ -299,6 +317,7 @@ class OpenWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wak
         return WakeResult(score, heard = true)
     }
 
+    /** Frees all four models. */
     override fun close() {
         mel.close()
         embed.close()
@@ -325,6 +344,10 @@ class WakeListener(
 
     val isRunning: Boolean get() = running
 
+    /**
+     * Starts listening on its own thread. False if this build lacks the model or there's no microphone
+     * permission.
+     */
     fun start(): Boolean {
         if (running) return true
         if (!WakeWord.available(context)) return false
@@ -334,11 +357,16 @@ class WakeListener(
         return true
     }
 
+    /** Stops at the next chunk; the thread closes the microphone and the model itself. */
     fun stop() {
         running = false
         thread = null
     }
 
+    /**
+     * The listening loop: opens the model and the microphone, scores audio until stopped or until it hears
+     * her, and notices when Android only hands it silence.
+     */
     @SuppressLint("MissingPermission") // checked in start()
     private fun loop() {
         val phrase = Prefs.wakePhrase(context)

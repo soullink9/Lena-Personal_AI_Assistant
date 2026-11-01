@@ -86,6 +86,7 @@ fun Item(
     }
 }
 
+/** A row with an on/off switch; tapping anywhere on the row flips it. */
 @Composable
 fun SwitchItem(icon: ImageVector?, title: String, summary: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
@@ -104,6 +105,7 @@ fun SwitchItem(icon: ImageVector?, title: String, summary: String?, checked: Boo
     }
 }
 
+/** One of several choices, with a radio button; tapping anywhere on the row picks it. */
 @Composable
 fun ChoiceItem(title: String, summary: String?, selected: Boolean, onSelect: () -> Unit) {
     Row(
@@ -133,6 +135,7 @@ fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/** A small coloured heading above a group. */
 @Composable
 fun SectionTitle(title: String, modifier: Modifier = Modifier) {
     Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,

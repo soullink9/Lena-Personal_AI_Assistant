@@ -34,6 +34,10 @@ object Notify {
     const val REPLIES = "replies"
     const val SCHEDULED = "scheduled"
 
+    /**
+     * Creates the notification channels (repeating this is harmless), so each kind can be silenced on its
+     * own in Android's settings.
+     */
     private fun channels(c: Context) {
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
@@ -46,6 +50,10 @@ object Notify {
         )
     }
 
+    /**
+     * Shows a notification that opens the chat. One per chat (its id is the chat's), so a newer answer
+     * replaces the older one. On the lock screen only "Lena replied" shows, not the text.
+     */
     fun show(c: Context, channel: String, title: String, text: String, chatId: String?) {
         if (c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         channels(c)
@@ -81,8 +89,10 @@ private val online = Constraints.Builder().setRequiredNetworkType(NetworkType.CO
 class ReplyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     companion object {
+        /** One job per chat, so leaving the same chat twice doesn't follow it twice. */
         private fun name(chatId: String) = "reply-$chatId"
 
+        /** Starts watching a chat's answer once there's a network. */
         fun enqueue(c: Context, chatId: String) {
             WorkManager.getInstance(c).enqueueUniqueWork(
                 name(chatId),
@@ -94,11 +104,16 @@ class ReplyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             )
         }
 
+        /** Back in the chat before the answer finished: no notification needed. */
         fun cancel(c: Context, chatId: String) {
             WorkManager.getInstance(c).cancelUniqueWork(name(chatId))
         }
     }
 
+    /**
+     * Waits (up to nine minutes, inside WorkManager's ten-minute limit) for the answer to finish, then
+     * notifies with its start. Signed out just stops; other failures retry twice.
+     */
     override suspend fun doWork(): Result {
         val chatId = inputData.getString("chat_id") ?: return Result.failure()
         val api = Api.from(applicationContext) ?: return Result.failure()
@@ -125,6 +140,10 @@ class ReplyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     companion object {
+        /**
+         * Runs a scheduled prompt as soon as there's a network. Expedited, so Android runs it promptly
+         * instead of batching it for later, when its quota allows.
+         */
         fun enqueue(c: Context, scheduleId: String) {
             WorkManager.getInstance(c).enqueueUniqueWork(
                 "schedule-$scheduleId",
@@ -138,6 +157,10 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         }
     }
 
+    /**
+     * Sends the prompt (into its named chat if it has one), waits for the answer and notifies you with it.
+     * A schedule that was deleted or paused since the alarm was set is skipped.
+     */
     override suspend fun doWork(): Result {
         val c = applicationContext
         val id = inputData.getString("schedule_id") ?: return Result.failure()
@@ -196,6 +219,10 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 object Schedules {
     private const val ACTION_FIRE = "io.github.soullink9.lena.SCHEDULE"
 
+    /**
+     * The alarm for one schedule. Its request code is the schedule's, so setting it again replaces it
+     * rather than adding a second.
+     */
     private fun pending(c: Context, id: String): PendingIntent = PendingIntent.getBroadcast(
         c,
         id.hashCode(),
@@ -203,6 +230,10 @@ object Schedules {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
+    /**
+     * Sets every schedule's next alarm, and cancels alarms for schedules that were deleted (their ids are
+     * remembered from last time, since Android can't list an app's alarms).
+     */
     fun rescheduleAll(c: Context) {
         val alarms = c.getSystemService(AlarmManager::class.java)
         val prefs = c.getSharedPreferences("lena_alarms", Context.MODE_PRIVATE)
@@ -221,6 +252,7 @@ object Schedules {
 
     /** When [s] runs next, after [from]; null if it won't again (a one-off that's past, or no days picked). */
     fun next(s: Schedule, from: ZonedDateTime = ZonedDateTime.now()): Long? {
+        /** That day at the schedule's minute and the given hour, in the phone's time zone. */
         fun at(day: java.time.LocalDate, hour: Int = s.hour) =
             day.atTime(hour, s.minute).atZone(from.zone)
         val today = from.toLocalDate()
@@ -250,10 +282,13 @@ object Schedules {
         return t?.toInstant()?.toEpochMilli()
     }
 
+    /** Whether an intent is one of these alarms going off. */
     fun isFire(intent: Intent) = intent.action == ACTION_FIRE
 }
 
+/** Receives the alarms: runs the prompt and sets the schedule's next time. */
 class ScheduleReceiver : BroadcastReceiver() {
+    /** A schedule's alarm went off. */
     override fun onReceive(context: Context, intent: Intent) {
         if (Schedules.isFire(intent)) intent.getStringExtra("id")?.let { PromptWorker.enqueue(context, it) }
         Schedules.rescheduleAll(context) // and set tomorrow's
@@ -282,13 +317,19 @@ class WidgetMoodWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
     }
 
+    /** Redraws the widget. */
     override suspend fun doWork(): Result {
         runCatching { LenaWidget().updateAll(applicationContext) }
         return Result.success()
     }
 }
 
+/**
+ * After a restart or an update Android has forgotten the app's alarms, so they're set again; after an
+ * update it also tidies away the downloaded APK.
+ */
 class BootReceiver : BroadcastReceiver() {
+    /** The phone started or Lena was updated. */
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             Schedules.rescheduleAll(context)
@@ -299,6 +340,7 @@ class BootReceiver : BroadcastReceiver() {
 
 /** Quick prompts on the app icon's long-press menu. */
 object Shortcuts {
+    /** The first three quick prompts on the app icon's long-press menu, kept in step with Settings. */
     fun update(c: Context) {
         val list = Prefs.quickPrompts(c).take(3).mapIndexed { i, p ->
             ShortcutInfo.Builder(c, "prompt-$i")

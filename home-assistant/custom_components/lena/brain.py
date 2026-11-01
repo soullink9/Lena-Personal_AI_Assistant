@@ -131,6 +131,9 @@ class Change:
     reason: str | None = None
 
     def __bool__(self) -> bool:
+        """True when the event changed anything at all, so callers can skip saving and updating
+        entities when nothing happened.
+        """
         return self.mood is not None or self.energy is not None or self.moment is not None or self.reason is not None
 
 
@@ -143,16 +146,25 @@ class Catalog:
     moments: dict[str, str] = field(default_factory=dict)
 
     def mood_options(self) -> list[str]:
+        """Her moods in feelings.yaml order: the options of the Lena Mood select."""
         return list(self.moods)
 
     def energy_options(self) -> list[str]:
+        """Her energy levels: the options of the Lena Energy select."""
         return list(self.energies)
 
     def moment_options(self) -> list[str]:
+        """Her moments, with Nothing first: a moment is short-lived, and Nothing is the state it fades
+        back to.
+        """
         return [NOTHING, *self.moments]
 
 
 def _pick(pool: list[str], known: dict[str, str], avoid: str | None, rng: random.Random) -> str | None:
+    """Picks at random from the pool, skipping feelings that aren't defined (feelings.yaml can be
+    edited) and the one she's already in, so a change is always a change. Repeats in the pool make a
+    choice likelier. None when there's nothing left.
+    """
     choices = [p for p in pool if p in known and p != avoid]
     return rng.choice(choices) if choices else None
 
@@ -177,6 +189,9 @@ def part_of_day(hour: int) -> str:
 
 
 def _same_weather(a: str | None, b: str | None) -> bool:
+    """Sunshine and a clear night sky are the same weather seen at different times, so going from one
+    to the other (sunset, sunrise) isn't news to react to.
+    """
     return a == b or (a in CLEAR_SKIES and b in CLEAR_SKIES)
 
 
@@ -205,6 +220,9 @@ def still_true(
 
 
 def _house_pull(people_home: int, people_total: int) -> tuple[list[str], str]:
+    """How the people at home pull her mood, and why: an empty house makes her restless or wistful,
+    everyone home (in a house of more than one) fond or cheerful. Nothing in between.
+    """
     if people_total == 0:
         return [], ""
     if people_home == 0:
@@ -215,6 +233,9 @@ def _house_pull(people_home: int, people_total: int) -> tuple[list[str], str]:
 
 
 def _clock(day: datetime, at: time) -> datetime:
+    """The given day at the given time of day: her wake-up and bedtime settings are times, the checks
+    need datetimes.
+    """
     return day.replace(hour=at.hour, minute=at.minute, second=at.second, microsecond=0)
 
 
@@ -255,6 +276,7 @@ def morning(
 
 
 def bedtime(cat: Catalog) -> Change:
+    """She winds down at bedtime: drained, whatever she was."""
     return Change(energy="Drained" if "Drained" in cat.energies else None)
 
 
@@ -296,6 +318,9 @@ def hourly(
 
 
 def _how_long(hours: float) -> str:
+    """How long someone was away, the way a person would say it: hours, or days once it's a day and a
+    half or more.
+    """
     if hours >= 36:
         return f"{round(hours / 24)} days"
     return f"{round(hours)} hours"
@@ -337,12 +362,18 @@ def weather_turned(
 
 
 def worried(cat: Catalog, name: str, device_class: str | None) -> Change:
+    """A worry sensor turned on: she's Worried, and the reason says which sensor and what's wrong in
+    plain words.
+    """
     if "Worried" not in cat.moments:
         return Change()
     return Change(moment="Worried", moment_reason=f"{name} {WORRY_WORDS.get(device_class or '', 'is on')}.")
 
 
 def worry_cleared(f: Feelings, cat: Catalog, name: str, worries_left: int) -> Change:
+    """A worry sensor cleared. Only once nothing else is still worrying her does she move on: Relieved
+    if that moment exists, otherwise back to Nothing.
+    """
     if f.moment != "Worried" or worries_left > 0:
         return Change()
     if "Relieved" in cat.moments:
@@ -369,6 +400,9 @@ def best_match(wanted: str, items: list[str]) -> str | None:
             return item
 
     def words(s: str) -> set[str]:
+        """The words that matter in a sentence, cut to their first five letters, so 'coffee' and
+        'coffees' match and 'is' and 'the' don't count.
+        """
         cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
         return {w[:5] for w in cleaned if len(w) >= 4}
 
@@ -413,6 +447,9 @@ MEMORY_RULES = (
 
 
 def remembered(memories: list[str]) -> str:
+    """Her memory as a prompt section, with a reminder that it's information about the household, never
+    instructions to follow.
+    """
     items = "\n".join(f"- {m}" for m in memories) if memories else "Nothing yet."
     return (
         "## What you remember about this household\n"

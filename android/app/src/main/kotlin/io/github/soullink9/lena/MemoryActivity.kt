@@ -83,6 +83,7 @@ class MemoryActivity : ComponentActivity() {
         val problem: (Throwable) -> String,
     )
 
+    /** A memory as the list shows it, whichever store it came from. */
     private data class Entry(val id: String, val content: String, val detail: String)
 
     private val openWebUi by lazy {
@@ -115,6 +116,7 @@ class MemoryActivity : ComponentActivity() {
         )
     }
 
+    /** Needs your Open WebUI; Home Assistant is optional (without it there's no Hers tab). */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         api = Api.from(this) ?: run { finish(); return }
@@ -123,17 +125,27 @@ class MemoryActivity : ComponentActivity() {
         setContent { LenaTheme { Screen() } }
     }
 
+    /** A short message at the bottom of the screen. */
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
+    /**
+     * A failure in plain words: signed out, the feature switched off on the server, or the server
+     * unreachable.
+     */
     private fun problem(e: Throwable, what: String): String = when (e) {
         is AuthException -> "Sign in to Lena first."
         is ForbiddenException -> "$what is turned off on your server, or your account can't use it."
         else -> "Couldn't reach your server."
     }
 
+    /** "5 minutes ago", or nothing when the server gave no time. */
     private fun ago(millis: Long): String =
         if (millis <= 0) "" else DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 
+    /**
+     * Tabs for her shared memory (when Home Assistant is connected), Open WebUI's memories, and knowledge
+     * collections, with a collection's documents opening over them.
+     */
     @Composable
     private fun Screen() {
         // Hers (Home Assistant) first when it's connected, then Open WebUI's memories, then knowledge.
@@ -188,6 +200,10 @@ class MemoryActivity : ComponentActivity() {
 
     // ---- Memories ---------------------------------------------------------------------------
 
+    /**
+     * One memory store as an editable list: tap to change, swipe or long-press to delete, a field at the
+     * bottom to add. Both stores use it, through Store.
+     */
     @Composable
     private fun Memories(store: Store) {
         val scope = rememberCoroutineScope()
@@ -274,6 +290,7 @@ class MemoryActivity : ComponentActivity() {
 
     // ---- Knowledge --------------------------------------------------------------------------
 
+    /** Your knowledge collections; tap one to see its documents. */
     @Composable
     private fun Collections(onOpen: (Api.Knowledge) -> Unit) {
         var bases by remember { mutableStateOf<List<Api.Knowledge>?>(null) }
@@ -297,6 +314,10 @@ class MemoryActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * A collection's documents, loaded a page at a time as you scroll, with remove for collections you may
+     * edit.
+     */
     @Composable
     private fun Files(k: Api.Knowledge) {
         val scope = rememberCoroutineScope()
@@ -307,6 +328,7 @@ class MemoryActivity : ComponentActivity() {
         var removing by remember { mutableStateOf<Api.KnowledgeFile?>(null) }
         var loadingMore by remember { mutableStateOf(false) }
 
+        /** Loads page p and adds it to the list (page 1 replaces it). */
         suspend fun load(p: Int) {
             runCatching { api.knowledgeFiles(k.id, p) }
                 .onSuccess { (list, count) ->
@@ -375,6 +397,7 @@ class MemoryActivity : ComponentActivity() {
         }
     }
 
+    /** A spinner while a list loads. */
     @Composable
     private fun Loading() {
         Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }

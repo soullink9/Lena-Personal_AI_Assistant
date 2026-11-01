@@ -136,6 +136,10 @@ import kotlinx.coroutines.launch
  */
 class SettingsActivity : ComponentActivity() {
 
+    /**
+     * The pages of Settings. One activity shows them all, so changes save as you go and the update download
+     * carries on while you look at other pages.
+     */
     private enum class Page(val title: String) {
         MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
         GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
@@ -157,6 +161,7 @@ class SettingsActivity : ComponentActivity() {
 
     private lateinit var original: Settings
 
+    /** Keeps the settings as they were on arrival, to tell on leaving whether the server changed. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         original = Prefs.load(this)
@@ -184,6 +189,10 @@ class SettingsActivity : ComponentActivity() {
         finish()
     }
 
+    /**
+     * The current page with a top bar; moving deeper slides in from the right, going back from the left.
+     * set() saves every change straight away.
+     */
     @Composable
     private fun Screen() {
         var s by remember { mutableStateOf(original) }
@@ -217,6 +226,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
 
+        /** Back: up to the page this one belongs to, or out of Settings from the main list. */
         fun back() {
             page.parent?.let { page = it } ?: leave()
         }
@@ -273,6 +283,10 @@ class SettingsActivity : ComponentActivity() {
 
     // ---- The list ---------------------------------------------------------------------------
 
+    /**
+     * The main list: one row per area, each saying how it's set, in groups that go from connecting Lena to
+     * her looks and extras.
+     */
     @Composable
     private fun Main(s: Settings, models: List<Model>, set: (Settings) -> Unit, open: (Page) -> Unit) {
         val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
@@ -362,6 +376,10 @@ class SettingsActivity : ComponentActivity() {
 
     private val upd = UpdateState()
 
+    /**
+     * Asks GitHub for the latest release and says whether it's newer. A different, lower version is pointed
+     * at Re-download and install, since that's what a reset version number looks like.
+     */
     private fun checkForUpdate() {
         lifecycleScope.launch {
             upd.status = "Checking…"
@@ -384,6 +402,10 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Downloads and checks a release in the activity's scope, so it continues if you move to another page.
+     * With reinstall, the same build may be installed again.
+     */
     private fun download(r: Updates.Release, reinstall: Boolean = false, done: () -> Unit) {
         if (upd.progress != null) return
         lifecycleScope.launch {
@@ -400,6 +422,10 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Updates: what's waiting to install and the steps for it, checking, downloading, Re-download and
+     * install, and where releases come from.
+     */
     @Composable
     private fun UpdatesPage() {
         val installed = remember { Updates.installed(this) }
@@ -551,6 +577,10 @@ class SettingsActivity : ComponentActivity() {
             "Choose only this repository, and under Repository permissions give Contents read-only access. Nothing else.")
     }
 
+    /**
+     * Your Open WebUI's address, optional sign-in addresses (for a sign-in proxy), and signing in by
+     * herself.
+     */
     @Composable
     private fun OpenWebUiPage(s: Settings, set: (Settings) -> Unit) {
         Group {
@@ -647,6 +677,10 @@ class SettingsActivity : ComponentActivity() {
             "so a restart doesn't sign anyone out in the first place.")
     }
 
+    /**
+     * Home Assistant's address and token (kept encrypted), a connection test that also checks for the Lena
+     * integration, and this phone's own alerts.
+     */
     @Composable
     private fun HomeAssistantPage(s: Settings, set: (Settings) -> Unit) {
         val scope = rememberCoroutineScope()
@@ -719,6 +753,7 @@ class SettingsActivity : ComponentActivity() {
         Footnote("For instant alerts, written by her, pick this phone under Tell these phones when she's worried in the Lena integration's Configure (needs the Home Assistant companion app). Use this switch on phones without it.")
     }
 
+    /** Which model talks to you: Lena (found by name on your server) unless you pick another. */
     @Composable
     private fun ModelPage(s: Settings, models: List<Model>, set: (Settings) -> Unit) {
         Footnote("Used for new chats, voice calls, the sheet and scheduled prompts.")
@@ -741,6 +776,10 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * What the assistant gesture opens, and whether it works on the lock screen, with what that means for
+     * privacy.
+     */
     @Composable
     private fun GesturePage(s: Settings, set: (Settings) -> Unit) {
         Footnote("What happens when you use your phone's assistant gesture.")
@@ -767,6 +806,7 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** Who hears you, who speaks, whether her voice follows her mood, and when she listens again. */
     @Composable
     private fun VoicePage(s: Settings, set: (Settings) -> Unit) {
         val phoneEar = remember { PhoneEar.available(this) }
@@ -801,6 +841,7 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** The one Assistant Lena chat, and the model's context size, half of which holds that conversation. */
     @Composable
     private fun ConversationPage(s: Settings, set: (Settings) -> Unit) {
         Group {
@@ -823,6 +864,7 @@ class SettingsActivity : ComponentActivity() {
             "the old one is kept in your history, named with the date, and a new “$ASSISTANT_CHAT” begins.")
     }
 
+    /** Up to six one-tap prompts for the sheet, the widget and the app icon's menu. */
     @Composable
     private fun QuickPage(s: Settings, set: (Settings) -> Unit) {
         var newPrompt by remember { mutableStateOf("") }
@@ -882,6 +924,7 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun SchedulePage(s: Settings, id: String?, set: (Settings) -> Unit, done: () -> Unit) {
         val sch = s.schedules.firstOrNull { it.id == id } ?: run { Footnote("That scheduled prompt was removed."); return }
+        /** Saves a change to this one scheduled prompt. */
         fun put(n: Schedule) = set(s.copy(schedules = s.schedules.map { if (it.id == sch.id) n else it }))
         Group {
             FieldItem {
@@ -969,6 +1012,7 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st… */
     private fun ordinal(n: Int) = "$n" + if (n in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
 
     /** "7:00 AM · Weekdays · into Daily briefings" */
@@ -989,9 +1033,11 @@ class SettingsActivity : ComponentActivity() {
         return whenText + if (sch.chat.isNotBlank()) " · into “${sch.chat.trim()}”" else ""
     }
 
+    /** When a scheduled prompt runs next, in the phone's 12- or 24-hour style. */
     private fun nextLabel(millis: Long): String =
         DateFormat.format(if (DateFormat.is24HourFormat(this)) "EEE, MMM d, HH:mm" else "EEE, MMM d, h:mm a", millis).toString()
 
+    /** The widget and the Quick Settings tile. */
     @Composable
     private fun PhonePage(s: Settings, set: (Settings) -> Unit) {
         Group {
@@ -1005,8 +1051,13 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Whether Home Assistant is set up (address and token), which the wall display's dashboards and photos
+     * need.
+     */
     private fun hasHouse() = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
 
+    /** A delay in plain words: 30 seconds, 1 minute, 5 minutes, 1 hour. */
     private fun duration(seconds: Int): String = when {
         seconds == 0 -> "Never"
         seconds < 60 -> "$seconds seconds"
@@ -1103,6 +1154,7 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun IdlePage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
         val sl = s.slides
+        /** Saves a change to the photo frame's settings. */
         fun put(n: Slides) = set(s.copy(slides = n))
         var picking by remember { mutableStateOf(false) }
         val house = hasHouse()
@@ -1152,7 +1204,7 @@ class SettingsActivity : ComponentActivity() {
                     put(sl.copy(clockAtNight = it))
                 }
             }
-            Footnote("Albums come from Home Assistant's media: Immich albums, people and favorites, your My media folders. Needs the Lena integration 1.2.0 or newer.")
+            Footnote("Albums come from Home Assistant's media: Immich albums, people and favorites, your My media folders. Needs the Lena integration in Home Assistant.")
         }
 
         SectionTitle("Waking it up")
@@ -1178,6 +1230,10 @@ class SettingsActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * The wake word: on or off, a live test, which phrase, how sure she must be, and what to do about false
+     * starts.
+     */
     @Composable
     private fun WakePage(s: Settings, set: (Settings) -> Unit) {
         Footnote("Talk to her from across the room while the wall display or the screen saver is showing. It listens on this device only; nothing is recorded or sent until she hears her name.")
@@ -1239,6 +1295,7 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
+    /** How talking to Lena looks, how the drawer lists chats, and how many pinned chats it shows. */
     @Composable
     private fun AppearancePage(s: Settings, set: (Settings) -> Unit) {
         Section("Talking to Lena") {
@@ -1263,10 +1320,13 @@ class SettingsActivity : ComponentActivity() {
 
     // ---- Words for the list -----------------------------------------------------------------
 
+    /** Just the host of an address, for the main list's summaries. */
     private fun host(address: String): String? = Uri.parse(address.trim()).host?.ifBlank { null }
 
+    /** "3 prompts", "1 prompt", or the text for none. */
     private fun count(n: Int, noun: String, none: String) = if (n == 0) none else "$n $noun${if (n == 1) "" else "s"}"
 
+    /** The name of each assistant-gesture choice. */
     private fun gestureLabel(a: AssistAction) = when (a) {
         AssistAction.ASK -> "Talk to Lena"
         AssistAction.TYPE -> "Type to Lena"
@@ -1274,6 +1334,7 @@ class SettingsActivity : ComponentActivity() {
         AssistAction.CHAT -> "New chat"
     }
 
+    /** What each assistant-gesture choice does. */
     private fun gestureDetail(a: AssistAction) = when (a) {
         AssistAction.ASK -> "Listens straight away, over whatever you're doing"
         AssistAction.TYPE -> "The same sheet, with the keyboard"
@@ -1281,6 +1342,7 @@ class SettingsActivity : ComponentActivity() {
         AssistAction.CHAT -> "Opens Lena on a new chat"
     }
 
+    /** The Voice row's summary: who listens, who speaks, and whether it follows her mood. */
     private fun voiceLabel(s: Settings): String {
         val ear = if (s.hearing == Hearing.PHONE) "Phone listens" else "Server listens"
         val mouth = when (s.speaking) {
@@ -1291,10 +1353,12 @@ class SettingsActivity : ComponentActivity() {
         return "$ear · $mouth" + if (s.moodVoice) " · follows her mood" else ""
     }
 
+    /** A time in the phone's 12- or 24-hour style. */
     private fun timeLabel(h: Int, m: Int): String =
         if (DateFormat.is24HourFormat(this)) "%02d:%02d".format(h, m)
         else "%d:%02d %s".format(if (h % 12 == 0) 12 else h % 12, m, if (h < 12) "AM" else "PM")
 
+    /** Asks Android to add the Call Lena tile to Quick Settings; Android shows its own confirmation. */
     private fun addTile() {
         getSystemService(StatusBarManager::class.java).requestAddTileService(
             ComponentName(this, LenaTile::class.java),
@@ -1304,6 +1368,7 @@ class SettingsActivity : ComponentActivity() {
         ) { }
     }
 
+    /** Asks the launcher to place Lena's widget, where the launcher supports that. */
     private fun addWidget() {
         val manager = getSystemService(AppWidgetManager::class.java)
         if (manager.isRequestPinAppWidgetSupported) {

@@ -9,9 +9,12 @@ How the repository is organised and how to change it without breaking things. Th
 ```
 .
 ├── README.md                      short front page, disclosure first
-├── CHANGELOG.md                   app and Home Assistant versions, known issues
+├── ARCHITECTURE.md                how the parts fit together and why
+├── CHANGELOG.md                   what changed in each release
 ├── CONTRIBUTING.md
 ├── LICENSE                        GPL-3.0
+├── THIRD_PARTY_NOTICES.md         included models and code, and their licences
+├── .env.example                   the environment variables the project reads
 ├── ollama/
 │   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog
@@ -64,7 +67,7 @@ The app build only runs when something in `android/` or its workflow changes, an
 | How `forget_fact` picks a memory | `best_match` in `brain.py` and `_best_match` in `open-webui/lena_tools.py` |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Conversation) in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
-| The app's version | `versionCode` and `versionName` in `android/app/build.gradle.kts`, plus an **App** entry in `CHANGELOG.md` |
+| The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |
 
 ## Running the checks
@@ -97,8 +100,10 @@ It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's ow
 
 ## Releasing
 
-- **The app** is released from GitHub Actions: bump the version, add the changelog entry, then **Actions → Build APK → Run workflow** with **Publish a release** ticked. Details in [App development](app/Development.md#making-a-release).
-- **The personality** (Modelfile, Home Assistant files, Open WebUI files) doesn't need a build. Add an entry under **Personality** in `CHANGELOG.md`, run the checks and commit. People update by rebuilding the model, copying the new integration folder in and restarting, and pasting the Open WebUI files over the old ones.
+Everything shares one version and one changelog.
+
+- **Releasing:** set the new version everywhere (see the table above; `tools/check.py` catches a mismatch), add its section to `CHANGELOG.md`, then **Actions → Build APK → Run workflow** with **Publish a release** ticked. That builds the app and publishes the release and its tag. Details in [App development](app/Development.md#making-a-release).
+- **The parts without a build** (Modelfile, Home Assistant integration, Open WebUI files) ship in the same release. People update them by rebuilding the model, copying the new integration folder in and restarting, and pasting the Open WebUI files over the old ones; the changelog says which of these a release needs.
 
 ## The logo
 

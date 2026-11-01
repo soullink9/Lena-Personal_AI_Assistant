@@ -16,11 +16,17 @@ from .const import DOMAIN
 
 
 class LenaContextView(HomeAssistantView):
+    """GET /api/lena/context. Any signed-in user may read it (it's what Open WebUI's filter calls with
+    a token).
+    """
     url = "/api/lena/context"
     name = "api:lena:context"
     requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
+        """Her context as ready-made text plus the parts as JSON. 404 until she's set up, so callers
+        can tell the integration is missing.
+        """
         hass = request.app[KEY_HASS]
         core = hass.data.get(DOMAIN)
         if core is None:
@@ -59,6 +65,9 @@ class LenaMediaView(HomeAssistantView):
     requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
+        """Browses Home Assistant's media for the app's photo frame: a folder's children, or with
+        photos=1 every photo in it (up to MAX_PHOTOS).
+        """
         hass = request.app[KEY_HASS]
         if hass.data.get(DOMAIN) is None:
             return self.json_message("Lena isn't set up", status_code=404)
@@ -104,11 +113,17 @@ _IMMICH = re.compile(r"^/immich/([^/]+)/([^/]+)/fullsize/")
 
 
 def _screen_sized(url: str) -> str:
+    """Immich serves full-size originals by default; the screen-sized preview is enough for a photo
+    frame and many times smaller to send to a tablet.
+    """
     if m := _IMMICH.match(url):
         return f"/immich/{m.group(1)}/{m.group(2)}/preview/image/jpeg"
     return url
 
 
 def _is_photo(item) -> bool:
+    """Whether a media item is a photo. Sources report it differently: some give a MIME type, some only
+    a media class.
+    """
     return str(getattr(item, "media_content_type", "") or "").startswith("image/") or \
         str(getattr(item, "media_class", "")) == "image"

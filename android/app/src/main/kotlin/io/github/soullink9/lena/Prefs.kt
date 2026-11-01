@@ -106,6 +106,36 @@ data class Schedule(
 ) {
     /** What it's called in Settings: its name, or the start of its prompt. */
     val title: String get() = name.trim().ifBlank { prompt.lineSequence().firstOrNull()?.take(40)?.ifBlank { null } ?: "Scheduled prompt" }
+
+    /** How it's kept in the app's settings. Every field has a default when read, so adding one never loses old schedules. */
+    fun toJson(): JSONObject = JSONObject()
+        .put("id", id).put("name", name).put("hour", hour).put("minute", minute)
+        .put("prompt", prompt).put("enabled", enabled).put("chat", chat.trim())
+        .put("repeat", repeat.name).put("days", JSONArray(days.sorted()))
+        .put("every_hours", everyHours).put("day_of_month", dayOfMonth).put("date", date)
+        .put("show_prompt", showPrompt)
+
+    companion object {
+        /** Reads one back, putting anything out of range back in range. */
+        fun fromJson(o: JSONObject): Schedule {
+            val days = o.optJSONArray("days")
+            return Schedule(
+                id = o.getString("id"),
+                name = o.optString("name"),
+                hour = o.getInt("hour"),
+                minute = o.getInt("minute"),
+                prompt = o.getString("prompt"),
+                enabled = o.optBoolean("enabled", true),
+                chat = o.optString("chat"),
+                repeat = runCatching { Repeat.valueOf(o.optString("repeat", "DAILY")) }.getOrDefault(Repeat.DAILY),
+                days = if (days == null) setOf(1, 2, 3, 4, 5) else List(days.length()) { days.optInt(it) }.filter { it in 1..7 }.toSet(),
+                everyHours = o.optInt("every_hours", 3).coerceIn(1, 12),
+                dayOfMonth = o.optInt("day_of_month", 1).coerceIn(1, 31),
+                date = o.optLong("date", 0),
+                showPrompt = o.optBoolean("show_prompt", false),
+            )
+        }
+    }
 }
 
 /** Signing in to Open WebUI by itself when its session ends (for example when the server restarts). */
@@ -126,7 +156,6 @@ data class Settings(
     val hearing: Hearing = Hearing.PHONE,
     val speaking: Speaking = Speaking.SERVER,
     val followUp: FollowUp = FollowUp.ALWAYS,
-    val ongoing: Boolean = true,
     val contextTokens: Int = 32_768,
     val haServer: String = "",
     val moodVoice: Boolean = false,
@@ -156,9 +185,19 @@ const val DEFAULT_MEMORY_LIST = "todo.lena_memory"
 /** Lena's settings, stored privately on the phone (and kept out of backups). */
 object Prefs {
 
+    /** The app's private settings file. It's excluded from backups (see data_extraction_rules.xml). */
     private fun p(c: Context) = c.getSharedPreferences("lena", Context.MODE_PRIVATE)
 
+    /**
+     * A choice saved by its enum name. An unknown or missing name (a choice that no longer exists)
+     * gives [default] rather than a crash.
+     */
+    private inline fun <reified E : Enum<E>> enumPref(c: Context, key: String, default: E): E =
+        p(c).getString(key, null)?.let { name -> enumValues<E>().firstOrNull { it.name == name } } ?: default
+
+    /** Your Open WebUI's address, normalized (https, ending in /), or null before it's set. */
     fun server(c: Context): String? = p(c).getString("server", null)
+    /** The model you picked, or null for "Lena, automatically". */
     fun model(c: Context): String? = p(c).getString("model", "")?.ifBlank { null }
 
     /** Your chosen model, or the Lena model found on your server when you haven't chosen one. */
@@ -186,63 +225,48 @@ object Prefs {
 
     /** Your Home Assistant, for Lena's feelings and shared memory. Null when not set. */
     fun haServer(c: Context): String? = p(c).getString("ha_server", "")?.ifBlank { null }
+    /** Extra sign-in addresses (a sign-in proxy) that may load inside the app, space-separated. */
     fun signIn(c: Context): String = p(c).getString("sign_in", "") ?: ""
+    /** Notify when an answer you walked away from is finished. */
     fun notifyReplies(c: Context): Boolean = p(c).getBoolean("notify_replies", true)
 
+    /** What the assistant gesture opens. */
     fun assistAction(c: Context): AssistAction =
-        runCatching { AssistAction.valueOf(p(c).getString("assist_action", null) ?: "ASK") }
-            .getOrDefault(AssistAction.ASK)
+        enumPref(c, "assist_action", AssistAction.ASK)
 
+    /** Who turns your voice into text: the phone or your server. */
     fun hearing(c: Context): Hearing =
-        runCatching { Hearing.valueOf(p(c).getString("hearing", null) ?: "PHONE") }.getOrDefault(Hearing.PHONE)
+        enumPref(c, "hearing", Hearing.PHONE)
 
+    /** Who reads her replies aloud: your server, the phone, or nobody. */
     fun speaking(c: Context): Speaking =
-        runCatching { Speaking.valueOf(p(c).getString("speaking", null) ?: "SERVER") }.getOrDefault(Speaking.SERVER)
+        enumPref(c, "speaking", Speaking.SERVER)
 
-    fun followUp(c: Context): FollowUp {
-        p(c).getString("follow_up", null)?.let { v -> return runCatching { FollowUp.valueOf(v) }.getOrDefault(FollowUp.ALWAYS) }
-        return if (p(c).getBoolean("follow_ups", true)) FollowUp.ALWAYS else FollowUp.OFF // 2.1.0 setting
-    }
-
-    /** Talking to Lena always continues the "Assistant Lena" chat (a setting before 2.17.0; now always on). */
-    @Suppress("UNUSED_PARAMETER")
-    fun ongoing(c: Context): Boolean = true
+    /** When the mic opens again after she answers. */
+    fun followUp(c: Context): FollowUp =
+        enumPref(c, "follow_up", FollowUp.ALWAYS)
 
     /** The model's context size in tokens; half of it holds the ongoing conversation. */
     fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", 32_768)
 
     /** The chat that conversation lives in, once it exists. */
     fun assistChat(c: Context): String? = p(c).getString("assist_chat", null)
+    /** Remembers (or forgets, with null) the Assistant Lena chat's id. */
     fun setAssistChat(c: Context, id: String?) = p(c).edit().putString("assist_chat", id).apply()
 
+    /** Your quick prompts, in order, blanks dropped. */
     fun quickPrompts(c: Context): List<String> {
         val a = runCatching { JSONArray(p(c).getString("quick_prompts", "[]")) }.getOrDefault(JSONArray())
         return List(a.length()) { a.getString(it) }.filter { it.isNotBlank() }
     }
 
+    /** Your scheduled prompts. A damaged list reads as empty rather than crashing the app. */
     fun schedules(c: Context): List<Schedule> {
         val a = runCatching { JSONArray(p(c).getString("schedules", "[]")) }.getOrDefault(JSONArray())
-        return List(a.length()) { i ->
-            val o = a.getJSONObject(i)
-            val days = o.optJSONArray("days")
-            Schedule(
-                id = o.getString("id"),
-                name = o.optString("name"),
-                hour = o.getInt("hour"),
-                minute = o.getInt("minute"),
-                prompt = o.getString("prompt"),
-                enabled = o.optBoolean("enabled", true),
-                chat = o.optString("chat"),
-                repeat = runCatching { Repeat.valueOf(o.optString("repeat", "DAILY")) }.getOrDefault(Repeat.DAILY),
-                days = if (days == null) setOf(1, 2, 3, 4, 5) else List(days.length()) { days.optInt(it) }.filter { it in 1..7 }.toSet(),
-                everyHours = o.optInt("every_hours", 3).coerceIn(1, 12),
-                dayOfMonth = o.optInt("day_of_month", 1).coerceIn(1, 31),
-                date = o.optLong("date", 0),
-                showPrompt = o.optBoolean("show_prompt", false),
-            )
-        }
+        return List(a.length()) { Schedule.fromJson(a.getJSONObject(it)) }
     }
 
+    /** Every setting at once, for the Settings screen. */
     fun load(c: Context) = Settings(
         server = server(c) ?: "",
         model = model(c) ?: "",
@@ -254,7 +278,6 @@ object Prefs {
         hearing = hearing(c),
         speaking = speaking(c),
         followUp = followUp(c),
-        ongoing = ongoing(c),
         contextTokens = contextTokens(c),
         haServer = haServer(c) ?: "",
         moodVoice = moodVoice(c),
@@ -276,17 +299,12 @@ object Prefs {
         slides = slides(c),
     )
 
+    /**
+     * Saves every setting at once. Settings calls this on each change, so nothing is lost if you leave
+     * mid-way.
+     */
     fun save(c: Context, s: Settings) {
-        val schedules = JSONArray()
-        s.schedules.forEach {
-            schedules.put(
-                JSONObject().put("id", it.id).put("name", it.name).put("hour", it.hour).put("minute", it.minute)
-                    .put("prompt", it.prompt).put("enabled", it.enabled).put("chat", it.chat.trim())
-                    .put("repeat", it.repeat.name).put("days", JSONArray(it.days.sorted()))
-                    .put("every_hours", it.everyHours).put("day_of_month", it.dayOfMonth).put("date", it.date)
-                    .put("show_prompt", it.showPrompt)
-            )
-        }
+        val schedules = JSONArray(s.schedules.map { it.toJson() })
         p(c).edit()
             .putString("server", s.server)
             .putString("model", s.model.trim())
@@ -298,7 +316,6 @@ object Prefs {
             .putString("hearing", s.hearing.name)
             .putString("speaking", s.speaking.name)
             .putString("follow_up", s.followUp.name)
-            .putBoolean("ongoing", s.ongoing)
             .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
             .putString("ha_server", s.haServer)
             .putBoolean("mood_voice", s.moodVoice)
@@ -331,6 +348,7 @@ object Prefs {
             .apply()
     }
 
+    /** Show Open WebUI's own header and sidebar under Lena's. */
     fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", false)
 
     /** This phone checks Home Assistant every 15 minutes and tells you when she's worried. */
@@ -338,6 +356,7 @@ object Prefs {
 
     /** What the last alert was about, so the same worry isn't announced twice. */
     fun lastAlert(c: Context): String? = p(c).getString("last_alert", null)
+    /** Remembers the last alert's reason, or clears it once the worry is gone. */
     fun setLastAlert(c: Context, reason: String?) = p(c).edit().putString("last_alert", reason).apply()
 
     /** Display mode and the screen saver listen for the wake word. */
@@ -351,22 +370,21 @@ object Prefs {
         return list.ifEmpty { listOf(Dashboard("Home", "lovelace")) }
     }
 
+    /** The photo frame's settings. */
     fun slides(c: Context): Slides = Slides(
         on = p(c).getBoolean("slides_on", false),
         album = p(c).getString("slides_album", "") ?: "",
         albumName = p(c).getString("slides_album_name", "") ?: "",
         seconds = p(c).getInt("slides_seconds", 15),
-        transition = runCatching { SlideTransition.valueOf(p(c).getString("slides_transition", null) ?: "FADE") }
-            .getOrDefault(SlideTransition.FADE),
+        transition = enumPref(c, "slides_transition", SlideTransition.FADE),
         shuffle = p(c).getBoolean("slides_shuffle", true),
-        framing = p(c).getString("slides_framing", null)?.let { v -> runCatching { Framing.valueOf(v) }.getOrNull() }
-            ?: if (p(c).getBoolean("slides_fill", true)) Framing.SMART else Framing.WHOLE, // before 2.17.0: a switch
+        framing = enumPref(c, "slides_framing", Framing.SMART),
         overlay = p(c).getBoolean("slides_overlay", true),
         clockAtNight = p(c).getBoolean("slides_night", true),
     )
 
-    /** Seconds without a touch before the wall display's screen saver; 0 never (minutes before 2.17.0). */
-    fun dimSeconds(c: Context): Int = if (p(c).contains("dim_seconds")) p(c).getInt("dim_seconds", 300) else p(c).getInt("dim_minutes", 5) * 60
+    /** Seconds without a touch before the wall display's screen saver; 0 never. */
+    fun dimSeconds(c: Context): Int = p(c).getInt("dim_seconds", 300)
 
     /** Seconds without a touch in your chats, opened from the wall display, before it goes back to it; 0 never. */
     fun returnSeconds(c: Context): Int = p(c).getInt("return_seconds", 60)
@@ -374,36 +392,28 @@ object Prefs {
     /** How many pinned chats the menu shows before "View all". */
     fun pinnedShown(c: Context): Int = p(c).getInt("pinned_shown", 5)
 
+    /** Whether, and how, to sign in to Open WebUI by herself. */
     fun autoSignIn(c: Context): AutoSignIn =
-        runCatching { AutoSignIn.valueOf(p(c).getString("auto_sign_in", null) ?: "OFF") }.getOrDefault(AutoSignIn.OFF)
+        enumPref(c, "auto_sign_in", AutoSignIn.OFF)
 
+    /** How sure the wake word must be. */
     fun wakeSensitivity(c: Context): WakeSensitivity =
-        runCatching { WakeSensitivity.valueOf(p(c).getString("wake_sensitivity", null) ?: "BALANCED") }.getOrDefault(WakeSensitivity.BALANCED)
-
-    /**
-     * Once, on 2.17.0: talking to Lena now opens as the orb and the chat list as slim groups, so
-     * anyone still on the old defaults (the sheet, rounded groups) moves to the new ones.
-     */
-    fun migrate(c: Context) {
-        val prefs = p(c)
-        if (prefs.getInt("migrated", 0) >= 1) return
-        val e = prefs.edit()
-        if ((prefs.getString("ask_style", null) ?: "SHEET") == "SHEET") e.putString("ask_style", "ORB")
-        if ((prefs.getString("chat_list", null) ?: "GROUPS") == "GROUPS") e.putString("chat_list", "SLIM")
-        e.putInt("migrated", 1).apply()
-    }
+        enumPref(c, "wake_sensitivity", WakeSensitivity.BALANCED)
 
     /** A motion or presence sensor that wakes dashboard mode, or blank. */
     fun motionEntity(c: Context): String = p(c).getString("motion_entity", "") ?: ""
 
+    /** Which wake word: Hey Lena unless you chose another. */
     fun wakePhrase(c: Context): WakePhrase =
-        runCatching { WakePhrase.valueOf(p(c).getString("wake_phrase", null) ?: "HEY_LENA") }.getOrDefault(WakePhrase.HEY_LENA)
+        enumPref(c, "wake_phrase", WakePhrase.HEY_LENA)
 
+    /** How the drawer lists your chats. */
     fun chatList(c: Context): ChatListStyle =
-        runCatching { ChatListStyle.valueOf(p(c).getString("chat_list", null) ?: "SLIM") }.getOrDefault(ChatListStyle.SLIM)
+        enumPref(c, "chat_list", ChatListStyle.SLIM)
 
+    /** How talking to Lena looks. */
     fun askStyle(c: Context): AskStyle =
-        runCatching { AskStyle.valueOf(p(c).getString("ask_style", null) ?: "ORB") }.getOrDefault(AskStyle.ORB)
+        enumPref(c, "ask_style", AskStyle.ORB)
 
     /**
      * A random secret only Lena knows. Lena's own widget and shortcuts include it, so a prompt
@@ -436,6 +446,10 @@ object Prefs {
         return out.joinToString(" ")
     }
 
+    /**
+     * https://host[:port] for an address, or null if it isn't https or has a user name or password in it
+     * (never allowed: it would end up in logs and history).
+     */
     private fun origin(u: Uri): String? {
         val host = u.host
         if (!"https".equals(u.scheme, ignoreCase = true) || host.isNullOrEmpty() || u.userInfo != null) return null

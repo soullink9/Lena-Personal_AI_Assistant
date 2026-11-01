@@ -44,9 +44,13 @@ from .const import (
 
 
 class LenaConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Adding Lena: one click, no questions. She's a single entry per Home Assistant
+    (single_config_entry in the manifest); everything else is set later under Configure.
+    """
     VERSION = 1
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """The only step: create the entry with empty options, so every setting starts at its default."""
         if user_input is not None:
             return self.async_create_entry(title=NAME, data={}, options={})
         return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
@@ -54,10 +58,14 @@ class LenaConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> LenaOptionsFlow:
+        """Her settings (Configure), in an options flow so they can change without removing her."""
         return LenaOptionsFlow()
 
 
 def _number(low: float, high: float, unit: str, step: float = 1) -> NumberSelector:
+    """A number box (not a slider) with a unit, for settings where an exact value matters more than
+    dragging.
+    """
     return NumberSelector(NumberSelectorConfig(min=low, max=high, step=step, unit_of_measurement=unit, mode=NumberSelectorMode.BOX))
 
 
@@ -65,11 +73,17 @@ class LenaOptionsFlow(OptionsFlowWithReload):
     """Configure: her house, her day, and how quickly her feelings move."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Configure: the people, sensors and calendars she watches, her day, how moody she is, and
+        alerts. Saving reloads her with the new settings.
+        """
         if user_input is not None:
             return self.async_create_entry(data=user_input)
         o = self.config_entry.options
 
         def default(key: str) -> dict[str, Any]:
+            """Shows the saved value, or the default from brain.DEFAULTS, as the field's suggestion. A
+            suggestion rather than a default lets a field be cleared.
+            """
             value = o.get(key, brain.DEFAULTS.get(key))
             return {"suggested_value": value} if value is not None else {}
 

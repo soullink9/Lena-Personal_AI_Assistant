@@ -28,6 +28,7 @@ object OpenWebUiSignIn {
     private val lock = Mutex()
     @Volatile private var lastTry = 0L
 
+    /** Whether signing in by herself is on and both details are saved. */
     fun configured(c: Context): Boolean =
         Prefs.autoSignIn(c) != AutoSignIn.OFF && Secrets.has(c, USER) && Secrets.has(c, PASSWORD)
 
@@ -71,6 +72,10 @@ object OpenWebUiSignIn {
         }
     }
 
+    /**
+     * Signs in once through Open WebUI's own sign-in endpoint (password or LDAP) and returns the session
+     * token. A redirect means a sign-in proxy is in front of Open WebUI, which can't be done this way.
+     */
     private suspend fun request(c: Context, server: String): String {
         val method = Prefs.autoSignIn(c)
         val user = Secrets.get(c, USER) ?: throw IOException("No saved sign-in.")

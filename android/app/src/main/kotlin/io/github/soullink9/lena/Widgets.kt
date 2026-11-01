@@ -40,6 +40,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** Quick Settings tile: start a voice call from the pull-down shade. */
 class LenaTile : TileService() {
 
+    /** The tile shows as an idle button labelled Call Lena whenever the shade opens. */
     override fun onStartListening() {
         qsTile?.apply {
             state = Tile.STATE_INACTIVE
@@ -48,6 +49,10 @@ class LenaTile : TileService() {
         }
     }
 
+    /**
+     * Starts a call in the full app, after unlocking, and closes the shade (Android 14+ requires a
+     * PendingIntent for that).
+     */
     override fun onClick() {
         val call = Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_CALL)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -63,6 +68,11 @@ class LenaTile : TileService() {
  */
 class LenaWidget : GlanceAppWidget() {
 
+    /**
+     * Builds the widget: your first three quick prompts and, if chosen, her mood (only the mood, since
+     * anyone can see a home screen). Home Assistant gets eight seconds, so a slow server never leaves the
+     * widget blank.
+     */
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val prompts = Prefs.quickPrompts(context).take(3)
         val feelings = if (!Prefs.widgetMood(context)) null
@@ -70,6 +80,10 @@ class LenaWidget : GlanceAppWidget() {
         provideContent { GlanceTheme { Content(context, prompts, feelings) } }
     }
 
+    /**
+     * The widget itself: her name and mood, the four action buttons, then the quick prompts, in your
+     * wallpaper's colours.
+     */
     @Composable
     private fun Content(c: Context, prompts: List<String>, feelings: Feelings?) {
         Column(
@@ -114,6 +128,7 @@ class LenaWidget : GlanceAppWidget() {
         }
     }
 
+    /** One round button on the widget. */
     @Composable
     private fun Action(icon: Int, label: String, intent: Intent) {
         Box(
@@ -131,6 +146,7 @@ class LenaWidget : GlanceAppWidget() {
     }
 }
 
+/** Tells Android which widget this app provides. */
 class LenaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LenaWidget()
 }

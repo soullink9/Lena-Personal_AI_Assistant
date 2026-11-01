@@ -27,6 +27,10 @@ object Photos {
     /** Big enough for the model to read a label, small enough to send quickly. */
     private const val LONGEST_SIDE = 1536
 
+    /**
+     * The single file the camera app saves into, in the app's cache. It's overwritten each time and deleted
+     * once read.
+     */
     private fun cameraFile(c: Context) = File(File(c.cacheDir, "photos").apply { mkdirs() }, "camera.jpg")
 
     /** Where the camera app should save the picture. */

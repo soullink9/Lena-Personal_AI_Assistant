@@ -4,7 +4,9 @@ import math, random, struct, sys
 random.seed(int(sys.argv[2]) if len(sys.argv) > 2 else 1)
 sr = 16000
 out = []
-def add(xs): out.extend(max(-32768, min(32767, int(round(x)))) for x in xs)
+def add(xs):
+    """Appends samples as 16-bit audio, clipped the way a microphone would clip them."""
+    out.extend(max(-32768, min(32767, int(round(x)))) for x in xs)
 add([0.0] * 8000)
 add([random.gauss(0, 30) for _ in range(16000)])
 for f0, amp in [(110, 3000), (220, 12000), (180, 800), (300, 25000)]:

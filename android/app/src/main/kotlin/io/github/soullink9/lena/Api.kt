@@ -21,10 +21,16 @@ class AuthException : IOException("Signed out")
 /** Signed in, but your account isn't allowed to do this (or the feature is turned off). */
 class ForbiddenException : IOException("Not allowed")
 
+/**
+ * A model on your Open WebUI, with the tools and features (web search and the like) its settings turn on by
+ * default, which the sheet and scheduled prompts use the same way the page would.
+ */
 data class Model(val id: String, val name: String, val toolIds: List<String>, val features: Set<String>)
 
+/** A chat in the drawer. active means an answer is still being written. */
 data class ChatItem(val id: String, val title: String, val updatedMillis: Long, val active: Boolean)
 
+/** Her answer so far, and whether it's finished. */
 data class Reply(val content: String, val done: Boolean)
 
 /**
@@ -40,6 +46,10 @@ class Api(server: String, private val context: Context? = null) {
     private val base = server.trimEnd('/')
 
     companion object {
+        /**
+         * An Api for the saved server, or null before one is set. It gets the app's context so it can sign
+         * in again by itself.
+         */
         fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it, c.applicationContext) }
 
         /**
@@ -63,10 +73,15 @@ class Api(server: String, private val context: Context? = null) {
         }
     }
 
+    /**
+     * The web view's cookies for your server: the sign-in lives there, so the native features use exactly
+     * the session the page has. CookieManager is read on the main thread.
+     */
     private suspend fun cookies(): String? = withContext(Dispatchers.Main) {
         CookieManager.getInstance().getCookie(base)
     }
 
+    /** Open WebUI's session token, from its token cookie. */
     private fun tokenFrom(cookies: String?): String? = cookies?.split(';')
         ?.map { it.trim() }
         ?.firstOrNull { it.startsWith("token=") }
@@ -101,6 +116,11 @@ class Api(server: String, private val context: Context? = null) {
         callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
     }
 
+    /**
+     * One HTTP request with the session. Redirects aren't followed: a redirect means a sign-in proxy wants
+     * you, not an answer. Failures are logged by path only (never the query or body, which can hold private
+     * text).
+     */
     private suspend fun callOnce(
         method: String,
         path: String,
@@ -166,6 +186,7 @@ class Api(server: String, private val context: Context? = null) {
         }
     }
 
+    /** A JSON request whose answer is text. */
     private suspend fun request(
         method: String,
         path: String,
@@ -174,8 +195,10 @@ class Api(server: String, private val context: Context? = null) {
         readTimeoutMs: Int = 30_000,
     ): String = String(call(method, path, body?.toString()?.toByteArray(), auth = auth, readTimeoutMs = readTimeoutMs))
 
+    /** Encodes part of a path, for ids and search text. */
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
+    /** The non-empty strings in a JSON array; absent arrays are empty. */
     private fun JSONArray?.strings(): List<String> =
         if (this == null) emptyList() else List(length()) { optString(it) }.filter { it.isNotBlank() }
 
@@ -184,6 +207,7 @@ class Api(server: String, private val context: Context? = null) {
         JSONObject(request("GET", "/api/version", auth = false)).optString("version").ifBlank { "?" }
     }.getOrNull()
 
+    /** Every model you can use on your server, with each one's default tools and features. */
     suspend fun models(): List<Model> {
         val data = JSONObject(request("GET", "/api/models")).optJSONArray("data") ?: JSONArray()
         return List(data.length()) { i ->
@@ -224,9 +248,11 @@ class Api(server: String, private val context: Context? = null) {
         return search(title).filter { it.title == title }.maxByOrNull { it.updatedMillis }
     }
 
+    /** Chats matching your search, as Open WebUI's search box finds them. */
     suspend fun search(text: String): List<ChatItem> =
         parseChats(request("GET", "/api/v1/chats/search?text=${enc(text)}"))
 
+    /** Reads Open WebUI's chat list format. */
     private fun parseChats(json: String): List<ChatItem> {
         val a = JSONArray(json)
         return List(a.length()) { i ->
@@ -240,12 +266,17 @@ class Api(server: String, private val context: Context? = null) {
         }
     }
 
+    /**
+     * Open WebUI's timestamps have been seconds, milliseconds or nanoseconds in different places; this
+     * tells them apart by size.
+     */
     private fun toMillis(t: Long) = when {
         t > 1_000_000_000_000_000L -> t / 1_000_000 // nanoseconds
         t > 1_000_000_000_000L -> t                 // milliseconds
         else -> t * 1000                            // seconds
     }
 
+    /** A whole chat: its title, models and message history. */
     suspend fun chat(id: String): JSONObject = JSONObject(request("GET", "/api/v1/chats/${enc(id)}"))
 
     /**
@@ -302,6 +333,7 @@ class Api(server: String, private val context: Context? = null) {
         return r.optString("title").ifBlank { "Lena" } to Markdown.plain(content)
     }
 
+    /** A question that's been sent: the chat it's in and the id of the answer to follow. */
     data class Started(val chatId: String, val messageId: String)
 
     /**
@@ -322,91 +354,136 @@ class Api(server: String, private val context: Context? = null) {
         locked: Boolean = false,
         instruction: String? = null,
     ): Started {
-        val userId = UUID.randomUUID().toString()
-        val replyId = UUID.randomUUID().toString()
-        val now = System.currentTimeMillis() / 1000
+        val turn = ChatTurn.create(prompt, model, image)
 
-        // A photo goes into the chat as an image file (so Open WebUI shows it) and to the model as an image part.
-        val files = image?.let { JSONArray().put(JSONObject().put("type", "image").put("url", it)) }
-        val user = JSONObject()
-            .put("id", userId).put("childrenIds", JSONArray().put(replyId))
-            .put("role", "user").put("content", prompt).put("timestamp", now)
-            .put("models", JSONArray().put(model.id))
-        if (files != null) user.put("files", files)
-        val reply = JSONObject()
-            .put("id", replyId).put("parentId", userId).put("childrenIds", JSONArray())
-            .put("role", "assistant").put("content", "")
-            .put("model", model.id).put("modelName", model.name).put("modelIdx", 0)
-            .put("done", false).put("timestamp", now)
-
-        val id: String
-        var conversation: JSONArray
-        // Continue the chat if it still exists; if it was deleted, start a new one.
+        // 1. Save your message and an empty reply into the chat, so it shows in Open WebUI straight
+        //    away, and work out what the model should see. Continue the chat if it still exists; if it
+        //    was deleted (or there isn't one yet), start a new one.
         val existing = chatId?.let { chatOrNull(it) }
+        val id: String
+        val thread: List<JSONObject>
         if (existing == null) {
-            user.put("parentId", JSONObject.NULL)
-            val chat = JSONObject()
-                .put("title", newTitle ?: prompt.lineSequence().first().take(60))
-                .put("models", JSONArray().put(model.id))
-                .put("params", JSONObject())
-                .put("history", JSONObject().put("currentId", replyId)
-                    .put("messages", JSONObject().put(userId, user).put(replyId, reply)))
-                .put("messages", JSONArray().put(user).put(reply))
-                .put("tags", JSONArray())
-                .put("timestamp", now * 1000)
-            id = JSONObject(request("POST", "/api/v1/chats/new", JSONObject().put("chat", chat))).getString("id")
-            if (pinNew) runCatching { request("POST", "/api/v1/chats/${enc(id)}/pin") }
-            conversation = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
+            id = startChat(turn, model, newTitle ?: prompt.lineSequence().first().take(60), pinNew)
+            thread = listOf(JSONObject().put("role", "user").put("content", prompt))
         } else {
-            val chat = existing.optJSONObject("chat") ?: JSONObject()
-            val history = chat.optJSONObject("history") ?: JSONObject()
-            val messages = history.optJSONObject("messages") ?: JSONObject()
-            val parent = parentId ?: history.optString("currentId").takeIf { !history.isNull("currentId") }
-            user.put("parentId", parent ?: JSONObject.NULL)
-            parent?.let { messages.optJSONObject(it) }?.let { p ->
-                (p.optJSONArray("childrenIds") ?: JSONArray().also { p.put("childrenIds", it) }).put(userId)
-            }
-            messages.put(userId, user).put(replyId, reply)
-            history.put("messages", messages).put("currentId", replyId)
-            val list = (chat.optJSONArray("messages") ?: JSONArray()).put(user).put(reply)
             id = chatId!!
-            request("POST", "/api/v1/chats/${enc(id)}",
-                JSONObject().put("chat", JSONObject().put("history", history).put("messages", list)))
-            // The model sees the whole thread up to your new message.
-            val thread = mutableListOf<JSONObject>()
-            var cursor: String? = userId
-            while (cursor != null) {
-                val m = messages.optJSONObject(cursor) ?: break
-                val role = m.optString("role")
-                if (role == "user" || role == "assistant") {
-                    val content = m.optString("content")
-                    thread.add(0, JSONObject().put("role", role)
-                        .put("content", if (role == "assistant") Markdown.clean(content) else content))
-                }
-                cursor = if (m.isNull("parentId")) null else m.optString("parentId")
+            thread = continueChat(id, existing, turn, parentId, contextTokens)
+        }
+
+        // 2. What the model is sent: notes for this request only, then the thread, with the photo
+        //    attached to your message as an image part.
+        val conversation = JSONArray()
+        val notes = requestNotes(spoken, locked, instruction)
+        if (notes.isNotEmpty()) conversation.put(JSONObject().put("role", "system").put("content", notes.joinToString("\n")))
+        thread.forEachIndexed { i, m ->
+            if (i == thread.lastIndex && image != null) {
+                m.put("content", JSONArray()
+                    .put(JSONObject().put("type", "text").put("text", prompt))
+                    .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", image))))
             }
-            conversation = JSONArray(fitToBudget(thread, contextTokens))
+            conversation.put(m)
         }
 
-        if (image != null && conversation.length() > 0) {
-            val last = conversation.getJSONObject(conversation.length() - 1)
-            last.put("content", JSONArray()
-                .put(JSONObject().put("type", "text").put("text", prompt))
-                .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", image))))
-        }
+        // 3. Ask Open WebUI to answer it server-side, with the model's tools, as its own page does.
+        request("POST", "/api/chat/completions", completionBody(id, turn, model, conversation,
+            wantTitle = existing == null && newTitle == null), readTimeoutMs = 120_000)
+        return Started(id, turn.replyId)
+    }
 
-        // Spoken turns: tell her the reply will be read aloud, so she uses her spoken style (no lists or
-        // formatting, short). Sent with this request only; it isn't saved in the chat.
-        // The phone's own clock, said plainly, so she never greets the evening with sunshine (and
-        // knows the time even without Home Assistant).
-        // On the lock screen the person may not be the phone's owner. This asks her to be careful; it
-        // isn't a lock, which is why lock-screen mode is off unless you turn it on.
+    /** One question and its (still empty) answer, as Open WebUI stores them in a chat's history. */
+    private class ChatTurn(val userId: String, val replyId: String, val user: JSONObject, val reply: JSONObject, val files: JSONArray?) {
+        companion object {
+            /**
+             * A new question and its empty answer, linked as parent and child, with the photo attached if
+             * there is one.
+             */
+            fun create(prompt: String, model: Model, image: String?): ChatTurn {
+                val userId = UUID.randomUUID().toString()
+                val replyId = UUID.randomUUID().toString()
+                val now = System.currentTimeMillis() / 1000
+                // A photo goes into the chat as an image file, so Open WebUI shows it with your message.
+                val files = image?.let { JSONArray().put(JSONObject().put("type", "image").put("url", it)) }
+                val user = JSONObject()
+                    .put("id", userId).put("childrenIds", JSONArray().put(replyId))
+                    .put("role", "user").put("content", prompt).put("timestamp", now)
+                    .put("models", JSONArray().put(model.id))
+                if (files != null) user.put("files", files)
+                val reply = JSONObject()
+                    .put("id", replyId).put("parentId", userId).put("childrenIds", JSONArray())
+                    .put("role", "assistant").put("content", "")
+                    .put("model", model.id).put("modelName", model.name).put("modelIdx", 0)
+                    .put("done", false).put("timestamp", now)
+                return ChatTurn(userId, replyId, user, reply, files)
+            }
+        }
+    }
+
+    /** Creates a chat holding just this turn, pinned if asked, and returns its id. */
+    private suspend fun startChat(turn: ChatTurn, model: Model, title: String, pin: Boolean): String {
+        turn.user.put("parentId", JSONObject.NULL)
+        val chat = JSONObject()
+            .put("title", title)
+            .put("models", JSONArray().put(model.id))
+            .put("params", JSONObject())
+            .put("history", JSONObject().put("currentId", turn.replyId)
+                .put("messages", JSONObject().put(turn.userId, turn.user).put(turn.replyId, turn.reply)))
+            .put("messages", JSONArray().put(turn.user).put(turn.reply))
+            .put("tags", JSONArray())
+            .put("timestamp", System.currentTimeMillis())
+        val id = JSONObject(request("POST", "/api/v1/chats/new", JSONObject().put("chat", chat))).getString("id")
+        if (pin) runCatching { request("POST", "/api/v1/chats/${enc(id)}/pin") }
+        return id
+    }
+
+    /**
+     * Adds this turn to an existing chat after [parentId] (or its latest message), saves it, and
+     * returns the thread the model should see: every question and answer from the start of the
+     * chat down this branch to your new message, trimmed to fit half the model's context.
+     * Open WebUI keeps a chat as a tree (edits and regenerations make branches), so the thread is
+     * found by walking parent links back from the new message rather than by list order.
+     */
+    private suspend fun continueChat(id: String, existing: JSONObject, turn: ChatTurn, parentId: String?, contextTokens: Int): List<JSONObject> {
+        val chat = existing.optJSONObject("chat") ?: JSONObject()
+        val history = chat.optJSONObject("history") ?: JSONObject()
+        val messages = history.optJSONObject("messages") ?: JSONObject()
+        val parent = parentId ?: history.optString("currentId").takeIf { !history.isNull("currentId") }
+        turn.user.put("parentId", parent ?: JSONObject.NULL)
+        parent?.let { messages.optJSONObject(it) }?.let { p ->
+            (p.optJSONArray("childrenIds") ?: JSONArray().also { p.put("childrenIds", it) }).put(turn.userId)
+        }
+        messages.put(turn.userId, turn.user).put(turn.replyId, turn.reply)
+        history.put("messages", messages).put("currentId", turn.replyId)
+        val list = (chat.optJSONArray("messages") ?: JSONArray()).put(turn.user).put(turn.reply)
+        request("POST", "/api/v1/chats/${enc(id)}", JSONObject().put("chat", JSONObject().put("history", history).put("messages", list)))
+
+        val thread = mutableListOf<JSONObject>()
+        var cursor: String? = turn.userId
+        while (cursor != null) {
+            val m = messages.optJSONObject(cursor) ?: break
+            val role = m.optString("role")
+            if (role == "user" || role == "assistant") {
+                // Her earlier answers go back without the markup Open WebUI adds (tool-call details and the like).
+                val content = m.optString("content")
+                thread.add(0, JSONObject().put("role", role).put("content", if (role == "assistant") Markdown.clean(content) else content))
+            }
+            cursor = if (m.isNull("parentId")) null else m.optString("parentId")
+        }
+        return fitToBudget(thread, contextTokens)
+    }
+
+    /**
+     * Notes for her with this request only (they're never saved in the chat): the phone's time, said
+     * plainly so she never greets the evening with sunshine and knows it even without Home Assistant;
+     * the [instruction] behind a scheduled prompt whose chat shows only its name; that the reply will
+     * be read aloud, so she uses her spoken style; and, on the lock screen, that the person may not be
+     * the phone's owner. That last one asks her to be careful; it isn't a lock, which is why lock-screen
+     * mode is off unless you turn it on.
+     */
+    private fun requestNotes(spoken: Boolean, locked: Boolean, instruction: String?): List<String> {
         val local = java.time.ZonedDateTime.now()
         val part = when (local.hour) { in 5..11 -> "morning"; in 12..16 -> "afternoon"; in 17..20 -> "evening"; else -> "night" }
         val clock = local.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, h:mm a", java.util.Locale.US))
-        // [instruction]: what she's really asked, sent with this request only, while the chat shows [prompt]
-        // (a scheduled prompt's name instead of the prompt itself).
-        val hints = listOfNotNull(
+        return listOfNotNull(
             "The time on the phone: $clock ($part).",
             instruction,
             if (spoken) "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken." else null,
@@ -414,29 +491,27 @@ class Api(server: String, private val context: Context? = null) {
                 "and don't share personal details, earlier conversations or what you remember about people. " +
                 "If asked, say it needs the phone unlocked." else null,
         )
-        if (hints.isNotEmpty()) {
-            val withHint = JSONArray().put(JSONObject().put("role", "system").put("content", hints.joinToString("\n")))
-            for (i in 0 until conversation.length()) withHint.put(conversation.get(i))
-            conversation = withHint
-        }
+    }
 
+    /** The request for Open WebUI's /api/chat/completions, the same shape its own page sends. */
+    private suspend fun completionBody(chatId: String, turn: ChatTurn, model: Model, conversation: JSONArray, wantTitle: Boolean): JSONObject {
+        // The model's default features (web search and the like), and memory as your Open WebUI settings have it.
         val features = JSONObject()
         listOf("web_search", "code_interpreter", "image_generation").forEach { features.put(it, it in model.features) }
         features.put("memory", memoryFeature())
-
-        val body = JSONObject()
+        return JSONObject()
             .put("model", model.id)
             .put("messages", conversation)
             .put("stream", true)
-            .put("chat_id", id)
-            .put("id", replyId)
-            // Open WebUI 0.12+ writes the turn into the chat itself and links the reply to this message.
+            .put("chat_id", chatId)
+            .put("id", turn.replyId)
+            // Open WebUI writes the turn into the chat itself and links the reply to this message.
             // Without it, the reply is saved with no parent and the conversation's history breaks.
             .put("user_message", JSONObject()
-                .put("id", userId).put("parentId", user.opt("parentId") ?: JSONObject.NULL)
-                .put("role", "user").put("content", prompt)
-                .put("models", JSONArray().put(model.id)).put("timestamp", now)
-                .apply { if (files != null) put("files", files) })
+                .put("id", turn.userId).put("parentId", turn.user.opt("parentId") ?: JSONObject.NULL)
+                .put("role", "user").put("content", turn.user.optString("content"))
+                .put("models", JSONArray().put(model.id)).put("timestamp", turn.user.optLong("timestamp"))
+                .apply { if (turn.files != null) put("files", turn.files) })
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
@@ -444,10 +519,8 @@ class Api(server: String, private val context: Context? = null) {
             // on a chat's first answer as "title it after the first message", which renamed chats Lena
             // had named herself ("Assistant Lena", a scheduled prompt's chat) so they couldn't be found again.
             .put("background_tasks", JSONObject()
-                .apply { if (existing == null && newTitle == null) put("title_generation", true) }
+                .apply { if (wantTitle) put("title_generation", true) }
                 .put("tags_generation", false).put("follow_up_generation", false))
-        request("POST", "/api/chat/completions", body, readTimeoutMs = 120_000)
-        return Started(id, replyId)
     }
 
     private var memoryOn: Boolean? = null
@@ -461,8 +534,10 @@ class Api(server: String, private val context: Context? = null) {
 
     // ---- Memory and knowledge -------------------------------------------------------------
 
+    /** One of Open WebUI's memories (its own feature, separate from Lena's shared memory in Home Assistant). */
     data class Memory(val id: String, val content: String, val path: String?, val updatedMillis: Long)
 
+    /** Your Open WebUI memories, newest first. */
     suspend fun memories(): List<Memory> {
         val a = JSONArray(request("GET", "/api/v1/memories/"))
         return List(a.length()) { i ->
@@ -472,20 +547,28 @@ class Api(server: String, private val context: Context? = null) {
         }.sortedByDescending { it.updatedMillis }
     }
 
+    /** Adds an Open WebUI memory. */
     suspend fun addMemory(content: String) {
         request("POST", "/api/v1/memories/add", JSONObject().put("content", content))
     }
 
+    /** Changes an Open WebUI memory's text. */
     suspend fun updateMemory(id: String, content: String) {
         request("POST", "/api/v1/memories/${enc(id)}/update", JSONObject().put("content", content))
     }
 
+    /** Deletes an Open WebUI memory. */
     suspend fun deleteMemory(id: String) {
         request("DELETE", "/api/v1/memories/${enc(id)}")
     }
 
+    /** A knowledge collection, and whether you may change it. */
     data class Knowledge(val id: String, val name: String, val description: String, val canEdit: Boolean)
 
+    /**
+     * Your knowledge collections, page by page (at most 20 pages, so a server answering oddly can't loop
+     * forever).
+     */
     suspend fun knowledgeBases(): List<Knowledge> {
         val out = mutableListOf<Knowledge>()
         var page = 1
@@ -503,6 +586,7 @@ class Api(server: String, private val context: Context? = null) {
         return out
     }
 
+    /** A document in a knowledge collection. */
     data class KnowledgeFile(val id: String, val name: String, val addedMillis: Long)
 
     /** One page of a collection's documents, and the total count. */
@@ -517,14 +601,17 @@ class Api(server: String, private val context: Context? = null) {
         return files to r.optInt("total", files.size)
     }
 
+    /** Removes a document from a collection (the file itself stays in Open WebUI). */
     suspend fun removeKnowledgeFile(knowledgeId: String, fileId: String) {
         request("POST", "/api/v1/knowledge/${enc(knowledgeId)}/file/remove", JSONObject().put("file_id", fileId))
     }
 
+    /** Deletes a chat from Open WebUI. */
     suspend fun deleteChat(id: String) {
         request("DELETE", "/api/v1/chats/${enc(id)}")
     }
 
+    /** Renames a chat. */
     suspend fun renameChat(id: String, title: String) {
         request("POST", "/api/v1/chats/${enc(id)}", JSONObject().put("chat", JSONObject().put("title", title)))
     }

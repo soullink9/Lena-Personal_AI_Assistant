@@ -62,8 +62,6 @@ Open **Settings → Logs** and look for "Heard …": each says how sure she was 
 - Choose **Fewer false starts** under **How sure she must be**.
 - Keep the tablet away from a TV or speaker if you can. Music and jingles are turned away by the voice check ("wasn't a voice; ignored" in the logs), but a voice on TV is still a voice.
 
-Before 2.17.0 she could also wake herself the moment the wall display started (after a restart, say), while the sound features were still settling; that's fixed.
-
 ## Open WebUI keeps signing me out when it restarts
 
 Open WebUI ends every session when its secret key changes, and if `WEBUI_SECRET_KEY` isn't set it may make a new one each time it starts. Set it to a long random value in your Open WebUI container's environment and restart once; after that, restarts keep everyone signed in. For anything that still slips through, turn on **Settings → Open WebUI → Sign in by herself**.

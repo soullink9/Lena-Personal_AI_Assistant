@@ -56,6 +56,7 @@ def check(ok, message):
 
 
 def rel(path):
+    """A path relative to the repository, for readable messages."""
     return path.relative_to(ROOT)
 
 
@@ -113,6 +114,9 @@ problems = []
 
 
 def ok(change, name):
+    """Records a problem if an event chose a feeling that feelings.yaml doesn't define, which would
+    leave her selects showing an unknown option.
+    """
     if change.mood is not None and change.mood not in catalog.moods:
         problems.append(f"{name} chose mood {change.mood}")
     if change.energy is not None and change.energy not in catalog.energies:
@@ -221,6 +225,7 @@ check(not hits, "no obvious private data found" + (f" ({', '.join(hits[:10])})" 
 # Sizes from the home-assistant/brands rules; tools/make_images.py makes them. Read from the PNG
 # header so the check needs no image library.
 def png_size(path):
+    """A PNG's width and height, read from its header so the check needs no image library."""
     head = path.read_bytes()[:24]
     if head[:8] != b"\x89PNG\r\n\x1a\n":
         return None
@@ -234,6 +239,24 @@ for name, k in (("logo.png", 1), ("logo@2x.png", 2), ("dark_logo.png", 1), ("dar
     size = png_size(BRAND / name) if (BRAND / name).exists() else None
     check(size is not None and size[0] >= size[1] and 128 * k <= min(size) <= 256 * k,
           f"brand/{name} is a landscape PNG with its short side {128 * k}-{256 * k} (got {size})")
+
+# ---- 10. One version everywhere ---------------------------------------------------------------
+# The whole project shares one version: the app's versionName, the integration's manifest, the
+# Open WebUI files' front matter and the newest CHANGELOG section. A mismatch means a release
+# would ship parts that say different things about what they are.
+gradle = (ROOT / "android/app/build.gradle.kts").read_text()
+app_version = re.search(r'versionName = "([^"]+)"', gradle).group(1)
+versions = {
+    "android/app/build.gradle.kts (versionName)": app_version,
+    "manifest.json": json.loads((ROOT / "home-assistant/custom_components/lena/manifest.json").read_text())["version"],
+}
+for name in ("lena_filter.py", "lena_tools.py"):
+    found = re.search(r"^version: *(\S+)", (ROOT / "open-webui" / name).read_text(), re.M)
+    versions[f"open-webui/{name}"] = found.group(1) if found else None
+newest = re.search(r"^## \[?v?([0-9][^\] ]*)", (ROOT / "CHANGELOG.md").read_text(), re.M)
+versions["CHANGELOG.md (newest section)"] = newest.group(1) if newest else None
+for where, v in versions.items():
+    check(v == app_version, f"{where} is version {app_version} (got {v})")
 
 print()
 if failures:

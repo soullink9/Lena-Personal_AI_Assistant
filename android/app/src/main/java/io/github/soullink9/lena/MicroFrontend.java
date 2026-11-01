@@ -88,6 +88,10 @@ public final class MicroFrontend {
     /** The latest 40 features, valid when {@link #process} reported a frame. */
     public final int[] features = new int[CHANNELS];
 
+    /**
+     * Builds the fixed tables once, the same way the C code initialises them: the window, the FFT's factors
+     * and twiddles, the mel filterbank, and the PCAN gain table.
+     */
     public MicroFrontend() {
         // Window: Hann, in Q12.
         float arg = (float) Math.PI * 2.0f / ((float) SIZE);
@@ -183,6 +187,11 @@ public final class MicroFrontend {
 
     // ---- One frame ----------------------------------------------------------------------
 
+    /**
+     * Turns one windowed 30 ms frame into 40 features: scale up for precision, FFT, energy per bin, mel
+     * filterbank, noise reduction, PCAN gain control and log scale. Each step is the C function of the same
+     * name, line for line.
+     */
     private void frame() {
         int inputShift = 15 - msb32(maxAbs);
         for (int i = 0; i < SIZE; i++) fftIn[i] = (short) ((windowed[i] & 0xFFFF) << inputShift);
@@ -245,6 +254,10 @@ public final class MicroFrontend {
 
     // ---- KISS FFT, 16-bit fixed point, radix 4 (512 real points = 256 complex = 4^4) -------
 
+    /**
+     * Splits the FFT size into radix-4 stages, as KISS FFT's kf_factor does (512 real points are 256
+     * complex = 4^4).
+     */
     private void factor(int n) {
         int p = 4;
         double floorSqrt = Math.floor(Math.sqrt(n));
@@ -267,16 +280,22 @@ public final class MicroFrontend {
         }
     }
 
+    /** Rounds a Q15 product back to 16 bits, as KISS FFT's sround macro does. */
     private static short sround(int x) {
         return (short) ((x + (1 << 14)) >> 15);
     }
 
+    /**
+     * Divides a complex value by the stage size before each butterfly, KISS FFT's fixed-point scaling that
+     * keeps 16 bits from overflowing.
+     */
     private void fixdiv(short[] r, short[] i, int at, int div) {
         int s = 32767 / div;
         r[at] = sround(r[at] * s);
         i[at] = sround(i[at] * s);
     }
 
+    /** One stage of the recursive FFT (KISS FFT's kf_work). */
     private void work(int fout, int f, int fstride, int fi) {
         int p = factors[fi];
         int m = factors[fi + 1];
@@ -297,6 +316,10 @@ public final class MicroFrontend {
         bfly4(begin, fstride, m);
     }
 
+    /**
+     * The radix-4 butterfly (KISS FFT's kf_bfly4), with the same order of operations, since fixed-point
+     * results depend on it.
+     */
     private void bfly4(int fout, int fstride, int m) {
         final short[] R = tmpR, I = tmpI;
         int tw1 = 0, tw2 = 0, tw3 = 0;
@@ -339,6 +362,7 @@ public final class MicroFrontend {
         } while (--k != 0);
     }
 
+    /** The real FFT of the frame, via a half-size complex FFT and KISS FFT's split step (kiss_fftr). */
     private void fftr() {
         work(0, 0, 1, 0);
 
@@ -370,10 +394,12 @@ public final class MicroFrontend {
 
     // ---- Filterbank ---------------------------------------------------------------------
 
+    /** Hertz to mel, with the same float maths as the C (StrictMath, so every device gets identical bits). */
     private static float freqToMel(float freq) {
         return 1127.0f * (float) StrictMath.log1p(freq / 700.0f);
     }
 
+    /** Sums each FFT bin's energy into the 40 mel channels with the C's integer weights. */
     private void filterbank() {
         final int plus1 = CHANNELS + 1;
         final int alignment = 2; // 4-byte alignment of 16-bit indices
@@ -438,6 +464,7 @@ public final class MicroFrontend {
 
     // ---- Integer maths ------------------------------------------------------------------
 
+    /** The position of the highest set bit (1-based), as the C's MostSignificantBit32. */
     private static int msb32(int n) {
         return 32 - Integer.numberOfLeadingZeros(n);
     }
@@ -484,6 +511,7 @@ public final class MicroFrontend {
         return (int) res;
     }
 
+    /** One entry of the PCAN gain table, computed in float exactly as the C does at start-up. */
     private short pcanGain(int inputBits, long x) {
         float xf = ((float) x) / ((float) (1L << inputBits));
         float gain = ((float) (1L << 21)) * (float) StrictMath.pow(xf + 80.0f, -0.95f);
@@ -491,6 +519,7 @@ public final class MicroFrontend {
         return (short) (int) (gain + 0.5f);
     }
 
+    /** The gain for a channel's noise estimate, interpolated from the gain table (the C's WideDynamicFunction). */
     private int wideDynamic(int x) {
         if (Integer.compareUnsigned(x, 2) <= 0) return gainLut[x];
         short interval = (short) msb32(x);
@@ -504,6 +533,7 @@ public final class MicroFrontend {
         return (short) result;
     }
 
+    /** The PCAN compression curve (the C's PcanShrink). */
     private static int pcanShrink(int x) {
         if (Integer.compareUnsigned(x, 2 << SNR_BITS) < 0) {
             return (x * x) >>> (2 + 2 * SNR_BITS - OUTPUT_BITS);
@@ -511,6 +541,7 @@ public final class MicroFrontend {
         return (x >>> (SNR_BITS - OUTPUT_BITS)) - (1 << OUTPUT_BITS);
     }
 
+    /** The fractional part of a base-2 log from the C's lookup table, with its interpolation. */
     private static int log2Fraction(int x, int log2x) {
         int frac = (int) ((x & U32) - (1L << log2x));
         if (log2x < 16) frac <<= 16 - log2x;
@@ -524,6 +555,7 @@ public final class MicroFrontend {
         return frac + c0 + relPos;
     }
 
+    /** The scaled natural log the front end outputs: log2 in Q16, times ln 2 (45426 / 65536), then the log scale shift (the C's Log). */
     private static int log(int x) {
         int integer = msb32(x) - 1;
         int fraction = log2Fraction(x, integer);
@@ -533,10 +565,12 @@ public final class MicroFrontend {
         return ((loge << SCALE_SHIFT) + round) >>> 16;
     }
 
+    /** cosf with StrictMath, so the window is bit-identical on every device. */
     private static float cosf(float x) {
         return (float) StrictMath.cos(x);
     }
 
+    /** floorf, for the filterbank's channel edges. */
     private static float floorf(float x) {
         return (float) Math.floor(x);
     }

@@ -44,7 +44,7 @@ Any user's token works; no admin rights are needed. A Home Assistant user just f
    | ha_url | Your Home Assistant address **as the Open WebUI container can reach it**, for example `http://homeassistant:8123` or `https://ha.example.com` |
    | ha_token | The token from step 3 |
    | memory | On, to include her shared memory |
-   | devices | On, to include the exact names of the devices you've exposed to Assist, by room (Lena integration 1.4.0 or newer) |
+   | devices | On, to include the exact names of the devices you've exposed to Assist, by room |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |
 
    The date and time come from Home Assistant, in your house's time zone; the model has no clock of its own.

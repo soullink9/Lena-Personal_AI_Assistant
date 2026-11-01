@@ -64,6 +64,10 @@ class HomeAssistant(server: String, private val token: String) {
         }
     }
 
+    /**
+     * One request to Home Assistant with the token. A 401 or 403 means the token was refused, which the
+     * screens report differently from Home Assistant being unreachable.
+     */
     private suspend fun call(method: String, path: String, body: JSONObject? = null): String = withContext(Dispatchers.IO) {
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
@@ -99,6 +103,7 @@ class HomeAssistant(server: String, private val token: String) {
         }
     }
 
+    /** Encodes part of a path. */
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** A file from Home Assistant itself (only paths on it, so the token never goes elsewhere). */
@@ -182,6 +187,10 @@ class HomeAssistant(server: String, private val token: String) {
         if (e.message == "HTTP 404") null else throw e
     }
 
+    /**
+     * Calls one of Home Assistant's to-do actions on her memory list, asking for the response when reading
+     * it.
+     */
     private suspend fun todo(service: String, list: String, data: JSONObject = JSONObject(), response: Boolean = false): String =
         call("POST", "/api/services/todo/$service" + if (response) "?return_response" else "", data.put("entity_id", list))
 
@@ -195,14 +204,17 @@ class HomeAssistant(server: String, private val token: String) {
         }.filter { it.text.isNotBlank() }
     }
 
+    /** Adds a fact to her shared memory. */
     suspend fun addMemory(list: String, text: String) {
         todo("add_item", list, JSONObject().put("item", text))
     }
 
+    /** Changes a fact's text, keeping its place in the list. */
     suspend fun updateMemory(list: String, m: HouseMemory, text: String) {
         todo("update_item", list, JSONObject().put("item", m.uid).put("rename", text))
     }
 
+    /** Removes a fact from her shared memory. */
     suspend fun removeMemory(list: String, m: HouseMemory) {
         todo("remove_item", list, JSONObject().put("item", m.uid))
     }
@@ -238,8 +250,13 @@ object Secrets {
     const val HA_TOKEN = "ha_token"
     private const val ALIAS = "lena-secrets"
 
+    /** Where the encrypted values are kept (excluded from backups like the rest of the app's data). */
     private fun p(c: Context) = c.getSharedPreferences("lena-secrets", Context.MODE_PRIVATE)
 
+    /**
+     * The AES key in Android's keystore, made the first time. It never leaves the keystore (and on most
+     * phones lives in secure hardware), so a copy of the app's files can't be decrypted elsewhere.
+     */
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
@@ -254,8 +271,10 @@ object Secrets {
         return generator.generateKey()
     }
 
+    /** Whether a value is saved, without decrypting it (the screens only need to show "(saved)"). */
     fun has(c: Context, name: String): Boolean = p(c).contains(name)
 
+    /** Encrypts and saves a value with AES-GCM and a fresh IV each time; blank removes it. */
     fun put(c: Context, name: String, value: String?) {
         if (value.isNullOrBlank()) {
             p(c).edit().remove(name).apply()
@@ -267,6 +286,10 @@ object Secrets {
         p(c).edit().putString(name, stored).apply()
     }
 
+    /**
+     * Decrypts a saved value, or null if there's none or it can't be read (for example after the keystore
+     * was reset).
+     */
     fun get(c: Context, name: String): String? = runCatching {
         val (iv, sealed) = p(c).getString(name, null)!!.split(":").map { Base64.decode(it, Base64.NO_WRAP) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv)) }

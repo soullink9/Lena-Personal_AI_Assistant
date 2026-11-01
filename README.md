@@ -8,6 +8,8 @@ Note: Built with the assistance of Claude.ai. I'm putting it here now so you don
 
 # Lena: a personal AI assistant on your own hardware
 
+> **V0.5.0 Beta.** The first public release: everything works day to day, but expect rough edges and settings that may still change before 1.0. See the [changelog](CHANGELOG.md).
+
 Lena is a Jarvis-style assistant that runs entirely on your own servers. She's one character everywhere you meet her: in Home Assistant's voice assistant, in Open WebUI, and in an Android app that makes her your phone's assistant. She's sharp, sassy and quietly caring. She runs your home, uses your Open WebUI tools, remembers what you tell her, and has feelings that change for real reasons.
 
 - **One personality, everywhere.** Her whole character is built into her Ollama model, so she's the same Lena in every app, whatever instructions the app adds.
@@ -53,7 +55,7 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 | **Home Assistant** | [The Lena integration](docs/home-assistant/Integration.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
 | **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
 | **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
-| **Development** | [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) |
+| **Development** | [Architecture](ARCHITECTURE.md) · [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) |
 
 ## Privacy
 
@@ -83,4 +85,4 @@ No code was copied from another project; everything else was written for this on
 
 ## License
 
-[GNU General Public License v3.0](LICENSE). You may use, study, share and change Lena; if you share a changed version, share its source under the same licence.
+[GNU General Public License v3.0](LICENSE). You may use, study, share and change Lena; if you share a changed version, share its source under the same licence. Third-party models and code included in the repository keep their own licences: see [Third-party notices](THIRD_PARTY_NOTICES.md).

@@ -95,7 +95,12 @@ private class Loaded(val bitmap: ImageBitmap, val fx: Float, val fy: Float)
  * an edge; a photo smaller than the space is centred.
  */
 private class FocusAlignment(private val fx: Float, private val fy: Float) : Alignment {
+    /** Where the photo goes in the space, so the focus point is as central as it can be. */
     override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
+        /**
+         * One axis: centred if the photo is smaller, otherwise offset to put the focus point in the middle,
+         * but never so far that an edge shows.
+         */
         fun axis(content: Int, room: Int, f: Float): Int =
             if (content <= room) (room - content) / 2 else (room / 2f - f * content).roundToInt().coerceIn(room - content, 0)
         return IntOffset(axis(size.width, space.width, fx), axis(size.height, space.height, fy))
@@ -172,6 +177,10 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
     }
 }
 
+/**
+ * One photo, fitted the way the setting says, slowly zooming towards its faces if that transition is
+ * chosen.
+ */
 @Composable
 private fun Photo(s: Shown?, slides: Slides) {
     if (s == null) return
@@ -191,6 +200,10 @@ private fun Photo(s: Shown?, slides: Slides) {
         }
         // Where the focus point lands on screen, so the slow zoom moves in on the faces.
         val scale = if (crop) maxOf(room.maxWidth / bw, room.maxHeight / bh) else minOf(room.maxWidth / bw, room.maxHeight / bh)
+        /**
+         * Where the focus point ends up on screen (0 to 1), so the zoom grows from there and the faces stay
+         * in view.
+         */
         fun pivot(content: Float, space: Int, f: Float): Float {
             if (space <= 0) return 0.5f
             val offset = if (content <= space) (space - content) / 2 else (space / 2f - f * content).coerceIn(space - content, 0f)
@@ -331,7 +344,7 @@ fun AlbumPicker(onPick: (id: String, name: String) -> Unit, onDismiss: () -> Uni
         try {
             items = ha.browse(here.first).second
         } catch (e: Exception) {
-            problem = if (e.message == "HTTP 404") "Update the Lena integration in Home Assistant (1.2.0 or newer) to pick an album."
+            problem = if (e.message == "HTTP 404") "Update the Lena integration in Home Assistant to pick an album."
             else "Couldn't open that folder."
         }
     }

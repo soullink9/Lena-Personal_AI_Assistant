@@ -199,6 +199,11 @@ class MainActivity : ComponentActivity() {
         pendingFiles = null
     }
 
+    /**
+     * Without a server there's nothing to show, so it goes straight to Settings. Otherwise it builds the
+     * web view once (it's kept across the screen's rebuilds) and opens what the intent asked for, or the
+     * page it was on before a theme change.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val url = Prefs.server(this)
@@ -231,6 +236,7 @@ class MainActivity : ComponentActivity() {
         return home?.packageName == packageName && home.name == DashboardActivity::class.java.name
     }
 
+    /** Every touch or key on this screen: the wall display's return timer starts again. */
     override fun onUserInteraction() {
         super.onUserInteraction()
         lastInteraction = System.currentTimeMillis()
@@ -267,6 +273,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Remembers the page, so switching dark mode (which rebuilds the screen) comes back to the same chat. */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (::web.isInitialized) outState.putString("url", currentUrl.value)
@@ -282,6 +289,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Lena is singleTask, so a widget, notification or shortcut reaches the running screen here instead of
+     * starting another.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -290,6 +301,10 @@ class MainActivity : ComponentActivity() {
         handle(intent, fresh = false)
     }
 
+    /**
+     * Opens what an intent asks for: a call, a new or temporary chat, a chat by id, or Settings. From the
+     * launcher, a fresh start opens a new chat and an already-open Lena just comes back as it was.
+     */
     private fun handle(i: Intent?, fresh: Boolean) {
         when (i?.action) {
             ACTION_CALL -> openNew(call = true)
@@ -303,6 +318,10 @@ class MainActivity : ComponentActivity() {
 
     // ---- Navigation -------------------------------------------------------------------------
 
+    /**
+     * A new chat with your model, through Open WebUI's own URL parameters: call mode, a temporary chat, or
+     * text already in the box (never sent by itself).
+     */
     private fun openNew(model: String? = null, call: Boolean = false, temporary: Boolean = false, text: String? = null) {
         val b = server.buildUpon()
         (model ?: Prefs.effectiveModel(this))?.let { b.appendQueryParameter("model", it) }
@@ -313,16 +332,19 @@ class MainActivity : ComponentActivity() {
         web.loadUrl(b.build().toString())
     }
 
+    /** Opens one of your chats by id. */
     private fun openChat(id: String) {
         keepScreenOn(false)
         web.loadUrl(server.buildUpon().appendPath("c").appendPath(id).build().toString())
     }
 
+    /** Keeps the screen on during a voice call, where you're talking rather than touching it. */
     private fun keepScreenOn(on: Boolean) {
         if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    /** The chat id in a page address (…/c/<id>), allowing for Open WebUI served under a path. */
     private fun chatIdOf(url: String): String? {
         val path = Uri.parse(url).path ?: return null
         val base = server.path?.trimEnd('/') ?: ""
@@ -331,6 +353,10 @@ class MainActivity : ComponentActivity() {
 
     // ---- The page ---------------------------------------------------------------------------
 
+    /**
+     * The web view for Open WebUI, locked down to what it needs: JavaScript and storage on, files, content
+     * URIs, location and pop-up windows off, and plain http never mixed in.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView = WebView(this).apply {
         // Fill the space Compose gives it. Without this the web view sizes itself to the page,
@@ -352,6 +378,7 @@ class MainActivity : ComponentActivity() {
         webChromeClient = Chrome()
     }
 
+    /** Your server's origin (scheme, host and port), which the shell style and sign-in checks are scoped to. */
     private fun serverOrigin(): String = "https://${server.host}" + if (server.port == -1) "" else ":${server.port}"
 
     /** Adds or removes the style that hides Open WebUI's header, now and on every page load. */
@@ -364,17 +391,26 @@ class MainActivity : ComponentActivity() {
         web.evaluateJavascript(if (showMenus.value) REMOVE_STYLE else ADD_STYLE, null)
     }
 
+    /** Whether an address is your Open WebUI. */
     private fun isServer(u: Uri?) = sameOrigin(u, server)
+    /** Whether an address may load inside Lena: your Open WebUI, or one of your sign-in addresses. */
     private fun isAllowed(u: Uri?) = isServer(u) || signIn.any { sameOrigin(u, it) }
 
+    /** Same origin, the browser's way: https, the same host and the same port. Only https is ever trusted. */
     private fun sameOrigin(u: Uri?, base: Uri): Boolean =
         u != null && u.scheme == "https" && base.host != null &&
             base.host.equals(u.host, ignoreCase = true) && port(u) == port(base)
 
+    /** The port, with https's default filled in, so https://host and https://host:443 count as the same. */
     private fun port(u: Uri) = if (u.port == -1) 443 else u.port
 
     /** Only your server and sign-in addresses load in the app. Other links open in your normal browser. */
     private inner class Client : WebViewClient() {
+        /**
+         * Lets your server and sign-in pages load here; sends ordinary links to your browser; blocks
+         * everything else (intent:, file:, javascript: and the like) so a page can't use Lena to open other
+         * apps.
+         */
         override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
             val u = req.url
             if (isAllowed(u)) return false
@@ -392,20 +428,33 @@ class MainActivity : ComponentActivity() {
             return true // intent:, file:, javascript: and anything else is blocked
         }
 
+        /**
+         * A page that didn't load goes in the log (for Settings → Logs), without its query, which can hold
+         * tokens.
+         */
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
             if (request.isForMainFrame) Logs.w("Open WebUI", "Page didn't load: ${error.description} (${request.url.path})")
         }
 
+        /** The same for a page that answered with an HTTP error. */
         override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: android.webkit.WebResourceResponse) {
             if (request.isForMainFrame) Logs.w("Open WebUI", "Page answered HTTP ${response.statusCode} (${request.url.path})")
         }
 
+        /**
+         * Every navigation, including Open WebUI's in-page ones: track the address (it decides the title
+         * and the chat), and sign in by herself if it landed on the sign-in page.
+         */
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             currentUrl.value = url ?: ""
             canGoBack.value = view.canGoBack()
             maybeSignIn(url)
         }
 
+        /**
+         * On web views without document-start scripts, the shell style goes in once the page has loaded
+         * instead.
+         */
         override fun onPageFinished(view: WebView, url: String?) {
             canGoBack.value = view.canGoBack()
             if (!showMenus.value && shellScript == null && isServer(url?.let { Uri.parse(it) })) {
@@ -416,6 +465,10 @@ class MainActivity : ComponentActivity() {
 
     /** Mic for your server only; no camera, no location. Plus the file picker for attachments. */
     private inner class Chrome : WebChromeClient() {
+        /**
+         * The page may use the microphone (call mode, voice input) only when it's your server asking, and
+         * only after Lena has Android's permission; the camera and everything else are refused.
+         */
         override fun onPermissionRequest(req: PermissionRequest) {
             val mic = PermissionRequest.RESOURCE_AUDIO_CAPTURE in req.resources
             if (!mic || !isServer(req.origin)) {
@@ -431,6 +484,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /**
+         * Open WebUI's attach button: Android's file picker, allowing several files when the page asks for
+         * that.
+         */
         override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
             pendingFiles?.onReceiveValue(null)
             pendingFiles = callback
@@ -473,11 +530,16 @@ class MainActivity : ComponentActivity() {
 
     // ---- Lifecycle --------------------------------------------------------------------------
 
+    /** Back on screen with a chat open: no need for a "Lena finished" notification about it any more. */
     override fun onStart() {
         super.onStart()
         if (::web.isInitialized) chatIdOf(currentUrl.value)?.let { ReplyWorker.cancel(this, it) }
     }
 
+    /**
+     * Picks up changes made in Settings while away: the chat list style and whether Open WebUI's own menus
+     * show.
+     */
     override fun onResume() {
         super.onResume()
         chatStyle.value = Prefs.chatList(this) // chosen in Settings → Appearance
@@ -492,6 +554,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Saves cookies to disk now, so the sign-in survives Android stopping the app in the background. */
     override fun onPause() {
         if (::web.isInitialized) {
             web.onPause()
@@ -512,6 +575,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Destroys the web view with the screen, or it keeps running scripts and holding memory. */
     override fun onDestroy() {
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
@@ -519,6 +583,10 @@ class MainActivity : ComponentActivity() {
 
     // ---- The native shell -------------------------------------------------------------------
 
+    /**
+     * The whole screen: the drawer with her status, search, pinned and recent chats and three buttons; the
+     * top bar with the model menu and new-chat buttons; and the page.
+     */
     @Composable
     private fun Shell() {
         val scope = rememberCoroutineScope()
@@ -572,6 +640,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        /**
+         * Closes the drawer and does the action at the same time, so the page starts loading while the
+         * drawer slides away.
+         */
         fun closeThen(action: () -> Unit) {
             scope.launch { drawer.close() }
             action()
@@ -730,6 +802,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** A short message at the bottom of the screen. */
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
     /**
@@ -765,6 +838,7 @@ class MainActivity : ComponentActivity() {
         FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, label) }
     }
 
+    /** Whether your server answered, with its Open WebUI version, under her name in the drawer. */
     @Composable
     private fun Status(checked: Boolean, version: String?) {
         val (color, text) = when {
@@ -782,6 +856,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Your chats in the chosen style, pinned ones first (up to the limit, then View all), the rest grouped
+     * by day. Every style shares the same long-press menu.
+     */
     @Composable
     private fun ChatList(
         chats: List<ChatItem>?,
@@ -1013,6 +1091,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** The small spinner on a chat that's still being answered. */
     @Composable
     private fun Spinner(modifier: Modifier = Modifier) {
         CircularProgressIndicator(modifier.size(14.dp), strokeWidth = 2.dp)
@@ -1035,6 +1114,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** A grey line in the list: loading, empty, or why it couldn't load. */
     @Composable
     private fun Hint(text: String) {
         Text(
@@ -1045,6 +1125,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * Groups chats by when they were last used, as Open WebUI's sidebar does: Today, Yesterday, the
+     * previous 7 and 30 days, and Older.
+     */
     private fun group(chats: List<ChatItem>): List<Pair<String, List<ChatItem>>> {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)

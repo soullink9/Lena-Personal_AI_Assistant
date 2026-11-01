@@ -111,76 +111,6 @@ class DashboardActivity : ComponentActivity() {
         /** Go straight to the screen saver (coming back from your chats after a while). */
         const val EXTRA_IDLE = "idle"
 
-        /**
-         * Home Assistant's own header goes, so Lena's bar is the only one: the dashboard's views,
-         * back and the sidebar menu move into it. Edit mode keeps the header (its save button lives
-         * there). The page tells Lena its views as they change.
-         */
-        private const val HEADER_CSS =
-            "div:not(.edit-mode)>.header{display:none!important}" +
-                "div:not(.edit-mode)>hui-view-container{padding-top:var(--safe-area-inset-top,0px)!important}"
-
-        /**
-         * The same for Home Assistant's other pages (Calendar, To-do, Map, Logbook, History, Media
-         * and the like), which use its standard app bar: its row goes; a second row of filters,
-         * where a page has one, stays.
-         */
-        private const val BAR_CSS =
-            ".top-app-bar .row{display:none!important}" +
-                ".top-app-bar-fixed-adjust{padding-top:calc(var(--sub-row-height,0px) + var(--safe-area-inset-top,0px))!important}" +
-                ".shadow-container{display:none!important}"
-
-        private val HEADER_SCRIPT = """
-            (function () {
-              if (window.__lena) return; window.__lena = true;
-              var post = function (kind, payload) { try { lenaBridge.postMessage(JSON.stringify({kind: kind, payload: payload})); } catch (e) {} };
-              var sr = function (el) { return el && el.shadowRoot; };
-              window.lenaMain = function () {
-                var ha = document.querySelector('home-assistant');
-                return sr(ha) && ha.shadowRoot.querySelector('home-assistant-main');
-              };
-              // The page showing now: dashboards, Overview and Energy draw their header in hui-root;
-              // the other built-in pages in an app bar.
-              window.lenaPanel = function () {
-                var main = window.lenaMain();
-                var res = sr(main) && main.shadowRoot.querySelector('partial-panel-resolver');
-                if (!res) return null;
-                var shown = [].slice.call(res.children).filter(function (k) { return k.getClientRects().length > 0; });
-                return shown[shown.length - 1] || res.lastElementChild;
-              };
-              window.lenaRoot = function () {
-                var panel = window.lenaPanel();
-                return sr(panel) && panel.shadowRoot.querySelector('hui-root');
-              };
-              var style = function (host, id, css) {
-                if (sr(host) && !host.shadowRoot.getElementById(id)) {
-                  var st = document.createElement('style'); st.id = id; st.textContent = css; host.shadowRoot.appendChild(st);
-                }
-              };
-              var last = '';
-              setInterval(function () {
-                var state = {found: false};
-                try {
-                  var panel = window.lenaPanel();
-                  var bars = sr(panel) ? panel.shadowRoot.querySelectorAll('ha-top-app-bar-fixed, ha-two-pane-top-app-bar-fixed') : [];
-                  for (var b = 0; b < bars.length; b++) style(bars[b], 'lena-bar', '$BAR_CSS');
-                  var r = window.lenaRoot();
-                  if (r && r.shadowRoot) {
-                    style(r, 'lena-header', '$HEADER_CSS');
-                    var cfg = (r.lovelace && r.lovelace.config) || {};
-                    var all = (cfg.views || []).map(function (v, i) {
-                      return {i: i, title: v.title || '', path: String(v.path || i), sub: !!v.subview, hidden: v.visible === false};
-                    });
-                    var cur = typeof r._curView === 'number' ? r._curView : 0;
-                    state = {found: true, current: cur, subview: !!(all[cur] && all[cur].sub), edit: !!(r.lovelace && r.lovelace.editMode),
-                      views: all.filter(function (v) { return !v.sub && !v.hidden; })};
-                  }
-                } catch (e) {}
-                var s = JSON.stringify(state);
-                if (s !== last) { last = s; post('header', s); }
-              }, 600);
-            })();
-        """.trimIndent()
     }
 
     /** One of the dashboard's views, as a tab in Lena's bar. */
@@ -204,6 +134,10 @@ class DashboardActivity : ComponentActivity() {
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
 
+    /**
+     * Needs Home Assistant's address and token; without them it opens Settings. Kept on and full screen,
+     * and asks for the microphone if the wake word is on.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val ha = HomeAssistant.from(this)
@@ -236,8 +170,13 @@ class DashboardActivity : ComponentActivity() {
 
     // ---- Home Assistant in a web view ------------------------------------------------------
 
+    /** Home Assistant's origin, which the sign-in bridge and page script are limited to. */
     private fun origin(): String = "https://${base.host}" + if (base.port == -1) "" else ":${base.port}"
 
+    /**
+     * The web view for Home Assistant: JavaScript, storage and media autoplay (camera streams) on; files,
+     * content URIs, location, pop-ups and plain http off.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView = WebView(this).apply {
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -253,6 +192,10 @@ class DashboardActivity : ComponentActivity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
         webViewClient = object : WebViewClient() {
+            /**
+             * Your Home Assistant loads here; other sites open in your browser. Frames (iframe and camera
+             * cards) load whatever they show.
+             */
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 if (!req.isForMainFrame) return false // iframe and camera cards load their own content
                 val u = req.url
@@ -266,24 +209,32 @@ class DashboardActivity : ComponentActivity() {
                 return true
             }
 
+            /** The page is up: from now on dashboards switch inside it instead of reloading. */
             override fun onPageFinished(view: WebView, url: String?) {
                 loaded = true
                 canGoBack.value = view.canGoBack()
             }
 
+            /** Every navigation, including Home Assistant's in-page ones: whether back has somewhere to go. */
             override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
                 canGoBack.value = view.canGoBack()
             }
 
+            /** A dashboard that didn't load goes in the log, by path only. */
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
                 if (request.isForMainFrame) Logs.w("Dashboard", "Page didn't load: ${error.description} (${request.url.path})")
             }
 
+            /** The same for an HTTP error. */
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: android.webkit.WebResourceResponse) {
                 if (request.isForMainFrame) Logs.w("Dashboard", "Page answered HTTP ${response.statusCode} (${request.url.path})")
             }
         }
         webChromeClient = object : android.webkit.WebChromeClient() {
+            /**
+             * Home Assistant's own script errors go in Lena's log, which helps when a frontend update
+             * breaks the header hiding.
+             */
             override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
                 if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
                     Logs.w("Dashboard", "Home Assistant page: ${m.message()}")
@@ -345,59 +296,34 @@ class DashboardActivity : ComponentActivity() {
                 }
             }
         }
-        // The externalApp object the frontend looks for, and the sidebar folded away (Lena's tabs replace it).
-        WebViewCompat.addDocumentStartJavaScript(
-            view,
-            """
-            (function () {
-              var send = function (kind, payload) { lenaBridge.postMessage(JSON.stringify({kind: kind, payload: payload})); };
-              window.externalApp = {
-                getExternalAuth: function (p) { send('auth', p); },
-                revokeExternalAuth: function (p) { send('revoke', p); },
-                externalBus: function (p) { send('bus', p); }
-              };
-              try { localStorage.setItem('dockedSidebar', '"always_hidden"'); } catch (e) {}
-            })();
-            """.trimIndent(),
-            origins,
-        )
-        WebViewCompat.addDocumentStartJavaScript(view, HEADER_SCRIPT, origins)
+        // Lena's side of the page (assets/js/home_assistant.js): signing in, hiding Home Assistant's
+        // header, reporting the views, and window.lena for the calls below. Only for this address.
+        val script = assets.open("js/home_assistant.js").bufferedReader().use { it.readText() }
+        WebViewCompat.addDocumentStartJavaScript(view, script, origins)
     }
 
-    /** Home Assistant's back: up from a subview, otherwise back through what you opened. */
+    /** Calls one of the page's `window.lena` functions (assets/js/home_assistant.js), if it's there yet. */
+    private fun callPage(function: String, argument: String? = null) {
+        val arg = argument?.let { JSONObject.quote(it) } ?: ""
+        web.evaluateJavascript("window.lena && window.lena.$function($arg);", null)
+    }
+
+    /** The back gesture: up out of a subview the way Home Assistant does, otherwise back through what you opened. */
     private fun back() {
-        if (header.value.subview) web.evaluateJavascript("(function(){var r=window.lenaRoot&&lenaRoot();if(r&&r._goBack)r._goBack();else history.back();})();", null)
-        else if (web.canGoBack()) web.goBack()
+        if (header.value.subview) callPage("back") else if (web.canGoBack()) web.goBack()
     }
 
     /** Home Assistant's sidebar: every dashboard, settings and the rest. */
-    private fun menu() {
-        web.evaluateJavascript(
-            "(function(){var m=window.lenaMain&&lenaMain();if(m)m.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));})();",
-            null,
-        )
-    }
+    private fun menu() = callPage("menu")
 
     /** One of the dashboard's views, the way its own tabs switch. */
-    private fun showView(v: View) {
-        val path = JSONObject.quote(v.path)
-        web.evaluateJavascript(
-            "(function(){var r=window.lenaRoot&&lenaRoot();if(r&&r._navigateToView){r._navigateToView($path);return;}" +
-                "var p=(r&&r.route&&r.route.prefix)||location.pathname.split('/').slice(0,2).join('/');" +
-                "history.pushState(null,'',p+'/'+$path);window.dispatchEvent(new CustomEvent('location-changed',{detail:{replace:false}}));})();",
-            null,
-        )
-    }
+    private fun showView(v: View) = callPage("showView", v.path)
 
     /** Shows a dashboard: a quick in-page switch once Home Assistant is running, a full load otherwise. */
     private fun open(d: Dashboard, reload: Boolean = false) {
         val path = "/" + d.path.trim().trimStart('/')
         if (!reload && loaded) {
-            val js = JSONObject.quote(path)
-            web.evaluateJavascript(
-                "history.pushState(null, '', $js); window.dispatchEvent(new CustomEvent('location-changed', {detail: {replace: false}}));",
-                null,
-            )
+            callPage("open", path)
         } else {
             loaded = false
             web.loadUrl(origin() + path + "?external_auth=1")
@@ -406,6 +332,10 @@ class DashboardActivity : ComponentActivity() {
 
     // ---- Touches, dimming and waking -------------------------------------------------------
 
+    /**
+     * A touch counts as someone being there; on the screen saver, the touch that wakes it doesn't also
+     * press whatever is underneath.
+     */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             lastTouch.longValue = System.currentTimeMillis()
@@ -417,12 +347,14 @@ class DashboardActivity : ComponentActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    /** Back to the dashboards at the tablet's normal brightness. */
     private fun wakeUp() {
         lastTouch.longValue = System.currentTimeMillis()
         dimmed.value = false
         brightness(-1f)
     }
 
+    /** The screen saver, at low brightness: 40% for photos (they need light), 2% for the night clock. */
     private fun dim() {
         dimmed.value = true
         // Photos need some light; the night clock (and the slideshow's night) as little as possible.
@@ -432,17 +364,26 @@ class DashboardActivity : ComponentActivity() {
         brightness(if (photos) 0.4f else 0.02f)
     }
 
+    /** Overrides the screen brightness for this window only; negative goes back to the system's. */
     private fun brightness(level: Float) {
         window.attributes = window.attributes.also {
             it.screenBrightness = if (level < 0) WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE else level
         }
     }
 
+    /**
+     * Opens her listening, over the dashboard. The wake word stops first: only one thing can hold the
+     * microphone.
+     */
     private fun talk() {
         wake?.stop()
         startActivity(AskActivity.intent(this, talk = true, from = AskActivity.From.DASHBOARD))
     }
 
+    /**
+     * Back on screen: the web view runs again, the wake word listens again, and time spent talking to her
+     * counts as a touch.
+     */
     override fun onResume() {
         super.onResume()
         if (!::web.isInitialized) return
@@ -457,11 +398,13 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
+    /** Whatever was answered, carry on (with or without the wake word). */
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         onResume()
     }
 
+    /** Off screen: stop listening and pause the page. */
     override fun onPause() {
         wake?.stop()
         if (listening.value == Listening.ON) listening.value = Listening.OFF
@@ -469,6 +412,10 @@ class DashboardActivity : ComponentActivity() {
         super.onPause()
     }
 
+    /**
+     * Home pressed while this is the home screen: back to the first dashboard. Back from your chats with
+     * EXTRA_IDLE: straight to the screen saver.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Back from your chats after a while: straight to the screen saver.
@@ -484,6 +431,7 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
+    /** Destroys the web view with the screen. */
     override fun onDestroy() {
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
@@ -491,6 +439,10 @@ class DashboardActivity : ComponentActivity() {
 
     // ---- The screen -----------------------------------------------------------------------
 
+    /**
+     * The bar (or the worried banner), the page, the screen saver over it, and the apps list, plus the
+     * loops that keep the clock, her feelings and the screen saver going.
+     */
     @Composable
     private fun Screen() {
         val dashboards = remember { Prefs.dashboards(this) }
@@ -555,6 +507,7 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
+    /** Whether the wall display is the tablet's home app, where back has nowhere to go. */
     private fun isHome(): Boolean {
         val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
         return home?.activityInfo?.packageName == packageName
@@ -647,6 +600,7 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
+    /** Replaces the bar when she's worried: what's wrong, in red, with a button to talk to her. */
     @Composable
     private fun WorriedBar(reason: String) {
         Surface(color = MaterialTheme.colorScheme.errorContainer) {
@@ -671,8 +625,13 @@ class DashboardActivity : ComponentActivity() {
 
     // ---- Apps, for when this is the home screen ----------------------------------------------
 
+    /** An app in the apps list. */
     private data class App(val label: String, val packageName: String, val icon: ImageBitmap)
 
+    /**
+     * Every app with a launcher icon, for when the wall display is the tablet's home screen and there's no
+     * other way to open them.
+     */
     @Composable
     private fun Apps(onClose: () -> Unit) {
         var list by remember { mutableStateOf<List<App>?>(null) }

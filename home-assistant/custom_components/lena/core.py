@@ -60,6 +60,9 @@ def load_catalog() -> brain.Catalog:
     data = yaml.safe_load(FEELINGS_FILE.read_text(encoding="utf-8")) or {}
 
     def section(name: str) -> dict[str, str]:
+        """One section of feelings.yaml as name -> description, with the description's line breaks
+        folded into single spaces (they're written as YAML block text) and empty entries dropped.
+        """
         raw = data.get(name) or {}
         return {str(k): " ".join(str(v).split()) for k, v in raw.items() if v}
 
@@ -70,6 +73,9 @@ def load_catalog() -> brain.Catalog:
 
 
 def _parse_time(value: str, fallback: str) -> time:
+    """A time setting ("06:30:00"), or the default if it's missing or unreadable, so a bad option never
+    stops her day from running.
+    """
     try:
         return time.fromisoformat(value)
     except (TypeError, ValueError):
@@ -77,10 +83,12 @@ def _parse_time(value: str, fallback: str) -> time:
 
 
 def _ts(value: datetime | None) -> str | None:
+    """A datetime as text for the store; the store is JSON."""
     return value.isoformat() if value else None
 
 
 def _dt(value: str | None) -> datetime | None:
+    """Reads back what _ts wrote."""
     return dt_util.parse_datetime(value) if value else None
 
 
@@ -88,6 +96,9 @@ class LenaCore:
     """Everything the integration's entities, tools and view share."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, catalog: brain.Catalog) -> None:
+        """Holds her state and settings. Nothing runs until async_start: Home Assistant may still be
+        starting when the entry is set up.
+        """
         self.hass = hass
         self.entry = entry
         self.catalog = catalog
@@ -102,23 +113,31 @@ class LenaCore:
     # ---- Settings ----------------------------------------------------------------------------
 
     def opt(self, key: str) -> Any:
+        """A setting from Configure, or its default when it was never set."""
         return self.entry.options.get(key, brain.DEFAULTS.get(key))
 
     @property
     def people(self) -> list[str]:
+        """The person entities she watches come and go."""
         return list(self.opt(CONF_PEOPLE) or [])
 
     @property
     def worries(self) -> list[str]:
+        """The sensors that worry her when they turn on."""
         return list(self.opt(CONF_WORRIES) or [])
 
     @property
     def weather_entity(self) -> str | None:
+        """The weather entity she notices, if one was chosen."""
         return self.opt(CONF_WEATHER) or None
 
     # ---- Starting and stopping -------------------------------------------------------------
 
     async def async_start(self) -> None:
+        """Loads how she felt and what she remembers from before the restart, then starts her day:
+        morning, bedtime and hourly timers and listeners for people, weather and worries. Saved
+        feelings win over the defaults, so a restart doesn't reset her mood.
+        """
         saved = await self._state_store.async_load() or {}
         f = self.feelings
         f.mood = saved.get("mood", f.mood)
@@ -155,6 +174,7 @@ class LenaCore:
 
     @callback
     def async_stop(self) -> None:
+        """Stops every timer and listener, for unloading or reloading after Configure."""
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
@@ -186,6 +206,9 @@ class LenaCore:
 
     @callback
     def _changed(self) -> None:
+        """Saves her feelings (batched: async_delay_save writes at most once a second) and tells the
+        entities to update.
+        """
         f = self.feelings
         self._state_store.async_delay_save(
             lambda: {
@@ -218,15 +241,20 @@ class LenaCore:
     # ---- Her memory --------------------------------------------------------------------------
 
     def memories(self) -> list[str]:
+        """What she remembers: the open items on her memory list. Ticked-off items are kept in the list
+        but retired from her prompt.
+        """
         return [m["summary"] for m in self.memory if m.get("status") != "completed"]
 
     @callback
     def memory_changed(self) -> None:
+        """Saves the memory list and updates the to-do entity."""
         self._memory_store.async_delay_save(lambda: {"items": self.memory}, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATED)
 
     @callback
     def remember(self, fact: str) -> dict[str, str]:
+        """Adds a fact to her memory and returns the new item."""
         item = {"uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action"}
         self.memory.append(item)
         self.memory_changed()
@@ -336,12 +364,14 @@ class LenaCore:
     # ---- Events ------------------------------------------------------------------------------
 
     def _wake_bed(self) -> tuple[time, time]:
+        """Her wake-up and bedtime from Configure."""
         return (
             _parse_time(self.opt(CONF_MORNING), brain.DEFAULTS["morning"]),
             _parse_time(self.opt(CONF_BEDTIME), brain.DEFAULTS["bedtime"]),
         )
 
     def _weather(self) -> str | None:
+        """The current weather condition, or None without a weather entity."""
         state = self.hass.states.get(self.weather_entity) if self.weather_entity else None
         return state.state if state else None
 
@@ -353,13 +383,18 @@ class LenaCore:
         return 7 <= dt_util.now().hour < 19
 
     def _home_counts(self) -> tuple[int, int]:
+        """How many of her people are home, and how many there are."""
         states = [self.hass.states.get(p) for p in self.people]
         return sum(1 for s in states if s and s.state == STATE_HOME), len(self.people)
 
     def _worries_on(self) -> int:
+        """How many worry sensors are on right now."""
         return sum(1 for w in self.worries if (s := self.hass.states.get(w)) and s.state == "on")
 
     async def _on_morning(self, now: datetime) -> None:
+        """Her morning: she wakes up, and today's special days from the chosen calendars (birthdays and
+        the like) can set her mood and its reason.
+        """
         special: list[str] = []
         calendars = list(self.opt(CONF_CALENDARS) or [])
         if calendars:
@@ -381,10 +416,14 @@ class LenaCore:
 
     @callback
     def _on_bedtime(self, now: datetime) -> None:
+        """Bedtime: she winds down."""
         self.apply(brain.bedtime(self.catalog), "bedtime")
 
     @callback
     def _on_hour(self, now: datetime) -> None:
+        """Every hour: her energy follows her day, her mood's reason is kept true, and a mood that's
+        lasted may drift.
+        """
         wake, bed = self._wake_bed()
         home, total = self._home_counts()
         change = brain.hourly(
@@ -396,6 +435,9 @@ class LenaCore:
 
     @callback
     def _on_person(self, event: Event[EventStateChangedData]) -> None:
+        """Someone's presence changed: a welcome back after a long time away, and the empty-house timer
+        started or stopped.
+        """
         old, new = event.data["old_state"], event.data["new_state"]
         if new is None:
             return
@@ -418,12 +460,16 @@ class LenaCore:
 
     @callback
     def _on_empty(self, now: datetime) -> None:
+        """The house has been empty for the set number of hours."""
         self._timers.pop("empty", None)
         if self._home_counts()[0] == 0:
             self.apply(brain.house_empty(self.feelings, self.catalog, self._rng), "house empty")
 
     @callback
     def _on_weather(self, event: Event[EventStateChangedData]) -> None:
+        """The weather changed. She waits a quarter of an hour before reacting, so a passing shower or
+        a flickering weather service doesn't jerk her mood around.
+        """
         old, new = event.data["old_state"], event.data["new_state"]
         if new is None or old is None or old.state == new.state:
             return
@@ -434,6 +480,7 @@ class LenaCore:
         @callback
         def settled(now: datetime) -> None:
             # Only react if it's still like this a quarter of an hour later.
+            """Fifteen minutes on: react only if the weather is still what it changed to."""
             self._timers.pop("weather", None)
             if self._weather() == after:
                 change = brain.weather_turned(self.feelings, self.catalog, before, after,
@@ -444,6 +491,9 @@ class LenaCore:
 
     @callback
     def _on_worry(self, event: Event[EventStateChangedData]) -> None:
+        """A worry sensor changed. Turning on only counts after two minutes (a door opened and shut
+        again isn't a worry); clearing counts at once.
+        """
         new, entity_id = event.data["new_state"], event.data["entity_id"]
         if new is None:
             return
@@ -453,6 +503,7 @@ class LenaCore:
         if new.state == "on":
             @callback
             def still_on(now: datetime) -> None:
+                """Two minutes on: if the sensor is still on, she's worried and the phones are told."""
                 self._timers.pop(key, None)
                 state = self.hass.states.get(entity_id)
                 if state and state.state == "on":
@@ -470,6 +521,9 @@ class LenaCore:
 
     @callback
     def _schedule_fade(self) -> None:
+        """Sets the timer that ends her current moment, unless it's Nothing. Worried has no end of its
+        own: it waits for the sensors to clear.
+        """
         if cancel := self._timers.pop("fade", None):
             cancel()
         f = self.feelings
@@ -481,6 +535,7 @@ class LenaCore:
 
     @callback
     def _on_fade(self, now: datetime) -> None:
+        """Her moment's time is up: back to Nothing, unless something still worries her."""
         self._timers.pop("fade", None)
         change = brain.fade(self.feelings, self._worries_on())
         if change:
@@ -518,6 +573,10 @@ class LenaCore:
             })
 
     async def _in_her_words(self, moment: str, reason: str) -> str | None:
+        """The alert written by her: the chosen conversation agent is asked to say it in her own words.
+        Returns None (and the plain reason is used) if no agent is set, it fails, or it takes longer
+        than 45 seconds, so an alert is never held up for long.
+        """
         agent = self.opt(CONF_ALERT_AGENT)
         if not agent:
             return None

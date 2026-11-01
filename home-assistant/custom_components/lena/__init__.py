@@ -26,6 +26,10 @@ type LenaConfigEntry = ConfigEntry[LenaCore]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:
+    """Starts Lena for this config entry: loads her feelings from feelings.yaml (in the executor, since
+    it reads a file), starts the core that runs her day, then the entities, the views and the feel
+    service.
+    """
     catalog = await hass.async_add_executor_job(load_catalog)
     core = LenaCore(hass, entry, catalog)
     await core.async_start()
@@ -41,6 +45,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
         hass.data[f"{DOMAIN}_view"] = True
 
     async def feel(call: ServiceCall) -> None:
+        """The lena.feel action: sets one of her moments by hand or from an automation. A name that
+        isn't in feelings.yaml is an error the user sees, rather than a silent no-op.
+        """
         current = hass.data.get(DOMAIN)
         moment = call.data["moment"]
         if current is None or not current.feel(moment, call.data.get("reason", "")):
@@ -58,6 +65,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:
+    """Unloads the entities and forgets the core; the core's own timers and listeners stop through the
+    entry's unload callbacks.
+    """
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         hass.data.pop(DOMAIN, None)

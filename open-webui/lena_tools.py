@@ -1,7 +1,7 @@
 """
 title: Lena (remember, forget, feel)
 author: soullink9
-version: 2.0.0
+version: 0.5.0-beta
 license: GPL-3.0
 description: Lets Lena save to and remove from her Home Assistant memory list, and record how something made her feel, from Open WebUI and the Lena app.
 """
@@ -58,6 +58,9 @@ def _best_match(wanted: str, items: list[str]) -> str | None:
             return item
 
     def words(s: str) -> set[str]:
+        """The words that matter, cut to five letters, the same rule as best_match in the integration's
+        brain.py, so both pick the same memory to forget.
+        """
         cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
         return {w[:5] for w in cleaned if len(w) >= 4}
 
@@ -68,7 +71,11 @@ def _best_match(wanted: str, items: list[str]) -> str | None:
 
 
 class Tools:
+    """Open WebUI turns each public method's signature and docstring into a tool for the model; methods
+    starting with _ are left out.
+    """
     class Valves(BaseModel):
+        """The tool's settings, shown under its gear icon in Open WebUI and kept on the server."""
         ha_url: str = Field(
             default="http://homeassistant.local:8123",
             description="Your Home Assistant address, as Open WebUI's server can reach it.",
@@ -77,9 +84,14 @@ class Tools:
         memory_list: str = Field(default="todo.lena_memory", description="Her memory to-do list.")
 
     def __init__(self):
+        """Open WebUI creates the tool once and keeps it."""
         self.valves = self.Valves()
 
     async def _call(self, domain: str, service: str, data: dict, response: bool = False):
+        """Calls a Home Assistant action over its REST API, optionally asking for the action's response
+        (needed to read the memory list). The request runs in a thread because urllib blocks and
+        Open WebUI's server is async.
+        """
         url = f"{self.valves.ha_url.rstrip('/')}/api/services/{domain}/{service}"
         if response:
             url += "?return_response"

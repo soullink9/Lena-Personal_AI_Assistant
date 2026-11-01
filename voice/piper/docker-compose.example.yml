@@ -22,7 +22,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=America/New_York               # your time zone
+      - TZ=Etc/UTC                        # your time zone, e.g. Europe/London
       # Voice name, in the form language-name-quality.
       # libritts-high is a multi-speaker voice; quality varies by speaker.
       - PIPER_VOICE=en_US-libritts-high

@@ -15,6 +15,10 @@ object Markdown {
     /** Open WebUI stores tool calls and reasoning as <details> blocks inside the answer. */
     private val details = Regex("<details[\\s\\S]*?(</details>|$)")
 
+    /**
+     * Her answer without those blocks: what she actually said, for showing, speaking and sending back as
+     * history.
+     */
     fun clean(text: String): String = details.replace(text, "").trim()
 
     /** Plain text for notifications. */
@@ -26,6 +30,10 @@ object Markdown {
 
     private val inline = Regex("\\*\\*(.+?)\\*\\*|__(.+?)__|`([^`]+)`|\\*([^*\\s][^*]*?)\\*|_([^_\\s][^_]*?)_")
 
+    /**
+     * Draws an answer with headings, bold, italics, inline code and code blocks, enough for short answers
+     * without a full Markdown library.
+     */
     fun render(text: String, codeBackground: androidx.compose.ui.graphics.Color): AnnotatedString = buildAnnotatedString {
         var inCode = false
         val lines = clean(text).lines()
@@ -56,6 +64,7 @@ object Markdown {
         }
     }
 
+    /** Adds one line with its bold, italic and code spans styled. */
     private fun AnnotatedString.Builder.appendInline(line: String, codeBackground: androidx.compose.ui.graphics.Color) {
         var last = 0
         for (m in inline.findAll(line)) {

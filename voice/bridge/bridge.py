@@ -47,6 +47,9 @@ FORMATS = {  # response_format -> (ffmpeg output args, content type)
 
 
 def log(*args):
+    """Prints at once: the bridge runs in Docker, where buffered output would show up in the container
+    log late or not at all.
+    """
     print(*args, flush=True)
 
 
@@ -57,19 +60,27 @@ class Wyoming:
     """One connection to a Wyoming server: JSON header line, then data and payload bytes."""
 
     def __init__(self, address):
+        """Opens a connection to a Wyoming server (Piper or Whisper). One connection per request keeps
+        the bridge stateless.
+        """
         self.sock = socket.create_connection(address, timeout=TIMEOUT)
         self.reader = self.sock.makefile("rb")
 
     def __enter__(self):
+        """Used with `with`, so the connection always closes."""
         return self
 
     def __exit__(self, *_):
+        """Closes the reader and the socket, even if closing the reader fails."""
         try:
             self.reader.close()
         finally:
             self.sock.close()
 
     def send(self, event_type, data=None, payload=b""):
+        """Sends one Wyoming event: a JSON header line, then its data and binary payload, whose lengths
+        the header gives.
+        """
         header = {"type": event_type, "version": "1.5.0"}
         data_bytes = json.dumps(data).encode() if data else b""
         if data_bytes:
@@ -79,12 +90,14 @@ class Wyoming:
         self.sock.sendall(json.dumps(header).encode() + b"\n" + data_bytes + payload)
 
     def _read(self, n):
+        """Reads exactly n bytes, or fails: a short read means the server hung up mid-event."""
         buf = self.reader.read(n)
         if buf is None or len(buf) < n:
             raise ConnectionError("Wyoming server closed the connection")
         return buf
 
     def receive(self):
+        """Reads one Wyoming event and returns (type, data, payload)."""
         line = self.reader.readline()
         if not line:
             raise ConnectionError("Wyoming server closed the connection")
@@ -97,6 +110,7 @@ class Wyoming:
 
 
 def piper_voices():
+    """The voices installed in Piper, from its describe event, for Open WebUI's voice list."""
     with Wyoming(PIPER) as w:
         w.send("describe")
         while True:
@@ -154,6 +168,9 @@ def transcribe(pcm16k, language):
 
 
 def ffmpeg(args, stdin=None):
+    """Runs ffmpeg on bytes in memory and returns its output, raising with ffmpeg's own error if it
+    fails.
+    """
     p = subprocess.run(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", *args],
         input=stdin, capture_output=True, timeout=TIMEOUT,
@@ -164,6 +181,9 @@ def ffmpeg(args, stdin=None):
 
 
 def encode(pcm, rate, width, channels, response_format):
+    """Piper's raw audio in the format the caller asked for (mp3 unless it said otherwise), and its
+    MIME type.
+    """
     if response_format == "pcm":
         return pcm, "audio/pcm"
     out_args, content_type = FORMATS.get(response_format, FORMATS["mp3"])
@@ -174,6 +194,9 @@ def encode(pcm, rate, width, channels, response_format):
 
 def to_pcm16k(audio):
     # A temp file, not a pipe: some formats (m4a, mp4) need to seek.
+    """Any recording (WebM or Ogg from Open WebUI's call mode, WAV from the app, and others) as the 16
+    kHz mono 16-bit audio Whisper wants.
+    """
     with tempfile.NamedTemporaryFile(suffix=".audio") as f:
         f.write(audio)
         f.flush()
@@ -184,21 +207,28 @@ def to_pcm16k(audio):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LenaVoiceBridge/1.0"
+    """The bridge's HTTP API, shaped like OpenAI's audio endpoints so Open WebUI can use it as an
+    "OpenAI" speech engine.
+    """
+    server_version = "LenaVoiceBridge/0.5.0-beta"
 
     def log_message(self, fmt, *args):
+        """Request lines go to the same log, with the caller's address."""
         log("%s %s" % (self.address_string(), fmt % args))
 
     def _path(self):
+        """The request path without its query, with or without the /v1 prefix OpenAI's clients add."""
         path = self.path.split("?", 1)[0].rstrip("/")
         return path[3:] if path.startswith("/v1/") else path
 
     def _authorized(self):
+        """True without an API_KEY, otherwise only with the matching bearer token."""
         if not API_KEY:
             return True
         return self.headers.get("Authorization", "") == f"Bearer {API_KEY}"
 
     def _send(self, status, body, content_type="application/json"):
+        """Sends a response: dicts and lists as JSON, text as UTF-8, bytes as they are."""
         if isinstance(body, (dict, list)):
             body = json.dumps(body).encode()
         elif isinstance(body, str):
@@ -210,6 +240,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _error(self, status, message):
+        """An error in OpenAI's shape, so Open WebUI shows its message."""
         self._send(status, {"error": {"message": message, "type": "bridge_error"}})
 
     def _body(self):
@@ -232,6 +263,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.rfile.read(length) if length else b""
 
     def do_GET(self):
+        """GET: the voice list (and models) Open WebUI asks for when you choose a voice."""
         if not self._authorized():
             return self._error(401, "Invalid API key")
         path = self._path()
@@ -252,6 +284,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(502, str(e))
 
     def do_POST(self):
+        """POST: speech (text to audio) and transcriptions (audio to text)."""
         if not self._authorized():
             return self._error(401, "Invalid API key")
         path = self._path()
@@ -270,6 +303,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(502, str(e))
 
     def _speech(self, body):
+        """Text to speech: Open WebUI's request to Piper over Wyoming, and Piper's audio back in the
+        asked-for format.
+        """
         req = json.loads(body or b"{}")
         text = (req.get("input") or "").strip()
         if not text:
@@ -290,6 +326,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, audio, content_type)
 
     def _transcription(self, body):
+        """Speech to text: the uploaded recording, converted with ffmpeg, to Whisper over Wyoming, and
+        its text back as OpenAI's transcription response.
+        """
         if not WHISPER[0]:
             return self._error(501, "Speech-to-text isn't set up on this bridge (set WHISPER_HOST)")
         content_type = self.headers.get("Content-Type", "")
@@ -322,6 +361,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    """Serves until stopped; each request on its own thread, so a long transcription doesn't hold up
+    speech.
+    """
     log(f"Lena voice bridge on :{PORT}  piper={PIPER[0]}:{PIPER[1]}"
         f"  whisper={'%s:%s' % WHISPER if WHISPER[0] else 'off'}  voice={DEFAULT_VOICE or 'Piper default'}")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

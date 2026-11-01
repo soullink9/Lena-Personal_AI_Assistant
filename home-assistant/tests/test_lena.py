@@ -28,6 +28,9 @@ OPTIONS = {
 
 
 async def setup(hass: HomeAssistant, options=None) -> MockConfigEntry:
+    """Sets Lena up the way a user would, with two people at home, cloudy weather and a leak sensor
+    that's off, and returns the entry.
+    """
     hass.states.async_set("person.alex", "home", {"friendly_name": "Alex"})
     hass.states.async_set("person.sam", "home", {"friendly_name": "Sam"})
     hass.states.async_set("weather.home", "cloudy", {"temperature": 61, "temperature_unit": "°F"})
@@ -47,10 +50,14 @@ def context() -> llm.LLMContext:
 
 
 def data(result):
+    """A tool's result data: Home Assistant returns a ToolResult on newer versions and a plain dict on
+    older ones.
+    """
     return getattr(result, "data", result)
 
 
 async def test_entities(hass: HomeAssistant) -> None:
+    """Her three feelings and her memory appear as entities, with sensible starting states."""
     await setup(hass)
     mood = hass.states.get("select.lena_mood")
     assert mood is not None and mood.state in mood.attributes["options"]
@@ -61,6 +68,7 @@ async def test_entities(hass: HomeAssistant) -> None:
 
 
 async def test_set_by_hand_clears_reason(hass: HomeAssistant) -> None:
+    """Picking a mood by hand clears the old reason, which no longer explains it."""
     await setup(hass)
     core = hass.data[DOMAIN]
     core.feelings.mood_reason = "It's raining."
@@ -71,6 +79,9 @@ async def test_set_by_hand_clears_reason(hass: HomeAssistant) -> None:
 
 
 async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
+    """The LLM API gives her prompt only her current feelings and her memory, and the three tools work
+    end to end.
+    """
     await setup(hass)
     await hass.services.async_call("select", "select_option", {"entity_id": "select.lena_mood", "option": "Grumpy"}, blocking=True)
     api = await llm.async_get_api(hass, "lena", context())
@@ -116,6 +127,7 @@ async def test_merged_with_assist(hass: HomeAssistant) -> None:
 
 
 async def test_feel_service_and_fade(hass: HomeAssistant) -> None:
+    """The feel action sets a moment, and it fades back to Nothing after its time."""
     await setup(hass)
     await hass.services.async_call(DOMAIN, "feel", {"moment": "Amused", "reason": "A good pun."}, blocking=True)
     assert hass.states.get("select.lena_moment").state == "Amused"
@@ -125,6 +137,7 @@ async def test_feel_service_and_fade(hass: HomeAssistant) -> None:
 
 
 async def test_memory_todo_list(hass: HomeAssistant) -> None:
+    """Her memory works as a to-do list: add, tick off (retired from her prompt), remove."""
     await setup(hass)
     await hass.services.async_call("todo", "add_item", {"entity_id": "todo.lena_memory", "item": "Sam is allergic to cats."}, blocking=True)
     found = await hass.services.async_call(
@@ -139,6 +152,9 @@ async def test_memory_todo_list(hass: HomeAssistant) -> None:
 
 
 async def test_worry_and_relief(hass: HomeAssistant) -> None:
+    """A leak worries her only after two minutes, keeps her worried past the usual fade, and relieves
+    her when it clears.
+    """
     await setup(hass)
     hass.states.async_set("binary_sensor.leak", "on", {"friendly_name": "Leak sensor", "device_class": "moisture"})
     await hass.async_block_till_done()
@@ -157,6 +173,7 @@ async def test_worry_and_relief(hass: HomeAssistant) -> None:
 
 
 async def test_arrival_after_a_long_time(hass: HomeAssistant, freezer) -> None:
+    """Someone back after more than a day: a Delighted moment that names them, and a Fond mood."""
     await setup(hass)
     hass.states.async_set("person.alex", "not_home", {"friendly_name": "Alex"})
     await hass.async_block_till_done()
@@ -171,6 +188,7 @@ async def test_arrival_after_a_long_time(hass: HomeAssistant, freezer) -> None:
 
 
 async def test_hourly_drift(hass: HomeAssistant) -> None:
+    """A mood that has lasted long enough drifts on the hour (with the change chance at 100%)."""
     await setup(hass)
     core = hass.data[DOMAIN]
     core.feelings.mood_since = dt_util.now() - timedelta(hours=5)
@@ -193,6 +211,7 @@ async def test_no_sunshine_after_dark(hass: HomeAssistant) -> None:
 
 
 async def test_sunset_is_not_news(hass: HomeAssistant) -> None:
+    """Going from sunny to a clear night at sunset doesn't count as the weather turning."""
     await setup(hass)
     core = hass.data[DOMAIN]
     hass.states.async_set("sun.sun", "above_horizon")
@@ -219,6 +238,9 @@ async def test_sunset_is_not_news(hass: HomeAssistant) -> None:
     ],
 )
 async def test_mood_reason_stays_true(hass: HomeAssistant, sun, weather, reason, expected) -> None:
+    """Each hour her mood's reason is checked: news becomes how things are, and what's no longer true
+    is dropped, while the mood stays.
+    """
     await setup(hass, dict(OPTIONS, mood_change_chance=0))
     core = hass.data[DOMAIN]
     hass.states.async_set("sun.sun", sun)
@@ -234,6 +256,7 @@ async def test_mood_reason_stays_true(hass: HomeAssistant, sun, weather, reason,
 
 
 async def test_context_view(hass: HomeAssistant, hass_client) -> None:
+    """The context view returns her context text and the parts the app reads, weather included."""
     await setup(hass)
     client = await hass_client()
     response = await client.get("/api/lena/context")
@@ -289,6 +312,7 @@ async def test_time_of_day_in_context(hass: HomeAssistant, freezer) -> None:
 
 
 async def test_options_flow(hass: HomeAssistant) -> None:
+    """Configure saves the options it's given."""
     entry = await setup(hass, options={})
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] == "form"
@@ -301,6 +325,7 @@ async def test_options_flow(hass: HomeAssistant) -> None:
 
 
 async def test_config_flow_single(hass: HomeAssistant) -> None:
+    """Lena can only be added once."""
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     assert result["type"] == "form"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], user_input={})
@@ -310,6 +335,7 @@ async def test_config_flow_single(hass: HomeAssistant) -> None:
 
 
 async def _leak(hass: HomeAssistant, state: str) -> None:
+    """Turns the leak sensor on or off and lets two minutes pass, so a worry (or its end) registers."""
     hass.states.async_set("binary_sensor.leak", state, {"friendly_name": "Leak sensor", "device_class": "moisture"})
     await hass.async_block_till_done()
     if state == "on":
@@ -318,6 +344,7 @@ async def _leak(hass: HomeAssistant, state: str) -> None:
 
 
 async def test_alerts_plain(hass: HomeAssistant) -> None:
+    """Without an agent, the phones get the plain reason, then an all-clear."""
     calls = async_mock_service(hass, "notify", "mobile_app_pixel")
     await setup(hass, options=dict(OPTIONS, alert_phones=["notify.mobile_app_pixel"]))
     await _leak(hass, "on")
@@ -332,6 +359,7 @@ async def test_alerts_plain(hass: HomeAssistant) -> None:
 
 
 async def test_alerts_in_her_words_and_no_all_clear(hass: HomeAssistant) -> None:
+    """With an agent, the alert is in her words, and with the all-clear off only the alert is sent."""
     calls = async_mock_service(hass, "notify", "mobile_app_pixel")
     options = dict(OPTIONS, alert_phones=["notify.mobile_app_pixel"], alert_agent="conversation.lena", alert_all_clear=False)
     await setup(hass, options=options)
@@ -350,6 +378,7 @@ async def test_alerts_in_her_words_and_no_all_clear(hass: HomeAssistant) -> None
 
 
 async def test_no_alerts_without_phones(hass: HomeAssistant) -> None:
+    """No phones chosen: no notifications at all."""
     calls = async_mock_service(hass, "notify", "mobile_app_pixel")
     await setup(hass)
     await _leak(hass, "on")
@@ -357,6 +386,7 @@ async def test_no_alerts_without_phones(hass: HomeAssistant) -> None:
 
 
 async def test_media_view(hass: HomeAssistant, hass_client, tmp_path) -> None:
+    """The media view lists a folder and its photos, using a local media folder in place of Immich."""
     from homeassistant.setup import async_setup_component
 
     from custom_components.lena.view import _screen_sized
