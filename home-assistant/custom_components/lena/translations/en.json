@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lena",
+        "description": "Adds Lena's feelings, her memory list and her tools. Afterwards, open Configure to tell her about your house, then tick Lena under Control Home Assistant in your Ollama conversation agent."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Lena is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Lena",
+        "description": "Who she misses, what she notices, her day, and who she tells when something's wrong. Her feelings' descriptions are in feelings.yaml in the integration's folder.",
+        "data": {
+          "people": "People she misses",
+          "weather": "Weather",
+          "special_days": "Special days calendars",
+          "worries": "Things that worry her",
+          "morning": "She wakes up at",
+          "bedtime": "She winds down at",
+          "away_hours": "Missed after being away",
+          "empty_hours": "Lonely after the house is empty for",
+          "weather_chance": "Weather sensitivity",
+          "mood_hold_hours": "A mood lasts at least",
+          "mood_change_chance": "Chance per hour a mood moves on",
+          "moment_minutes": "Reactions fade after",
+          "alert_phones": "Tell these phones when she's worried",
+          "alert_agent": "Write alerts in her words with",
+          "alert_all_clear": "Also tell them when it's sorted"
+        },
+        "data_description": {
+          "people": "Coming home after a while makes her delighted; an empty house makes her restless.",
+          "weather": "Rain, storms, snow and sunshine colour her mood.",
+          "special_days": "Birthdays, anniversaries or holidays: anything on these today puts her in a good mood.",
+          "worries": "Problem sensors she frets about while they're on: leaks, smoke, a door or garage left open.",
+          "mood_change_chance": "Once a mood has lasted long enough.",
+          "moment_minutes": "How long a reaction, like being pleased or exasperated, lasts.",
+          "alert_phones": "Phones with the Home Assistant companion app. Tapping the alert opens the Lena app, listening.",
+          "alert_agent": "Your Lena conversation agent. She writes each alert herself; leave empty to send the plain reason instead.",
+          "alert_all_clear": "A second alert when the sensor clears, replacing the first."
+        }
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "mood": {
+        "name": "Mood"
+      },
+      "energy": {
+        "name": "Energy"
+      },
+      "moment": {
+        "name": "Moment"
+      }
+    },
+    "todo": {
+      "memory": {
+        "name": "Memory"
+      }
+    }
+  },
+  "services": {
+    "feel": {
+      "name": "Feel",
+      "description": "Sets how something just made Lena feel. It fades on its own after a few minutes.",
+      "fields": {
+        "moment": {
+          "name": "Moment",
+          "description": "One of her moments in feelings.yaml, for example Pleased or Exasperated."
+        },
+        "reason": {
+          "name": "Reason",
+          "description": "What happened, in a few words, written to her."
+        }
+      }
+    }
+  }
+}

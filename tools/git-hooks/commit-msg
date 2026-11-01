@@ -1,0 +1,19 @@
+#!/bin/sh
+# Rejects a commit whose subject isn't a Conventional Commit, e.g. "feat: add pinned chats" or
+# "fix(app): keep the chat's name". Turn it on once per clone:
+#     git config core.hooksPath tools/git-hooks
+# Merge and revert commits that git writes itself are let through.
+
+subject=$(head -n 1 "$1")
+types="feat|fix|refactor|docs|test|build|ci|chore|perf|style|revert"
+
+case "$subject" in
+  Merge\ *|Revert\ *) exit 0 ;;
+esac
+
+if ! printf '%s' "$subject" | grep -Eq "^($types)(\([a-z0-9-]+\))?!?: .+"; then
+  echo "Commit subject must be a Conventional Commit: <type>(optional scope): <description>" >&2
+  echo "Types: $types" >&2
+  echo "Got: $subject" >&2
+  exit 1
+fi

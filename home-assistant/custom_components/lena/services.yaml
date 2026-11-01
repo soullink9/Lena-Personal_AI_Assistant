@@ -1,0 +1,11 @@
+feel:
+  fields:
+    moment:
+      required: true
+      example: Pleased
+      selector:
+        text:
+    reason:
+      example: Alex thanked her for sorting the heating.
+      selector:
+        text:

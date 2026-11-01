@@ -1,0 +1,32 @@
+# Android build output
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+
+# The app's signing key: never commit it (it lives in the repository's secrets)
+*.jks
+*.keystore
+*.b64
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+
+# Secrets and local settings
+secrets.yaml
+.env
+*.env
+
+# Data folders created by the example compose files
+ollama-data/
+piper-data/
+
+
+# Python caches
+__pycache__/
+*.pyc

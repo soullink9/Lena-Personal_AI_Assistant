@@ -1,0 +1,22 @@
+# Lena voice bridge: put it on the same Docker network as Open WebUI and your Wyoming containers.
+services:
+  lena-voice:
+    build: .
+    container_name: lena-voice
+    restart: unless-stopped
+    environment:
+      PIPER_HOST: wyoming-piper          # your Piper container's name on the network
+      PIPER_PORT: "10200"
+      PIPER_VOICE: en_US-lessac-medium   # the voice Home Assistant uses (optional)
+      # Optional: also use your Whisper container for speech-to-text.
+      # Leave these out to keep Open WebUI's built-in Whisper.
+      WHISPER_HOST: wyoming-whisper
+      WHISPER_PORT: "10300"
+      WHISPER_LANGUAGE: en
+    networks:
+      - llm
+    # No ports: only containers on the network (Open WebUI) can reach it.
+
+networks:
+  llm:
+    external: true   # the network from ollama/docker-compose.example.yml; change to yours

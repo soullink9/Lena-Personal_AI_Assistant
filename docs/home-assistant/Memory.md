@@ -1,0 +1,27 @@
+# Memory
+
+[← Back to Home Assistant installation](Installation.md)
+
+Lena has one memory, shared everywhere she lives: the **Lena Memory** to-do list (`todo.lena_memory`) that the integration creates. What you tell her in the kitchen she knows on your phone, and the other way round.
+
+| Where | How she reads it | How she saves and forgets |
+|---|---|---|
+| Home Assistant voice | Always in her context, through the Lena choice in your agent | Her `remember_fact` and `forget_fact` tools |
+| Open WebUI and the Lena app | The Lena filter adds it to every chat | The Lena tool's remember and forget |
+| You | The To-do lists panel in Home Assistant, or **Memory & knowledge → Hers** in the app | Edit the list directly |
+
+## How she saves
+
+When someone asks her to remember something, or tells her a lasting fact that clearly matters, she adds one short third-person line, like "Alex likes the office at seventy degrees." She's told not to save passing moods, one-off requests, duplicates or secrets, and to confirm only once it's saved.
+
+Some small models say they saved something without actually doing it. Check the list after your first few tries.
+
+## Forgetting and tidying
+
+- Ask her to forget something. She removes the saved memory that best matches what you said.
+- Or edit the list yourself: delete an item, reword it, or **tick it off** to retire it. She only reads open items.
+- Keep it short. It's added to every request.
+
+## Privacy
+
+Everything on the list is shared with everyone who talks to Lena, in every app, and is sent to your own Ollama server with their messages. Don't keep passwords, door codes or anything similar in it. She's told to refuse to save those, but don't rely on that.
