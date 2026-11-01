@@ -203,6 +203,11 @@ First release.
 
 ## Personality
 
+### 3.3.1 (2026-10-31)
+
+- **No more going in circles.** With thinking on, she could spend minutes redrafting a one-line answer ("They're closed. I'm not sure what you're planning…") until the reply ran out. The Modelfile now tells her to think about facts and actions only, never wordings, and caps a reply at 4096 tokens (`num_predict`) so a loop can't run on. Turn thinking off for her in Open WebUI (Workspace → Models → lena → Advanced Params → Think) too: house questions don't need it.
+- **Finding devices:** she asks Home Assistant for a kind or a room (curtains and blinds are covers) instead of guessing names, tries the other way once if nothing's found, and doesn't search for tools she already has. Rebuild the model: `ollama create lena -f Modelfile`.
+
 ### 3.3.0 (2026-10-31)
 
 - **Time of day she can't get wrong.** The Lena integration (1.3.0) now tells her the part of the day and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun ("8:05 PM: evening, and dark out (the sun rises at 7:16 AM)"), and the Modelfile tells her to go by it for greetings and anything about the time of day. Rebuild the model, copy the new `custom_components/lena` folder over the old one, and restart.

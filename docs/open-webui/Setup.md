@@ -24,6 +24,7 @@ Workspace → Models → `lena` (edit it; if it isn't listed, create a model wit
 - **System Prompt:** leave it **empty**. Her character is built into the model and reaches her anyway; a system prompt here would only add to it, and any personality you write here could contradict hers.
 - **Advanced Params → Function Calling:** **Native**. Gemma 4 supports tool calling natively, and this lets her use the Lena tool and Open WebUI's built-in tools.
 - **Advanced Params → Keep Alive:** `-1`, so the model stays loaded between chats.
+- **Advanced Params → Think (Ollama)** (called **Reasoning** in some versions): **Off** or Default. Gemma 4 only thinks when asked, and thinking adds nothing for house questions but time; with it on she can get stuck redrafting a one-line answer for minutes. Also leave the **Think** button in the chat box off. The Modelfile caps a reply at 4096 tokens as a backstop.
 - Leave **Context Length** unset so the Modelfile's 32768 is used.
 
 ## 3. Get a Home Assistant token
@@ -76,4 +77,5 @@ A change in Home Assistant can take up to a minute (`cache_seconds`) to reach he
 - **No feelings or memory in chats:** check the filter is switched on and ticked on the `lena` model, and that `ha_url` works from inside the Open WebUI container (`curl` it from there). Open WebUI's log shows `Lena filter: Home Assistant request failed` with the reason.
 - **Nothing from Home Assistant at all:** open `<ha_url>/api/lena/context` with the token (for example with `curl -H "Authorization: Bearer <token>"`). A 404 means the Lena integration isn't set up; a 401 means the token is wrong.
 - **She never uses the tool:** check Function Calling is **Native** and the tool is ticked on the model.
+- **"Thought for 3 minutes" and she goes in circles** (the same sentence drafted over and over): thinking is on. Turn off **Think (Ollama)** on the `lena` model and the **Think** button in the chat box, and rebuild her from the current Modelfile, which tells her not to draft replies while thinking and stops a runaway reply at 4096 tokens.
 - More in [Troubleshooting](../home-assistant/Troubleshooting.md).
