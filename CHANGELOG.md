@@ -7,6 +7,10 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.17.1 (2026-10-31)
+
+- **"Not signed in" in the logs is now only that.** Open WebUI answers a request for a chat that no longer exists with the same HTTP 401 as a signed-out one; Lena now reads its message, logs a deleted chat as "not found" (information, not a warning) and treats it as gone. A deleted "Assistant Lena" is forgotten so the next talk starts a fresh one, and the wall display's clock stops asking for it. A real sign-out says so, with Open WebUI's reason and, if it's off, a pointer to Sign in by herself.
+
 ### 2.17.0 (2026-10-31)
 
 **Wall display**

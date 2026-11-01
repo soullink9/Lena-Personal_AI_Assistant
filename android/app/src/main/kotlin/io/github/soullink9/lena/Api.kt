@@ -135,7 +135,18 @@ class Api(server: String, private val context: Context? = null) {
                     throw e
                 }
                 if (code == 401 || code in 300..399) {
-                    Logs.w("Open WebUI", "$method ${path.substringBefore('?')}: not signed in (HTTP $code)")
+                    val where = "$method ${path.substringBefore('?')}"
+                    // Open WebUI answers "that chat doesn't exist" with 401 too; its message tells them apart.
+                    val detail = if (code != 401) "" else runCatching {
+                        JSONObject(String(conn.errorStream?.use { it.readBytes() } ?: ByteArray(0))).optString("detail")
+                    }.getOrDefault("")
+                    if (detail.startsWith("We could not find")) {
+                        Logs.i("Open WebUI", "$where: not found (it was deleted, or isn't yours)")
+                        throw IOException("HTTP 404")
+                    }
+                    val c = context
+                    val hint = if (c != null && !OpenWebUiSignIn.configured(c)) ". Settings → Open WebUI → Sign in by herself can sign in again automatically." else ""
+                    Logs.w("Open WebUI", "$where: not signed in (HTTP $code${detail.ifBlank { null }?.let { ": $it" } ?: ""})$hint")
                     throw AuthException()
                 }
                 if (code == 403) {

@@ -118,8 +118,12 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
         if (locked || !Prefs.ongoing(context)) return@LaunchedEffect
         val api = Api.from(context) ?: return@LaunchedEffect
         while (true) {
-            said = Prefs.assistChat(context)?.let { id -> runCatching { api.latest(id).second }.getOrNull() }
-                ?.lineSequence()?.firstOrNull { it.isNotBlank() }
+            said = Prefs.assistChat(context)?.let { id ->
+                runCatching { api.latest(id).second }
+                    // The chat was deleted: forget it, so talking to her finds or starts "Assistant Lena" again.
+                    .onFailure { if (it.message == "HTTP 404") Prefs.setAssistChat(context, null) }
+                    .getOrNull()
+            }?.lineSequence()?.firstOrNull { it.isNotBlank() }
             delay(300_000)
         }
     }
