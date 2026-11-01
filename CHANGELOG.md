@@ -7,6 +7,11 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.17.3 (2026-10-31)
+
+- **No back button in the wall display's bar.** Use the back gesture (or button): it still goes up out of a subview, or back through what you opened. The menu button stays.
+- **Updates point at Auto Blocker, not Play Protect.** Step 2 now opens Security and privacy, where Samsung's Auto Blocker (which stops installs from outside the store) is switched off, and the reminder after the update says to turn Auto Blocker back on. Samsung doesn't let apps open the Auto Blocker page itself, so it opens the page it's listed on.
+
 ### 2.17.2 (2026-10-31)
 
 - **One bar on Home Assistant's own pages too.** Its header was only hidden on your dashboards; now it's also gone on Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and the other built-in pages that use its standard app bar. A second row of filters, where a page has one, stays.

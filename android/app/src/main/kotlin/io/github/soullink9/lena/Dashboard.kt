@@ -46,7 +46,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.rounded.Menu
@@ -562,7 +561,7 @@ class DashboardActivity : ComponentActivity() {
     }
 
     /**
-     * The one bar across the top: Home Assistant's back and menu, the time and weather, the
+     * The one bar across the top: Home Assistant's menu (back is the back gesture), the time and weather, the
      * dashboard's views, how she feels (tap to talk), and your chats, reload, apps and settings.
      */
     @Composable
@@ -575,7 +574,6 @@ class DashboardActivity : ComponentActivity() {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
-                IconButton(onClick = ::back, enabled = h.subview || canGoBack.value) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
                 IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
                 Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
                     Text(DateFormat.getTimeFormat(this@DashboardActivity).format(clock), style = MaterialTheme.typography.titleLarge)

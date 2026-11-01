@@ -252,35 +252,38 @@ object Updates {
         Logs.i(TAG, "Installing $version")
     }
 
-    /** Remember to remind you to turn Play Protect back on after the update. */
-    fun remindPlayProtect(c: Context, on: Boolean) = p(c).edit().putBoolean("remind_play_protect", on).apply()
+    /** Remember to remind you to turn Auto Blocker back on after the update. */
+    fun remindAutoBlocker(c: Context, on: Boolean) = p(c).edit().putBoolean("remind_auto_blocker", on).apply()
 
-    /** After an update: tidy up, and the Play Protect reminder if you paused it. */
+    /** After an update: tidy up, and the Auto Blocker reminder if you turned it off. */
     fun afterUpdate(c: Context) {
         // Whatever was waiting has just been installed (or replaced by another install): it's not needed now.
         if (p(c).contains("pending_version")) discard(c)
         Logs.i(TAG, "Updated to ${installed(c)}")
-        if (!p(c).getBoolean("remind_play_protect", false)) return
-        remindPlayProtect(c, false)
+        if (!p(c).getBoolean("remind_auto_blocker", false)) return
+        remindAutoBlocker(c, false)
         if (c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("updates", "Updates", NotificationManager.IMPORTANCE_DEFAULT))
-        val open = PendingIntent.getActivity(c, 0, playProtect(), PendingIntent.FLAG_IMMUTABLE)
+        val open = PendingIntent.getActivity(c, 0, autoBlocker(), PendingIntent.FLAG_IMMUTABLE)
         nm.notify(
             7_100,
             Notification.Builder(c, "updates")
                 .setSmallIcon(R.drawable.ic_stat_logo)
                 .setColor(c.getColor(R.color.lena_cyan))
                 .setContentTitle("Lena updated to ${installed(c)}")
-                .setContentText("If you paused Play Protect for the update, turn it back on.")
+                .setContentText("If you turned Auto Blocker off for the update, turn it back on (Security and privacy).")
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build(),
         )
     }
 
-    /** Google Play Protect's settings (where scanning can be paused and turned back on). */
-    fun playProtect(): Intent = Intent("com.google.android.gms.settings.VERIFY_APPS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /**
+     * Where Auto Blocker is switched off and on again: Settings → Security and privacy. Samsung
+     * doesn't give apps a way to open the Auto Blocker page itself, so this opens the page it's on.
+     */
+    fun autoBlocker(): Intent = Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }
 
 /** Android's installer reports back here: it needs you to confirm, or it failed. */
@@ -297,7 +300,7 @@ class UpdateReceiver : BroadcastReceiver() {
                 Logs.e("Updates", "The install didn't go through: $why")
                 val friendly = when (status) {
                     PackageInstaller.STATUS_FAILURE_ABORTED -> "Update cancelled. Tap Install to try again."
-                    PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android blocked the update. Check Play Protect, then tap Install again."
+                    PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android blocked the update. Turn off Auto Blocker (Security and privacy), then tap Install again."
                     PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
                         "That update doesn't fit this Lena (a different signing key?). See Settings → Logs."
                     else -> "The update didn't install. See Settings → Logs."

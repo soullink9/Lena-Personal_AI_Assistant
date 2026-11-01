@@ -438,13 +438,14 @@ class SettingsActivity : ComponentActivity() {
                 ) {
                     startActivity(Intent(AndroidSettings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
                 }
-                Item(Icons.Outlined.Shield, "2. If Play Protect stops it",
-                    "Pause scanning in Play Protect, then come back here and install. Lena reminds you to turn it back on afterwards.") {
-                    Updates.remindPlayProtect(this@SettingsActivity, true)
+                Item(Icons.Outlined.Shield, "2. If Auto Blocker stops it",
+                    "Opens Security and privacy: turn Auto Blocker off, then come back here and install. Lena reminds you to turn it back on afterwards.") {
+                    Updates.remindAutoBlocker(this@SettingsActivity, true)
                     try {
-                        startActivity(Updates.playProtect())
+                        startActivity(Updates.autoBlocker())
+                        Toast.makeText(this@SettingsActivity, "Auto Blocker is under Security and privacy", Toast.LENGTH_LONG).show()
                     } catch (_: ActivityNotFoundException) {
-                        Toast.makeText(this@SettingsActivity, "Open the Play Store → your picture → Play Protect", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@SettingsActivity, "Open Settings → Security and privacy → Auto Blocker", Toast.LENGTH_LONG).show()
                     }
                 }
                 Item(Icons.Outlined.InstallMobile, "3. Install $version", "Android asks you to confirm. The download is deleted once the update is in.") {
@@ -1090,7 +1091,7 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.Add, "Add a dashboard", null) { set(s.copy(dashboards = s.dashboards + Dashboard("", ""))) }
         }
-        Footnote("Home Assistant's own header is replaced by Lena's bar: back and Home Assistant's menu, the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons for your chats, reload, your other apps and settings. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
+        Footnote("Home Assistant's own header is replaced by Lena's bar: Home Assistant's menu (back is the back gesture), the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons for your chats, reload, your other apps and settings. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
     }
 
     /** What it shows when no one's using it, and what wakes it up. Also the screen saver. */

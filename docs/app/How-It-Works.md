@@ -122,8 +122,7 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 
 | From left to right | What it does |
 |---|---|
-| **Back** | Home Assistant's back: up out of a subview, or back through what you opened. |
-| **Menu** | Home Assistant's sidebar, with all its dashboards, settings and the rest. |
+| **Menu** | Home Assistant's sidebar, with all its dashboards, settings and the rest. Back is your device's back gesture (or button): up out of a subview, or back through what you opened. |
 | **Time, date and weather** | |
 | **The dashboard's views** | Its view tabs, as chips (only when it has more than one). |
 | **Dashboards** | Switches between the dashboards you added here (only when there's more than one). |
