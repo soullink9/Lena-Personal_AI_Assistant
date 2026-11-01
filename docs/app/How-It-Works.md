@@ -217,6 +217,7 @@ Settings → Scheduled prompts lists them by **name**, each with when it runs an
 |---|---|
 | **Name** | What it's called in the list and on its notification, such as "Morning briefing". |
 | **What she's asked** | The prompt. |
+| **Show the prompt in the chat** | Off (the default): the chat shows just the prompt's name ("Morning briefing") and her answer, and the prompt itself goes to her with that one request, unsaved. On: the chat shows the whole prompt, like any question. |
 | **Time** and **Repeats** | Every day, weekdays, weekends, on the days you pick, every few hours (1 to 12, from the time until midnight), once a month (on a day you pick; the 29th to 31st mean the month's last day in shorter months) or once (on a date). The next run is shown under **On**. |
 | **Chat** | Optional. Every run goes into the chat with this name, made the first time; give several prompts the same chat to keep them in one history, such as a morning and an evening briefing in "Daily briefings". Empty: each run is a chat of its own. |
 | **Run it now** | Asks her straight away, to try it out. |

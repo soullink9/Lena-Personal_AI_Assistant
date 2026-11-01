@@ -101,6 +101,8 @@ data class Schedule(
     val dayOfMonth: Int = 1,
     /** For [Repeat.ONCE]: the date, as days since 1970-01-01. */
     val date: Long = 0,
+    /** The chat shows the prompt itself; otherwise just its [title], with the prompt sent to her quietly. */
+    val showPrompt: Boolean = false,
 ) {
     /** What it's called in Settings: its name, or the start of its prompt. */
     val title: String get() = name.trim().ifBlank { prompt.lineSequence().firstOrNull()?.take(40)?.ifBlank { null } ?: "Scheduled prompt" }
@@ -236,6 +238,7 @@ object Prefs {
                 everyHours = o.optInt("every_hours", 3).coerceIn(1, 12),
                 dayOfMonth = o.optInt("day_of_month", 1).coerceIn(1, 31),
                 date = o.optLong("date", 0),
+                showPrompt = o.optBoolean("show_prompt", false),
             )
         }
     }
@@ -281,6 +284,7 @@ object Prefs {
                     .put("prompt", it.prompt).put("enabled", it.enabled).put("chat", it.chat.trim())
                     .put("repeat", it.repeat.name).put("days", JSONArray(it.days.sorted()))
                     .put("every_hours", it.everyHours).put("day_of_month", it.dayOfMonth).put("date", it.date)
+                    .put("show_prompt", it.showPrompt)
             )
         }
         p(c).edit()

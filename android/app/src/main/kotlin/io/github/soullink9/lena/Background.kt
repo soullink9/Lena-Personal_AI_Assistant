@@ -150,10 +150,15 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             // prompts can share one history; otherwise each run is a chat of its own.
             val chatName = schedule.chat.trim()
             val existing = if (chatName.isEmpty()) null else api.chatTitled(chatName)?.id
+            // Unless you chose to show it, the chat shows the prompt's name and her answer; the prompt
+            // itself goes to her with this request only.
+            val quiet = !schedule.showPrompt
             val started = api.ask(
-                schedule.prompt, model, chatId = existing,
-                newTitle = chatName.ifEmpty { null },
+                if (quiet) title else schedule.prompt, model, chatId = existing,
+                newTitle = chatName.ifEmpty { if (quiet) title else null },
                 contextTokens = Prefs.contextTokens(c),
+                instruction = if (quiet) "This is \u201C$title\u201D, one of the prompts you run on a schedule; no one typed it just now. " +
+                    "Your reply is what this asks for, as if you'd been asked directly: ${schedule.prompt}" else null,
             )
             var last = Reply("", false)
             api.follow(started.chatId, started.messageId).collect { last = it }

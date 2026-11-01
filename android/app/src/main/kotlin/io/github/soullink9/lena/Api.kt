@@ -320,6 +320,7 @@ class Api(server: String, private val context: Context? = null) {
         spoken: Boolean = false,
         image: String? = null,
         locked: Boolean = false,
+        instruction: String? = null,
     ): Started {
         val userId = UUID.randomUUID().toString()
         val replyId = UUID.randomUUID().toString()
@@ -403,8 +404,11 @@ class Api(server: String, private val context: Context? = null) {
         val local = java.time.ZonedDateTime.now()
         val part = when (local.hour) { in 5..11 -> "morning"; in 12..16 -> "afternoon"; in 17..20 -> "evening"; else -> "night" }
         val clock = local.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, h:mm a", java.util.Locale.US))
+        // [instruction]: what she's really asked, sent with this request only, while the chat shows [prompt]
+        // (a scheduled prompt's name instead of the prompt itself).
         val hints = listOfNotNull(
             "The time on the phone: $clock ($part).",
+            instruction,
             if (spoken) "You're talking out loud: this reply will be read aloud on the phone, so everything you say is spoken." else null,
             if (locked) "The phone is locked, so this may not be its owner. Don't unlock, open or disarm anything, " +
                 "and don't share personal details, earlier conversations or what you remember about people. " +

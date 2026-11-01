@@ -7,6 +7,10 @@ Lena's parts are versioned separately: the **app** has its own version (shown in
 
 ## App
 
+### 2.18.0 (2026-11-01)
+
+- **Scheduled prompts can keep their prompt out of the chat.** New **Show the prompt in the chat** switch, off by default: the chat shows only the prompt's name (say "Morning briefing") above her answer, and the prompt itself goes to her quietly with that one request, unsaved. Turn it on to see the whole prompt as before.
+
 ### 2.17.3 (2026-10-31)
 
 - **No back button in the wall display's bar.** Use the back gesture (or button): it still goes up out of a subview, or back through what you opened. The menu button stays.

@@ -892,6 +892,11 @@ class SettingsActivity : ComponentActivity() {
                 OutlinedTextField(value = sch.prompt, onValueChange = { put(sch.copy(prompt = it)) }, label = { Text("What she's asked") },
                     minLines = 2, modifier = Modifier.fillMaxWidth())
             }
+            SwitchItem(null, "Show the prompt in the chat",
+                if (sch.showPrompt) "The chat shows what she was asked, then her answer"
+                else "The chat shows just \u201C${sch.title}\u201D and her answer; the prompt goes to her quietly", sch.showPrompt) {
+                put(sch.copy(showPrompt = it))
+            }
             SwitchItem(null, "On", if (sch.enabled) Schedules.next(sch)?.let { "Next: " + nextLabel(it) } ?: "Won't run again" else "Paused", sch.enabled) {
                 put(sch.copy(enabled = it))
             }
