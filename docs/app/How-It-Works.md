@@ -130,7 +130,7 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 | **Lena** | Her mood and why. Tap to talk to her. |
 | **Chats, Reload, Apps, Settings** | Your chats, reload the dashboard, the tablet's other apps, and Lena's settings. |
 
-The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
+The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
 **Your chats, then back.** Open your chats from the bar and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up, during a voice call, and while she's still answering. On a tablet where the wall display is the home screen, this applies however your chats were opened.
 

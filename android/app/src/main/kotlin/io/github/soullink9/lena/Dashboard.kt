@@ -121,6 +121,16 @@ class DashboardActivity : ComponentActivity() {
             "div:not(.edit-mode)>.header{display:none!important}" +
                 "div:not(.edit-mode)>hui-view-container{padding-top:var(--safe-area-inset-top,0px)!important}"
 
+        /**
+         * The same for Home Assistant's other pages (Calendar, To-do, Map, Logbook, History, Media
+         * and the like), which use its standard app bar: its row goes; a second row of filters,
+         * where a page has one, stays.
+         */
+        private const val BAR_CSS =
+            ".top-app-bar .row{display:none!important}" +
+                ".top-app-bar-fixed-adjust{padding-top:calc(var(--sub-row-height,0px) + var(--safe-area-inset-top,0px))!important}" +
+                ".shadow-container{display:none!important}"
+
         private val HEADER_SCRIPT = """
             (function () {
               if (window.__lena) return; window.__lena = true;
@@ -130,21 +140,34 @@ class DashboardActivity : ComponentActivity() {
                 var ha = document.querySelector('home-assistant');
                 return sr(ha) && ha.shadowRoot.querySelector('home-assistant-main');
               };
-              window.lenaRoot = function () {
+              // The page showing now: dashboards, Overview and Energy draw their header in hui-root;
+              // the other built-in pages in an app bar.
+              window.lenaPanel = function () {
                 var main = window.lenaMain();
-                var panel = sr(main) && main.shadowRoot.querySelector('ha-panel-lovelace');
+                var res = sr(main) && main.shadowRoot.querySelector('partial-panel-resolver');
+                if (!res) return null;
+                var shown = [].slice.call(res.children).filter(function (k) { return k.getClientRects().length > 0; });
+                return shown[shown.length - 1] || res.lastElementChild;
+              };
+              window.lenaRoot = function () {
+                var panel = window.lenaPanel();
                 return sr(panel) && panel.shadowRoot.querySelector('hui-root');
+              };
+              var style = function (host, id, css) {
+                if (sr(host) && !host.shadowRoot.getElementById(id)) {
+                  var st = document.createElement('style'); st.id = id; st.textContent = css; host.shadowRoot.appendChild(st);
+                }
               };
               var last = '';
               setInterval(function () {
                 var state = {found: false};
                 try {
+                  var panel = window.lenaPanel();
+                  var bars = sr(panel) ? panel.shadowRoot.querySelectorAll('ha-top-app-bar-fixed, ha-two-pane-top-app-bar-fixed') : [];
+                  for (var b = 0; b < bars.length; b++) style(bars[b], 'lena-bar', '$BAR_CSS');
                   var r = window.lenaRoot();
                   if (r && r.shadowRoot) {
-                    if (!r.shadowRoot.getElementById('lena-header')) {
-                      var st = document.createElement('style'); st.id = 'lena-header'; st.textContent = '$HEADER_CSS';
-                      r.shadowRoot.appendChild(st);
-                    }
+                    style(r, 'lena-header', '$HEADER_CSS');
                     var cfg = (r.lovelace && r.lovelace.config) || {};
                     var all = (cfg.views || []).map(function (v, i) {
                       return {i: i, title: v.title || '', path: String(v.path || i), sub: !!v.subview, hidden: v.visible === false};
