@@ -152,13 +152,18 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_WALL = "from_wall"
         private const val PINNED = "Pinned"
 
-        /** Hides Open WebUI's own header and sidebar; the drawer and top bar replace them. */
+        /**
+         * Hides Open WebUI's own header and sidebar; the drawer and top bar replace them. Top frame only:
+         * Android adds the script to every frame on your server's address, which (with Open WebUI's
+         * "allow same origin" setting for iframes on) includes artifacts and previews, whose own
+         * navigation or sidebar must not disappear.
+         */
         private const val HIDE_CSS =
             "nav.drag-region{display:none!important}" +
                 "div[role=\"navigation\"][data-state]{display:none!important}" +
                 "#sidebar{display:none!important}"
         private const val ADD_STYLE =
-            "(function(){if(document.getElementById('lena-shell'))return;" +
+            "(function(){if(window.top!==window||document.getElementById('lena-shell'))return;" +
                 "var s=document.createElement('style');s.id='lena-shell';s.textContent='$HIDE_CSS';" +
                 "(document.head||document.documentElement).appendChild(s);})();"
         private const val REMOVE_STYLE =

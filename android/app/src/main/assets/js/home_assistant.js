@@ -5,6 +5,12 @@
  * Assistant's address. It talks to the app through `lenaBridge`, a message channel the app
  * opens for that address alone, with messages of the form {kind, payload}.
  *
+ * Android adds it to every frame on that address, and other apps can be served from it too:
+ * add-on ingress and the Ingress Proxy integration put apps like Music Assistant or Zigbee2MQTT
+ * there, in frames inside Home Assistant or, after a "new window" link, as the whole page. Those
+ * get nothing of Lena's: the script stops in any frame, and on any page that isn't Home
+ * Assistant's frontend. (The app checks the same before answering.)
+ *
  * It does three things:
  *
  *  1. Signs the page in. Opened with `?external_auth=1`, Home Assistant's frontend asks
@@ -25,6 +31,14 @@
  * header again.
  */
 (function () {
+  // Paths that aren't Home Assistant's frontend: apps and views under /api/, your www files, HACS's
+  // files, the frontend's static files. Keep in step with NOT_FRONTEND in Dashboard.kt.
+  var NOT_FRONTEND = ['/api/', '/local/', '/hacsfiles/', '/static/'];
+
+  if (window.top !== window) return; // proxied apps and iframe cards get nothing of Lena's
+  for (var i = 0; i < NOT_FRONTEND.length; i++) {
+    if (location.pathname.indexOf(NOT_FRONTEND[i]) === 0) return; // another app opened as the whole page
+  }
   if (window.lena) return; // already added to this page
 
   // Hides a dashboard's header (Overview and Energy are dashboards too) and the space it took.

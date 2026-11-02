@@ -20,7 +20,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
-| `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page: sign-in bridge, hiding its header, reporting its views. |
+| `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |

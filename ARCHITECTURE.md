@@ -157,7 +157,7 @@ sequenceDiagram
 ## Trust boundaries
 
 - The app talks only to the addresses you entered (Open WebUI, optional sign-in pages, optional Home Assistant) over HTTPS, plus GitHub's API when you check for updates. No analytics.
-- Inside the app's web views, only those origins load; other links go to your browser, and anything else (`intent:`, `file:`, `javascript:`) is blocked. Script bridges exist only for their own origin and the top frame.
+- Inside the app's web views, only those origins load; other links go to your browser, and anything else (`intent:`, `file:`, `javascript:`) is blocked. Script bridges exist only for their own origin and answer only the top frame; Lena's page scripts stop in frames, and on the wall display also on pages that aren't Home Assistant's frontend (apps proxied under `/api/`).
 - Home Assistant's long-lived token and the Open WebUI filter's token are the main credentials; use a non-admin Home Assistant user for them.
 - Her memory is added to prompts and shared with everyone who talks to her, so it must never hold secrets.
 

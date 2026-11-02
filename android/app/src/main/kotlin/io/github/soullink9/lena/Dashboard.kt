@@ -111,6 +111,20 @@ class DashboardActivity : ComponentActivity() {
         /** Go straight to the screen saver (coming back from your chats after a while). */
         const val EXTRA_IDLE = "idle"
 
+        /**
+         * Paths on Home Assistant's address that aren't its frontend: other apps served through it
+         * (add-on ingress, the Ingress Proxy integration and other integrations' views, all under
+         * /api/), your own files in www (/local/), HACS's files and the frontend's static files.
+         * They share Home Assistant's address, so they'd otherwise get Lena's script and bridge too.
+         * Keep in step with NOT_FRONTEND in assets/js/home_assistant.js.
+         */
+        private val NOT_FRONTEND = listOf("/api/", "/local/", "/hacsfiles/", "/static/")
+
+        /** Whether an address on Home Assistant's origin is its own frontend (a dashboard, settings, a panel). */
+        fun isFrontend(url: String?): Boolean {
+            val path = url?.let { Uri.parse(it).path } ?: return false
+            return NOT_FRONTEND.none { path.startsWith(it) }
+        }
     }
 
     /** One of the dashboard's views, as a tab in Lena's bar. */
@@ -233,10 +247,12 @@ class DashboardActivity : ComponentActivity() {
         webChromeClient = object : android.webkit.WebChromeClient() {
             /**
              * Home Assistant's own script errors go in Lena's log, which helps when a frontend update
-             * breaks the header hiding.
+             * breaks the header hiding. Errors from apps served through Home Assistant (their scripts
+             * load from under /api/) are theirs, not Lena's business, and stay out.
              */
             override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
-                if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
+                val fromFrontend = m.sourceId().isNullOrBlank() || isFrontend(m.sourceId())
+                if (fromFrontend && m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
                     Logs.w("Dashboard", "Home Assistant page: ${m.message()}")
                 }
                 return true
@@ -248,8 +264,13 @@ class DashboardActivity : ComponentActivity() {
     /**
      * Home Assistant's frontend asks `window.externalApp` for its token when the page is opened
      * with `?external_auth=1`, the way the companion app signs in. Lena answers with the token from
-     * its settings. The bridge exists only for your Home Assistant's address, in the top frame,
-     * so iframe cards from other sites can't use it.
+     * its settings.
+     *
+     * Android adds the bridge to every frame on Home Assistant's address, and other apps can live
+     * there too (add-on ingress and the Ingress Proxy integration serve apps from it, in frames or,
+     * after a "new window" link, as the whole page). So a message is answered only when it comes
+     * from the top frame, on that address, while the top frame shows Home Assistant's own frontend
+     * (isFrontend). The page script makes the same checks before it adds anything.
      */
     private fun bridge(view: WebView) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) ||
@@ -258,6 +279,10 @@ class DashboardActivity : ComponentActivity() {
         val origins = setOf(origin())
         WebViewCompat.addWebMessageListener(view, "lenaBridge", origins) { v, message, source, isMainFrame, _ ->
             if (!isMainFrame || source.toString().trimEnd('/') != origin()) return@addWebMessageListener
+            if (!isFrontend(v.url)) {
+                Logs.w("Dashboard", "Ignored a request from a page that isn't Home Assistant's frontend (${v.url?.let { Uri.parse(it).path }})")
+                return@addWebMessageListener
+            }
             val m = runCatching { JSONObject(message.data ?: "") }.getOrNull() ?: return@addWebMessageListener
             when (m.optString("kind")) {
                 "auth" -> {
@@ -297,7 +322,8 @@ class DashboardActivity : ComponentActivity() {
             }
         }
         // Lena's side of the page (assets/js/home_assistant.js): signing in, hiding Home Assistant's
-        // header, reporting the views, and window.lena for the calls below. Only for this address.
+        // header, reporting the views, and window.lena for the calls below. Android runs it in every
+        // frame on this address; the script itself stops in frames and on pages that aren't the frontend.
         val script = assets.open("js/home_assistant.js").bufferedReader().use { it.readText() }
         WebViewCompat.addDocumentStartJavaScript(view, script, origins)
     }

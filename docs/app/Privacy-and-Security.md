@@ -31,7 +31,7 @@ If you add your Home Assistant under **Settings → Home Assistant**, Lena uses 
 
 ## The wall display
 
-The wall display shows your Home Assistant's own pages in a web view and signs them in with your saved token, handing it over only when Home Assistant's page asks (the way the companion app does), only on your Home Assistant's address, and only to the top frame, never to iframe or camera cards from elsewhere. The token is never put in an address or written into the page. Because the dashboard is your real Home Assistant, anyone at the tablet can do whatever that token's user can; for a shared tablet, use a token from a non-admin Home Assistant user.
+The wall display shows your Home Assistant's own pages in a web view and signs them in with your saved token, handing it over only when Home Assistant's page asks (the way the companion app does), only on your Home Assistant's address, only to the top frame, and only while that frame shows Home Assistant's own frontend. Iframe and camera cards never get it, and neither do other apps served from your Home Assistant's address (add-on ingress or the Ingress Proxy integration, under `/api/`), whether they're in a frame or opened as the whole page; Lena's page script isn't added to them at all. The token is never put in an address or written into the page. Because the dashboard is your real Home Assistant, anyone at the tablet can do whatever that token's user can; for a shared tablet, use a token from a non-admin Home Assistant user.
 
 ## The photo slideshow
 
@@ -94,7 +94,7 @@ When you talk to Lena in the sheet:
 - **Your server** records until you stop talking and sends the recording to your Open WebUI's speech-to-text.
 - Spoken replies are made by your Open WebUI's text-to-speech (the reply text goes to your server, which already wrote it), or by the phone's own voice if you choose.
 
-The sheet only listens while it shows "Listening…". The wake word (off unless you turn it on) listens the whole time the wall display or the screen saver is showing, but on the device only: the sound goes through two small models a few times a second (the wake word and a voice check) and is thrown away, and nothing is recorded or sent until it hears her name and hands over to the sheet. In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Lena never asks for the camera, so requests for video are refused.
+The sheet only listens while it shows "Listening…". The wake word (off unless you turn it on) listens the whole time the wall display or the screen saver is showing, but on the device only: the sound goes through two small models a few times a second (the wake word and a voice check) and is thrown away, and nothing is recorded or sent until it hears her name and hands over to the sheet. In the main app, only your Open WebUI address can use the microphone (never your sign-in page), and only after you've granted Lena the permission. Android can't tell the app which frame is asking, so if you turn on Open WebUI's "allow same origin" setting for iframes (off by default), artifacts and previews count as your address too; that setting also gives them your Open WebUI session, so leave it off unless you trust what they show. Lena never asks for the camera, so requests for video are refused.
 
 Android blocks apps from listening while they're in the background, and shows its privacy indicator whenever the microphone is in use.
 
