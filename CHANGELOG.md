@@ -9,6 +9,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 - **Wall display:** Lena's page script and sign-in bridge now stay out of everything on Home Assistant's address that isn't Home Assistant's own frontend in the top frame. Apps proxied through Home Assistant (add-on ingress or the Ingress Proxy integration, such as Music Assistant or Zigbee2MQTT) and iframe cards no longer get Lena's sign-in hooks, and an app opened as the whole page through a "new window" link can't ask the app for the Home Assistant token. Their script errors also stay out of Lena's log.
 - **Main screen:** the style that hides Open WebUI's header now applies to the top frame only, so artifacts and previews shown with Open WebUI's "allow same origin" setting keep their own navigation.
 
+### Releases
+
+- Releases are titled with the plain version number, for example **v0.5.2**.
+
 ## [0.5.1-beta] - 2026-11-01
 
 ### Android app

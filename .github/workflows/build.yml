@@ -120,7 +120,7 @@ jobs:
             found { print }
           ' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
-          # "0.5.0-beta" is titled "V0.5.0 Beta"; other versions as they are.
-          title="Lena $(echo "${VERSION#v}" | sed -E 's/^([0-9.]+)-beta$/V\1 Beta/')"
+          # The title is the plain version number: "v0.5.2-beta" is titled "v0.5.2".
+          title="${VERSION%%-*}"
           gh release create "$VERSION" apk/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$title" --notes-file notes.md
