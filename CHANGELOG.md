@@ -2,6 +2,14 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.5] - 2026-11-02
+
+### Android app (wall display)
+
+- **Apps and Settings moved to Home Assistant's menu:** they're now rows at the bottom of Home Assistant's sidebar (**Apps** and **Lena settings**), in its own style, so Lena's bar has more room. If a Home Assistant update ever stops them being added, they come back to the bar by themselves.
+- **Calendar, To-do and Activity fit again:** their header was hidden but the page stayed below an empty gap. The page now moves up into the space, as on the other dashboards (newer Home Assistant frontends place the page differently from older ones; both work).
+- **Apps through the Ingress Proxy** (Music Assistant and the like) no longer show the proxy's own toolbar under Lena's bar.
+
 ## [0.6.4] - 2026-11-02
 
 ### Android app

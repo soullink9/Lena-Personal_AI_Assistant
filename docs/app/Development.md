@@ -21,7 +21,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
 | `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
-| `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header, reporting its views. |
+| `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header (and the Ingress Proxy integration's toolbar), Lena's Apps and Settings at the bottom of its menu, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |

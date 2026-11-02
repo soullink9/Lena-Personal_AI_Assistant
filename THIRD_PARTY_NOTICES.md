@@ -12,7 +12,7 @@ Lena's own code is licensed under the [GNU General Public License v3.0](LICENSE)
 | "Hey Jarvis" wake word model and openWakeWord's feature models | `android/app/src/main/assets/wakeword/hey_jarvis_v0.1.tflite`, `melspectrogram.tflite`, `embedding_model.tflite` | [dscripka/openWakeWord](https://github.com/dscripka/openWakeWord) v0.5.1 | Code Apache 2.0; the Hey Jarvis model **CC BY-NC-SA 4.0** (non-commercial) |
 | TensorFlow Lite Micro audio front end | Ported in `android/app/src/main/java/.../MicroFrontend.java`; original C in `tools/frontend_check/vendor/` | [tensorflow/tflite-micro](https://github.com/tensorflow/tflite-micro) | Apache 2.0 (also shipped in the app as `assets/wakeword/licenses/tflite-micro-LICENSE.txt`) |
 | KISS FFT (fixed point) | Ported in `MicroFrontend.java`; original C in `tools/frontend_check/vendor/` | [mborgerding/kissfft](https://github.com/mborgerding/kissfft) | BSD (shipped in the app as `assets/wakeword/licenses/kissfft-LICENSE.txt`) |
-| Material Icons glyphs | `android/app/src/main/res/drawable/ic_glyph_*`, `ic_shortcut_*` | [google/material-design-icons](https://github.com/google/material-design-icons) | Apache 2.0 |
+| Material Icons glyphs | `android/app/src/main/res/drawable/ic_glyph_*`, `ic_shortcut_*`, and the Apps and Settings icons in `android/app/src/main/assets/js/home_assistant.js` | [google/material-design-icons](https://github.com/google/material-design-icons) | Apache 2.0 |
 
 ## Used by the app at build time (downloaded by Gradle, not stored here)
 

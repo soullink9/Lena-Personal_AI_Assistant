@@ -141,7 +141,19 @@ class DashboardActivity : ComponentActivity() {
     private data class View(val index: Int, val title: String, val path: String)
 
     /** What Home Assistant's header would have shown. */
-    private data class Header(val views: List<View> = emptyList(), val current: Int = 0, val subview: Boolean = false)
+    /**
+     * What Home Assistant's header would have shown, and whether Lena's Apps and Settings made it into
+     * Home Assistant's menu (menuItems); until they have, her bar keeps its own buttons for them.
+     */
+    private data class Header(
+        val views: List<View> = emptyList(),
+        val current: Int = 0,
+        val subview: Boolean = false,
+        val menuItems: Boolean = false,
+    )
+
+    /** Whether the list of the device's other apps is showing (from Apps in the bar or Home Assistant's menu). */
+    private val showApps = mutableStateOf(false)
 
     private val header = mutableStateOf(Header())
     private val canGoBack = mutableStateOf(false)
@@ -334,8 +346,12 @@ class DashboardActivity : ComponentActivity() {
                         },
                         current = h.optInt("current"),
                         subview = h.optBoolean("subview"),
+                        menuItems = h.optBoolean("menuItems"),
                     )
                 }
+                // Lena's rows at the bottom of Home Assistant's menu.
+                "apps" -> { showApps.value = true }
+                "settings" -> { startActivity(Intent(this, SettingsActivity::class.java)) }
                 "revoke" -> {
                     val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthRevokeToken" }
                     if (callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) v.evaluateJavascript("window.$callback(true);", null)
@@ -522,7 +538,7 @@ class DashboardActivity : ComponentActivity() {
         val dashboards = remember { Prefs.dashboards(this) }
         var now by remember { mutableStateOf(HouseNow(null, null)) }
         var clock by remember { mutableStateOf(Date()) }
-        var apps by remember { mutableStateOf(false) }
+        var apps by showApps
         val f = now.feelings
         val worried = f?.moment == "Worried"
 
@@ -664,17 +680,21 @@ class DashboardActivity : ComponentActivity() {
                     Icon(Icons.Rounded.Mic, "Talk to Lena", tint = MaterialTheme.colorScheme.primary)
                 }
                 val openSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }
-                if (narrow) Box {
-                    IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
-                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                        DropdownMenuItem(text = { Text("Apps") }, leadingIcon = { Icon(Icons.Outlined.Apps, null) },
-                            onClick = { more = false; onApps() })
-                        DropdownMenuItem(text = { Text("Settings") }, leadingIcon = { Icon(Icons.Outlined.Settings, null) },
-                            onClick = { more = false; openSettings() })
+                // Apps and Settings live at the bottom of Home Assistant's menu once the page script has put
+                // them there; until then (or if a frontend update stops it), they stay here.
+                if (!h.menuItems) {
+                    if (narrow) Box {
+                        IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                        DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                            DropdownMenuItem(text = { Text("Apps") }, leadingIcon = { Icon(Icons.Outlined.Apps, null) },
+                                onClick = { more = false; onApps() })
+                            DropdownMenuItem(text = { Text("Settings") }, leadingIcon = { Icon(Icons.Outlined.Settings, null) },
+                                onClick = { more = false; openSettings() })
+                        }
+                    } else {
+                        FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
+                        FilledTonalIconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings") }
                     }
-                } else {
-                    FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
-                    FilledTonalIconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings") }
                 }
             }
         }

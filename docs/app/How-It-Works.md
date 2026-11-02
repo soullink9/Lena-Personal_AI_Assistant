@@ -79,15 +79,15 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 
 | From left to right | What it does |
 |---|---|
-| **Menu** | Home Assistant's sidebar, with all its dashboards, settings and the rest. Back is your device's back gesture (or button): up out of a subview, or back through what you opened. |
+| **Menu** | Home Assistant's sidebar, with all its dashboards, settings and the rest, and at its bottom Lena's own **Apps** (the tablet's other apps) and **Lena settings**. Back is your device's back gesture (or button): up out of a subview, or back through what you opened. |
 | **Chat \| Home** | The same switch as on the main screen: **Chat** opens your chats. |
 | **Time, date and weather** | |
 | **The dashboard's views** | Its view tabs, as chips (only when it has more than one). |
 | **Dashboards** | Switches between the dashboards you added here (only when there's more than one). |
 | **Lena** | Her mood and why. Tap to talk to her. |
-| **Apps, Settings** | The tablet's other apps, and Lena's settings. On a narrow screen they're in a **⋮** menu, and the time and her mood's words step aside to leave the views room. To reload the dashboard, use Settings → **Refresh all connections**. |
+| **Apps, Settings** | Only if they couldn't be added to Home Assistant's menu (after a Home Assistant update, say): then they stay in the bar, in a **⋮** menu on a narrow screen. On a narrow screen the time and her mood's words also step aside to leave the views room. To reload the dashboard, use Settings → **Refresh all connections**. |
 
-The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
+The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Activity, Map, History, Media and so on): their header goes too and the page moves up into its space, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Apps served through the Ingress Proxy integration (Music Assistant and the like) lose the proxy's toolbar the same way. Home Assistant's settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
 **Your chats, then back** (dashboard mode only). Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Screensaver → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up, while you're talking to her, and while she's still thinking or answering, and starts counting again once she's done. Switching back to **Home** yourself does the same at once. It applies however your chats were opened.
 
