@@ -4,6 +4,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [0.6.4] - 2026-11-02
 
+### Android app
+
+- **No more giving up while she thinks.** The wall display's screensaver and the return from your chats now wait while you're talking to her (listening, thinking or speaking) and start counting again once she's done, so a long think no longer ends in the screensaver. Following her answer is also more patient: a dropped connection mid-think is retried for about half a minute, and an answer with no words yet isn't mistaken for a finished one.
+
 ### Project
 
 - **Default settings in one spreadsheet:** `adjustments/defaults.csv` lists every setting that has a default, with four columns: the setting (as it's named in Settings), **Change to**, its possible values, and the current default. Fill in **Change to** and commit; before the next build it's checked and applied (`python3 tools/defaults.py apply`) into the app's `Defaults.kt`, which is now the only place the app takes its defaults from. Checks fail and releases won't publish while a change is waiting. This replaces the adjustment template from 0.6.3.

@@ -894,24 +894,46 @@ class Api(server: String, private val context: Context? = null) {
         call("POST", "/api/v1/audio/speech", JSONObject().put("input", text).toString().toByteArray(),
             readTimeoutMs = 60_000, accept = "audio/*")
 
-    /** The answer as it's written, until it's done (or 15 minutes pass). */
+    /**
+     * The answer as it's written, until it's done (or 15 minutes pass). Built to wait out a long think:
+     * a dropped connection while polling is retried for about half a minute before giving up, and an
+     * answer with no words yet isn't taken as finished just because no task shows for a moment.
+     */
     fun follow(chatId: String, messageId: String): Flow<Reply> = flow {
         val deadline = System.currentTimeMillis() + 15 * 60_000
         var idle = 0
+        var failures = 0
         while (System.currentTimeMillis() < deadline) {
-            val msg = chat(chatId).optJSONObject("chat")?.optJSONObject("history")
-                ?.optJSONObject("messages")?.optJSONObject(messageId)
-            val reply = Reply(msg?.optString("content") ?: "", msg?.optBoolean("done", false) ?: false)
+            val reply = try {
+                val msg = chat(chatId).optJSONObject("chat")?.optJSONObject("history")
+                    ?.optJSONObject("messages")?.optJSONObject(messageId)
+                Reply(msg?.optString("content") ?: "", msg?.optBoolean("done", false) ?: false)
+            } catch (e: AuthException) {
+                throw e
+            } catch (e: ForbiddenException) {
+                throw e
+            } catch (e: IOException) {
+                // A hiccup (Wi-Fi, a proxy, the server busy thinking): try again, up to about 30 seconds.
+                if (++failures >= 15) throw e
+                delay(2_000)
+                continue
+            }
+            failures = 0
             emit(reply)
             if (reply.done) return@flow
             // Some servers don't mark the message done; no running task for a few checks means it is.
-            if (runningTasks(chatId) == 0) {
-                if (++idle >= 3) {
-                    emit(reply.copy(done = true))
-                    return@flow
+            // Before any words have arrived she may still be starting or thinking, so wait longer then.
+            val tasks = runCatching { runningTasks(chatId) }.getOrNull() // null: couldn't tell this time
+            when {
+                tasks == null -> Unit
+                tasks > 0 -> idle = 0
+                else -> {
+                    val needed = if (reply.content.isBlank()) 15 else 3
+                    if (++idle >= needed) {
+                        emit(reply.copy(done = true))
+                        return@flow
+                    }
                 }
-            } else {
-                idle = 0
             }
             delay(800)
         }

@@ -354,8 +354,9 @@ class AskActivity : ComponentActivity() {
         if (!isChangingConfigurations) finish()
     }
 
-    /** Frees the microphone and the voice. */
+    /** Frees the microphone and the voice, and stops counting as busy. */
     override fun onDestroy() {
+        Busy.talking = false
         ear?.release()
         mouth?.release()
         super.onDestroy()
@@ -373,8 +374,12 @@ class AskActivity : ComponentActivity() {
         var text by remember { mutableStateOf(initial) }
         val turns = remember { mutableStateListOf<Turn>() }
         var phase by remember { mutableStateOf(Phase.IDLE) }
-        // Keep the screen on while she listens, thinks or speaks, so a long question isn't cut off.
-        SideEffect { view.keepScreenOn = phase != Phase.IDLE }
+        // Keep the screen on while she listens, thinks or speaks, so a long question isn't cut off, and tell
+        // the wall display's timers she's busy, so they don't count that time as no one being around.
+        SideEffect {
+            view.keepScreenOn = phase != Phase.IDLE
+            Busy.talking = phase != Phase.IDLE
+        }
         var heard by remember { mutableStateOf("") }
         var level by remember { mutableStateOf(0f) }
         var note by remember { mutableStateOf<String?>(null) }

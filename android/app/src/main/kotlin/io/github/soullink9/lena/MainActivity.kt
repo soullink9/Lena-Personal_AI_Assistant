@@ -310,7 +310,8 @@ class MainActivity : ComponentActivity() {
     /**
      * In dashboard mode, left alone for a while (Settings → Wall display → When no one's around → Back
      * from your chats after): back to the dashboards, straight to the screen saver. Not while the
-     * keyboard is up, or while she's still answering.
+     * keyboard is up, while you're talking to her in the sheet, or while she's still answering; the wait
+     * starts again once she's done.
      */
     private fun watchForIdle() {
         lifecycleScope.launch {
@@ -320,7 +321,8 @@ class MainActivity : ComponentActivity() {
                 if (!dashboardMode || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
                 val typing = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView)
                     ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-                if (typing) { lastInteraction = System.currentTimeMillis(); continue }
+                // Typing, or talking to her in the sheet (listening, thinking, speaking), counts as being here.
+                if (typing || Busy.talking) { lastInteraction = System.currentTimeMillis(); continue }
                 if (System.currentTimeMillis() - lastInteraction < seconds * 1000L) continue
                 val answering = chatIdOf(currentUrl.value)?.let { id -> runCatching { api.runningTasks(id) }.getOrDefault(0) > 0 } == true
                 if (answering) { lastInteraction = System.currentTimeMillis(); continue }

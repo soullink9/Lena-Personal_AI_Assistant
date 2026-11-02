@@ -550,6 +550,9 @@ class DashboardActivity : ComponentActivity() {
             val motion = Prefs.motionEntity(this@DashboardActivity).trim()
             while (true) {
                 delay(3_000)
+                // Talking to her (listening, thinking, speaking) counts as someone being there, so the
+                // wait starts again once she's done rather than ending mid-answer.
+                if (Busy.talking) lastTouch.longValue = System.currentTimeMillis()
                 if (dashboardMode && !dimmed.value && seconds > 0 && System.currentTimeMillis() - lastTouch.longValue > seconds * 1000L &&
                     now.feelings?.moment != "Worried") dim()
                 if (dimmed.value && motion.isNotEmpty()) {
