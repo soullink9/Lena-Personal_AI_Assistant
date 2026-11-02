@@ -1,9 +1,9 @@
 Setting,Change to,Possible values,Current default
 Connections › Model › Her context size,,A whole number from 2048 to 1048576,32768
-Wall display › Screensaver › Screen saver after,,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; 15 minutes; 30 minutes; 1 hour; Never,5 minutes
-Wall display › Screensaver › Back from your chats after,,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; Never,1 minute
-Wall display › Screensaver › Each photo for,,5 seconds; 10 seconds; 15 seconds; 30 seconds; 1 minute; 5 minutes,15 seconds
-Wall display › Screensaver › Transition,,Fade; Slide; Slow zoom and fade; None,Fade
+Wall display › Screensaver › Screen saver after,2 minutes,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; 15 minutes; 30 minutes; 1 hour; Never,5 minutes
+Wall display › Screensaver › Back from your chats after,1 minutes,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; Never,1 minute
+Wall display › Screensaver › Each photo for,1 minutes,5 seconds; 10 seconds; 15 seconds; 30 seconds; 1 minute; 5 minutes,15 seconds
+Wall display › Screensaver › Transition,Fade,Fade; Slide; Slow zoom and fade; None,Fade
 Wall display › Screensaver › Shuffle,,On; Off,On
 Wall display › Screensaver › Fit,,Smart; Fill the screen; Whole photo,Smart
 Wall display › Screensaver › Time and her mood on top,,On; Off,On
