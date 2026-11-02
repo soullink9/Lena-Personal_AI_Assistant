@@ -66,13 +66,13 @@ The page didn't get Lena's token. Check **Settings → Home Assistant → Test c
 
 ## The wall display isn't full screen, or the screen saver never comes on
 
-Both happen only in dashboard mode: when Lena's wall display is the device's **home screen** (Settings → Wall display → **Make it this device's home screen**, then pick Lena). The category's summary says whether it is. Anywhere else the dashboards are a normal screen that sleeps as usual, on purpose, so a phone doesn't stay lit.
+Both happen only in dashboard mode: when Lena's wall display is the device's **home screen** (Settings → **Make it this device's home screen**, then pick Lena). The category's summary says whether it is. Anywhere else the dashboards are a normal screen that sleeps as usual, on purpose, so a phone doesn't stay lit.
 
 ## The wake word starts by mistake
 
 Open **Settings → Logs** and look for "Heard …": each says how sure she was and what she needed.
 
-- Switch to **Hey Lena** (Settings → Wall display → Wake word). One word on its own, "Lena", is far easier to hear in ordinary talk and on TV.
+- Switch to **Hey Lena** (Settings → Wake word). One word on its own, "Lena", is far easier to hear in ordinary talk and on TV.
 - Choose **Fewer false starts** under **How sure she must be**.
 - Keep the tablet away from a TV or speaker if you can. Music and jingles are turned away by the voice check ("wasn't a voice; ignored" in the logs), but a voice on TV is still a voice.
 
@@ -82,11 +82,11 @@ Open WebUI ends every session when its secret key changes, and if `WEBUI_SECRET_
 
 ## Portrait photos lose their heads in the photo frame
 
-Choose **Fit → Smart** (Settings → Wall display → When no one's around). Portrait and panorama photos then show whole on a blurred copy of themselves, and cropped photos are centred on the faces in them. **Fill the screen** crops every photo, around its faces.
+Choose **Fit → Smart** (Settings → Screensaver). Portrait and panorama photos then show whole on a blurred copy of themselves, and cropped photos are centred on the faces in them. **Fill the screen** crops every photo, around its faces.
 
 ## The wake word never hears me
 
-Use **Settings → Wall display → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, try **Easier to wake** under **How sure she must be**, and try another name to compare. Note she ignores her name for the first second after she starts listening. In the screen saver some phones block the microphone; it says so on screen, and the wall display itself will hear you.
+Use **Settings → Wake word → Try it** from where you'll stand and watch the bar. Speak at a normal volume, try **Easier to wake** under **How sure she must be**, and try another name to compare. Note she ignores her name for the first second after she starts listening. In the screen saver some phones block the microphone; it says so on screen, and the wall display itself will hear you.
 
 ## Talking to Lena doesn't hear me
 

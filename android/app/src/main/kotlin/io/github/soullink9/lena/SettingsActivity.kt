@@ -66,7 +66,7 @@ import androidx.compose.material.icons.outlined.Hearing
 import androidx.compose.material.icons.outlined.NotificationImportant
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Tv
-import androidx.compose.material.icons.outlined.AssistantNavigation
+import androidx.compose.material.icons.outlined.Assistant
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -337,7 +337,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Section(Area.TALKING.title) {
             val assistant = remember { isDigitalAssistant() }
-            Item(Icons.Outlined.AssistantNavigation, "Make Lena your digital assistant",
+            Item(Icons.Outlined.Assistant, "Make Lena your digital assistant",
                 if (assistant) "She is: the assistant gesture opens her" else "So the assistant gesture opens her",
                 trailing = { OpenInAndroid() }) { openAssistantSettings() }
             Item(Icons.Outlined.Hearing, "Wake word", wakeLabel(s)) { open(Page.WAKE) }

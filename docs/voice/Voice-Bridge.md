@@ -51,7 +51,7 @@ If Open WebUI, Piper and Whisper are on different networks, attach the bridge to
 | API Key | The same as above |
 | STT Model | `whisper` |
 
-Save, then try the speaker icon on any reply in Open WebUI. In the Lena app, **Settings → Voice → Your server's voice** now uses Piper.
+Save, then try the speaker icon on any reply in Open WebUI. In the Lena app, **Settings → How she looks and sounds → Your server's voice** now uses Piper.
 
 ## How it works
 

@@ -46,6 +46,6 @@ The model's context window is set in three places, and they should match. All th
 
 1. `num_ctx` in `ollama/Modelfile`.
 2. **Context window size** in Home Assistant's Ollama agent options.
-3. **Her context size** (Settings → Conversation) in the app's settings, which gives the ongoing conversation half of it.
+3. **Her context size** (Settings → Model) in the app's settings, which gives the ongoing conversation half of it.
 
 See [Performance tuning](home-assistant/Performance-Tuning.md) if you need to change it.

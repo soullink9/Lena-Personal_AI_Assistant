@@ -38,7 +38,7 @@ If both runs above are slow, read the eval rate. A 12B model fully on a modern 1
 Every request carries her character, Home Assistant's list of exposed entities and the tool definitions. A bigger context costs VRAM and time.
 
 - The Modelfile uses 32768, which leaves room for long conversations in the Lena app. If `ollama ps` shows part of the model on the CPU, drop to 16384.
-- Use the same number in the Modelfile, Home Assistant's agent and the Lena app's **Her context size** (Settings → Conversation) setting.
+- Use the same number in the Modelfile, Home Assistant's agent and the Lena app's **Her context size** (Settings → Model) setting.
 - Expose fewer entities. Under about a hundred is better.
 - Keep her memory list short; Open WebUI adds it to every message.
 

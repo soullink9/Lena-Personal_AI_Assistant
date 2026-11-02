@@ -40,105 +40,31 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives.
 
-Below it, the settings are in **categories that fold open**: each shows a one-line summary of how it's set, and tapping it shows its rows (it remembers which you left open). A setting with several choices shows **only the current one**; tap it for the list, with a line on each choice. **How she looks** and the **Model** are picked right in the list; the rest open their page.
+Below it, the settings are in sections, and every row says how it's set and opens its own page. A setting with several choices shows **only the current one**; tap it for the list, with a line on each choice. Rows with ↗ open Android's own settings, for the three things only Android can change.
 
-| Section | What's in it |
+| Section | Rows |
 |---|---|
-| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself) and **Home Assistant** (address, token, test). |
-| **Talking to Lena** | **Assistant gesture** (and the lock screen), **How she looks** (Orb, Sheet, Glow, Bar, Island, Subtitles), **Voice** (who hears you, who speaks, keep listening) and **Conversation** (the Assistant Lena chat and her context size). |
-| **Chats** | **Model** for new chats, the sheet and scheduled prompts, and **Chat screen**: **Lena's look** for Open WebUI's pages (off for Open WebUI's own), **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
-| **Prompts** | **Quick prompts** and **Scheduled prompts**. |
-| **This phone** | **Notifications** (reply notifications and house alerts) and **Widget & tile**. |
-| **Wall display** | Making it the home screen, starting it, dashboards, the screen saver and photo frame, the wake word. |
-| **About** | **Updates** and **Logs**, and the version. |
-
-## Talking to Lena
-
-The assistant gesture opens Lena over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
-
-**How it looks** is your choice (Settings → How she looks, with **Try it** to see it):
-
-| Look | What you see |
-|---|---|
-| **Orb** (default) | The screen darkens (and blurs, on phones that support it), her logo pulses in the middle, and her words appear underneath like captions. Tap the orb to talk or stop her. |
-| **Sheet** | A panel from the bottom with the whole conversation. Everything below describes this one. |
-| **Glow** | Lena's colours run around the edges of the screen, brighter as you speak, with a small caption card for your words and her answer. |
-| **Bar** | A compact bar at the bottom to type or talk in; her answer appears in a card above it, with Copy, Open in Lena and New. |
-| **Island** | A small black pill at the top showing what's happening; her answer drops down under it like a notification. Tap her avatar to talk. |
-| **Subtitles** | No panel at all: her words appear at the bottom of the screen over a soft fade, like film subtitles. |
-
-Every look listens, answers, speaks and keeps listening the same way; only the Sheet shows earlier turns. In the others, **⋮** has everything that doesn't fit: type or talk, new conversation, photos, copy and open in Lena. Tapping empty space closes any of them.
-
-1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
-2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her. When you talk (rather than type), Lena tells her the reply will be read aloud, so she answers the way she would in the kitchen: short, plain sentences, no lists or formatting.
-3. **Then she listens again**, so you can carry on the conversation without tapping. If you say nothing, the mic closes quietly. Tap the mic any time to talk. Saying just "thanks", "that's all", "never mind" or "stop" closes the sheet without asking her anything.
-
-**One conversation: "Assistant Lena".** Every time you talk to Lena, she continues the same chat, titled **Assistant Lena** and pinned in Open WebUI, so she remembers what you talked about before, even days later, and she's the same Lena with the same history on every screen. The app finds it by its name, so it's the same chat after reinstalling the app or on another phone. The sheet opens on the whole conversation, scrolled to the latest.
-
-- **New conversation** (the speech-bubble button in the sheet) starts over: the old chat stays in your history, unpinned and renamed with the date ("Assistant Lena (until Oct 31, 2026)"), and a new Assistant Lena begins.
-- Delete the **Assistant Lena** chat (from the drawer or Open WebUI) and the next time you talk, she starts a fresh one.
-- A conversation that never ends would outgrow any model, so Lena gives it **half of the model's context** (set **Her context size** under Settings → Conversation; 32,768 by default), filled from the newest exchange back. For short spoken exchanges that's usually 50 to 80 of them. The other half stays free for her system prompt, tools, tool results and reply. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
-
-- The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
-- The **expand** button opens the full app.
-- Your **quick prompts** appear as chips when typing.
-- Tap outside the sheet to close it. If Lena is still answering, you get a notification when she's done.
-
-**Settings → Voice** chooses who hears you and who speaks:
-
-| Setting | Choices |
-|---|---|
-| Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as its voice input. |
-| Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as reading a reply aloud there. **The phone's voice**: Android's text-to-speech. **Off**. |
-| Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
-| Her context size (Conversation) | Your model's context length in tokens (32,768 by default). Half of it holds the ongoing conversation. |
-
-If the phone's speech model isn't installed yet, Android starts downloading it and Lena uses your server meanwhile. If the phone's recognizer can't listen for any other reason, Lena uses your server for that turn. If your server's voice isn't set up, Lena uses the phone's.
-
-Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu, and **Type to Lena** for the keyboard version.
-
-**Show her a photo.** The camera button in the sheet takes a photo or lets you choose one ("What's this plant?", "Read this label"). Ask about it by typing or by tapping the mic, or just send it. The photo is shrunk to a sensible size, sent with your question, and saved in the chat like any other. Lena needs a model that can see images; `gemma4:12b` can. The camera app saves the picture into Lena's private storage and it's deleted as soon as it's read; choosing a photo uses Android's photo picker, so Lena only ever sees the one you pick.
-
-**Her voice follows her mood** (Settings → Voice, off by default, needs Home Assistant). She speaks a little slower and lower when she's groggy, drained or wistful, and a little quicker and brighter when she's wired, cheerful or playful. The changes are small on purpose. It works with your server's voice and the phone's.
-
-**On the lock screen** (Settings → Assistant gesture → On the lock screen, off by default). With it off, Android asks you to unlock before the sheet opens. With it on, the gesture opens her straight over the lock screen in a private mode:
-
-- She starts a fresh conversation. Your **Assistant Lena** chat and its history stay hidden.
-- Her mood shows, but not the reasons.
-- No photos, and opening the app or a chat asks you to unlock first.
-- She's told the person may not be you, so she shouldn't unlock, open or disarm anything, or share personal details, earlier conversations or what she remembers.
-
-That last part is an instruction to her, not a lock: anyone holding your phone can still talk to her, and a model can be talked round. If your Home Assistant exposes locks, garage doors or alarms to her, think about that before turning this on.
-
-## Memory & knowledge
-
-Open it from the drawer. It shows what Lena draws on beyond the conversation, so you can fix anything that went in by mistake.
-
-- **Hers** (only if you've connected Home Assistant): Lena's own memory, the to-do list the Lena integration keeps in Home Assistant, which she uses in the house, in Open WebUI and here. Search, correct, forget or add, the same as below.
-- **Memories** (called **Open WebUI** when Hers is there): the facts Open WebUI keeps about you. Search them, tap one to correct it, delete one to make Lena forget it, or add one with **+**.
-- **Notes**: your Open WebUI notes, the same ones as under **Notes** in the browser, pinned first. Search them, tap **New note** to write one, or open one to change its title and text (Markdown, so `#` makes a heading and `-` a list), pin it or delete it. If the note was changed in the browser while you had it open here, saving tells you, and saving again replaces that change with yours. Notes with several pages, and notes shared with you to read only, can be read and pinned here and changed in the browser.
-- **Knowledge**: your knowledge collections and the documents in each. Remove a document from a collection you can edit (by default, Open WebUI also deletes the file).
-
-Talking to Lena uses Open WebUI's memories when its memory setting is on for you (**Settings → Personalization → Memory** in Open WebUI), the same as the web page. Her shared memory reaches her through the Lena filter in Open WebUI; see [Lena in Open WebUI](../open-webui/Setup.md).
-
-## How she feels
-
-Connect Home Assistant under **Settings → Home Assistant**: its address and a long-lived access token (your Home Assistant profile → Security). Any user's token works. **Test connection** checks it, and tells you if the [Lena integration](../home-assistant/Installation.md) isn't set up yet. The Ask sheet then shows how she feels under her name, refreshed after each reply in case something you said landed, and the drawer shows it too.
+| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself), **Home Assistant** (address, token, test) and **Model** (the model for new chats, the sheet and scheduled prompts, and the Assistant Lena conversation with her context size). |
+| **Wall display** | **Make it this device's home screen** ↗ (dashboard mode), **Make it this device's screensaver** ↗ (Android's screen saver while charging), **Screensaver** (what shows when no one's around, when, and what wakes it) and **Dashboards**. |
+| **Talking to Lena** | **Make Lena your digital assistant** ↗, **Wake word** (on or off, her name, how sure she must be, and whether she listens only on the wall display or whenever Lena is open), **How she looks and sounds** (her look, who hears you, her voice, keep listening) and **Interacting with Lena** (what the assistant gesture opens, and the lock screen). |
+| **Chat screen configuration** | **Chat screen**: **Lena's look** for Open WebUI's pages, **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
+| **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets & tile**, **Quick prompts** and **Scheduled prompts**. |
+| **About** | **Updates**, **Logs** and the **software version**. |
 
 ## Wall display
 
-**Settings → Wall display** turns a tablet on the wall (or a docked phone) into a home panel: your Home Assistant dashboards while someone's using it, a photo frame or her clock when no one is, and her name to talk to her from across the room.
+The **Wall display** section of Settings turns a tablet on the wall (or a docked phone) into a home panel: your Home Assistant dashboards while someone's using it, a photo frame or her clock when no one is, and her name to talk to her from across the room.
 
 **Dashboard mode is the home screen.** Only when Lena's wall display is the device's home screen are the dashboards and your chats **full screen**, kept on, and only then does the **screen saver** come on by itself and your chats go back to it when left alone. Anywhere else (on your phone, say), **Home** shows your dashboards as a normal screen with Android's bars, which sleeps as usual. The **Chat | Home** switch keeps the same view both ways.
 
-| In the category | What it does |
+| Row | What it does |
 |---|---|
-| **Make it this device's home screen** | Android's choice of home app; pick Lena. That's dashboard mode: full screen and the screen saver. Home then always brings the wall display back, and **Apps** in its bar lists everything else on the tablet. |
-| **Start the wall display** | Opens the dashboards (full screen in dashboard mode); back leaves it. Without Home Assistant connected it's just the idle screen. |
+| **Make it this device's home screen** | Android's choice of home app; pick Lena. That's dashboard mode: full screen and the screensaver. Home then always brings the wall display back, and **Apps** in its bar lists everything else on the tablet. |
+| **Make it this device's screensaver** | Android's screen saver setting; pick Lena, and the same idle screen appears by itself whenever the device charges. |
+| **Screensaver** | When it starts, what it shows (her clock or a photo frame), when your chats give way back to it, and what wakes it up. |
 | **Dashboards** | The Home Assistant dashboards it shows. |
-| **When no one's around** | When the screen saver starts, what it shows (her clock or a photo frame), when your chats give way back to it, and what wakes it up. |
-| **Wake word** | Saying her name to talk to her. |
-| **Use it as the screen saver** | The same idle screen as Android's screen saver, so it appears by itself whenever the device charges. |
+
+Open the dashboards with the **Home** switch on the main screen. The wake word is under **Talking to Lena**.
 
 ### Dashboards
 
@@ -158,9 +84,9 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 
 The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
-**Your chats, then back** (dashboard mode only). Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up and while she's still answering. Switching back to **Home** yourself does the same at once. It applies however your chats were opened.
+**Your chats, then back** (dashboard mode only). Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Screensaver → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up and while she's still answering. Switching back to **Home** yourself does the same at once. It applies however your chats were opened.
 
-### When no one's around
+### Screensaver
 
 In dashboard mode, after a while without a touch (**Screen saver after**: 30 seconds, 1, 2, 5, 10, 15 or 30 minutes, an hour, or never; 5 minutes by default) the dashboards give way to the screen saver, which shows one of these. Android's own screen saver shows the same.
 
@@ -177,7 +103,7 @@ On the wall display, the screen goes to 40% brightness for photos and 2% for the
 
 ### Wake word
 
-**Wall display → Wake word** lets the wall display and the screen saver listen for her name. Nothing listens until you turn it on, and even then it only ever opens Lena when it hears her name; the wall display never starts listening by itself when it starts. Choose:
+**Settings → Wake word** lets Lena listen for her name. **Listens** chooses where: **Only on the wall display** (the dashboards and the screensaver; the default), or **Whenever Lena is open**, your chats too (it stops when you leave Lena, and while Open WebUI's own voice input uses the microphone). Nothing listens until you turn it on, and even then it only ever opens Lena when it hears her name; the wall display never starts listening by itself when it starts. Choose:
 
 - **Hey Lena** (the default for new setups): a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/Tater-Wake-Words), the same kind of model Home Assistant's voice satellites run, trained and measured at about one false start every ten hours of background sound. Two words are much harder to say by accident than one.
 - **Lena:** the same kind of model for just her name. Quicker to say, but ordinary speech and TV set it off more often.
@@ -195,7 +121,7 @@ The app computes exactly the sound features Home Assistant's voice devices do: i
 
 **When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 
-It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing, and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
+It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing (or, set to listen whenever Lena is open, while Lena is on screen), and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
 
 ## House alerts
 
@@ -214,13 +140,13 @@ Lena has no voice calls: talking to her is the Ask sheet (the assistant gesture,
 
 ## Quick Settings tile
 
-Settings → Widget & tile → **Add the Quick Settings tile**. Tapping **Talk to Lena** in the pull-down shade opens the sheet, listening, the same as the assistant gesture (including its lock-screen setting).
+Settings → Widgets & tile → **Add the Quick Settings tile**. Tapping **Talk to Lena** in the pull-down shade opens the sheet, listening, the same as the assistant gesture (including its lock-screen setting).
 
 ## Home screen widget
 
-Settings → Widget & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
+Settings → Widgets & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
 
-Turn on **Her mood on the widget** (Settings → Widget & tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
+Turn on **Her mood on the widget** (Settings → Widgets & tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
 
 ## Quick prompts
 
