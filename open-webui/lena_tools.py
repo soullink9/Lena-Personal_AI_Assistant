@@ -1,7 +1,7 @@
 """
 title: Lena (remember, forget, feel, calendar)
 author: soullink9
-version: 0.6.2-beta
+version: 0.6.3
 license: GPL-3.0
 description: Lets Lena save to and remove from her Home Assistant memory list, record how something made her feel, and add events to your Home Assistant calendars, from Open WebUI and the Lena app.
 """

@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -176,8 +178,9 @@ class ChatsActivity : ComponentActivity() {
             },
         ) { padding ->
             val pinnedIds = pinned.map { it.id }.toSet()
+            // Centred and no wider than PAGE_MAX_WIDTH, so the list stays readable on an unfolded screen.
             LazyColumn(
-                Modifier.padding(padding).fillMaxSize(),
+                Modifier.padding(padding).fillMaxSize().wrapContentWidth().widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth(),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 32.dp),
             ) {
                 item(key = "search") { SearchField(query, "Search chats", Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) { query = it } }
@@ -195,34 +198,18 @@ class ChatsActivity : ComponentActivity() {
                             chatGroups(listOf(PINNED_LABEL to pinned), style, null, pinnedIds, actions, folded, false, ::openChat)
                         }
 
-                        // Folders: tap to open, long-press to rename or delete; their chats in slim rows.
+                        // Folders: drawn exactly like the chats in your list style. Tap one to open it,
+                        // long-press to rename or delete it; its chats show under it, indented.
                         val list = folders
-                        if (!list.isNullOrEmpty()) {
-                            item(key = "folders-title") { SectionTitle("Folders", Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)) }
-                            list.forEach { f ->
-                                item(key = "folder-${f.folder.id}") {
-                                    FolderRow(f, onRename = { renamingFolder = f.folder }, onDelete = { deletingFolder = f.folder }) {
-                                        f.open = !f.open
-                                        scope.launch {
-                                            runCatching { api.setFolderExpanded(f.folder.id, f.open) }
-                                            if (f.open && f.chats == null) loadFolder(f)
-                                        }
-                                    }
-                                }
-                                if (f.open) {
-                                    val chats = f.chats
-                                    when {
-                                        chats == null -> item(key = "folder-${f.folder.id}-loading") { ListHint("Loading…", Modifier.padding(start = 24.dp)) }
-                                        chats.isEmpty() -> item(key = "folder-${f.folder.id}-empty") { ListHint("No chats in this folder", Modifier.padding(start = 24.dp)) }
-                                        else -> items(chats, key = { "folder-${f.folder.id}-${it.id}" }) { c ->
-                                            actions.WithMenu(c, c.id in pinnedIds) { longPress ->
-                                                ChatLine(c, false, null, 40.dp, 44.dp, RoundedCornerShape(20.dp), Color.Transparent, { openChat(c.id) }, longPress)
-                                            }
-                                        }
-                                    }
-                                    if (f.more) item(key = "folder-${f.folder.id}-more") {
-                                        TextButton(onClick = { scope.launch { loadFolder(f) } }, modifier = Modifier.padding(start = 32.dp)) { Text("Show more") }
-                                    }
+                        if (!list.isNullOrEmpty()) item(key = "folders") {
+                            Folders(list, style, pinnedIds, actions,
+                                onRename = { renamingFolder = it }, onDelete = { deletingFolder = it },
+                                onMore = { f -> scope.launch { loadFolder(f) } },
+                            ) { f ->
+                                f.open = !f.open
+                                scope.launch {
+                                    runCatching { api.setFolderExpanded(f.folder.id, f.open) }
+                                    if (f.open && f.chats == null) loadFolder(f)
                                 }
                             }
                         }
@@ -292,19 +279,55 @@ class ChatsActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Your folders under a Folders label, each row (and the chats in an open one) drawn with the same look
+     * as the chats in your list style (lineLook), so folders and chats match.
+     */
+    @Composable
+    private fun Folders(
+        list: List<FolderState>,
+        style: ChatListStyle,
+        pinnedIds: Set<String>,
+        actions: ChatActions,
+        onRename: (Api.Folder) -> Unit,
+        onDelete: (Api.Folder) -> Unit,
+        onMore: (FolderState) -> Unit,
+        onToggle: (FolderState) -> Unit,
+    ) {
+        val look = lineLook(style)
+        val inside = look.start + 32.dp // a folder's chats sit under its name, past the folder icon
+        Column {
+            GroupLabel("Folders", style)
+            Column(
+                if (look.grouped) Modifier.clip(RoundedCornerShape(if (style == ChatListStyle.GROUPS) 24.dp else 16.dp)) else Modifier,
+                verticalArrangement = Arrangement.spacedBy(if (look.grouped) 1.dp else 0.dp),
+            ) {
+                list.forEach { f ->
+                    FolderRow(f, look, onRename = { onRename(f.folder) }, onDelete = { onDelete(f.folder) }) { onToggle(f) }
+                    if (f.open) {
+                        val chats = f.chats
+                        when {
+                            chats == null -> ListHint("Loading…", Modifier.padding(start = inside))
+                            chats.isEmpty() -> ListHint("No chats in this folder", Modifier.padding(start = inside))
+                            else -> chats.forEach { c ->
+                                actions.WithMenu(c, c.id in pinnedIds) { longPress ->
+                                    ChatLine(c, false, null, look.height, inside, look.shape, look.idle, { openChat(c.id) }, longPress)
+                                }
+                            }
+                        }
+                        if (f.more) TextButton(onClick = { onMore(f) }, modifier = Modifier.padding(start = inside - 12.dp)) { Text("Show more") }
+                    }
+                }
+            }
+        }
+    }
+
     /** A folder's row: tap to open or close it, long-press for Rename and Delete. */
     @Composable
-    private fun FolderRow(f: FolderState, onRename: () -> Unit, onDelete: () -> Unit, onToggle: () -> Unit) {
+    private fun FolderRow(f: FolderState, look: LineLook, onRename: () -> Unit, onDelete: () -> Unit, onToggle: () -> Unit) {
         var menu by remember { mutableStateOf(false) }
         Box {
-            FoldHeader(
-                label = f.folder.label,
-                count = null,
-                open = f.open,
-                icon = if (f.open) Icons.Outlined.FolderOpen else Icons.Outlined.Folder,
-                onLongClick = { menu = true },
-                onToggle = onToggle,
-            )
+            FolderLine(f.folder.label, f.open, look.height, look.start, look.shape, look.idle, onToggle = onToggle, onLongClick = { menu = true })
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = false; onRename() })
                 DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { menu = false; onDelete() })

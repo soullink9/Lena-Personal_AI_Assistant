@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,6 +68,7 @@ import androidx.compose.material.icons.outlined.Hearing
 import androidx.compose.material.icons.outlined.NotificationImportant
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.Assistant
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoAlbum
@@ -77,6 +80,8 @@ import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.ViewSidebar
 import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -265,13 +270,14 @@ class SettingsActivity : ComponentActivity() {
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 label = "page",
             ) { shown ->
+                // Centred and no wider than PAGE_MAX_WIDTH, so pages stay readable on an unfolded screen.
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    Modifier.fillMaxSize().wrapContentWidth().widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth().verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     when (shown) {
-                        Page.MAIN -> Main(s, models, query, { query = it }) { page = it }
+                        Page.MAIN -> Main(s, models, ::set, query, { query = it }) { page = it }
                         Page.OPEN_WEBUI -> OpenWebUiPage(s, ::set)
                         Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set) { page = it }
                         Page.MODEL -> ModelPage(s, models, ::set)
@@ -301,8 +307,17 @@ class SettingsActivity : ComponentActivity() {
      * Android's own setting for the three things only Android can change.
      */
     @Composable
-    private fun Main(s: Settings, models: List<Model>, query: String, onQuery: (String) -> Unit, open: (Page) -> Unit) {
+    private fun Main(s: Settings, models: List<Model>, set: (Settings) -> Unit, query: String, onQuery: (String) -> Unit, open: (Page) -> Unit) {
         val house = hasHouse()
+        var resetting by askReset
+        if (resetting) ResetDialog(
+            onConfirm = {
+                resetting = false
+                set(Prefs.defaultsKeeping(s))
+                Toast.makeText(this, "Back to defaults", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { resetting = false },
+        )
         SearchField(query, "Search settings") { onQuery(it) }
         if (query.isNotBlank()) {
             SearchResults(query, open)
@@ -315,6 +330,7 @@ class SettingsActivity : ComponentActivity() {
                 open(Page.HOME_ASSISTANT)
             }
             Item(Icons.Outlined.SmartToy, "Model", "$modelName · %,d tokens".format(s.contextTokens)) { open(Page.MODEL) }
+            RefreshItem()
         }
         Section(Area.WALL.title) {
             val home = remember { DashboardActivity.isHomeScreen(this@SettingsActivity) }
@@ -376,6 +392,9 @@ class SettingsActivity : ComponentActivity() {
                 1 -> "1 problem in the last day"
                 else -> "$problems problems in the last day"
             }) { openLogs() }
+            Item(Icons.Outlined.SettingsBackupRestore, "Return to defaults", "Timings, wake word, look and feel; keeps your connections") {
+                resetting = true
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = rowModifier().padding(horizontal = 20.dp, vertical = 16.dp),
@@ -387,6 +406,54 @@ class SettingsActivity : ComponentActivity() {
                     Text("Lena ${appVersion() ?: ""} · your own assistant, on your own hardware", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+
+    /** Whether the Return to defaults question is showing (search can open it too). */
+    private val askReset = mutableStateOf(false)
+
+    /** Asks before Return to defaults, saying what changes and what's kept. */
+    @Composable
+    private fun ResetDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Return to defaults?") },
+            text = {
+                Text(
+                    "Timings, the wake word, how she looks and sounds, the chat screen, notifications and the screensaver's " +
+                        "options go back to how a new install starts.\n\nKept: your Open WebUI and Home Assistant connections, " +
+                        "the model and context size, your dashboards, the screensaver's album, your quick and scheduled prompts, " +
+                        "and your order of pinned chats and folders."
+                )
+            },
+            confirmButton = {
+                TextButton(colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error), onClick = onConfirm) {
+                    Text("Return to defaults")
+                }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        )
+    }
+
+    /**
+     * Refresh all connections: checks Open WebUI and Home Assistant again and says how each answered, and
+     * has your chats and the dashboards reload their pages when you go back to them. (It replaces the
+     * reload buttons that were in the menu and on the wall display.)
+     */
+    @Composable
+    private fun RefreshItem() {
+        val scope = rememberCoroutineScope()
+        var result by remember { mutableStateOf<String?>(null) }
+        Item(Icons.Outlined.Refresh, "Refresh all connections", result ?: "Checks both servers and reloads your chats and dashboards") {
+            Refresh.request()
+            result = "Checking…"
+            scope.launch {
+                val chat = Api.from(this@SettingsActivity)?.version()?.let { "Open WebUI $it" }
+                    ?: if (Prefs.server(this@SettingsActivity) == null) "No Open WebUI" else "Open WebUI unreachable"
+                val house = HomeAssistant.from(this@SettingsActivity)?.let { if (it.check()) "Home Assistant connected" else "Home Assistant unreachable" }
+                    ?: "No Home Assistant"
+                result = "$chat · $house · pages reload when you go back"
             }
         }
     }
@@ -466,6 +533,10 @@ class SettingsActivity : ComponentActivity() {
             Findable("Sign in by herself", "auto sign-in automatic login password email ldap signed out session restart", Page.OPEN_WEBUI),
             Findable("Home Assistant address and token", "ha url connect long-lived access token test connection integration", Page.HOME_ASSISTANT),
             Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
+            Findable("Refresh all connections", "reload refresh reconnect check server page dashboard", null, Area.CONNECTIONS) {
+                Refresh.request()
+                Toast.makeText(this, "Your chats and dashboards reload when you go back to them", Toast.LENGTH_SHORT).show()
+            },
             Findable("Assistant Lena chat", "conversation history new conversation one chat", Page.MODEL),
             Findable("Her context size", "tokens num_ctx memory length context window conversation", Page.MODEL),
             Findable("Make it this device's home screen", "home app launcher dashboard mode full screen kiosk tablet", null, Area.WALL, ::openHomeSettings),
@@ -498,6 +569,7 @@ class SettingsActivity : ComponentActivity() {
             Findable("Scheduled prompts", "briefing morning schedule repeat timer daily recurring automatic", Page.SCHEDULED),
             Findable("Updates", "install download version github auto blocker re-download reinstall release", Page.UPDATES),
             Findable("Logs", "problems errors debug log troubleshooting", null, Area.ABOUT, ::openLogs),
+            Findable("Return to defaults", "reset restore default factory start over", null, Area.ABOUT) { askReset.value = true },
         )
     }
 

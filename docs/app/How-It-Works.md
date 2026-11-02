@@ -11,7 +11,7 @@ Lena is two things working together:
 
 **Top bar**
 - **☰** opens the drawer.
-- **Lena's logo**, then the **Chat | Home** switch: **Home** opens your Home Assistant dashboards (the wall display), and the same switch there brings you back to your chats. It shows once Home Assistant is set up in Settings; turn it off in Settings → Chat screen.
+- The **Chat | Home** switch (Lena's logo is in the drawer, which leaves the bar more room): **Home** opens your Home Assistant dashboards (the wall display), and the same switch there brings you back to your chats. It shows once Home Assistant is set up in Settings; turn it off in Settings → Chat screen.
 - **Temporary chat** (one Open WebUI doesn't save) and **New chat** on the right.
 
 **Drawer**
@@ -24,7 +24,8 @@ Lena is two things working together:
 - **Your order:** the **Reorder** button (⇅) on the Pinned and Folders headings puts them in the order you like, with up and down arrows. Open WebUI keeps no order for either, so it's kept on this phone; All chats uses it too. Chats you pin later come first until you reorder again, and folders inside folders stay under their parent.
 - **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Chat screen → All chats list style): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
 - **Long-press** any chat, in the drawer or All chats, to **pin** (or unpin) it, **move it to a folder** (or out of one, or into a new folder), **rename** or **delete** it (deleting removes it from Open WebUI too). A spinner marks a chat that's still being answered.
-- Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
+- Along the bottom, two buttons: **Settings** and **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below). To reload, use Settings → **Refresh all connections**.
+- **Folders look like chats**: in the drawer and in All chats a folder is a row like the chats around it (in your list style), with a folder icon.
 
 **Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). Turn it off in Settings → Chat screen → **Lena's look**. It recolours Open WebUI through its colour settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
 
@@ -44,12 +45,16 @@ Below it, the settings are in sections, and every row says how it's set and open
 
 | Section | Rows |
 |---|---|
-| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself), **Home Assistant** (address, token, test) and **Model** (the model for new chats, the sheet and scheduled prompts, and the Assistant Lena conversation with her context size). |
+| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself), **Home Assistant** (address, token, test), **Model** (the model for new chats, the sheet and scheduled prompts, and the Assistant Lena conversation with her context size) and **Refresh all connections** (checks both servers, and reloads your chats and dashboards when you go back to them). |
 | **Wall display** | **Make it this device's home screen** ↗ (dashboard mode), **Make it this device's screensaver** ↗ (Android's screen saver while charging), **Screensaver** (what shows when no one's around, when, and what wakes it) and **Dashboards**. |
 | **Talking to Lena** | **Make Lena your digital assistant** ↗, **Wake word** (on or off, her name, how sure she must be, and whether she listens only on the wall display or whenever Lena is open), **How she looks and sounds** (her look, who hears you, her voice, keep listening) and **Interacting with Lena** (what the assistant gesture opens, and the lock screen). |
 | **Chat screen configuration** | **Chat screen**: **Lena's look** for Open WebUI's pages, **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
 | **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets & tile**, **Quick prompts** and **Scheduled prompts**. |
-| **About** | **Updates**, **Logs** and the **software version**. |
+| **About** | **Updates**, **Logs**, **Return to defaults** and the **software version**. |
+
+**Return to defaults** puts timings, the wake word, how she looks and sounds, the chat screen, notifications and the screensaver's options back to how a new install starts. It keeps your connections (Open WebUI, Home Assistant, signing in by herself), the model and context size, your dashboards and motion sensor, the screensaver's album, your quick and scheduled prompts, and your order of pinned chats and folders. It asks first.
+
+**Any screen size.** On a foldable's outer screen (or any narrow screen) her clock, the photo frame's clock and the orb shrink to fit, and the drawer leaves a strip of the page showing. On a wide inner screen or a tablet, Settings, All chats and Memory & knowledge stay a readable width in the middle. Folding or unfolding keeps your chat open.
 
 ## Wall display
 
@@ -80,7 +85,7 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 | **The dashboard's views** | Its view tabs, as chips (only when it has more than one). |
 | **Dashboards** | Switches between the dashboards you added here (only when there's more than one). |
 | **Lena** | Her mood and why. Tap to talk to her. |
-| **Reload, Apps, Settings** | Reload the dashboard, the tablet's other apps, and Lena's settings. |
+| **Apps, Settings** | The tablet's other apps, and Lena's settings. On a narrow screen they're in a **⋮** menu, and the time and her mood's words step aside to leave the views room. To reload the dashboard, use Settings → **Refresh all connections**. |
 
 The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 

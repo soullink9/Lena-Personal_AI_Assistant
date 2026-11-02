@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -209,7 +211,7 @@ class MemoryActivity : ComponentActivity() {
             },
         ) { padding ->
             Column(
-                Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
+                Modifier.padding(padding).fillMaxSize().wrapContentWidth().widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

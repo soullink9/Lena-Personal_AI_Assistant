@@ -165,10 +165,11 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
             }
             Spacer(Modifier.weight(1f))
 
-            // The clock
+            // The clock, smaller on a narrow screen (a foldable's outer screen) so it fits on one line
+            val clockSize = (112 * displayScale()).sp
             Text(
                 DateFormat.getTimeFormat(context).format(now).replace(Regex("\\s?[AaPp]\\.?[Mm]\\.?$"), ""),
-                color = ink, fontSize = 112.sp, fontWeight = FontWeight.Light, lineHeight = 112.sp,
+                color = ink, fontSize = clockSize, fontWeight = FontWeight.Light, lineHeight = clockSize, maxLines = 1,
             )
             Spacer(Modifier.height(20.dp))
 

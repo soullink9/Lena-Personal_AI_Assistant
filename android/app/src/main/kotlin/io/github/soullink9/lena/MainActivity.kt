@@ -66,7 +66,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
@@ -121,6 +120,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -220,6 +220,9 @@ class MainActivity : ComponentActivity() {
      * Otherwise both are normal screens with the status and navigation bars.
      */
     private var dashboardMode = false
+
+    /** The Refresh generation this page was loaded at; a newer one reloads it (see [Refresh]). */
+    private var refreshSeen = Refresh.generation
 
     /**
      * The wake word, when it's set to listen whenever Lena is open (Settings → Talking to Lena → Wake word
@@ -623,6 +626,10 @@ class MainActivity : ComponentActivity() {
         hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
         applyWindowMode()
         listenForName()
+        if (::web.isInitialized && refreshSeen != Refresh.generation) {
+            refreshSeen = Refresh.generation
+            web.reload()
+        }
         if (::web.isInitialized) {
             val look = Prefs.lenaLook(this)
             if (look != lenaLook.value) {
@@ -687,7 +694,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * The whole screen: the drawer (her status, then as many pinned chats, folders and recent chats as
-     * fit, View all chats, and three buttons); the top bar with Lena's logo, the Chat | Home switch and
+     * fit, View all chats, and two buttons); the top bar with the Chat | Home switch and
      * the new-chat buttons; and the page.
      */
     @Composable
@@ -765,7 +772,9 @@ class MainActivity : ComponentActivity() {
             drawerState = drawer,
             gesturesEnabled = drawer.isOpen, // swipes stay with the page; open with the menu button
             drawerContent = {
-                ModalDrawerSheet(Modifier.width(320.dp)) {
+                // 320dp, or less on a narrow outer screen, so a strip of the page always shows beside it.
+                val drawerWidth = minOf(320.dp, (LocalConfiguration.current.screenWidthDp * 0.85f).dp)
+                ModalDrawerSheet(Modifier.width(drawerWidth)) {
                     Column(Modifier.fillMaxHeight()) {
                         // Who and how she is
                         Row(
@@ -830,7 +839,7 @@ class MainActivity : ComponentActivity() {
                             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        // Settings, memory and reload, side by side
+                        // Settings and memory, side by side (reloading is Settings → Refresh all connections)
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         Row(
                             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -842,7 +851,6 @@ class MainActivity : ComponentActivity() {
                             DrawerIcon(Icons.Outlined.Psychology, "Memory & knowledge") {
                                 closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
                             }
-                            DrawerIcon(Icons.Outlined.Refresh, "Reload") { closeThen { web.reload() } }
                         }
                     }
                 }
@@ -857,13 +865,10 @@ class MainActivity : ComponentActivity() {
                             IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Rounded.Menu, "Menu") }
                         },
                         title = {
-                            // Lena's logo, then the switch between your chats and the dashboards (when
-                            // Home Assistant is set up; without it there's only one screen).
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                LenaAvatar(28.dp)
-                                if (hasHome.value) ScreenSwitcher(MainScreen.CHAT, ::switchTo)
-                                else Text("Lena", style = MaterialTheme.typography.titleMedium)
-                            }
+                            // The switch between your chats and the dashboards (when Home Assistant is set
+                            // up; without it there's only one screen). Her logo is in the drawer.
+                            if (hasHome.value) ScreenSwitcher(MainScreen.CHAT, ::switchTo)
+                            else Text("Lena", style = MaterialTheme.typography.titleMedium)
                         },
                         actions = {
                             IconButton(onClick = { openNew(temporary = true) }) { Icon(Icons.Outlined.VisibilityOff, "Temporary chat") }
@@ -940,7 +945,7 @@ class MainActivity : ComponentActivity() {
         @Composable
         fun Line(c: ChatItem, indent: Boolean = false) {
             actions.WithMenu(c, c.id in pinnedIds) { longPress ->
-                ChatLine(c, c.id == currentId, null, 40.dp, if (indent) 44.dp else 16.dp, RoundedCornerShape(20.dp),
+                ChatLine(c, c.id == currentId, null, 40.dp, if (indent) 48.dp else 16.dp, RoundedCornerShape(20.dp),
                     Color.Transparent, { onOpen(c.id) }, longPress)
             }
         }
@@ -952,7 +957,7 @@ class MainActivity : ComponentActivity() {
         if (folders.isNotEmpty()) DrawerHeading("Folders", if (folders.count { it.depth == 0 } > 1) onReorderFolders else null)
         folders.forEach { f ->
             val open = openFolders[f.id] == true
-            FoldHeader(f.label, null, open, if (open) Icons.Outlined.FolderOpen else Icons.Outlined.Folder) { onFolder(f) }
+            FolderLine(f.label, open, 40.dp, 16.dp, RoundedCornerShape(20.dp), Color.Transparent, onToggle = { onFolder(f) }, onLongClick = { onFolder(f) })
             if (open) {
                 val chats = folderChats[f.id]
                 when {

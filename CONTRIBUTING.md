@@ -2,6 +2,10 @@
 
 This is a personal project shared in case it helps someone, so replies and merges may be slow. Issues and pull requests are still welcome.
 
+## Asking for a change
+
+Copy [`adjustments/TEMPLATE.md`](adjustments/TEMPLATE.md) into `adjustments/`, fill it in and commit it (on GitHub, **Add file → Upload files** works). Every adjustment is reviewed before the next build and release; see [adjustments/README.md](adjustments/README.md).
+
 ## Reporting a problem
 
 Open an issue using the bug report template, and include:
@@ -18,7 +22,7 @@ These apply to every change, by people and by AI assistants alike.
 
 **Versions**
 - One version for everything. The app, the Home Assistant integration, the Open WebUI files and the changelog always carry the same version and move together, so every part of a release is known to work with every other. `tools/check.py` fails if they disagree.
-- No 1.0 yet. Versions stay 0.x until the owner says otherwise; `tools/check.py` fails on 1.0 or higher. The app's `versionCode` always goes up by one per release.
+- No 1.0 yet. Versions stay 0.x until the owner says otherwise; `tools/check.py` fails on 1.0 or higher. The app's `versionCode` always goes up by one per release. Versions are plain numbers, such as `0.6.3`, with no "beta" suffix.
 
 **Code and documentation**
 - Consistent naming: follow the names already used for the same thing elsewhere (Kotlin `camelCase` and `PascalCase`, Python `snake_case`, settings keys `snake_case`), and call one concept by one name everywhere: in code, settings, the app's words and the docs.

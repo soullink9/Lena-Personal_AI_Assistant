@@ -50,7 +50,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.rounded.Close
@@ -160,6 +160,9 @@ class DashboardActivity : ComponentActivity() {
 
     /** Whether this is the home screen (see [isHomeScreen]): full screen and the screen saver. */
     private var dashboardMode = false
+
+    /** The Refresh generation the dashboards were loaded at; a newer one reloads them (see [Refresh]). */
+    private var refreshSeen = Refresh.generation
 
     /**
      * Needs Home Assistant's address and token; without them it opens Settings. Full screen and kept on in
@@ -454,6 +457,10 @@ class DashboardActivity : ComponentActivity() {
         super.onResume()
         if (!::web.isInitialized) return
         applyWindowMode()
+        if (refreshSeen != Refresh.generation) {
+            refreshSeen = Refresh.generation
+            web.reload()
+        }
         web.onResume()
         // Time spent talking to her counts as using it, so it doesn't dim the moment she's done.
         if (!dimmed.value) lastTouch.longValue = System.currentTimeMillis()
@@ -577,21 +584,26 @@ class DashboardActivity : ComponentActivity() {
 
     /**
      * The one bar across the top: Home Assistant's menu (back is the back gesture), the Chat | Home switch,
-     * the time and weather, the dashboard's views, how she feels (tap to talk), and reload, apps and settings.
+     * the time and weather, the dashboard's views, how she feels (tap to talk), and apps and settings.
+     * (Reloading is Settings → Connections → Refresh all connections.)
      */
     @Composable
     private fun Strip(now: HouseNow, clock: Date, dashboards: List<Dashboard>, onTalk: () -> Unit, onApps: () -> Unit) {
         val h = header.value
         var pickDashboard by remember { mutableStateOf(false) }
+        var more by remember { mutableStateOf(false) }
+        // On a narrow screen (a foldable's outer screen, a phone upright) the time and her mood's words step
+        // aside and Apps and Settings go into a ⋮ menu, so the views keep room.
+        val narrow = isNarrowScreen()
         Surface(color = MaterialTheme.colorScheme.surface) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = if (narrow) 8.dp else 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
                 ScreenSwitcher(MainScreen.HOME, { if (it == MainScreen.CHAT) openChats() })
-                Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
+                if (!narrow) Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
                     Text(DateFormat.getTimeFormat(this@DashboardActivity).format(clock), style = MaterialTheme.typography.titleLarge)
                     Text(
                         listOfNotNull(
@@ -635,7 +647,7 @@ class DashboardActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 6.dp, end = 14.dp, top = 5.dp, bottom = 5.dp),
                 ) {
                     LenaAvatar(32.dp)
-                    Column(Modifier.width(180.dp)) {
+                    if (!narrow) Column(Modifier.width(180.dp)) {
                         val f = now.feelings
                         Text(listOfNotNull("Lena", f?.mood, f?.moment).joinToString(" · "), style = MaterialTheme.typography.titleSmall,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -648,11 +660,19 @@ class DashboardActivity : ComponentActivity() {
                     }
                     Icon(Icons.Rounded.Mic, "Talk to Lena", tint = MaterialTheme.colorScheme.primary)
                 }
-                FilledTonalIconButton(onClick = { web.reload() }) { Icon(Icons.Outlined.Refresh, "Reload the dashboard") }
-                FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
-                FilledTonalIconButton(onClick = {
-                    startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java))
-                }) { Icon(Icons.Outlined.Settings, "Settings") }
+                val openSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }
+                if (narrow) Box {
+                    IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        DropdownMenuItem(text = { Text("Apps") }, leadingIcon = { Icon(Icons.Outlined.Apps, null) },
+                            onClick = { more = false; onApps() })
+                        DropdownMenuItem(text = { Text("Settings") }, leadingIcon = { Icon(Icons.Outlined.Settings, null) },
+                            onClick = { more = false; openSettings() })
+                    }
+                } else {
+                    FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
+                    FilledTonalIconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings") }
+                }
             }
         }
     }

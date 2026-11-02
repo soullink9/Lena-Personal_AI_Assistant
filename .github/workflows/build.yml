@@ -26,6 +26,27 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Requests in adjustments/ are reviewed before every build (see adjustments/README.md): list the open
+      # ones in the run's summary, and warn about any still marked New. The release job below won't publish
+      # while one is New.
+      - name: Adjustments
+        run: |
+          {
+            echo "### Adjustments"
+            found=0
+            for f in adjustments/*.md; do
+              case "$(basename "$f")" in README.md|TEMPLATE.md) continue ;; esac
+              [ -f "$f" ] || continue
+              found=1
+              status=$(sed -n 's/^Status:[[:space:]]*\([A-Za-z]*\).*/\1/p' "$f" | head -1)
+              echo "- \`$f\`: ${status:-no Status line} — $(head -1 "$f" | sed 's/^# *//')"
+            done
+            [ "$found" = 1 ] || echo "None open."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for f in $(grep -l '^Status:[[:space:]]*New' adjustments/*.md 2>/dev/null | grep -v -e README.md -e TEMPLATE.md); do
+            echo "::warning file=$f::Not reviewed yet (Status: New)"
+          done
+
       # Plain Gradle download, checked against Gradle's published SHA-256. No third-party setup actions.
       - name: Install Gradle
         run: |
@@ -105,8 +126,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          sparse-checkout: CHANGELOG.md
+          sparse-checkout: |
+            CHANGELOG.md
+            adjustments/
           sparse-checkout-cone-mode: false
+      # Every adjustment must be reviewed before a release.
+      - name: No unreviewed adjustments
+        run: |
+          new=$(grep -l '^Status:[[:space:]]*New' adjustments/*.md 2>/dev/null | grep -v -e README.md -e TEMPLATE.md || true)
+          if [ -n "$new" ]; then
+            for f in $new; do echo "::error file=$f::Review this adjustment before releasing (its Status is New)"; done
+            exit 1
+          fi
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -120,7 +151,7 @@ jobs:
             found { print }
           ' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
-          # The title is the plain version number: "v0.5.2-beta" is titled "v0.5.2".
+          # The title is the plain version number ("v0.6.3"; an older "v0.5.2-beta" was titled "v0.5.2").
           title="${VERSION%%-*}"
           gh release create "$VERSION" apk/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$title" --notes-file notes.md

@@ -2,6 +2,22 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.3] - 2026-11-02
+
+No longer called a beta: versions are plain numbers from here on (still below 1.0, so settings may still change).
+
+### Android app
+
+- **Return to defaults** (Settings → About): timings, the wake word, how she looks and sounds, the chat screen, notifications and the screensaver's options go back to how a new install starts. Your connections, model and context size, dashboards and motion sensor, the screensaver's album, your quick and scheduled prompts and your order of pinned chats and folders are kept.
+- **Refresh all connections** (Settings → Connections) checks Open WebUI and Home Assistant and reloads your chats and dashboards when you go back to them. It replaces the Reload buttons in the menu and on the wall display.
+- **More room at the top:** Lena's logo is no longer in the top bar (it's in the menu).
+- **Folders look like chats:** in All chats (and the menu) a folder is a row like the chats around it, in your list style, with a folder icon.
+- **Any screen size:** for foldables' outer and inner screens, her clock, the photo frame's clock and the orb shrink on a narrow screen, the menu is never wider than the screen allows, Settings, All chats and Memory & knowledge stay a readable width on a wide screen, and the wall display's bar folds Apps and Settings into a ⋮ menu (and leaves out the time and her mood's words) when it's narrow.
+
+### Project
+
+- **Adjustments:** drop a file in `adjustments/` (copy `adjustments/TEMPLATE.md`) to ask for a change. Every build reviews them first, and a release won't publish while any is still marked New.
+
 ## [0.6.2-beta] - 2026-11-02
 
 ### Android app

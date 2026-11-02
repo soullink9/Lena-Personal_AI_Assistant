@@ -1399,10 +1399,11 @@ class AskActivity : ComponentActivity() {
                 }
                 Spacer(Modifier.weight(0.8f))
 
-                // The orb, with rings that spread while she listens or speaks
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
+                // The orb, with rings that spread while she listens or speaks; smaller on a narrow screen
+                val scale = displayScale()
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp * scale)) {
                     Canvas(Modifier.fillMaxSize()) {
-                        val base = 70.dp.toPx() * grow
+                        val base = 70.dp.toPx() * scale * grow
                         val active = a.phase == Phase.LISTENING || a.phase == Phase.SPEAKING
                         drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.55f), Color.Transparent), radius = base * 1.9f), base * 1.9f)
                         if (active) for (k in 0..1) {
@@ -1411,9 +1412,9 @@ class AskActivity : ComponentActivity() {
                         }
                     }
                     Box(
-                        Modifier.size(140.dp).graphicsLayer { scaleX = grow; scaleY = grow }.clip(CircleShape)
+                        Modifier.size(140.dp * scale).graphicsLayer { scaleX = grow; scaleY = grow }.clip(CircleShape)
                             .clickable(enabled = a.phase != Phase.THINKING, onClickLabel = "Talk or stop", onClick = a.tapOrb),
-                    ) { LenaAvatar(140.dp) }
+                    ) { LenaAvatar(140.dp * scale) }
                 }
                 Spacer(Modifier.height(24.dp))
 

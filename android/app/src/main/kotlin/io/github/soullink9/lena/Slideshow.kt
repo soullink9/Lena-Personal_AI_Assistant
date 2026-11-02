@@ -250,7 +250,8 @@ private fun Overlay(now: Date, house: HouseNow?, locked: Boolean, listening: Lis
             Column(Modifier.weight(1f)) {
                 Text(
                     DateFormat.getTimeFormat(context).format(now).replace(Regex("\\s?[AaPp]\\.?[Mm]\\.?$"), ""),
-                    color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Light, lineHeight = 64.sp,
+                    color = Color.White, fontSize = (64 * displayScale()).sp, fontWeight = FontWeight.Light,
+                    lineHeight = (64 * displayScale()).sp, maxLines = 1,
                 )
                 val w = house?.weather
                 Text(

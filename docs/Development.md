@@ -15,6 +15,7 @@ How the repository is organised and how to change it without breaking things. Th
 ├── LICENSE                        GPL-3.0
 ├── THIRD_PARTY_NOTICES.md         included models and code, and their licences
 ├── .env.example                   the environment variables the project reads
+├── adjustments/                   change requests, reviewed before every build (TEMPLATE.md, README.md)
 ├── ollama/
 │   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog

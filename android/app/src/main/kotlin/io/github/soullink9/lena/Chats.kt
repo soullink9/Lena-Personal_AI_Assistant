@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -463,16 +464,65 @@ fun ChatLine(
     c: ChatItem, selected: Boolean, time: String?, height: Dp, start: Dp, shape: Shape, idle: Color,
     onOpen: () -> Unit, onLongClick: () -> Unit,
 ) {
+    ListLine(
+        title = c.title, selected = selected, height = height, start = start, shape = shape, idle = idle,
+        onClick = onOpen, onLongClick = onLongClick,
+        trailing = when {
+            c.active -> { { Spinner(Modifier.padding(start = 12.dp)) } }
+            time != null -> { { Text(time, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp, end = 8.dp)) } }
+            else -> null
+        },
+    )
+}
+
+/**
+ * A folder as a row, looking exactly like a chat row of the same list (same height, type and background),
+ * with a folder icon before its name and an arrow that turns when it's open.
+ */
+@Composable
+fun FolderLine(
+    label: String, open: Boolean, height: Dp, start: Dp, shape: Shape, idle: Color,
+    onToggle: () -> Unit, onLongClick: () -> Unit,
+) {
+    val turn by animateFloatAsState(if (open) 180f else 0f, label = "folder")
+    ListLine(
+        title = label, selected = false, height = height, start = start, shape = shape, idle = idle,
+        leading = if (open) Icons.Outlined.FolderOpen else Icons.Outlined.Folder,
+        onClick = onToggle, onLongClick = onLongClick,
+        clickLabel = if (open) "Close $label" else "Open $label",
+        trailing = { Icon(Icons.Rounded.ExpandMore, null, Modifier.rotate(turn), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+    )
+}
+
+/** The row both chats and folders are drawn with, so they always match. */
+@Composable
+fun ListLine(
+    title: String,
+    selected: Boolean,
+    height: Dp,
+    start: Dp,
+    shape: Shape,
+    idle: Color,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    leading: ImageVector? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    clickLabel: String? = null,
+) {
     val cs = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().height(height).clip(shape)
             .background(if (selected) cs.secondaryContainer else idle)
-            .combinedClickable(onClick = onOpen, onLongClick = onLongClick)
-            .padding(start = start, end = if (time != null) 20.dp else 12.dp),
+            .combinedClickable(onClickLabel = clickLabel, onClick = onClick, onLongClick = onLongClick)
+            .padding(start = start, end = 12.dp),
     ) {
+        if (leading != null) {
+            Icon(leading, null, tint = cs.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp).size(20.dp))
+        }
         Text(
-            c.title,
+            title,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             color = if (selected) cs.onSecondaryContainer else cs.onSurface,
@@ -480,11 +530,40 @@ fun ChatLine(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        when {
-            c.active -> Spinner(Modifier.padding(start = 12.dp))
-            time != null -> Text(time, style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp))
-        }
+        trailing?.invoke()
+    }
+}
+
+/**
+ * How rows look in each list style: their height, indent, shape and background, and whether they sit
+ * together in one rounded group. Folders in All chats use it so they match the chats around them.
+ */
+data class LineLook(val height: Dp, val start: Dp, val shape: Shape, val idle: Color, val grouped: Boolean)
+
+@Composable
+fun lineLook(style: ChatListStyle): LineLook {
+    val raised = MaterialTheme.colorScheme.surfaceContainerHigh
+    return when (style) {
+        ChatListStyle.GROUPS -> LineLook(56.dp, 20.dp, RectangleShape, raised, grouped = true)
+        ChatListStyle.SLIM -> LineLook(44.dp, 16.dp, RectangleShape, raised, grouped = true)
+        ChatListStyle.FLAT -> LineLook(40.dp, 12.dp, RoundedCornerShape(20.dp), Color.Transparent, grouped = false)
+        ChatListStyle.TIMED -> LineLook(44.dp, 20.dp, RectangleShape, Color.Transparent, grouped = false)
+        ChatListStyle.TIMELINE -> LineLook(36.dp, 10.dp, RoundedCornerShape(18.dp), Color.Transparent, grouped = false)
+        ChatListStyle.FOLDING -> LineLook(40.dp, 24.dp, RoundedCornerShape(20.dp), Color.Transparent, grouped = false)
+    }
+}
+
+/** A group's label (Pinned, Today, Folders) in the same type and colour as the chosen list style uses. */
+@Composable
+fun GroupLabel(label: String, style: ChatListStyle) {
+    when (style) {
+        ChatListStyle.GROUPS -> SectionTitle(label, Modifier.padding(start = 4.dp, top = 12.dp, bottom = 8.dp))
+        ChatListStyle.SLIM -> Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+        ChatListStyle.TIMED -> Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp))
+        else -> Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 12.dp, top = 14.dp, bottom = 4.dp))
     }
 }
 

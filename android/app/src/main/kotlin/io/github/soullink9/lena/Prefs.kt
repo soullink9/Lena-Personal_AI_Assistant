@@ -277,6 +277,28 @@ object Prefs {
         return List(a.length()) { Schedule.fromJson(a.getJSONObject(it)) }
     }
 
+    /**
+     * Settings → Return to defaults: every preference back to how a new install starts, keeping what
+     * connects Lena and what's yours. Kept: the Open WebUI and Home Assistant connections (addresses,
+     * sign-in, tokens, signing in by herself), the model and her context size, the dashboards and motion
+     * sensor, the screensaver's album (and whether the photo frame is on), your quick and scheduled
+     * prompts, and your order of pinned chats and folders. Whether this is the home screen is Android's
+     * setting, so it isn't touched either.
+     */
+    fun defaultsKeeping(current: Settings): Settings = Settings(
+        server = current.server,
+        signIn = current.signIn,
+        haServer = current.haServer,
+        autoSignIn = current.autoSignIn,
+        model = current.model,
+        contextTokens = current.contextTokens,
+        dashboards = current.dashboards,
+        motionEntity = current.motionEntity,
+        quickPrompts = current.quickPrompts,
+        schedules = current.schedules,
+        slides = Slides(on = current.slides.on, album = current.slides.album, albumName = current.slides.albumName),
+    )
+
     /** Every setting at once, for the Settings screen. */
     fun load(c: Context) = Settings(
         server = server(c) ?: "",

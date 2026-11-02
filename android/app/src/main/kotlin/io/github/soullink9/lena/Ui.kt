@@ -282,3 +282,27 @@ fun FitColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     }
 }
 
+// ---- Fitting any screen ---------------------------------------------------------------------
+//
+// Foldables have a narrow outer screen and a wide inner one, and Lena runs on both (and on tablets).
+// Big display elements shrink on small screens, pages of rows stop growing on wide ones, and the
+// wall display's bar folds its extras into a menu when it's narrow.
+
+/**
+ * How much big display elements (her clock, the orb) are scaled for this screen: 1 on an ordinary
+ * phone and anything larger, less on a narrow outer screen (down to 0.6). Based on the screen's
+ * shorter side, so turning the device doesn't change it.
+ */
+@Composable
+fun displayScale(): Float {
+    val c = androidx.compose.ui.platform.LocalConfiguration.current
+    return (minOf(c.screenWidthDp, c.screenHeightDp) / 400f).coerceIn(0.6f, 1f)
+}
+
+/** The widest a page of rows (Settings, All chats, Memory & knowledge) gets; on wider screens it's centred. */
+val PAGE_MAX_WIDTH: Dp = 720.dp
+
+/** Whether this screen is narrow, like a foldable's outer screen or a phone held upright (under 600dp across). */
+@Composable
+fun isNarrowScreen(): Boolean = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
+
