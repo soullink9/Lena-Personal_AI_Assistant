@@ -1,9 +1,9 @@
 """
-title: Lena (remember, forget, feel)
+title: Lena (remember, forget, feel, calendar)
 author: soullink9
 version: 0.5.2-beta
 license: GPL-3.0
-description: Lets Lena save to and remove from her Home Assistant memory list, and record how something made her feel, from Open WebUI and the Lena app.
+description: Lets Lena save to and remove from her Home Assistant memory list, record how something made her feel, and add events to your Home Assistant calendars, from Open WebUI and the Lena app.
 """
 
 # =============================================================================
@@ -12,7 +12,7 @@ description: Lets Lena save to and remove from her Home Assistant memory list, a
 # WHERE THIS GOES
 #   Open WebUI > Workspace > Tools > + (New tool). Paste this whole file and
 #   save. Then attach it to the "lena" model: Workspace > Models > lena >
-#   Tools > tick "Lena (remember, forget, feel)". The Lena app uses the
+#   Tools > tick "Lena (remember, forget, feel, calendar)". The Lena app uses the
 #   model's tools automatically.
 #   Fill in the settings (the gear icon next to the tool): the same Home
 #   Assistant address and token as the Lena filter. Any user's token works.
@@ -22,6 +22,9 @@ description: Lets Lena save to and remove from her Home Assistant memory list, a
 #                      the same list she uses in Home Assistant.
 #   feel               runs the lena.feel action, the same way her voice does,
 #                      so her reaction carries everywhere.
+#   add_calendar_event runs the lena.add_event action, which adds the event with
+#                      Home Assistant's calendar.create_event, to a calendar
+#                      exposed to Assist that takes new events.
 #
 # The moment names must match feelings.yaml in the Lena integration.
 # tools/check.py checks that.
@@ -29,6 +32,7 @@ description: Lets Lena save to and remove from her Home Assistant memory list, a
 
 import asyncio
 import json
+import urllib.error
 import urllib.request
 from typing import Literal
 
@@ -45,6 +49,19 @@ def _post(url: str, token: str, payload: dict) -> dict | list:
     )
     with urllib.request.urlopen(request, timeout=10) as reply:
         return json.loads(reply.read().decode() or "null")
+
+
+def _problem(error: Exception) -> str:
+    """What went wrong, in Home Assistant's own words when it gave any: an action that refuses (an
+    unknown calendar, say) answers HTTP 400 with a message saying how to fix it.
+    """
+    if isinstance(error, urllib.error.HTTPError):
+        try:
+            message = json.loads(error.read().decode() or "{}").get("message")
+        except (ValueError, AttributeError):
+            message = None
+        return message or f"Home Assistant answered HTTP {error.code}"
+    return str(error)
 
 
 def _best_match(wanted: str, items: list[str]) -> str | None:
@@ -156,3 +173,35 @@ class Tools:
         except Exception as error:
             return f"Couldn't record it: {error}"
         return "Noted."
+
+    async def add_calendar_event(
+        self,
+        calendar: str,
+        title: str,
+        start: str,
+        end: str = "",
+        location: str = "",
+        description: str = "",
+    ) -> str:
+        """
+        Add an event to a Home Assistant calendar when someone asks you to put something on it, book it or
+        remind them on a day. Times are the house's local time. Say what you added only after this succeeds.
+        :param calendar: The calendar's exact name, as in your context's list of the home.
+        :param title: What it is, in a few words. For example "Dentist".
+        :param start: A date like 2026-11-14 for an all-day event, or a date and time like 2026-11-14T15:30.
+        :param end: Optional. For an all-day event the last day (2026-11-16); for a timed event when it ends (2026-11-14T16:30). Leave empty for one day, or one hour.
+        :param location: Optional. Where it is.
+        :param description: Optional. Any details worth keeping.
+        """
+        if not self.valves.ha_token:
+            return "The calendar isn't set up: the tool has no Home Assistant token."
+        data = {"calendar": calendar.strip(), "title": title.strip(), "start": start.strip()}
+        optional = {"end": end, "location": location, "description": description}
+        data.update({key: value.strip() for key, value in optional.items() if value and value.strip()})
+        try:
+            reply = await self._call("lena", "add_event", data, response=True)
+        except Exception as error:
+            return f"Not added: {_problem(error)} Correct it as that says and try once more, or tell the person it failed."
+        added = (reply or {}).get("service_response", {}) if isinstance(reply, dict) else {}
+        when = added.get("start", data["start"])
+        return f"Added \"{added.get('added', data['title'])}\" to {added.get('calendar', calendar)}, starting {when}."

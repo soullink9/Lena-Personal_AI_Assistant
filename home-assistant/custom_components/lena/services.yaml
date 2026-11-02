@@ -9,3 +9,30 @@ feel:
       example: Alex thanked her for sorting the heating.
       selector:
         text:
+
+add_event:
+  fields:
+    calendar:
+      example: Personal
+      selector:
+        text:
+    title:
+      required: true
+      example: Dentist
+      selector:
+        text:
+    start:
+      required: true
+      example: "2026-11-14T15:30"
+      selector:
+        text:
+    end:
+      example: "2026-11-14T16:30"
+      selector:
+        text:
+    location:
+      selector:
+        text:
+    description:
+      selector:
+        text:

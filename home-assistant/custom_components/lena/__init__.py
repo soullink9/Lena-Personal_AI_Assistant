@@ -2,8 +2,8 @@
 
 Sets up one Lena (there's only ever one), her Mood, Energy and Moment dropdowns, her memory
 to-do list, the "Lena" choice under Control Home Assistant in a conversation agent, the
-lena.feel action, /api/lena/context for Open WebUI and the Lena app, and /api/lena/media for
-the app's photo slideshow.
+lena.feel and lena.add_event actions, /api/lena/context for Open WebUI and the Lena app, and
+/api/lena/media for the app's photo slideshow.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, llm
 
+from . import events
 from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
@@ -28,7 +29,7 @@ type LenaConfigEntry = ConfigEntry[LenaCore]
 async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:
     """Starts Lena for this config entry: loads her feelings from feelings.yaml (in the executor, since
     it reads a file), starts the core that runs her day, then the entities, the views and the feel
-    service.
+    and add_event actions.
     """
     catalog = await hass.async_add_executor_job(load_catalog)
     core = LenaCore(hass, entry, catalog)
@@ -59,6 +60,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
         supports_response=SupportsResponse.NONE,
     )
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "feel"))
+
+    async def add_event(call: ServiceCall) -> dict:
+        """The lena.add_event action: what Open WebUI's Lena tool calls to put an event on a calendar,
+        the same way her add_calendar_event tool does in Home Assistant. Returns what was added; a
+        problem (an unknown calendar, a badly written time, the calendar refusing) is an error with
+        a message she can act on.
+        """
+        try:
+            return await events.add_event(
+                hass, call.context, call.data.get("calendar"), call.data["title"], call.data["start"],
+                call.data.get("end"), call.data.get("location"), call.data.get("description"),
+            )
+        except events.EventError as error:
+            raise ServiceValidationError(str(error)) from error
+
+    hass.services.async_register(
+        DOMAIN, "add_event", add_event,
+        schema=vol.Schema({
+            vol.Optional("calendar"): cv.string,
+            vol.Required("title"): cv.string,
+            vol.Required("start"): cv.string,
+            vol.Optional("end"): cv.string,
+            vol.Optional("location"): cv.string,
+            vol.Optional("description"): cv.string,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "add_event"))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

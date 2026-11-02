@@ -1,8 +1,9 @@
 """The "Lena" choice under Control Home Assistant in a conversation agent.
 
 Tick it next to Assist in your Ollama agent's settings. Every request then carries the time,
-who's home, how she feels and what she remembers, and she gets three tools: remember_fact,
-forget_fact and record_feeling. Her character itself comes from the model's Modelfile.
+who's home, how she feels and what she remembers, and she gets her tools: remember_fact,
+forget_fact, record_feeling and, when there's a calendar she may write to, add_calendar_event.
+Her character itself comes from the model's Modelfile.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, llm
 
-from . import brain
+from . import brain, events
 from .compat import tool_result, vol
 from .const import DOMAIN, HOUSE_MOMENTS
 
@@ -91,6 +92,46 @@ class FeelTool(llm.Tool):
         return tool_result({"recorded": ok})
 
 
+class AddEventTool(llm.Tool):
+    """add_calendar_event: puts an event on one of the house's calendars through calendar.create_event
+    (Home Assistant's own tools can only read calendars). The work is in events.py, shared with the
+    lena.add_event action that Open WebUI uses.
+    """
+    name = "add_calendar_event"
+    integration = DOMAIN
+    description = (
+        "Add an event to a calendar when someone asks you to put something on it, book it or remind them on a "
+        "day. Times are the house's local time. For an all-day event give only dates; for anything at a time "
+        "give the date and time. Say what you added only after this succeeds."
+    )
+
+    def __init__(self, calendars: list[str]) -> None:
+        """Built per request with the calendars she may add to, so she can only name real ones."""
+        self.parameters = vol.Schema({
+            vol.Required("calendar", description="The calendar's exact name"): vol.In(calendars),
+            vol.Required("title", description="What it is, in a few words, e.g. Dentist"): cv.string,
+            vol.Required("start", description="2026-11-14 for all day, or 2026-11-14T15:30 at a time"): cv.string,
+            vol.Optional(
+                "end",
+                description="Optional. For all day, the last day (2026-11-16); at a time, when it ends (2026-11-14T16:30). Without it: one day, or one hour",
+            ): cv.string,
+            vol.Optional("location", description="Optional. Where it is"): cv.string,
+            vol.Optional("description", description="Optional. Any details worth keeping"): cv.string,
+        })
+
+    async def async_call(self, hass, tool_input, llm_context):
+        """Adds the event, or tells her what to fix (the error says how) so she can try once more."""
+        args = tool_input.tool_args
+        try:
+            added = await events.add_event(
+                hass, llm_context.context, args.get("calendar"), args.get("title", ""), args.get("start", ""),
+                args.get("end"), args.get("location"), args.get("description"),
+            )
+        except events.EventError as error:
+            return tool_result({"added": None, "error": str(error)})
+        return tool_result(added)
+
+
 class LenaAPI(llm.API):
     """Her context and tools, added to whatever else the agent uses (usually Assist)."""
 
@@ -103,5 +144,8 @@ class LenaAPI(llm.API):
         tools: list[llm.Tool] = [RememberTool(), ForgetTool()]
         if moments:
             tools.append(FeelTool(moments))
+        calendars = sorted(events.writable_calendars(self.hass))
+        if calendars:
+            tools.append(AddEventTool(calendars))
         prompt = "\n\n".join([SPOKEN, core.context(), brain.MEMORY_RULES])
         return llm.APIInstance(api=self, api_prompt=prompt, llm_context=llm_context, tools=tools)

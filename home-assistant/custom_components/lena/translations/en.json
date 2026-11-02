@@ -78,6 +78,36 @@
           "description": "What happened, in a few words, written to her."
         }
       }
+    },
+    "add_event": {
+      "name": "Add event",
+      "description": "Adds an event to a calendar exposed to Assist, the way Lena does when asked. Open WebUI's Lena tool uses it.",
+      "fields": {
+        "calendar": {
+          "name": "Calendar",
+          "description": "The calendar's name as shown in Home Assistant. Can be left out when only one calendar can take events."
+        },
+        "title": {
+          "name": "Title",
+          "description": "What the event is."
+        },
+        "start": {
+          "name": "Start",
+          "description": "A date (2026-11-14) for an all-day event, or a date and time (2026-11-14T15:30), in the house's time zone."
+        },
+        "end": {
+          "name": "End",
+          "description": "For an all-day event, the last day; for a timed event, when it ends. Without it: one day, or one hour."
+        },
+        "location": {
+          "name": "Location",
+          "description": "Where it is."
+        },
+        "description": {
+          "name": "Description",
+          "description": "Details to keep with it."
+        }
+      }
     }
   }
 }

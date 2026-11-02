@@ -420,3 +420,78 @@ async def test_media_view(hass: HomeAssistant, hass_client, tmp_path) -> None:
 
     assert _screen_sized("/immich/abc/123/fullsize/image/heic") == "/immich/abc/123/preview/image/jpeg"
     assert _screen_sized("/media/local/beach.jpg") == "/media/local/beach.jpg"
+
+
+async def _calendars(hass: HomeAssistant):
+    """Two calendars that take new events (Personal exposed to Assist, Work not) and a read-only one
+    that's exposed, with calendar.create_event recorded instead of run.
+    """
+    from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
+    from homeassistant.setup import async_setup_component
+
+    assert await async_setup_component(hass, "homeassistant", {})
+    hass.states.async_set("calendar.personal", "off", {"friendly_name": "Personal", "supported_features": 7})
+    hass.states.async_set("calendar.work", "off", {"friendly_name": "Work", "supported_features": 1})
+    hass.states.async_set("calendar.holidays", "off", {"friendly_name": "Holidays", "supported_features": 0})
+    async_expose_entity(hass, "conversation", "calendar.personal", True)
+    async_expose_entity(hass, "conversation", "calendar.work", False)
+    async_expose_entity(hass, "conversation", "calendar.holidays", True)
+    return async_mock_service(hass, "calendar", "create_event")
+
+
+async def test_add_calendar_event_tool(hass: HomeAssistant) -> None:
+    """Home Assistant's own tools only read calendars; her add_calendar_event tool writes through
+    calendar.create_event, to exposed calendars that take events, in the house's time zone.
+    """
+    calls = await _calendars(hass)
+    await setup(hass)
+    api = await llm.async_get_api(hass, "lena", context())
+    assert "add_calendar_event" in {t.name for t in api.tools}
+
+    result = await api.async_call_tool(llm.ToolInput(
+        tool_name="add_calendar_event",
+        tool_args={"calendar": "personal", "title": "Dentist", "start": "2026-11-14T15:30", "location": "Main St"},
+    ))
+    assert data(result)["added"] == "Dentist" and data(result)["calendar"] == "Personal"
+    call = calls[-1].data
+    assert call["entity_id"] == "calendar.personal" and call["summary"] == "Dentist" and call["location"] == "Main St"
+    start = dt_util.parse_datetime(call["start_date_time"])
+    end = dt_util.parse_datetime(call["end_date_time"])
+    assert start.tzinfo is not None and start.hour == 15 and end - start == timedelta(hours=1)  # an hour by default
+
+    # All day: the end is the last day, stored as the day after.
+    await api.async_call_tool(llm.ToolInput(
+        tool_name="add_calendar_event",
+        tool_args={"calendar": "Personal", "title": "Trip", "start": "2026-11-20", "end": "2026-11-22"},
+    ))
+    assert calls[-1].data["start_date"] == "2026-11-20" and calls[-1].data["end_date"] == "2026-11-23"
+
+    # A mistake comes back as words she can act on, and nothing is added.
+    count = len(calls)
+    result = await api.async_call_tool(llm.ToolInput(
+        tool_name="add_calendar_event",
+        tool_args={"calendar": "Personal", "title": "Call", "start": "2026-11-14T15:30", "end": "2026-11-14T15:00"},
+    ))
+    assert data(result)["added"] is None and "after the start" in data(result)["error"]
+    assert len(calls) == count
+
+
+async def test_add_event_action(hass: HomeAssistant) -> None:
+    """lena.add_event, which Open WebUI's tool calls over REST: the same rules, a response saying what
+    was added, and a clear error for a calendar she can't use.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+
+    calls = await _calendars(hass)
+    await setup(hass)
+    # The only writable exposed calendar can be left out.
+    reply = await hass.services.async_call(
+        DOMAIN, "add_event", {"title": "Bins out", "start": "2026-11-16"}, blocking=True, return_response=True,
+    )
+    assert reply["calendar"] == "Personal" and calls[-1].data["end_date"] == "2026-11-17"
+
+    for calendar in ("Work", "Holidays"):  # not exposed; read-only
+        with pytest.raises(ServiceValidationError, match="Use one of these names exactly: Personal"):
+            await hass.services.async_call(
+                DOMAIN, "add_event", {"calendar": calendar, "title": "x", "start": "2026-11-16"}, blocking=True,
+            )
