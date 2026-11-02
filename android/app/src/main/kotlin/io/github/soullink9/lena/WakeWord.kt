@@ -18,7 +18,7 @@ import java.nio.ByteOrder
 
 /** What one 80 ms piece of audio told the wake word. */
 data class WakeResult(
-    /** How sure it is, 0 to 1 (the meter in Settings → Wake word → Try it). */
+    /** How sure it is, 0 to 1 (the meter in Settings → Wall display → Wake word → Try it). */
     val score: Float,
     /** It's her name and every check passed: wake up. */
     val heard: Boolean = false,

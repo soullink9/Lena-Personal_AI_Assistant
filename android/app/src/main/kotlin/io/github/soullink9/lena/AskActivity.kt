@@ -136,7 +136,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Ask Lena: talk (or type) to Lena over whatever app you're in, like Google Assistant or Home
- * Assistant's Assist. [Sheet] holds the conversation; one of six looks (Settings → Appearance)
+ * Assistant's Assist. [Sheet] holds the conversation; one of six looks (Settings → How she looks)
  * draws it. Answers are real Open WebUI chats, written on your server with your
  * model's tools; follow-ups continue the same chat, and "Continue in Lena" opens it.
  */

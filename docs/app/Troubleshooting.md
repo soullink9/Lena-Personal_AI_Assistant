@@ -30,7 +30,7 @@ Restart the phone after installing, then look again. A few phone makers hide thi
 
 ## Open WebUI's header shows up again
 
-An Open WebUI update probably changed its page, so Lena's hiding no longer matches. Everything still works; the page just shows its own header under Lena's. Check **Open WebUI's own menus** is off in Settings, then open an issue so Lena can catch up.
+An Open WebUI update probably changed its page, so Lena's hiding no longer matches. Everything still works; the page just shows its own header under Lena's. Check **Open WebUI's own menus** is off in Settings → Chat screen, then open an issue so Lena can catch up.
 
 ## The drawer says "Sign in to see your chats"
 
@@ -102,7 +102,7 @@ Use **Settings → Wall display → Wake word → Try it** from where you'll sta
 ## No "Lena finished" or scheduled prompt notifications
 
 - **Settings → Apps → Lena → Notifications** must be allowed, with both channels on.
-- **Reply notifications** in Lena's settings must be on (for finished replies).
+- **Reply notifications** in Settings → Notifications must be on (for finished replies).
 - If they arrive late or not at all, set **Settings → Apps → Lena → Battery** to **Unrestricted**. Android delays background work for apps it's saving battery on.
 - Scheduled prompts run within a few minutes of their time, not to the second.
 

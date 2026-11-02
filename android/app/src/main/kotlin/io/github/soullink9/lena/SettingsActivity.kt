@@ -54,6 +54,7 @@ import androidx.compose.material.icons.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Language
@@ -141,11 +142,21 @@ class SettingsActivity : ComponentActivity() {
      * carries on while you look at other pages.
      */
     private enum class Page(val title: String) {
-        MAIN("Settings"), OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"), MODEL("Model"),
-        GESTURE("Assistant gesture"), VOICE("Voice"), CONVERSATION("Conversation"), QUICK("Quick prompts"),
-        SCHEDULED("Scheduled prompts"), PHONE("Widget & tile"), APPEARANCE("Appearance"), UPDATES("Updates"),
+        MAIN("Settings"),
+        // Connections
+        OPEN_WEBUI("Open WebUI"), HOME_ASSISTANT("Home Assistant"),
+        // Talking to Lena
+        GESTURE("Assistant gesture"), LOOK("How she looks"), VOICE("Voice"), CONVERSATION("Conversation"),
+        // Chats
+        MODEL("Model"), CHAT_SCREEN("Chat screen"),
+        // Prompts
+        QUICK("Quick prompts"), SCHEDULED("Scheduled prompts"), SCHEDULE("Scheduled prompt"),
+        // This phone
+        NOTIFICATIONS("Notifications"), PHONE("Widget & tile"),
+        // Wall display
         WALL("Wall display"), WALL_DASHBOARDS("Dashboards"), WALL_IDLE("When no one's around"), WAKE("Wake word"),
-        SCHEDULE("Scheduled prompt");
+        // About
+        UPDATES("Updates");
 
         /** Where back goes: the wall display's own pages sit under it. */
         val parent: Page?
@@ -198,6 +209,7 @@ class SettingsActivity : ComponentActivity() {
         var s by remember { mutableStateOf(original) }
         var page by remember { mutableStateOf(Page.MAIN) }
         var editing by remember { mutableStateOf<String?>(null) }
+        var query by remember { mutableStateOf("") } // Search settings; kept while you look at a result
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
         val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -258,18 +270,20 @@ class SettingsActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     when (shown) {
-                        Page.MAIN -> Main(s, models, ::set) { page = it }
+                        Page.MAIN -> Main(s, models, query, { query = it }) { page = it }
                         Page.OPEN_WEBUI -> OpenWebUiPage(s, ::set)
-                        Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set)
+                        Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set) { page = it }
                         Page.MODEL -> ModelPage(s, models, ::set)
                         Page.GESTURE -> GesturePage(s, ::set)
+                        Page.LOOK -> LookPage(s, ::set)
                         Page.VOICE -> VoicePage(s, ::set)
                         Page.CONVERSATION -> ConversationPage(s, ::set)
+                        Page.CHAT_SCREEN -> ChatScreenPage(s, ::set)
                         Page.QUICK -> QuickPage(s, ::set)
                         Page.SCHEDULED -> ScheduledPage(s, ::set) { id -> editing = id; page = Page.SCHEDULE }
                         Page.SCHEDULE -> SchedulePage(s, editing, ::set) { page = Page.SCHEDULED }
+                        Page.NOTIFICATIONS -> NotificationsPage(s, ::set)
                         Page.PHONE -> PhonePage(s, ::set)
-                        Page.APPEARANCE -> AppearancePage(s, ::set)
                         Page.WALL -> WallPage(s) { page = it }
                         Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
                         Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
@@ -284,52 +298,57 @@ class SettingsActivity : ComponentActivity() {
     // ---- The list ---------------------------------------------------------------------------
 
     /**
-     * The main list: one row per area, each saying how it's set, in groups that go from connecting Lena to
-     * her looks and extras.
+     * The main list, in sections by what you're doing: connecting Lena, talking to her, your chats, prompts,
+     * this phone, the wall display, and about. Each row says how it's set. The search box at the top finds
+     * any setting by name or by what it's about (see [findable]).
      */
     @Composable
-    private fun Main(s: Settings, models: List<Model>, set: (Settings) -> Unit, open: (Page) -> Unit) {
-        val house = Prefs.haServer(this) != null && Secrets.has(this, Secrets.HA_TOKEN)
-        Group {
+    private fun Main(s: Settings, models: List<Model>, query: String, onQuery: (String) -> Unit, open: (Page) -> Unit) {
+        val house = hasHouse()
+        SearchField(query, "Search settings") { onQuery(it) }
+        if (query.isNotBlank()) {
+            SearchResults(query, open)
+            return
+        }
+        Section("Connections") {
             Item(Icons.Outlined.Language, "Open WebUI", host(s.server) ?: "Not set") { open(Page.OPEN_WEBUI) }
             Item(Icons.Outlined.Home, "Home Assistant", if (house) host(s.haServer) ?: "Connected" else "Not connected") {
                 open(Page.HOME_ASSISTANT)
             }
         }
-        Group {
-            Item(Icons.Outlined.SmartToy, "Model", models.firstOrNull { it.id == s.model }?.name ?: s.model.ifBlank { "Lena, automatically" }) {
-                open(Page.MODEL)
-            }
+        Section("Talking to Lena") {
             Item(Icons.Outlined.TouchApp, "Assistant gesture", gestureLabel(s.assist) + if (s.lockScreen) " · lock screen" else "") {
                 open(Page.GESTURE)
             }
+            Item(Icons.Outlined.Palette, "How she looks", s.askStyle.label) { open(Page.LOOK) }
             Item(Icons.Outlined.RecordVoiceOver, "Voice", voiceLabel(s)) { open(Page.VOICE) }
-            Item(Icons.Outlined.Palette, "Appearance", "${s.askStyle.label} · ${s.chatList.label.lowercase()}") { open(Page.APPEARANCE) }
-            Item(Icons.Outlined.Forum, "Conversation",
-                "“$ASSISTANT_CHAT” · %,d tokens".format(s.contextTokens)) {
+            Item(Icons.Outlined.Forum, "Conversation", "“$ASSISTANT_CHAT” · %,d tokens".format(s.contextTokens)) {
                 open(Page.CONVERSATION)
             }
         }
-        Group {
+        Section("Chats") {
+            Item(Icons.Outlined.SmartToy, "Model", models.firstOrNull { it.id == s.model }?.name ?: s.model.ifBlank { "Lena, automatically" }) {
+                open(Page.MODEL)
+            }
+            Item(Icons.Outlined.ViewSidebar, "Chat screen", chatScreenLabel(s)) { open(Page.CHAT_SCREEN) }
+        }
+        Section("Prompts") {
             Item(Icons.Outlined.Bolt, "Quick prompts", count(s.quickPrompts.size, "prompt", "None yet")) { open(Page.QUICK) }
             Item(Icons.Outlined.Schedule, "Scheduled prompts",
                 if (s.schedules.isEmpty()) "None yet" else s.schedules.filter { it.enabled }.joinToString(", ") { it.title }.ifBlank { "All paused" }) {
                 open(Page.SCHEDULED)
             }
         }
-        Group {
-            SwitchItem(Icons.Outlined.Notifications, "Reply notifications", "When she finishes a reply you left", s.notifyReplies) {
-                set(s.copy(notifyReplies = it))
+        Section("This phone") {
+            Item(Icons.Outlined.Notifications, "Notifications", notificationsLabel(s)) { open(Page.NOTIFICATIONS) }
+            Item(Icons.Outlined.Widgets, "Widget & tile", if (s.widgetMood) "Widget shows her mood" else "Talk to Lena from the home screen or the shade") {
+                open(Page.PHONE)
             }
-            SwitchItem(Icons.Outlined.ViewSidebar, "Open WebUI's own menus", "Its header and sidebar, under Lena's", s.openWebUiMenus) {
-                set(s.copy(openWebUiMenus = it))
-            }
-            Item(Icons.Outlined.Widgets, "Widget & tile", if (s.widgetMood) "Widget shows her mood" else null) { open(Page.PHONE) }
         }
-        Group {
+        Section("Wall display") {
             Item(Icons.Outlined.Tv, "Wall display", "Dashboards when you need them, a photo frame when you don't") { open(Page.WALL) }
         }
-        Group {
+        Section("About") {
             val waiting = remember { Updates.pending(this@SettingsActivity) }
             Item(Icons.Outlined.SystemUpdate, "Updates",
                 waiting?.let { "${it.first} downloaded, ready to install" } ?: upd.available ?: "From your GitHub releases") { open(Page.UPDATES) }
@@ -344,7 +363,7 @@ class SettingsActivity : ComponentActivity() {
                 0 -> "No problems in the last day"
                 1 -> "1 problem in the last day"
                 else -> "$problems problems in the last day"
-            }) { startActivity(Intent(this@SettingsActivity, LogsActivity::class.java)) }
+            }) { openLogs() }
         }
         Group {
             val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() }
@@ -361,6 +380,87 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun openLogs() = startActivity(Intent(this, LogsActivity::class.java))
+
+    // ---- Search -----------------------------------------------------------------------------
+
+    /**
+     * One setting the search box can find: its name, the words someone might look for it by, and the page
+     * it's on (null for Logs, which is its own screen).
+     */
+    private class Findable(val title: String, val words: String, val page: Page?)
+
+    /**
+     * Every setting, by name and by what people call it. Keep this in step with the pages: a new setting
+     * goes here too, under the page it's on.
+     */
+    private val findable = listOf(
+        Findable("Open WebUI address", "server url https chat connect", Page.OPEN_WEBUI),
+        Findable("Sign-in address", "authentik proxy sso single sign-on login", Page.OPEN_WEBUI),
+        Findable("Sign in by herself", "auto sign-in automatic login password email ldap signed out session restart", Page.OPEN_WEBUI),
+        Findable("Home Assistant address and token", "ha url connect long-lived access token test connection integration", Page.HOME_ASSISTANT),
+        Findable("Assistant gesture", "digital assistant power button corner swipe default assistant open", Page.GESTURE),
+        Findable("On the lock screen", "locked privacy unlock lockscreen", Page.GESTURE),
+        Findable("How she looks when you talk to her", "orb sheet glow bar island subtitles style appearance ask overlay", Page.LOOK),
+        Findable("Hearing you", "speech-to-text stt microphone recognition on device whisper", Page.VOICE),
+        Findable("Her voice", "text-to-speech tts read aloud piper speak mute", Page.VOICE),
+        Findable("Her voice follows her mood", "mood voice pitch speed", Page.VOICE),
+        Findable("Keep listening", "follow-up continue conversation listen again mic", Page.VOICE),
+        Findable("Assistant Lena chat", "conversation history new conversation one chat", Page.CONVERSATION),
+        Findable("Her context size", "tokens num_ctx memory length context window", Page.CONVERSATION),
+        Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
+        Findable("Lena's look for Open WebUI", "theme colours colors claude warm serif font appearance style dark light", Page.CHAT_SCREEN),
+        Findable("Open WebUI's own menus", "header sidebar model selector chat controls sign out", Page.CHAT_SCREEN),
+        Findable("Chat | Home switch", "dashboard switcher home assistant toggle top bar", Page.CHAT_SCREEN),
+        Findable("Pinned chats in the menu", "drawer pinned how many limit sidebar", Page.CHAT_SCREEN),
+        Findable("Folders in the menu", "drawer folders groups sidebar", Page.CHAT_SCREEN),
+        Findable("All chats list style", "chat list slim groups flat timeline folding days drawer history appearance", Page.CHAT_SCREEN),
+        Findable("Quick prompts", "shortcuts one tap chips widget prompts", Page.QUICK),
+        Findable("Scheduled prompts", "briefing morning schedule repeat timer daily recurring automatic", Page.SCHEDULED),
+        Findable("Reply notifications", "lena finished notify answer done", Page.NOTIFICATIONS),
+        Findable("Alerts on this phone", "worried leak alarm house warning notify", Page.NOTIFICATIONS),
+        Findable("Widget", "home screen launcher mood on widget", Page.PHONE),
+        Findable("Quick Settings tile", "notification shade pull-down tile talk", Page.PHONE),
+        Findable("Wall display", "tablet kiosk dashboard home screen start", Page.WALL),
+        Findable("Dashboards", "lovelace path tabs home assistant views", Page.WALL_DASHBOARDS),
+        Findable("Screen saver after", "idle dim timeout sleep", Page.WALL_IDLE),
+        Findable("Back from your chats after", "return idle wall display timeout", Page.WALL_IDLE),
+        Findable("Photo frame", "photos album immich slideshow pictures shuffle transition fit crop faces", Page.WALL_IDLE),
+        Findable("Her clock", "clock screen saver night dim time weather", Page.WALL_IDLE),
+        Findable("Motion sensor", "presence wake up binary_sensor motion", Page.WALL_IDLE),
+        Findable("Wake word", "hey lena jarvis listen name hotword sensitivity false starts", Page.WAKE),
+        Findable("Android screen saver", "dream charging daydream", Page.WALL),
+        Findable("Updates", "install download version github auto blocker re-download reinstall release", Page.UPDATES),
+        Findable("Logs", "problems errors debug log troubleshooting", null),
+    )
+
+    /** The settings that match what you typed, each with where it lives; tap one to go there. */
+    @Composable
+    private fun SearchResults(query: String, open: (Page) -> Unit) {
+        val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val found = findable.filter { f ->
+            val text = (f.title + " " + f.words + " " + (f.page?.title ?: "")).lowercase()
+            words.all { it in text }
+        }
+        if (found.isEmpty()) {
+            Footnote("Nothing matches. Try another word, like voice, photos or notifications.")
+            return
+        }
+        Group {
+            found.forEach { f ->
+                Item(null, f.title, f.page?.let { where(it) } ?: "About") {
+                    if (f.page == null) openLogs() else open(f.page)
+                }
+            }
+        }
+    }
+
+    /** Where a page is, as a path from the main list: "Wall display › When no one's around". */
+    private fun where(page: Page): String {
+        val trail = generateSequence(page) { it.parent }.takeWhile { it != Page.MAIN }.toList().reversed()
+        return trail.joinToString(" › ") { it.title }
     }
 
     // ---- Pages ------------------------------------------------------------------------------
@@ -678,11 +778,11 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * Home Assistant's address and token (kept encrypted), a connection test that also checks for the Lena
-     * integration, and this phone's own alerts.
+     * Home Assistant's address and token (kept encrypted), and a connection test that also checks for the
+     * Lena integration. This phone's alerts are under Notifications.
      */
     @Composable
-    private fun HomeAssistantPage(s: Settings, set: (Settings) -> Unit) {
+    private fun HomeAssistantPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
         val scope = rememberCoroutineScope()
         var token by remember { mutableStateOf("") }
         var tokenSaved by remember { mutableStateOf(Secrets.has(this, Secrets.HA_TOKEN)) }
@@ -742,8 +842,24 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Group {
+            Item(Icons.Outlined.NotificationImportant, "Alerts on this phone", if (s.alerts) "On" else "Off") { open(Page.NOTIFICATIONS) }
+            Item(Icons.Outlined.Tv, "Wall display", "Your dashboards on a tablet") { open(Page.WALL) }
+        }
+        Footnote("Home Assistant also gives the wall display its dashboards and photos, and the Chat | Home switch somewhere to go.")
+    }
+
+    /** What Lena tells you about: replies you left, and worries at home. */
+    @Composable
+    private fun NotificationsPage(s: Settings, set: (Settings) -> Unit) {
+        Group {
+            SwitchItem(Icons.Outlined.Notifications, "Reply notifications", "When she finishes a reply you left before it was done", s.notifyReplies) {
+                set(s.copy(notifyReplies = it))
+            }
+        }
+        Footnote("Scheduled prompts always notify you with their answer.")
+        Group {
             SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on this phone",
-                "Checks every 15 minutes and tells you when she's worried about something at home", s.alerts) {
+                "Checks every 15 minutes and tells you when she's worried about something at home. Needs Home Assistant.", s.alerts) {
                 set(s.copy(alerts = it))
                 if (it && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
@@ -751,6 +867,11 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote("For instant alerts, written by her, pick this phone under Tell these phones when she's worried in the Lena integration's Configure (needs the Home Assistant companion app). Use this switch on phones without it.")
+        Group {
+            Item(Icons.AutoMirrored.Outlined.OpenInNew, "Android's notification settings", "Sounds, and which kinds of notification show") {
+                startActivity(Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, packageName))
+            }
+        }
     }
 
     /** Which model talks to you: Lena (found by name on your server) unless you pick another. */
@@ -1147,7 +1268,7 @@ class SettingsActivity : ComponentActivity() {
             }
             Item(Icons.Outlined.Add, "Add a dashboard", null) { set(s.copy(dashboards = s.dashboards + Dashboard("", ""))) }
         }
-        Footnote("Home Assistant's own header is replaced by Lena's bar: Home Assistant's menu (back is the back gesture), the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons for your chats, reload, your other apps and settings. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
+        Footnote("Home Assistant's own header is replaced by Lena's bar: Home Assistant's menu (back is the back gesture), the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons to reload, for your other apps and for settings; the Chat | Home switch beside the menu opens your chats. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
     }
 
     /** What it shows when no one's using it, and what wakes it up. Also the screen saver. */
@@ -1295,10 +1416,10 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    /** How talking to Lena looks, how the drawer lists chats, and how many pinned chats it shows. */
+    /** How talking to Lena looks over other apps, with a button to try it. */
     @Composable
-    private fun AppearancePage(s: Settings, set: (Settings) -> Unit) {
-        Section("Talking to Lena") {
+    private fun LookPage(s: Settings, set: (Settings) -> Unit) {
+        Group {
             AskStyle.entries.forEach { a -> ChoiceItem(a.label, a.detail, s.askStyle == a) { set(s.copy(askStyle = a)) } }
         }
         Group {
@@ -1307,18 +1428,40 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote("Every look listens, answers and speaks the same way. The sheet is the only one that shows earlier turns; the others show what's happening now.")
-        Section("All chats") {
-            ChatListStyle.entries.forEach { c -> ChoiceItem(c.label, c.detail, s.chatList == c) { set(s.copy(chatList = c)) } }
-        }
-        Group {
-            PickItem(Icons.Outlined.PushPin, "Pinned chats in the menu", listOf(3, 5, 8, 12).map { it to "Up to $it" }, s.pinnedShown) {
-                set(s.copy(pinnedShown = it))
+    }
+
+    /**
+     * The main screen: how Open WebUI's pages look, what the top bar shows, and the menu and All chats
+     * (how many pinned chats, folders, the list style).
+     */
+    @Composable
+    private fun ChatScreenPage(s: Settings, set: (Settings) -> Unit) {
+        Section("The page") {
+            SwitchItem(Icons.Outlined.Palette, "Lena's look", "Warm colours, a clay accent and replies in a serif. Off: Open WebUI's own look.", s.lenaLook) {
+                set(s.copy(lenaLook = it))
+            }
+            SwitchItem(Icons.Outlined.ViewSidebar, "Open WebUI's own menus", "Its header and sidebar, under Lena's, for its model selector, chat controls and settings", s.openWebUiMenus) {
+                set(s.copy(openWebUiMenus = it))
             }
         }
-        Footnote(
-            "The menu shows your pinned chats, your folders and your latest chats, as many as fit, and never scrolls. " +
-                "View all chats has everything, in the style above. Long-press a chat to pin it, move it to a folder, rename or delete it."
-        )
+        Section("Top bar") {
+            SwitchItem(Icons.Outlined.Home, "Chat | Home switch",
+                if (hasHouse()) "Beside her logo, to switch to your dashboards" else "Shows once Home Assistant is connected", s.homeSwitch) {
+                set(s.copy(homeSwitch = it))
+            }
+        }
+        Section("The menu") {
+            PickItem(Icons.Outlined.PushPin, "Pinned chats", listOf(3, 5, 8, 12).map { it to "Up to $it" }, s.pinnedShown) {
+                set(s.copy(pinnedShown = it))
+            }
+            SwitchItem(Icons.Outlined.Folder, "Folders", "Your Open WebUI folders, between pinned and recent chats", s.drawerFolders) {
+                set(s.copy(drawerFolders = it))
+            }
+        }
+        Footnote("The menu shows your pinned chats, your folders and your latest chats, as many as fit, and never scrolls. View all chats at its bottom has everything. Long-press a chat to pin it, move it to a folder, rename or delete it.")
+        Section("All chats list style") {
+            ChatListStyle.entries.forEach { c -> ChoiceItem(c.label, c.detail, s.chatList == c) { set(s.copy(chatList = c)) } }
+        }
     }
 
     // ---- Words for the list -----------------------------------------------------------------
@@ -1341,6 +1484,22 @@ class SettingsActivity : ComponentActivity() {
         AssistAction.ASK -> "Listens straight away, over whatever you're doing"
         AssistAction.TYPE -> "The same sheet, with the keyboard"
         AssistAction.CHAT -> "Opens Lena on a new chat"
+    }
+
+    /** The Chat screen row's summary: the look, and what the menu shows. */
+    private fun chatScreenLabel(s: Settings): String =
+        listOf(
+            if (s.lenaLook) "Lena's look" else "Open WebUI's look",
+            if (s.drawerFolders) "pinned, folders, recent" else "pinned, recent",
+            s.chatList.label.lowercase(),
+        ).joinToString(" · ")
+
+    /** The Notifications row's summary: which of the two are on. */
+    private fun notificationsLabel(s: Settings): String = when {
+        s.notifyReplies && s.alerts -> "Replies and house alerts"
+        s.notifyReplies -> "Replies you left"
+        s.alerts -> "House alerts"
+        else -> "Off"
     }
 
     /** The Voice row's summary: who listens, who speaks, and whether it follows her mood. */

@@ -11,7 +11,8 @@
  * and those use ids and classes from Open WebUI's source that have been stable for a long time.
  * If an update renames one, that part simply goes back to Open WebUI's own look.
  *
- * Also here: Open WebUI's voice-call button is hidden, since Lena has no calls.
+ * Settings → Chat screen → Lena's look turns it off. (Open WebUI's call button is hidden separately,
+ * whichever look: NO_CALLS_CSS in MainActivity.kt.)
  */
 
 /* ---- Colours ----------------------------------------------------------------------------- */
@@ -112,14 +113,4 @@ body,
 .chat-assistant #response-content-container .markdown-prose :is(pre, code, kbd, samp) {
   font-family: ui-monospace, "JetBrains Mono", "Roboto Mono", monospace;
   font-size: 0.9em;
-}
-
-/* ---- No voice calls ---------------------------------------------------------------------- */
-
-/* Open WebUI's call button sits where Send is while the box is empty. Its label is the only stable
-   handle; "Voice mode" and "Return to call" are its English labels. */
-button[aria-label="Voice mode"],
-button[aria-label="Return to call"],
-button.call-active {
-  display: none !important;
 }

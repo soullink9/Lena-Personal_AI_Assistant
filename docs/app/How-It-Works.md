@@ -11,22 +11,22 @@ Lena is two things working together:
 
 **Top bar**
 - **☰** opens the drawer.
-- **Lena's logo**, then the **Chat | Home** switch: **Home** opens your Home Assistant dashboards (the wall display), and the same switch there brings you back to your chats. It shows once Home Assistant is set up in Settings.
+- **Lena's logo**, then the **Chat | Home** switch: **Home** opens your Home Assistant dashboards (the wall display), and the same switch there brings you back to your chats. It shows once Home Assistant is set up in Settings; turn it off in Settings → Chat screen.
 - **Temporary chat** (one Open WebUI doesn't save) and **New chat** on the right.
 
 **Drawer**
 - **Lena** at the top, with whether your server is reachable (and its Open WebUI version), and **how she feels** if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
 - Then your chats, in this order, as many as fit. The drawer never scrolls:
-  - **Pinned** chats, the same as Open WebUI's sidebar (up to five; Settings → Appearance → **Pinned chats in the menu**: 3, 5, 8 or 12).
-  - Your **folders** (Open WebUI's folders). Tap one to open or close it; open folders show their chats. Open WebUI remembers which are open, so its sidebar matches.
+  - **Pinned** chats, the same as Open WebUI's sidebar (up to five; Settings → Chat screen → **Pinned chats**: 3, 5, 8 or 12).
+  - Your **folders** (Open WebUI's folders). Tap one to open or close it; open folders show their chats. Open WebUI remembers which are open, so its sidebar matches. (Settings → Chat screen → **Folders** leaves them out of the menu.)
   - **Recent** chats, newest first.
-- **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Appearance → All chats): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
+- **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Chat screen → All chats list style): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
 - **Long-press** any chat, in the drawer or All chats, to **pin** (or unpin) it, **move it to a folder** (or out of one, or into a new folder), **rename** or **delete** it (deleting removes it from Open WebUI too). A spinner marks a chat that's still being answered.
 - Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
 
-**Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). It recolours Open WebUI through its colour settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
+**Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). Turn it off in Settings → Chat screen → **Lena's look**. It recolours Open WebUI through its colour settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
 
-**Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings.
+**Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings → Chat screen.
 
 Lena hides Open WebUI's own header and sidebar because the top bar and drawer replace them. If an Open WebUI update changes its page, the header may simply reappear until Lena catches up; nothing breaks.
 
@@ -34,11 +34,25 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 **Back** goes back within Open WebUI, then closes Lena to the background. **Swiping right from the middle of the left edge** opens the drawer instead of going back; Android lets an app take over only part of an edge, so higher or lower on the left edge, and the right edge, still go back.
 
+## Settings
+
+Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives. The list is grouped by what you're doing:
+
+| Section | What's in it |
+|---|---|
+| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself) and **Home Assistant** (address, token, test). |
+| **Talking to Lena** | **Assistant gesture** (and the lock screen), **How she looks** (Orb, Sheet, Glow, Bar, Island, Subtitles), **Voice** (who hears you, who speaks, keep listening) and **Conversation** (the Assistant Lena chat and her context size). |
+| **Chats** | **Model** for new chats, the sheet and scheduled prompts, and **Chat screen**: **Lena's look** for Open WebUI's pages (off for Open WebUI's own), **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
+| **Prompts** | **Quick prompts** and **Scheduled prompts**. |
+| **This phone** | **Notifications** (reply notifications and house alerts) and **Widget & tile**. |
+| **Wall display** | Starting it, dashboards, the screen saver and photo frame, the wake word. |
+| **About** | **Updates** and **Logs**, and the version. |
+
 ## Talking to Lena
 
 The assistant gesture opens Lena over whatever you're doing, already listening, like Google Assistant or Home Assistant's Assist.
 
-**How it looks** is your choice (Settings → Appearance → Talking to Lena, with **Try it** to see it):
+**How it looks** is your choice (Settings → How she looks, with **Try it** to see it):
 
 | Look | What you see |
 |---|---|
@@ -182,7 +196,7 @@ It runs entirely on the device: the sound is scored a few times a second and thr
 When something in your house worries her (a leak, smoke, a door left open: the sensors you chose in the Lena integration), she can tell you on your phone, and tapping the alert opens Lena listening so you can ask what's going on.
 
 - **Instant, in her words:** in Home Assistant, Lena integration → Configure → **Tell these phones when she's worried**, pick your phones (they need the Home Assistant companion app), and choose your Lena agent under **Write alerts in her words with**. Each alert is written by her, and an "all clear" replaces it when the sensor clears.
-- **Backup on this phone:** Settings → Home Assistant → **Alerts on this phone**. The app checks every 15 minutes, the shortest Android allows an app without Google's push service, so an alert can arrive up to 15 minutes late and uses the plain reason ("Leak sensor is detecting water."). Use it on phones without the companion app; on phones with both, you'd get each alert twice.
+- **Backup on this phone:** Settings → Notifications → **Alerts on this phone**. The app checks every 15 minutes, the shortest Android allows an app without Google's push service, so an alert can arrive up to 15 minutes late and uses the plain reason ("Leak sensor is detecting water."). Use it on phones without the companion app; on phones with both, you'd get each alert twice.
 
 ## Share to Lena
 
@@ -208,7 +222,7 @@ Settings → Quick prompts. Up to six. They appear as chips in the sheet when ty
 
 ## "Lena finished" notifications
 
-If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off with **Reply notifications** in Settings.
+If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off with **Reply notifications** in Settings → Notifications.
 
 Lena watches for up to about nine minutes. Android may delay the check a little to save battery.
 

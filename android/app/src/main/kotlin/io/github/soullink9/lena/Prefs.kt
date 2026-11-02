@@ -177,6 +177,12 @@ data class Settings(
     /** Seconds without a touch in your chats, opened from the wall display, before it goes back; 0 never. */
     val returnSeconds: Int = 60,
     val pinnedShown: Int = 5,
+    /** Lena's warm look for Open WebUI's pages (assets/css/open_webui.css); off shows Open WebUI's own. */
+    val lenaLook: Boolean = true,
+    /** The Chat | Home switch at the top of the main screen (it shows only with Home Assistant set up). */
+    val homeSwitch: Boolean = true,
+    /** Your Open WebUI folders in the menu (All chats always has them). */
+    val drawerFolders: Boolean = true,
     val autoSignIn: AutoSignIn = AutoSignIn.OFF,
     val motionEntity: String = "",
     val slides: Slides = Slides(),
@@ -297,6 +303,9 @@ object Prefs {
         dimSeconds = dimSeconds(c),
         returnSeconds = returnSeconds(c),
         pinnedShown = pinnedShown(c),
+        lenaLook = lenaLook(c),
+        homeSwitch = homeSwitch(c),
+        drawerFolders = drawerFolders(c),
         autoSignIn = autoSignIn(c),
         motionEntity = motionEntity(c),
         slides = slides(c),
@@ -333,6 +342,9 @@ object Prefs {
             .putString("wake_sensitivity", s.wakeSensitivity.name)
             .putInt("return_seconds", s.returnSeconds)
             .putInt("pinned_shown", s.pinnedShown)
+            .putBoolean("lena_look", s.lenaLook)
+            .putBoolean("home_switch", s.homeSwitch)
+            .putBoolean("drawer_folders", s.drawerFolders)
             .putString("auto_sign_in", s.autoSignIn.name)
             .putString("dashboards", JSONArray().apply {
                 s.dashboards.filter { it.path.isNotBlank() }.forEach { put(JSONObject().put("name", it.name).put("path", it.path)) }
@@ -394,6 +406,15 @@ object Prefs {
 
     /** How many pinned chats the menu shows before "View all". */
     fun pinnedShown(c: Context): Int = p(c).getInt("pinned_shown", 5)
+
+    /** Lena's look for Open WebUI's pages, rather than Open WebUI's own. On by default. */
+    fun lenaLook(c: Context): Boolean = p(c).getBoolean("lena_look", true)
+
+    /** The Chat | Home switch on the main screen (when Home Assistant is set up). On by default. */
+    fun homeSwitch(c: Context): Boolean = p(c).getBoolean("home_switch", true)
+
+    /** Folders in the menu. On by default. */
+    fun drawerFolders(c: Context): Boolean = p(c).getBoolean("drawer_folders", true)
 
     /** Whether, and how, to sign in to Open WebUI by herself. */
     fun autoSignIn(c: Context): AutoSignIn =

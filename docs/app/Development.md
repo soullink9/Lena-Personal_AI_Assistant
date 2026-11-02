@@ -15,12 +15,12 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
 | `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
 | `SignIn.kt` | Signing in to Open WebUI by herself with details kept encrypted. |
-| `SettingsActivity.kt` | The settings screen and all its pages. |
+| `SettingsActivity.kt` | The settings screen and all its pages, in sections (Connections, Talking to Lena, Chats, Prompts, This phone, Wall display, About), with **Search settings**. Its `findable` list is what search finds: a new setting needs a line there too. |
 | `Ui.kt` | The shared rows and groups the settings and lists are built from. |
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
-| `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies) and the hidden call button, added to the top frame. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. |
+| `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
 | `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |

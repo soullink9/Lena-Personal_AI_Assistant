@@ -169,6 +169,13 @@ class MainActivity : ComponentActivity() {
                 "(document.head||document.documentElement).appendChild(s);})();"
         private const val REMOVE_STYLE =
             "(function(){var s=document.getElementById('lena-shell');if(s)s.remove();})();"
+
+        /**
+         * Hides Open WebUI's voice-call button, since Lena has no calls, whichever look is on. It sits where
+         * Send is while the box is empty; its English labels are its only stable handle.
+         */
+        private const val NO_CALLS_CSS =
+            "button[aria-label=\"Voice mode\"],button[aria-label=\"Return to call\"],button.call-active{display:none!important}"
     }
 
     private lateinit var web: WebView
@@ -177,23 +184,33 @@ class MainActivity : ComponentActivity() {
     private val signIn = mutableListOf<Uri>()
     private var shellScript: ScriptHandler? = null
 
+    private var themeHandle: ScriptHandler? = null
+
+    /** Lena's look for Open WebUI's pages (assets/css/open_webui.css), read once. */
+    private val lookCss by lazy { assets.open("css/open_webui.css").bufferedReader().use { it.readText() } }
+
     /**
-     * Lena's look for Open WebUI's pages (assets/css/open_webui.css), as a script that adds it once, in
-     * the top frame only, like the shell style above.
+     * The style Lena adds to Open WebUI's pages, in the top frame only like the shell style above: her
+     * look when it's on (Settings → Chat screen → Lena's look), and always the hidden call button. Run
+     * again, it replaces the style already there, so switching the look takes effect at once.
      */
-    private val themeScript by lazy {
-        val css = assets.open("css/open_webui.css").bufferedReader().use { it.readText() }
-        "(function(){if(window.top!==window||document.getElementById('lena-theme'))return;" +
-            "var s=document.createElement('style');s.id='lena-theme';s.textContent=${JSONObject.quote(css)};" +
-            "(document.head||document.documentElement).appendChild(s);})();"
+    private fun themeScript(look: Boolean): String {
+        val css = (if (look) lookCss + "\n" else "") + NO_CALLS_CSS
+        return "(function(){if(window.top!==window)return;" +
+            "var s=document.getElementById('lena-theme')||document.createElement('style');s.id='lena-theme';" +
+            "s.textContent=${JSONObject.quote(css)};" +
+            "if(!s.parentNode)(document.head||document.documentElement).appendChild(s);})();"
     }
 
     private val currentUrl = mutableStateOf("")
     private val canGoBack = mutableStateOf(false)
     private val showMenus = mutableStateOf(false)
 
-    /** Whether Home Assistant is set up, so the Chat | Home switch has somewhere to go. */
+    /** Whether the Chat | Home switch shows: Home Assistant is set up and the switch is on in Settings. */
     private val hasHome = mutableStateOf(false)
+
+    /** Whether Lena's look is on for Open WebUI's pages (the top bar matches the page either way). */
+    private val lenaLook = mutableStateOf(true)
 
     private var fromWall = false
     private var lastInteraction = System.currentTimeMillis()
@@ -235,11 +252,12 @@ class MainActivity : ComponentActivity() {
         api = Api(url, applicationContext)
         Prefs.signIn(this).split(" ").filter { it.isNotBlank() }.forEach { signIn += Uri.parse(it) }
         showMenus.value = Prefs.showOpenWebUiMenus(this)
-        hasHome.value = HomeAssistant.from(this) != null
+        hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
+        lenaLook.value = Prefs.lenaLook(this)
 
         enableEdgeToEdge()
         web = createWebView()
-        addTheme()
+        applyTheme()
         applyShellStyle()
         setContent { LenaTheme { Shell() } }
         // Switching dark mode rebuilds the screen so the page re-themes; come back to the same chat.
@@ -404,11 +422,15 @@ class MainActivity : ComponentActivity() {
     /** Your server's origin (scheme, host and port), which the shell style and sign-in checks are scoped to. */
     private fun serverOrigin(): String = "https://${server.host}" + if (server.port == -1) "" else ":${server.port}"
 
-    /** Adds Lena's look to Open WebUI's pages on every page load (assets/css/open_webui.css). */
-    private fun addTheme() {
+    /** Puts the current look (and the hidden call button) on Open WebUI's pages, now and on every page load. */
+    private fun applyTheme() {
+        themeHandle?.remove()
+        themeHandle = null
+        val script = themeScript(lenaLook.value)
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(web, themeScript, setOf(serverOrigin()))
+            themeHandle = WebViewCompat.addDocumentStartJavaScript(web, script, setOf(serverOrigin()))
         }
+        web.evaluateJavascript(script, null)
     }
 
     /** Adds or removes the style that hides Open WebUI's header, now and on every page load. */
@@ -488,7 +510,7 @@ class MainActivity : ComponentActivity() {
         override fun onPageFinished(view: WebView, url: String?) {
             canGoBack.value = view.canGoBack()
             val older = !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
-            if (older && isServer(url?.let { Uri.parse(it) })) view.evaluateJavascript(themeScript, null)
+            if (older && isServer(url?.let { Uri.parse(it) })) view.evaluateJavascript(themeScript(lenaLook.value), null)
             if (!showMenus.value && shellScript == null && isServer(url?.let { Uri.parse(it) })) {
                 view.evaluateJavascript(ADD_STYLE, null) // older web views without document-start scripts
             }
@@ -569,13 +591,18 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Picks up changes made in Settings while away: whether Home Assistant is set up (for the Chat | Home
-     * switch) and whether Open WebUI's own menus show.
+     * Picks up changes made in Settings while away: the Chat | Home switch (and whether Home Assistant is
+     * set up), Lena's look, and whether Open WebUI's own menus show.
      */
     override fun onResume() {
         super.onResume()
-        hasHome.value = HomeAssistant.from(this) != null
+        hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
         if (::web.isInitialized) {
+            val look = Prefs.lenaLook(this)
+            if (look != lenaLook.value) {
+                lenaLook.value = look
+                applyTheme()
+            }
             web.onResume()
             // "Show Open WebUI's own menus" lives in Settings; pick up a change made there.
             val wanted = Prefs.showOpenWebUiMenus(this)
@@ -653,7 +680,9 @@ class MainActivity : ComponentActivity() {
             feelings = HomeAssistant.from(this@MainActivity)?.let { runCatching { it.feelings() }.getOrNull() }
             try {
                 pinned = runCatching { api.pinned() }.getOrDefault(pinned)
-                folders = runCatching { api.folders() }.getOrDefault(emptyList()) // none, or folders are off
+                // None when they're off in Settings → Chat screen, or turned off on the server.
+                folders = if (!Prefs.drawerFolders(this@MainActivity)) emptyList()
+                    else runCatching { api.folders() }.getOrDefault(emptyList())
                 folders.forEach { f ->
                     if (openFolders[f.id] == null) openFolders[f.id] = f.expanded
                     if (openFolders[f.id] == true) folderChats[f.id] = runCatching { api.folderChats(f.id) }.getOrDefault(emptyList())
@@ -756,10 +785,10 @@ class MainActivity : ComponentActivity() {
             },
         ) {
             Scaffold(
-                containerColor = pageBackground(),
+                containerColor = pageBackground(lenaLook.value),
                 topBar = {
                     TopAppBar(
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = pageBackground()),
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = pageBackground(lenaLook.value)),
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Rounded.Menu, "Menu") }
                         },

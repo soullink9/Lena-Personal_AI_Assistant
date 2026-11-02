@@ -71,6 +71,7 @@ The app build only runs when something in `android/` or its workflow changes, an
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Conversation) in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |
+| A setting in the app | `Settings` and `Prefs` in `Prefs.kt`, its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |
 
 ## Running the checks
