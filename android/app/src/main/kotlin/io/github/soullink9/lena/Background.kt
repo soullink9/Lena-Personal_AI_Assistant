@@ -136,7 +136,7 @@ class ReplyWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
     }
 }
 
-/** Sends a scheduled prompt, waits for the answer and notifies you with it. */
+/** Sends a scheduled prompt (to Open WebUI, or to Assist when it answers), waits for the answer and notifies you with it. */
 class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     companion object {
@@ -159,12 +159,14 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     /**
      * Sends the prompt (into its named chat if it has one), waits for the answer and notifies you with it.
-     * A schedule that was deleted or paused since the alarm was set is skipped.
+     * A schedule that was deleted or paused since the alarm was set is skipped. With Assist chosen in
+     * Settings → Connections → Who answers, it goes to Assist instead.
      */
     override suspend fun doWork(): Result {
         val c = applicationContext
         val id = inputData.getString("schedule_id") ?: return Result.failure()
         val schedule = Prefs.schedules(c).firstOrNull { it.id == id && it.enabled } ?: return Result.success()
+        if (Prefs.answers(c) == Answerer.ASSIST) return throughAssist(c, schedule)
         val api = Api.from(c) ?: return Result.failure()
         val title = schedule.title
         return try {
@@ -206,6 +208,37 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             if (runAttemptCount < 2) Result.retry()
             else {
                 Notify.show(c, Notify.SCHEDULED, title, "Couldn't reach your server for this scheduled prompt.", null)
+                Result.success()
+            }
+        }
+    }
+
+    /**
+     * Sends the prompt to Home Assistant's Assist and notifies you with its answer. Assist keeps no chats
+     * Lena can open, so the schedule's chat name isn't used: each run is a conversation of its own, and
+     * the answer is in the notification.
+     */
+    private suspend fun throughAssist(c: Context, schedule: Schedule): Result {
+        val title = schedule.title
+        val house = HomeAssistant.from(c)
+        if (house == null) {
+            Notify.show(c, Notify.SCHEDULED, title, "Set up Home Assistant in Lena's settings so scheduled prompts can go through Assist.", null)
+            return Result.success()
+        }
+        return try {
+            val reply = house.converse(schedule.prompt, Prefs.assistAgent(c), conversationId = null)
+            val text = Markdown.plain(reply.speech).take(900).ifBlank { "Assist didn't say anything." }
+            Notify.show(c, Notify.SCHEDULED, title, text, null)
+            Result.success()
+        } catch (_: HaAuthException) {
+            Logs.w("Scheduled prompts", "Couldn't run one through Assist: Home Assistant refused the token")
+            Notify.show(c, Notify.SCHEDULED, title, "Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.", null)
+            Result.success()
+        } catch (e: Exception) {
+            Logs.w("Scheduled prompts", "Couldn't run one through Assist (try ${runAttemptCount + 1})", e)
+            if (runAttemptCount < 2) Result.retry()
+            else {
+                Notify.show(c, Notify.SCHEDULED, title, "Couldn't reach Home Assistant for this scheduled prompt.", null)
                 Result.success()
             }
         }

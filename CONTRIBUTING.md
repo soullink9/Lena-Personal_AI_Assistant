@@ -4,7 +4,7 @@ This is a personal project shared in case it helps someone, so replies and merge
 
 ## Changing a default setting
 
-Where every setting starts (on a new install, and after Return to defaults) is in [`adjustments/defaults.csv`](adjustments/defaults.csv): the setting, a **Change to** column, its possible values, and the current default. Fill in **Change to** and commit; it's applied before the next build. See [adjustments/README.md](adjustments/README.md).
+Where every setting starts (on a new install, and after Return to defaults) is in [`adjustments/defaults.env`](adjustments/defaults.env): each setting's name, with comments above it saying where it is in Settings, its possible values and its current default. Type the new value after its `=` and commit; it's applied before the next build. See [adjustments/README.md](adjustments/README.md).
 
 ## Reporting a problem
 

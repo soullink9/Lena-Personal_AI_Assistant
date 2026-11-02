@@ -182,7 +182,7 @@ check(re.search(r'^MESSAGE system """', modelfile, re.M) is not None and modelfi
 check(re.search(r"^SYSTEM ", modelfile, re.M) is None,
       "Modelfile has no SYSTEM line (apps would replace it; her character belongs in MESSAGE system)")
 ctx = re.search(r"^PARAMETER num_ctx (\d+)", modelfile, re.M)
-# The app's default comes from adjustments/defaults.csv by way of Defaults.kt.
+# The app's default comes from adjustments/defaults.env by way of Defaults.kt.
 APP_DEFAULTS = APP_PREFS.parent / "Defaults.kt"
 app_ctx = re.search(r"CONTEXT_TOKENS: Int = ([\d_]+)", APP_DEFAULTS.read_text()) if APP_DEFAULTS.exists() else None
 if ctx and app_ctx:
@@ -302,16 +302,16 @@ manifest = json.loads((ROOT / "home-assistant/custom_components/lena/manifest.js
 check(manifest.get("requirements", []) == [], "the integration installs no Python packages (manifest requirements is empty)")
 
 # ---- 12. Default settings: requested changes are applied before a build -------------------------
-# adjustments/defaults.csv is where defaults are changed (see adjustments/README.md). Every "Change to"
-# must be applied (python3 tools/defaults.py apply) before a build, and the app's Defaults.kt must match.
+# adjustments/defaults.env is where defaults are changed (see adjustments/README.md). Every value asked
+# for after a setting's = must be applied (python3 tools/defaults.py apply) before a build, and the app's Defaults.kt must match.
 
 sys.path.insert(0, str(ROOT / "tools"))
 import defaults  # noqa: E402 - the tools folder, added just above
 
 issues = defaults.check()
 for issue in issues:
-    check(False, f"adjustments/defaults.csv: {issue}")
-check(not issues, "adjustments/defaults.csv is applied and matches Defaults.kt")
+    check(False, f"adjustments/defaults.env: {issue}")
+check(not issues, "adjustments/defaults.env is applied and matches Defaults.kt")
 
 print()
 if failures:

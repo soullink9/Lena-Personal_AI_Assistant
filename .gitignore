@@ -21,6 +21,8 @@ Thumbs.db
 secrets.yaml
 .env
 *.env
+# Except Lena's default settings: no secrets, only where each setting starts (see adjustments/README.md).
+!adjustments/defaults.env
 
 # Data folders created by the example compose files
 ollama-data/

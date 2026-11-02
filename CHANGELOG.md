@@ -2,6 +2,20 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.6] - 2026-11-02
+
+### Android app
+
+- **Who answers** (Settings → Connections): Open WebUI, as before, or **Home Assistant Assist**. With Assist, everything that asks her goes to Home Assistant's conversation agent: the sheet however it's opened (assistant gesture, wake word, tile, widget, quick prompts, sharing) and scheduled prompts. Pick the agent, or leave it to Home Assistant. Talking to her continues one Assist conversation; **New conversation** starts another. Assist takes words only (no photos), waits for you to unlock before answering from the lock screen (it can control your home), and its answers aren't saved to your chats: they're on the sheet, or in a scheduled prompt's notification. The chats screen is still Open WebUI's.
+- **The wall display's screensaver on every screen:** when Lena is the device's home screen, the screensaver now comes on after **Screen saver after** without a touch whichever screen is showing (the dashboards, your chats, All chats, Memory, Settings, Logs), on one clock shared by all of them. A touch on it always shows the dashboard. The screen never goes dark in this mode, on any screen.
+- **Back from your chats after** still takes you back to the dashboards on its own timer, but no longer straight to the screensaver: that keeps its own time, so whichever is shorter comes first.
+
+- **New defaults** (asked for in the defaults file): **Screen saver after** 2 minutes (was 5), and **Each photo for** 1 minute (was 15 seconds). Only new installs and **Return to defaults** use them; what you've already picked stays.
+
+### Project
+
+- **Default settings in an env file:** `adjustments/defaults.csv` is now `adjustments/defaults.env`, which is easier to edit on GitHub. Each setting has a few comment lines (where it is in Settings, its possible values, its current default) and a `NAME=` line: type the new value after the `=` and commit. It's applied before the next build as before (`python3 tools/defaults.py apply`), and a value it can't read is listed in the build's summary. Capitals and a stray plural ("1 minutes") don't matter. **Who answers** has a default there too.
+
 ## [0.6.5] - 2026-11-02
 
 ### Android app (wall display)

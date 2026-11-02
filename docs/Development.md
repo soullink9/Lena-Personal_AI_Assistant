@@ -15,7 +15,7 @@ How the repository is organised and how to change it without breaking things. Th
 ├── LICENSE                        GPL-3.0
 ├── THIRD_PARTY_NOTICES.md         included models and code, and their licences
 ├── .env.example                   the environment variables the project reads
-├── adjustments/defaults.csv       every default setting: change one in its "Change to" column
+├── adjustments/defaults.env       every default setting: type a new one after its =
 ├── ollama/
 │   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog
@@ -43,7 +43,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   └── bridge/                    Wyoming bridge for Open WebUI
 ├── tools/
 │   ├── check.py                   offline checks
-│   ├── defaults.py                applies adjustments/defaults.csv to the app's Defaults.kt
+│   ├── defaults.py                applies adjustments/defaults.env to the app's Defaults.kt
 │   └── make_images.py             app icon, notification icon and avatars from the logo
 ├── docs/                          everything in detail
 │   ├── assets/                    the logo, avatar and GitHub social preview
@@ -70,11 +70,12 @@ The app build only runs when something in `android/` or its workflow changes, an
 | How `forget_fact` picks a memory | `best_match` in `brain.py` and `_best_match` in `open-webui/lena_tools.py` |
 | How calendar events are added | `events.py` (shared by `add_calendar_event` and `lena.add_event`), the `add_calendar_event` method's description in `open-webui/lena_tools.py`, `services.yaml` and `strings.json`, and [Calendars](home-assistant/Integration.md#calendars) |
 | Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](app/How-It-Works.md). It relies on Open WebUI's Tailwind colour variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
-| `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `android/.../Prefs.kt` |
+| `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `adjustments/defaults.env` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |
-| A setting in the app | `Settings` and `Prefs` in `Prefs.kt` (its default comes from `Defaults.kt`, written from `adjustments/defaults.csv` by `tools/defaults.py`; add a row there for a new one), its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
+| A setting in the app | `Settings` and `Prefs` in `Prefs.kt` (its default comes from `Defaults.kt`, written from `adjustments/defaults.env` by `tools/defaults.py`; add an entry to its `SETTINGS` for a new one), its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |
+| A new screen (activity) in the app | `WallDisplay.watch(this)` in its `onCreate` and `WallDisplay.touched()` in `onUserInteraction`, so the wall display keeps the screen on and its screen saver comes on there too |
 
 ## Running the checks
 

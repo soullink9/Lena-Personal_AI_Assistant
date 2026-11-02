@@ -128,9 +128,16 @@ class MemoryActivity : ComponentActivity() {
         )
     }
 
+    /** Every touch or key: someone's using the wall display, so its screensaver waits (see [WallDisplay]). */
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        WallDisplay.touched()
+    }
+
     /** Needs your Open WebUI; Home Assistant is optional (without it there's no Hers tab). */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WallDisplay.watch(this)
         api = Api.from(this) ?: run { finish(); return }
         house = HomeAssistant.from(this)
         enableEdgeToEdge()

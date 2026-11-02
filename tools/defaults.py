@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""Lena's default settings, kept in adjustments/defaults.csv.
+"""Lena's default settings, kept in adjustments/defaults.env.
 
-The CSV has one row per setting, with four columns:
+The file has one block per setting: a few comment lines, then the setting's line.
 
-    Setting          where it is in Lena's Settings ("Talking to Lena › Wake word › Her name")
-    Change to        empty, or the new default you want (one of the possible values)
-    Possible values  what it can be, separated by semicolons
-    Current default  what a new install (and Return to defaults) uses today
+    # Talking to Lena › Wake word › Her name
+    # Possible values: Hey Lena | Lena | Hey Jarvis
+    # Current default: Hey Lena
+    WAKE_PHRASE=
 
-The app reads its defaults from android/.../Defaults.kt, which this script writes from the CSV, so the
+The first comment is where the setting is in Lena's Settings. To ask for a new default, type one of the
+possible values after the = sign (no quotes needed) and commit. An empty value means "no change".
+
+The app reads its defaults from android/.../Defaults.kt, which this script writes from the file, so the
 two never disagree. Before every build:
 
     python3 tools/defaults.py waiting   lists the changes asked for (exit 1 if there are any)
     python3 tools/defaults.py apply     applies them
-    python3 tools/defaults.py           checks the CSV and Defaults.kt match (what tools/check.py runs)
+    python3 tools/defaults.py           checks the file and Defaults.kt match (what tools/check.py runs)
 
-checks every "Change to", writes the new defaults into Defaults.kt, moves each value to "Current
-default" and empties "Change to". tools/check.py fails while any "Change to" is filled in or
-Defaults.kt doesn't match the CSV, and the release workflow won't publish.
+apply checks every value asked for, writes the new defaults into Defaults.kt, moves each one to
+"Current default" and empties it again (the whole file is rewritten from SETTINGS, so the comments and
+possible values always match the app). tools/check.py fails while a change is waiting or Defaults.kt
+doesn't match the file, and the release workflow won't publish.
 
 A default is only where a setting starts: changing one doesn't change what someone has already picked
 on their phone (Return to defaults does).
@@ -27,25 +31,37 @@ Standard library only.
 
 from __future__ import annotations
 
-import csv
-import io
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CSV_PATH = ROOT / "adjustments/defaults.csv"
+ENV_PATH = ROOT / "adjustments/defaults.env"
 KOTLIN_PATH = ROOT / "android/app/src/main/kotlin/io/github/soullink9/lena/Defaults.kt"
-HEADER = ["Setting", "Change to", "Possible values", "Current default"]
 
 ON_OFF = {"On": "true", "Off": "false"}
+
+# The comment line that holds a setting's current default, and a setting's own line.
+CURRENT_LINE = re.compile(r"^#\s*Current default:\s*(.*)$")
+SETTING_LINE = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=(.*)$")
+
+HEADER = """\
+# Lena's default settings
+#
+# Where each setting starts on a new install, and what Settings → About → Return to defaults goes back to.
+#
+# To change one: type one of its possible values after its = sign, exactly as listed (no quotes needed),
+# and commit. Leave every other setting empty. Before the next build the change is applied: it becomes
+# the "Current default" and the value after = is emptied again. See README.md in this folder.
+"""
 
 
 @dataclass
 class Setting:
-    """One default: its name in Settings, its name in Defaults.kt, its Kotlin type, and its possible
-    values (as shown in the app) with the Kotlin each one becomes. A number setting has no list, only
-    a range."""
+    """One default: its name in Settings, its name in Defaults.kt (also its name in defaults.env), its
+    Kotlin type, and its possible values (as shown in the app) with the Kotlin each one becomes. A number
+    setting has no list, only a range."""
 
     name: str
     const: str
@@ -54,11 +70,11 @@ class Setting:
     number_range: tuple[int, int] | None = None
 
     def possible(self) -> str:
-        """The Possible values column."""
+        """The Possible values comment."""
         if self.number_range:
             low, high = self.number_range
-            return f"A whole number from {low} to {high}"
-        return "; ".join(self.values)
+            return f"a whole number from {low} to {high}"
+        return " | ".join(self.values)
 
     def kotlin(self, label: str) -> str:
         """The Kotlin for one of its values."""
@@ -66,12 +82,29 @@ class Setting:
             return f"{int(label):_}"
         return self.values[label]
 
-    def accepts(self, label: str) -> bool:
-        """Whether a value is one this setting can have."""
+    def canonical(self, label: str) -> str | None:
+        """The value as the app spells it, ignoring capitals, spaces and a stray plural s, or None if this
+        setting can't have it."""
+        label = label.strip()
         if self.number_range:
             low, high = self.number_range
-            return label.isdigit() and low <= int(label) <= high
-        return label in self.values
+            digits = label.replace(",", "").replace("_", "")
+            if digits.isdigit() and low <= int(digits) <= high:
+                return str(int(digits))
+            return None
+        for known in self.values:
+            if known.lower() == label.lower():
+                return known
+        # A slip like "1 minutes" for "1 minute" still means one value, so it's read as that one.
+        for known in self.values:
+            if loosely(known) == loosely(label):
+                return known
+        return None
+
+
+def loosely(label: str) -> str:
+    """A value with capitals, extra spaces and each word's final s ignored ("1 Minutes" reads as "1 minute")."""
+    return " ".join(word.removesuffix("s") for word in label.lower().split())
 
 
 def seconds(*options: tuple[str, int]) -> dict[str, str]:
@@ -80,8 +113,10 @@ def seconds(*options: tuple[str, int]) -> dict[str, str]:
 
 
 # Every setting with a default, in the order Settings shows them. The labels are the app's own, so the
-# CSV reads like the screen. Keep in step with Prefs.kt (which uses Defaults.*) and the Settings pages.
+# file reads like the screen. Keep in step with Prefs.kt (which uses Defaults.*) and the Settings pages.
 SETTINGS = [
+    Setting("Connections › Who answers › Lena answers through", "ANSWERS", "Answerer", {
+        "Open WebUI": "Answerer.OPEN_WEBUI", "Home Assistant Assist": "Answerer.ASSIST"}),
     Setting("Connections › Model › Her context size", "CONTEXT_TOKENS", "Int", number_range=(2048, 1_048_576)),
     Setting("Wall display › Screensaver › Screen saver after", "DIM_SECONDS", "Int", seconds(
         ("30 seconds", 30), ("1 minute", 60), ("2 minutes", 120), ("5 minutes", 300), ("10 minutes", 600),
@@ -134,125 +169,182 @@ SETTINGS = [
     Setting("Device customization › Widgets & tile › Her mood on the widget", "WIDGET_MOOD", "Boolean", ON_OFF),
 ]
 
-BY_NAME = {s.name: s for s in SETTINGS}
+BY_CONST = {s.const: s for s in SETTINGS}
 
 
-def read_csv() -> list[dict[str, str]]:
-    """The CSV's rows, as dictionaries keyed by the header."""
-    with CSV_PATH.open(newline="", encoding="utf-8") as f:
-        return [{k: (v or "").strip() for k, v in row.items()} for row in csv.DictReader(f)]
+@dataclass
+class Entry:
+    """One setting as found in defaults.env: the value asked for after = (empty for none) and the
+    Current default comment above it."""
+
+    asked: str
+    current: str
 
 
-def write_csv(rows: list[dict[str, str]]) -> None:
-    """Writes the rows back, every setting in SETTINGS order with its possible values filled in."""
-    out = io.StringIO()
-    writer = csv.DictWriter(out, fieldnames=HEADER, lineterminator="\n")
-    writer.writeheader()
-    for row in rows:
-        writer.writerow({key: row.get(key, "") for key in HEADER})
-    CSV_PATH.write_text(out.getvalue(), encoding="utf-8")
+def unquote(value: str) -> str:
+    """A value with spaces around it and one pair of matching quotes removed (env files often quote)."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1].strip()
+    return value
 
 
-def kotlin(rows: list[dict[str, str]]) -> str:
+def read_env() -> tuple[dict[str, Entry], list[str]]:
+    """The file's settings by name, and lines it couldn't make sense of. A Current default comment
+    belongs to the next setting line below it."""
+    entries: dict[str, Entry] = {}
+    odd: list[str] = []
+    if not ENV_PATH.exists():
+        # Say so plainly (a missing file would otherwise just be every setting missing).
+        return entries, ["adjustments/defaults.env is missing (is it committed? .gitignore must keep it)"]
+    current = ""
+    for number, raw in enumerate(ENV_PATH.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            found = CURRENT_LINE.match(line)
+            if found:
+                current = found.group(1).strip()
+            continue
+        found = SETTING_LINE.match(line)
+        if found is None:
+            odd.append(f"Line {number} isn't a setting (NAME=value) or a comment (# ...): \"{line}\"")
+            continue
+        name = found.group(1)
+        if name in entries:
+            odd.append(f"Line {number}: {name} is in the file twice")
+        entries[name] = Entry(asked=unquote(found.group(2)), current=current)
+        current = ""
+    return entries, odd
+
+
+def write_env(current: dict[str, str]) -> None:
+    """Writes the whole file from SETTINGS: every setting with its comments and an empty value."""
+    blocks = [HEADER]
+    for setting in SETTINGS:
+        blocks.append(
+            f"# {setting.name}\n"
+            f"# Possible values: {setting.possible()}\n"
+            f"# Current default: {current[setting.const]}\n"
+            f"{setting.const}=\n"
+        )
+    ENV_PATH.write_text("\n".join(blocks), encoding="utf-8")
+
+
+def kotlin(current: dict[str, str]) -> str:
     """Defaults.kt for these current defaults."""
-    current = {row["Setting"]: row["Current default"] for row in rows}
     lines = [
-        "// Written by tools/defaults.py from adjustments/defaults.csv. Don't edit it by hand: change the CSV's",
-        "// \"Change to\" column and run `python3 tools/defaults.py apply`.",
+        "// Written by tools/defaults.py from adjustments/defaults.env. Don't edit it by hand: type the new",
+        "// value after the setting's = sign there and run `python3 tools/defaults.py apply`.",
         "",
         "package io.github.soullink9.lena",
         "",
         "/**",
         " * Where every setting starts on a new install, and what Return to defaults goes back to. Prefs.kt",
-        " * reads these; adjustments/defaults.csv is where they're changed.",
+        " * reads these; adjustments/defaults.env is where they're changed.",
         " */",
         "object Defaults {",
     ]
     for setting in SETTINGS:
-        value = setting.kotlin(current[setting.name])
+        label = current[setting.const]
         keyword = "const val" if setting.kotlin_type in ("Int", "Boolean") else "val"
-        lines.append(f"    /** {setting.name}: {current[setting.name]} */")
-        lines.append(f"    {keyword} {setting.const}: {setting.kotlin_type} = {value}")
+        lines.append(f"    /** {setting.name}: {label} */")
+        lines.append(f"    {keyword} {setting.const}: {setting.kotlin_type} = {setting.kotlin(label)}")
     lines.append("}")
     return "\n".join(lines) + "\n"
 
 
-def problems(rows: list[dict[str, str]]) -> list[str]:
-    """What's wrong with the CSV: unknown or missing settings, and values a setting can't have."""
-    found = []
-    names = [row.get("Setting", "") for row in rows]
-    for name in names:
-        if name not in BY_NAME:
-            found.append(f"Unknown setting: \"{name}\"")
+def problems(entries: dict[str, Entry], odd: list[str]) -> list[str]:
+    """What's wrong with the file: lines it can't read, unknown or missing settings, and values a setting
+    can't have."""
+    found = list(odd)
+    if not ENV_PATH.exists():
+        return found  # one line says it; listing every setting as missing too would bury it
+    for name in entries:
+        if name not in BY_CONST:
+            found.append(f"Unknown setting: {name}")
     for setting in SETTINGS:
-        if setting.name not in names:
-            found.append(f"Missing setting: \"{setting.name}\"")
-    for row in rows:
-        setting = BY_NAME.get(row.get("Setting", ""))
-        if setting is None:
+        entry = entries.get(setting.const)
+        if entry is None:
+            found.append(f"Missing setting: {setting.const} ({setting.name})")
             continue
-        for column in ("Change to", "Current default"):
-            value = row.get(column, "")
-            if value and not setting.accepts(value):
-                found.append(f"\"{setting.name}\": {column} \"{value}\" isn't one of: {setting.possible()}")
-        if not row.get("Current default"):
-            found.append(f"\"{setting.name}\" has no Current default")
+        if not entry.current:
+            found.append(f"{setting.const} has no \"# Current default:\" line above it")
+        elif setting.canonical(entry.current) is None:
+            found.append(f"{setting.const}: Current default \"{entry.current}\" isn't one of: {setting.possible()}")
+        if entry.asked and setting.canonical(entry.asked) is None:
+            found.append(f"{setting.const}: \"{entry.asked}\" isn't one of: {setting.possible()}")
     return found
 
 
+def current_defaults(entries: dict[str, Entry]) -> dict[str, str]:
+    """Every setting's current default, spelled as the app spells it."""
+    return {s.const: s.canonical(entries[s.const].current) for s in SETTINGS}
+
+
+def asked_for(entries: dict[str, Entry]) -> list[tuple[Setting, str, str]]:
+    """The changes asked for: (setting, current default, new value), skipping a value that's already the
+    default."""
+    changes = []
+    for setting in SETTINGS:
+        entry = entries[setting.const]
+        if not entry.asked:
+            continue
+        old = setting.canonical(entry.current)
+        new = setting.canonical(entry.asked)
+        if new is not None and new != old:
+            changes.append((setting, old, new))
+    return changes
+
+
 def apply() -> int:
-    """Makes every "Change to" the current default, writes Defaults.kt, and empties "Change to"."""
-    rows = read_csv()
-    wrong = problems(rows)
+    """Makes every value asked for the current default, writes Defaults.kt, and empties the values."""
+    entries, odd = read_env()
+    wrong = problems(entries, odd)
     if wrong:
-        print("Nothing changed. Fix these in adjustments/defaults.csv first:")
+        print("Nothing changed. Fix these in adjustments/defaults.env first:")
         for line in wrong:
             print(f"  - {line}")
         return 1
-    by_name = {row["Setting"]: row for row in rows}
-    changed = []
-    ordered = []
-    for setting in SETTINGS:
-        row = by_name[setting.name]
-        if row["Change to"] and row["Change to"] != row["Current default"]:
-            changed.append(f"{setting.name}: {row['Current default']} → {row['Change to']}")
-            row["Current default"] = row["Change to"]
-        row["Change to"] = ""
-        row["Possible values"] = setting.possible()
-        ordered.append(row)
-    write_csv(ordered)
-    KOTLIN_PATH.write_text(kotlin(ordered), encoding="utf-8")
-    if changed:
+    current = current_defaults(entries)
+    changes = asked_for(entries)
+    for setting, _old, new in changes:
+        current[setting.const] = new
+    write_env(current)
+    KOTLIN_PATH.write_text(kotlin(current), encoding="utf-8")
+    if changes:
         print("New defaults:")
-        for line in changed:
-            print(f"  - {line}")
+        for setting, old, new in changes:
+            print(f"  - {setting.name}: {old} → {new}")
     else:
-        print("No changes asked for. Defaults.kt matches the CSV.")
+        print("No changes asked for. Defaults.kt matches defaults.env.")
     return 0
 
 
 def check() -> list[str]:
-    """For tools/check.py: what stops a build. Problems in the CSV, changes not applied yet, or a
-    Defaults.kt that doesn't match the CSV."""
-    rows = read_csv()
-    found = problems(rows)
+    """For tools/check.py: what stops a build. Problems in the file, changes not applied yet, or a
+    Defaults.kt that doesn't match it."""
+    entries, odd = read_env()
+    found = problems(entries, odd)
     if found:
         return found
-    for row in rows:
-        if row["Change to"]:
-            found.append(f"\"{row['Setting']}\" asks for {row['Change to']}: run python3 tools/defaults.py apply")
-    if KOTLIN_PATH.read_text(encoding="utf-8") != kotlin(rows):
-        found.append("Defaults.kt doesn't match adjustments/defaults.csv: run python3 tools/defaults.py apply")
+    for setting in SETTINGS:
+        if entries[setting.const].asked:
+            found.append(f"{setting.const} asks for \"{entries[setting.const].asked}\": run python3 tools/defaults.py apply")
+    if KOTLIN_PATH.read_text(encoding="utf-8") != kotlin(current_defaults(entries)):
+        found.append("Defaults.kt doesn't match adjustments/defaults.env: run python3 tools/defaults.py apply")
     return found
 
 
 def waiting() -> list[str]:
-    """The changes asked for and not applied yet, as "setting: current → new", for the build's summary."""
-    return [
-        f"{row['Setting']}: {row['Current default']} → {row['Change to']}"
-        for row in read_csv()
-        if row["Change to"]
-    ]
+    """The changes asked for and not applied yet, as "setting: current → new", for the build's summary.
+    A file with problems lists those instead, so nothing is silently skipped."""
+    entries, odd = read_env()
+    wrong = problems(entries, odd)
+    if wrong:
+        return wrong
+    return [f"{setting.name}: {old} → {new}" for setting, old, new in asked_for(entries)]
 
 
 if __name__ == "__main__":

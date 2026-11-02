@@ -229,7 +229,6 @@ class MainActivity : ComponentActivity() {
      * → Listens). Stopped while you're away, and while the page itself uses the microphone.
      */
     private var wake: WakeListener? = null
-    private var lastInteraction = System.currentTimeMillis()
 
     private var pendingMic: PermissionRequest? = null
     private var pendingFiles: ValueCallback<Array<Uri>>? = null
@@ -281,6 +280,8 @@ class MainActivity : ComponentActivity() {
         if (restored != null) web.loadUrl(restored) else handle(intent, fresh = true)
         askForNotificationsOnce()
         applyWindowMode()
+        // The wall display's screensaver, here too; not while she's still answering the open chat.
+        WallDisplay.watch(this) { answering() }
         watchForIdle()
     }
 
@@ -301,17 +302,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Every touch or key on this screen: the wall display's return timer starts again. */
+    /** Every touch or key on this screen: the wall display's timers start again (see [WallDisplay]). */
     override fun onUserInteraction() {
         super.onUserInteraction()
-        lastInteraction = System.currentTimeMillis()
+        WallDisplay.touched()
     }
 
+    /** Whether she's still answering in the open chat (Open WebUI is still working on it). */
+    private suspend fun answering(): Boolean =
+        chatIdOf(currentUrl.value)?.let { id -> runCatching { api.runningTasks(id) }.getOrDefault(0) > 0 } == true
+
     /**
-     * In dashboard mode, left alone for a while (Settings → Wall display → When no one's around → Back
-     * from your chats after): back to the dashboards, straight to the screen saver. Not while the
-     * keyboard is up, while you're talking to her in the sheet, or while she's still answering; the wait
-     * starts again once she's done.
+     * In dashboard mode, left alone for a while (Settings → Wall display → Screensaver → Back from your
+     * chats after): back to the dashboards. The screensaver keeps its own timer (Screen saver after, on
+     * the same clock as every screen), so whichever is shorter comes first. Not while the keyboard is up,
+     * while you're talking to her in the sheet, or while she's still answering; the wait starts again
+     * once she's done.
      */
     private fun watchForIdle() {
         lifecycleScope.launch {
@@ -319,17 +325,19 @@ class MainActivity : ComponentActivity() {
                 delay(5_000)
                 val seconds = Prefs.returnSeconds(this@MainActivity)
                 if (!dashboardMode || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
-                val typing = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView)
-                    ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
                 // Typing, or talking to her in the sheet (listening, thinking, speaking), counts as being here.
-                if (typing || Busy.talking) { lastInteraction = System.currentTimeMillis(); continue }
-                if (System.currentTimeMillis() - lastInteraction < seconds * 1000L) continue
-                val answering = chatIdOf(currentUrl.value)?.let { id -> runCatching { api.runningTasks(id) }.getOrDefault(0) > 0 } == true
-                if (answering) { lastInteraction = System.currentTimeMillis(); continue }
+                if (WallDisplay.typing(this@MainActivity) || Busy.talking) {
+                    WallDisplay.touched()
+                    continue
+                }
+                if (WallDisplay.idleMillis() < seconds * 1000L) continue
+                if (answering()) {
+                    WallDisplay.touched()
+                    continue
+                }
                 Logs.i("Chats", "Left alone for a while; back to the wall display")
                 startActivity(
                     Intent(this@MainActivity, DashboardActivity::class.java)
-                        .putExtra(DashboardActivity.EXTRA_IDLE, true)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 )
                 finish()
@@ -361,7 +369,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        lastInteraction = System.currentTimeMillis()
+        WallDisplay.touched()
         handle(intent, fresh = false)
     }
 

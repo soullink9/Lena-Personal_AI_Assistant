@@ -11,7 +11,7 @@ Instructions for AI coding assistants working in this repository. The same rules
 - **Readability over cleverness.** No dense one-liners or clever shortcuts.
 - **Test integrity.** Keep existing behaviour. Run `python3 tools/check.py`; the Home Assistant tests (`.github/workflows/home-assistant.yml`) and the app build (`.github/workflows/build.yml`) must pass.
 - **Conventional Commits** for every commit (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `build:`, `ci:`, `chore:`, `perf:`, with an optional scope).
-- **Default settings first.** Before every build and release, check `adjustments/defaults.csv` (see its README) for filled-in **Change to** values, review them, and run `python3 tools/defaults.py apply`, which writes them into `Defaults.kt` and moves them to **Current default**. Never edit `Defaults.kt` by hand. A new setting with a default gets a row (add it to `SETTINGS` in `tools/defaults.py`, then apply). `tools/check.py` fails while a change is waiting, and the release workflow won't publish.
+- **Default settings first.** Before every build and release, check `adjustments/defaults.env` (see its README) for values typed after a setting's `=`, review them, and run `python3 tools/defaults.py apply`, which writes them into `Defaults.kt`, moves them to its **Current default** comment and empties the value. Never edit `Defaults.kt` by hand. A new setting with a default gets an entry (add it to `SETTINGS` in `tools/defaults.py`, then apply). `tools/check.py` fails while a change is waiting, and the release workflow won't publish.
 - **No new dependencies** (Gradle libraries or plugins, Python packages) without the owner's explicit approval. `tools/check.py` enforces the approved list.
 
 ## Standing constraints

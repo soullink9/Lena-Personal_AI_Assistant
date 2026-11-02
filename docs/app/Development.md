@@ -11,14 +11,14 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | File | What it does |
 |---|---|
 | `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar (logo and Chat \| Home switch) and drawer (pinned chats, folders and recent chats, only what fits), Lena's look for Open WebUI's pages, hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
-| `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat, speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
+| `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat (or to Home Assistant's Assist, when it answers), speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
 | `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
 | `SignIn.kt` | Signing in to Open WebUI by herself with details kept encrypted. |
-| `SettingsActivity.kt` | The settings screen and all its pages, in sections (Connections, Talking to Lena, Chats, Prompts, This phone, Wall display, About), with **Search settings**. Its `findable` list is what search finds: a new setting needs a line there too. |
+| `SettingsActivity.kt` | The settings screen and all its pages, in sections (Connections, Wall display, Talking to Lena, Chat screen configuration, Device customization, About), with **Search settings**. Its `findable` list is what search finds: a new setting needs a line there too. |
 | `Ui.kt` | The shared rows and groups the settings and lists are built from. |
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
-| `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, and the encrypted secret store (`Secrets`). |
+| `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, Assist (its conversation agents and `/api/conversation/process`), and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
 | `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
 | `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header (and the Ingress Proxy integration's toolbar), Lena's Apps and Settings at the bottom of its menu, reporting its views. |
@@ -27,12 +27,13 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |
 | `java/…/MicroFrontend.java` | A line-for-line port of TensorFlow Lite Micro's audio front end, checked bit for bit against the C on every build. |
 | `ChatsActivity.kt` | All chats: pinned chats, folders (new, rename, delete) and your whole history, with search. |
-| `Defaults.kt` | Every setting's default, written from `adjustments/defaults.csv` by `tools/defaults.py`. Don't edit it by hand. |
+| `Defaults.kt` | Every setting's default, written from `adjustments/defaults.env` by `tools/defaults.py`. Don't edit it by hand. |
 | `Refresh.kt` | Settings → Refresh all connections: open screens reload their page when next shown. |
+| `WallDisplay.kt` | The wall display on every screen: in dashboard mode each screen keeps the display on and, after **Screen saver after** without a touch (one clock for all screens), brings up the dashboard's screen saver. Every screen calls `WallDisplay.watch` in `onCreate` and `WallDisplay.touched` from `onUserInteraction`; a new screen needs both. |
 | `Chats.kt` | What the drawer and All chats share: chat and folder rows in each list style (one row look for both), grouping by day, and the long-press menu (pin, move to folder, rename, delete) with its dialogs. |
 | `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |
 | `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
-| `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, schedule alarms, boot handling and quick prompt shortcuts. |
+| `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers (scheduled prompts go to Assist when it answers), schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
 | `Updates.kt` | Updating from GitHub releases: checking, downloading, verifying and installing. |
 | `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Logs. |
@@ -95,6 +96,8 @@ And, only if you add it, your Home Assistant, with the token you give it:
 | `GET /api/` | **Test connection** in settings |
 | `GET /api/lena/context?memory=0` | How she feels and the weather, from the Lena integration (the sheet, the drawer, the wall display, house alerts) |
 | `GET /api/states/{entity}` | The wall display's motion sensor, while it's idle |
+| `GET /api/states` | Settings → Who answers: the conversation agents (its `conversation.*` entities), only when Assist answers |
+| `POST /api/conversation/process` | Talking to her and scheduled prompts, only when Assist answers (Settings → Who answers) |
 | `GET /api/lena/media`, `?photos=1` | Picking the slideshow's album, and its photos |
 | The photos' own paths (`/immich/…`, `/media/…`) | The slideshow; only paths on your Home Assistant, never another address |
 | Home Assistant's own pages | The wall display's dashboards, in a web view signed in with the token |

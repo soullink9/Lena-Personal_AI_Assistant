@@ -14,6 +14,16 @@ import java.util.UUID
  */
 enum class AssistAction { ASK, TYPE, CHAT }
 
+/**
+ * Who answers when you talk to Lena: Open WebUI (her chats, with history you can open) or Home Assistant's
+ * Assist (its conversation agent). With Assist, everything that asks her goes there: the sheet (gesture,
+ * wake word, tile, widget, quick prompts) and scheduled prompts. Her chats screen is still Open WebUI's.
+ */
+enum class Answerer(val label: String, val detail: String) {
+    OPEN_WEBUI("Open WebUI", "Your Lena model, with every conversation kept in your chats"),
+    ASSIST("Home Assistant Assist", "Home Assistant's conversation agent. Nothing is saved to your chats."),
+}
+
 /** Who turns your voice into text in the Ask sheet. */
 enum class Hearing { PHONE, SERVER }
 
@@ -186,6 +196,10 @@ data class Settings(
     /** The wake word listens whenever Lena is open (her chats too), not only on the wall display. */
     val wakeEverywhere: Boolean = Defaults.WAKE_EVERYWHERE,
     val autoSignIn: AutoSignIn = AutoSignIn.OFF,
+    /** Who answers: Open WebUI or Home Assistant's Assist. */
+    val answers: Answerer = Defaults.ANSWERS,
+    /** Assist's conversation agent (a conversation.* entity), or blank for the one Home Assistant's Assist uses. */
+    val assistAgent: String = "",
     val motionEntity: String = "",
     val slides: Slides = Slides(),
 )
@@ -265,6 +279,20 @@ object Prefs {
     /** Remembers (or forgets, with null) the Assistant Lena chat's id. */
     fun setAssistChat(c: Context, id: String?) = p(c).edit().putString("assist_chat", id).apply()
 
+    /** Who answers when you talk to Lena. */
+    fun answers(c: Context): Answerer = enumPref(c, "answers", Defaults.ANSWERS)
+
+    /** Assist's conversation agent, or null for the one Home Assistant's Assist settings pick. */
+    fun assistAgent(c: Context): String? = p(c).getString("assist_agent", "")?.ifBlank { null }
+
+    /**
+     * The ongoing Assist conversation (Home Assistant's conversation id), so talking to Lena continues it
+     * the way the Assistant Lena chat does with Open WebUI. Home Assistant forgets a conversation after a
+     * while of quiet; a forgotten id simply starts a new one.
+     */
+    fun assistConversation(c: Context): String? = p(c).getString("assist_conversation", null)
+    fun setAssistConversation(c: Context, id: String?) = p(c).edit().putString("assist_conversation", id).apply()
+
     /** Your quick prompts, in order, blanks dropped. */
     fun quickPrompts(c: Context): List<String> {
         val a = runCatching { JSONArray(p(c).getString("quick_prompts", "[]")) }.getOrDefault(JSONArray())
@@ -280,9 +308,9 @@ object Prefs {
     /**
      * Settings → Return to defaults: every preference back to how a new install starts, keeping what
      * connects Lena and what's yours. Kept: the Open WebUI and Home Assistant connections (addresses,
-     * sign-in, tokens, signing in by herself), the model and her context size, the dashboards and motion
-     * sensor, the screensaver's album (and whether the photo frame is on), your quick and scheduled
-     * prompts, and your order of pinned chats and folders. Whether this is the home screen is Android's
+     * sign-in, tokens, signing in by herself), who answers and Assist's agent, the model and her context
+     * size, the dashboards and motion sensor, the screensaver's album (and whether the photo frame is on),
+     * your quick and scheduled prompts, and your order of pinned chats and folders. Whether this is the home screen is Android's
      * setting, so it isn't touched either.
      */
     fun defaultsKeeping(current: Settings): Settings = Settings(
@@ -290,6 +318,8 @@ object Prefs {
         signIn = current.signIn,
         haServer = current.haServer,
         autoSignIn = current.autoSignIn,
+        answers = current.answers,
+        assistAgent = current.assistAgent,
         model = current.model,
         contextTokens = current.contextTokens,
         dashboards = current.dashboards,
@@ -332,6 +362,8 @@ object Prefs {
         drawerFolders = drawerFolders(c),
         wakeEverywhere = wakeEverywhere(c),
         autoSignIn = autoSignIn(c),
+        answers = answers(c),
+        assistAgent = assistAgent(c) ?: "",
         motionEntity = motionEntity(c),
         slides = slides(c),
     )
@@ -372,6 +404,8 @@ object Prefs {
             .putBoolean("drawer_folders", s.drawerFolders)
             .putBoolean("wake_everywhere", s.wakeEverywhere)
             .putString("auto_sign_in", s.autoSignIn.name)
+            .putString("answers", s.answers.name)
+            .putString("assist_agent", s.assistAgent)
             .putString("dashboards", JSONArray().apply {
                 s.dashboards.filter { it.path.isNotBlank() }.forEach { put(JSONObject().put("name", it.name).put("path", it.path)) }
             }.toString())

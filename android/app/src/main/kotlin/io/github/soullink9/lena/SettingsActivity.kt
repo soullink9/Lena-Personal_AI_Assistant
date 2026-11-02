@@ -151,7 +151,8 @@ class SettingsActivity : ComponentActivity() {
      */
     private enum class Page(val title: String, val section: Area?) {
         MAIN("Settings", null),
-        OPEN_WEBUI("Open WebUI", Area.CONNECTIONS), HOME_ASSISTANT("Home Assistant", Area.CONNECTIONS), MODEL("Model", Area.CONNECTIONS),
+        OPEN_WEBUI("Open WebUI", Area.CONNECTIONS), HOME_ASSISTANT("Home Assistant", Area.CONNECTIONS),
+        WHO_ANSWERS("Who answers", Area.CONNECTIONS), MODEL("Model", Area.CONNECTIONS),
         WALL_IDLE("Screensaver", Area.WALL), WALL_DASHBOARDS("Dashboards", Area.WALL),
         WAKE("Wake word", Area.TALKING), LOOK_SOUND("How she looks and sounds", Area.TALKING), GESTURE("Interacting with Lena", Area.TALKING),
         CHAT_SCREEN("Chat screen", Area.CHAT_SCREEN),
@@ -178,9 +179,16 @@ class SettingsActivity : ComponentActivity() {
 
     private lateinit var original: Settings
 
+    /** Every touch or key: someone's using the wall display, so its screensaver waits (see [WallDisplay]). */
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        WallDisplay.touched()
+    }
+
     /** Keeps the settings as they were on arrival, to tell on leaving whether the server changed. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WallDisplay.watch(this)
         original = Prefs.load(this)
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }
@@ -280,6 +288,7 @@ class SettingsActivity : ComponentActivity() {
                         Page.MAIN -> Main(s, models, ::set, query, { query = it }) { page = it }
                         Page.OPEN_WEBUI -> OpenWebUiPage(s, ::set)
                         Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set) { page = it }
+                        Page.WHO_ANSWERS -> WhoAnswersPage(s, ::set) { page = it }
                         Page.MODEL -> ModelPage(s, models, ::set)
                         Page.GESTURE -> GesturePage(s, ::set)
                         Page.LOOK_SOUND -> LookSoundPage(s, ::set)
@@ -329,6 +338,7 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.Home, "Home Assistant", if (house) host(s.haServer) ?: "Connected" else "Not connected") {
                 open(Page.HOME_ASSISTANT)
             }
+            Item(Icons.Outlined.Assistant, "Who answers", s.answers.label) { open(Page.WHO_ANSWERS) }
             Item(Icons.Outlined.SmartToy, "Model", "$modelName · %,d tokens".format(s.contextTokens)) { open(Page.MODEL) }
             RefreshItem()
         }
@@ -532,6 +542,8 @@ class SettingsActivity : ComponentActivity() {
             Findable("Sign-in address", "authentik proxy sso single sign-on login", Page.OPEN_WEBUI),
             Findable("Sign in by herself", "auto sign-in automatic login password email ldap signed out session restart", Page.OPEN_WEBUI),
             Findable("Home Assistant address and token", "ha url connect long-lived access token test connection integration", Page.HOME_ASSISTANT),
+            Findable("Who answers", "open webui home assistant assist conversation agent voice assistant answers through", Page.WHO_ANSWERS),
+            Findable("Assist's conversation agent", "home assistant assist agent ollama openai google conversation", Page.WHO_ANSWERS),
             Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
             Findable("Refresh all connections", "reload refresh reconnect check server page dashboard", null, Area.CONNECTIONS) {
                 Refresh.request()
@@ -1033,7 +1045,7 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
-        Footnote("Used for new chats, the sheet and scheduled prompts.")
+        Footnote("Used for new chats, and for the sheet and scheduled prompts while Open WebUI answers (Connections → Who answers).")
 
         Section("Conversation") {
             Item(Icons.Outlined.Forum, "“$ASSISTANT_CHAT”", "Talking to Lena always continues this one chat, so she's the same Lena with the same history on every screen") { }
@@ -1053,6 +1065,55 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("It's found by its name, so it's the same chat after reinstalling or on another phone. Start over with New conversation: " +
             "the old one is kept in your history, named with the date, and a new “$ASSISTANT_CHAT” begins.")
+    }
+
+    /**
+     * Who answers: Open WebUI or Home Assistant's Assist, and with Assist, which of Home Assistant's
+     * conversation agents. The agents are listed from Home Assistant when the page opens.
+     */
+    @Composable
+    private fun WhoAnswersPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        Group {
+            PickItem(Icons.Outlined.Forum, "Lena answers through", Answerer.entries.map { it to it.label }, s.answers,
+                detail = { it.detail }) { set(s.copy(answers = it)) }
+        }
+        Footnote(
+            "With Assist, everything that asks her goes to Home Assistant: talking to her (the assistant gesture, the wake word, " +
+                "the tile, the widget and quick prompts) and scheduled prompts. Her chats screen is still Open WebUI's."
+        )
+        if (s.answers != Answerer.ASSIST) return
+        if (!hasHouse()) {
+            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
+            return
+        }
+        // null while loading; empty when Home Assistant couldn't be asked.
+        var agents by remember { mutableStateOf<List<AssistAgent>?>(null) }
+        LaunchedEffect(Unit) {
+            agents = runCatching { HomeAssistant.from(this@SettingsActivity)?.agents() }
+                .onFailure { Logs.w("Settings", "Couldn't list Assist's conversation agents", it) }
+                .getOrNull() ?: emptyList()
+        }
+        Section("Assist") {
+            val found = agents
+            when {
+                found == null -> Item(Icons.Outlined.SmartToy, "Conversation agent", "Looking in Home Assistant…") { }
+                found.isEmpty() && s.assistAgent.isEmpty() ->
+                    Item(Icons.Outlined.SmartToy, "Conversation agent", "Home Assistant's choice (couldn't list the others)") { }
+                else -> PickItem(
+                    Icons.Outlined.SmartToy, "Conversation agent",
+                    listOf("" to "Home Assistant's choice") + found.map { it.id to it.name } +
+                        // A saved agent that's gone (or couldn't be listed) still shows as picked.
+                        listOfNotNull(s.assistAgent.takeIf { id -> id.isNotEmpty() && found.none { it.id == id } }?.let { it to it }),
+                    s.assistAgent,
+                    detail = { id -> if (id.isEmpty()) "The assistant set in Home Assistant → Settings → Voice assistants" else id },
+                ) { set(s.copy(assistAgent = it)) }
+            }
+        }
+        Footnote(
+            "Assist takes words only, so photos are off. It can switch things in your home, so from the lock screen it waits until you " +
+                "unlock. Its answers aren't saved to your chats: they're on the sheet while it's open, and in the notification for a " +
+                "scheduled prompt. Hearing you and her voice still follow How she looks and sounds (“your server” there is Open WebUI)."
+        )
     }
 
     /**
@@ -1369,7 +1430,7 @@ class SettingsActivity : ComponentActivity() {
         var picking by remember { mutableStateOf(false) }
         val house = hasHouse()
 
-        Footnote("When Lena is this device's home screen, the dashboards give way to this screen saver after a while without a touch. Anywhere else they're a normal screen that sleeps as usual. Android's own screen saver shows the same.")
+        Footnote("When Lena is this device's home screen, the screen never goes dark, and after a while without a touch on any of Lena's screens (the dashboards, your chats, Settings) this screen saver comes on. A touch on it shows the dashboard. Anywhere else Lena is a normal app that sleeps as usual. Android's own screen saver shows the same.")
         Group {
             PickItem(Icons.Outlined.Timer, "Screen saver after",
                 screenSaverDelays.map { it to if (it == 0) "Never" else "${duration(it)} without a touch" }, s.dimSeconds) {
@@ -1380,7 +1441,7 @@ class SettingsActivity : ComponentActivity() {
                 set(s.copy(returnSeconds = it))
             }
         }
-        Footnote("Opened your chats on a device where Lena is the home screen and walked away? After this long it goes back to the dashboards and straight to the screen saver. Not while you're typing or while she's still answering.")
+        Footnote("Opened your chats on a device where Lena is the home screen and walked away? After this long it goes back to the dashboards; the screen saver keeps its own time, so whichever is shorter comes first. Neither while you're typing, talking to her, or while she's still answering.")
 
         SectionTitle("Show")
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {

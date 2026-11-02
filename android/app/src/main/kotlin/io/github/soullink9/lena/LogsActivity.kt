@@ -70,9 +70,16 @@ import java.util.Date
  */
 class LogsActivity : ComponentActivity() {
 
+    /** Every touch or key: someone's using the wall display, so its screensaver waits (see [WallDisplay]). */
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        WallDisplay.touched()
+    }
+
     /** Edge to edge, like the rest of the app. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WallDisplay.watch(this)
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }
     }

@@ -42,6 +42,12 @@ data class MediaItem(val id: String, val title: String, val folder: Boolean, val
 /** One item on her shared memory list. */
 data class HouseMemory(val uid: String, val text: String)
 
+/** One of Home Assistant's conversation agents (Assist itself, or an AI one such as Ollama's). */
+data class AssistAgent(val id: String, val name: String)
+
+/** Assist's answer, and the conversation it belongs to (sent back with the next question, to continue it). */
+data class AssistReply(val speech: String, val conversationId: String?)
+
 /**
  * The optional link to your Home Assistant, where Lena's feelings and shared memory live.
  *
@@ -68,13 +74,18 @@ class HomeAssistant(server: String, private val token: String) {
      * One request to Home Assistant with the token. A 401 or 403 means the token was refused, which the
      * screens report differently from Home Assistant being unreachable.
      */
-    private suspend fun call(method: String, path: String, body: JSONObject? = null): String = withContext(Dispatchers.IO) {
+    private suspend fun call(
+        method: String,
+        path: String,
+        body: JSONObject? = null,
+        readTimeoutMs: Int = 30_000, // a large album takes a moment to list
+    ): String = withContext(Dispatchers.IO) {
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 8_000
-            conn.readTimeout = 30_000 // a large album takes a moment to list
+            conn.readTimeout = readTimeoutMs
             conn.setRequestProperty("Authorization", "Bearer $token")
             conn.setRequestProperty("Accept", "application/json")
             if (body != null) {
@@ -141,6 +152,42 @@ class HomeAssistant(server: String, private val token: String) {
     suspend fun photos(id: String): List<String> {
         val a = JSONObject(call("GET", "/api/lena/media?id=${enc(id)}&photos=1")).optJSONArray("photos") ?: JSONArray()
         return List(a.length()) { a.getString(it) }.filter { it.startsWith("/") && !it.startsWith("//") }
+    }
+
+    /**
+     * Home Assistant's conversation agents, for Settings → Who answers. Each is a `conversation.*` entity
+     * (Home Assistant's own Assist, and any AI agent added by an integration such as Ollama), so the plain
+     * states list has them all; the REST API has no separate list.
+     */
+    suspend fun agents(): List<AssistAgent> {
+        val states = JSONArray(call("GET", "/api/states"))
+        return List(states.length()) { states.getJSONObject(it) }
+            .filter { it.optString("entity_id").startsWith("conversation.") }
+            .map { o ->
+                val id = o.optString("entity_id")
+                AssistAgent(id, o.optJSONObject("attributes")?.optString("friendly_name")?.ifBlank { null } ?: id)
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
+    /**
+     * Sends what you said or typed to Assist (Home Assistant's /api/conversation/process) and returns its
+     * spoken answer. [agentId] null uses the agent picked in Home Assistant's own Assist settings;
+     * [conversationId] continues an earlier conversation, so the agent remembers what was just said. An
+     * AI agent can take a while to answer, hence the long wait. The language is Home Assistant's own.
+     */
+    suspend fun converse(text: String, agentId: String?, conversationId: String?): AssistReply {
+        val body = JSONObject().put("text", text)
+        if (agentId != null) body.put("agent_id", agentId)
+        if (conversationId != null) body.put("conversation_id", conversationId)
+        val r = JSONObject(call("POST", "/api/conversation/process", body, readTimeoutMs = 180_000))
+        val speech = r.optJSONObject("response")
+            ?.optJSONObject("speech")
+            ?.optJSONObject("plain")
+            ?.optString("speech")
+            .orEmpty()
+        val conversation = r.optString("conversation_id").takeIf { it.isNotBlank() && !r.isNull("conversation_id") }
+        return AssistReply(speech, conversation)
     }
 
     /** True when the address and token work. */

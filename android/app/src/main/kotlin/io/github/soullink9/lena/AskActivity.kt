@@ -196,9 +196,15 @@ class AskActivity : ComponentActivity() {
     /** A touch on the sheet: stops it closing by itself, since you're using it. */
     private var onTouch: (() -> Unit)? = null
 
-    /** Sees every touch before the views do, so any touch counts as using the sheet. */
+    /**
+     * Sees every touch before the views do, so any touch counts as using the sheet (and, on the wall
+     * display, as someone being there).
+     */
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) onTouch?.invoke()
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            onTouch?.invoke()
+            WallDisplay.touched()
+        }
         return super.dispatchTouchEvent(ev)
     }
 
@@ -274,6 +280,8 @@ class AskActivity : ComponentActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
             window.attributes = window.attributes.also { it.blurBehindRadius = 64 }
         }
+        // On the wall display the screen never goes dark, the sheet included.
+        if (DashboardActivity.isHomeScreen(this)) WallDisplay.keepScreenOn(this, true)
         enableEdgeToEdge()
         setContent { LenaTheme { Sheet(shared, auto) } }
     }
@@ -354,9 +362,13 @@ class AskActivity : ComponentActivity() {
         if (!isChangingConfigurations) finish()
     }
 
-    /** Frees the microphone and the voice, and stops counting as busy. */
+    /**
+     * Frees the microphone and the voice, and stops counting as busy. The end of a conversation counts as
+     * a touch, so the wall display's screensaver doesn't come on the moment she's done.
+     */
     override fun onDestroy() {
         Busy.talking = false
+        WallDisplay.touched()
         ear?.release()
         mouth?.release()
         super.onDestroy()
@@ -396,6 +408,10 @@ class AskActivity : ComponentActivity() {
         val ongoing = !startedLocked
         var photo by remember { mutableStateOf<Photo?>(null) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
+        // Settings → Connections → Who answers: Home Assistant's Assist instead of Open WebUI.
+        val viaAssist = remember { Prefs.answers(this@AskActivity) == Answerer.ASSIST }
+        // Assist's ongoing conversation, continued the way the Assistant Lena chat is with Open WebUI.
+        var assistConversation by remember { mutableStateOf(if (ongoing && viaAssist) Prefs.assistConversation(this@AskActivity) else null) }
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
 
@@ -472,13 +488,60 @@ class AskActivity : ComponentActivity() {
         }
 
         /**
-         * Sends a question (with any photo) into the Assistant Lena chat, follows the answer as it's
-         * written, then speaks it if you spoke. Errors become a short note on the sheet rather than a
-         * crash.
+         * Asks Home Assistant's Assist, continuing its conversation, and returns its answer. Assist has no
+         * history Lena can show and no photos, and a blank answer still gets a line so the turn doesn't
+         * look stuck.
+         */
+        suspend fun askAssist(question: String): String {
+            val ha = house ?: throw IllegalStateException("Set up Home Assistant in Settings → Connections to talk through Assist.")
+            val reply = ha.converse(question, Prefs.assistAgent(this@AskActivity), assistConversation)
+            assistConversation = reply.conversationId
+            if (ongoing) Prefs.setAssistConversation(this@AskActivity, reply.conversationId)
+            return reply.speech.ifBlank { "(Assist didn't say anything.)" }
+        }
+
+        /**
+         * Sends a question (with any photo) into the Assistant Lena chat and follows the answer into
+         * [turn] as it's written.
+         */
+        suspend fun askOpenWebUi(turn: Turn, image: Photo?, spoken: Boolean) {
+            val m = model ?: api.defaultModel(this@AskActivity).also { model = it }
+                ?: throw IllegalStateException("No models on your server.")
+            val started = api.ask(
+                turn.question, m, chatId, lastReplyId,
+                newTitle = if (ongoing) ASSISTANT_CHAT else if (startedLocked) "Lena (lock screen)" else null,
+                pinNew = ongoing,
+                contextTokens = Prefs.contextTokens(this@AskActivity),
+                spoken = spoken,
+                image = image?.dataUrl,
+                locked = locked.value,
+            )
+            running = started
+            working = true
+            chatId = started.chatId
+            if (ongoing) Prefs.setAssistChat(this@AskActivity, started.chatId)
+            api.follow(started.chatId, started.messageId).collect { r -> turn.answer = r.content }
+            lastReplyId = started.messageId
+        }
+
+        /**
+         * Sends a question to whoever answers (Settings → Connections → Who answers), then speaks the
+         * answer if you spoke. Errors become a short note on the sheet rather than a crash.
          */
         fun send(q: String, spoken: Boolean) {
             val image = photo
             if (q.isBlank() && image == null) return
+            if (viaAssist && locked.value) {
+                // Assist can switch things in your home (locks, doors, alarms), so it isn't asked from the
+                // lock screen: unlock first, then it's sent.
+                note = "Unlock your phone to ask Assist."
+                unlockThen {
+                    // Already unlocked (unlockThen runs it straight away): leave the lock-screen mode here too.
+                    locked.value = false
+                    send(q, spoken)
+                }
+                return
+            }
             val turn = Turn(q.trim().ifBlank { "What's in this photo?" }, image?.preview)
             photo = null
             turns += turn
@@ -489,23 +552,12 @@ class AskActivity : ComponentActivity() {
             job = scope.launch {
                 try {
                     ready.await()
-                    val m = model ?: api.defaultModel(this@AskActivity).also { model = it }
-                        ?: throw IllegalStateException("No models on your server.")
-                    val started = api.ask(
-                        turn.question, m, chatId, lastReplyId,
-                        newTitle = if (ongoing) ASSISTANT_CHAT else if (startedLocked) "Lena (lock screen)" else null,
-                        pinNew = ongoing,
-                        contextTokens = Prefs.contextTokens(this@AskActivity),
-                        spoken = spoken,
-                        image = image?.dataUrl,
-                        locked = locked.value,
-                    )
-                    running = started
-                    working = true
-                    chatId = started.chatId
-                    if (ongoing) Prefs.setAssistChat(this@AskActivity, started.chatId)
-                    api.follow(started.chatId, started.messageId).collect { r -> turn.answer = r.content }
-                    lastReplyId = started.messageId
+                    if (viaAssist) {
+                        working = true
+                        turn.answer = askAssist(turn.question)
+                    } else {
+                        askOpenWebUi(turn, image, spoken)
+                    }
                     turn.done = true
                     working = false
                     // She may have reacted to what you said; show how she feels now.
@@ -519,6 +571,9 @@ class AskActivity : ComponentActivity() {
                 } catch (_: AuthException) {
                     note = "Open Lena and sign in first."
                     phase = Phase.IDLE
+                } catch (_: HaAuthException) {
+                    note = "Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant."
+                    phase = Phase.IDLE
                 } catch (e: IllegalStateException) {
                     Logs.w("Ask", e.message ?: "Couldn't ask", e)
                     note = e.message
@@ -526,7 +581,7 @@ class AskActivity : ComponentActivity() {
                 } catch (e: Exception) {
                     Logs.e("Ask", "Couldn't get an answer", e)
                     if (phase == Phase.THINKING) {
-                        note = "Couldn't reach your server."
+                        note = if (viaAssist) "Couldn't reach Home Assistant." else "Couldn't reach your server."
                         phase = Phase.IDLE
                         closeAfter(8_000)
                     }
@@ -659,6 +714,11 @@ class AskActivity : ComponentActivity() {
         }
 
         LaunchedEffect(Unit) {
+            // Assist keeps no history the app can show, and needs no model.
+            if (viaAssist) {
+                ready.complete(Unit)
+                return@LaunchedEffect
+            }
             // Pick up the "Assistant Lena" chat, and show where you left off. It's found by name too, so
             // it's the same chat after reinstalling, on another phone, or once it was made elsewhere.
             try {
@@ -716,6 +776,8 @@ class AskActivity : ComponentActivity() {
             model = model,
             chatId = chatId,
             photo = photo,
+            // Assist only takes words; and on the lock screen, photos stay private.
+            photos = !locked.value && !viaAssist,
             prompts = prompts,
             lockedHint = startedLocked && turns.isEmpty(),
             locked = locked.value,
@@ -750,9 +812,13 @@ class AskActivity : ComponentActivity() {
                 turns.clear()
                 chatId = null
                 lastReplyId = null
+                assistConversation = null
                 note = null
                 heard = ""
-                if (ongoing) Prefs.setAssistChat(this@AskActivity, null)
+                if (ongoing) {
+                    Prefs.setAssistChat(this@AskActivity, null)
+                    Prefs.setAssistConversation(this@AskActivity, null)
+                }
                 phase = Phase.IDLE
                 if (!typing) listen(false)
             },
@@ -800,6 +866,7 @@ class AskActivity : ComponentActivity() {
         val model: Model?,
         val chatId: String?,
         val photo: Photo?,
+        val photos: Boolean,
         val prompts: List<String>,
         val lockedHint: Boolean,
         val locked: Boolean,
@@ -900,7 +967,7 @@ class AskActivity : ComponentActivity() {
                         leadingIcon = { Icon(Icons.Outlined.AddComment, null) },
                         onClick = { open = false; a.newConversation() },
                     )
-                    if (!a.locked) {
+                    if (a.photos) {
                         DropdownMenuItem(
                             text = { Text("Take a photo") },
                             leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) },
@@ -1063,7 +1130,7 @@ class AskActivity : ComponentActivity() {
                         if (a.turns.isNotEmpty() || a.chatId != null) IconButton(onClick = a.newConversation) {
                             Icon(Icons.Outlined.AddComment, "New conversation")
                         }
-                        if (!a.locked) Box {
+                        if (a.photos) Box {
                             IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.AddAPhoto, "Show Lena a photo") }
                             DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {
                                 DropdownMenuItem(text = { Text("Take a photo") }, onClick = { photoMenu = false; a.takePhoto() })
@@ -1344,7 +1411,7 @@ class AskActivity : ComponentActivity() {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TypeBar(
                                 a, Modifier.weight(1f),
-                                leading = if (a.locked) null else ({
+                                leading = if (!a.photos) null else ({
                                     Box {
                                         IconButton(onClick = { photoMenu = true }) { Icon(Icons.Outlined.AddAPhoto, "Show Lena a photo") }
                                         DropdownMenu(expanded = photoMenu, onDismissRequest = { photoMenu = false }) {

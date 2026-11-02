@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Requested default changes (adjustments/defaults.csv, "Change to") are applied before every build;
+      # Requested default changes (adjustments/defaults.env, a value after a setting's =) are applied before every build;
       # list any still waiting in the run's summary. The release job below won't publish while one is.
       - name: Default settings waiting
         run: |
@@ -40,7 +40,7 @@ jobs:
               echo "Nothing waiting."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "$waiting" ]; then echo "::warning file=adjustments/defaults.csv::Default changes waiting to be applied"; fi
+          if [ -n "$waiting" ]; then echo "::warning file=adjustments/defaults.env::Default changes waiting to be applied"; fi
 
       # Plain Gradle download, checked against Gradle's published SHA-256. No third-party setup actions.
       - name: Install Gradle
@@ -123,14 +123,14 @@ jobs:
         with:
           sparse-checkout: |
             CHANGELOG.md
-            adjustments/defaults.csv
+            adjustments/defaults.env
             tools/defaults.py
           sparse-checkout-cone-mode: false
       # Every requested default change must be applied (and reviewed) before a release.
       - name: No default changes waiting
         run: |
           if ! python3 tools/defaults.py waiting; then
-            echo "::error file=adjustments/defaults.csv::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
+            echo "::error file=adjustments/defaults.env::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
             exit 1
           fi
       - name: Publish release

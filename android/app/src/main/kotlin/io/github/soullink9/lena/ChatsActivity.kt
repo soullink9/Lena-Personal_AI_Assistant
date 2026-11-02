@@ -77,9 +77,16 @@ class ChatsActivity : ComponentActivity() {
 
     private lateinit var api: Api
 
+    /** Every touch or key: someone's using the wall display, so its screensaver waits (see [WallDisplay]). */
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        WallDisplay.touched()
+    }
+
     /** Needs your Open WebUI; without one there's nothing to list. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WallDisplay.watch(this)
         api = Api.from(this) ?: run { finish(); return }
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }

@@ -70,7 +70,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -108,7 +107,7 @@ import java.util.Date
 class DashboardActivity : ComponentActivity() {
 
     companion object {
-        /** Go straight to the screen saver (coming back from your chats after a while). */
+        /** Go straight to the screen saver (another Lena screen was left alone for a while, see [WallDisplay]). */
         const val EXTRA_IDLE = "idle"
 
         /**
@@ -166,7 +165,6 @@ class DashboardActivity : ComponentActivity() {
 
     private val tab = mutableIntStateOf(0)
     private val dimmed = mutableStateOf(false)
-    private val lastTouch = mutableLongStateOf(System.currentTimeMillis())
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
 
@@ -423,7 +421,7 @@ class DashboardActivity : ComponentActivity() {
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-            lastTouch.longValue = System.currentTimeMillis()
+            WallDisplay.touched()
             if (dimmed.value) {
                 wakeUp()
                 return true // the touch that wakes it doesn't also press a button
@@ -434,7 +432,7 @@ class DashboardActivity : ComponentActivity() {
 
     /** Back to the dashboards at the tablet's normal brightness. */
     private fun wakeUp() {
-        lastTouch.longValue = System.currentTimeMillis()
+        WallDisplay.touched()
         dimmed.value = false
         brightness(-1f)
     }
@@ -466,8 +464,9 @@ class DashboardActivity : ComponentActivity() {
     }
 
     /**
-     * Back on screen: the web view runs again, the wake word listens again, and time spent talking to her
-     * counts as a touch.
+     * Back on screen: the web view runs again and the wake word listens again. The screensaver's wait
+     * carries on from the other screens (one clock, see [WallDisplay]); time spent talking to her counts as
+     * a touch, since the sheet marks the end of a conversation as one.
      */
     override fun onResume() {
         super.onResume()
@@ -478,8 +477,6 @@ class DashboardActivity : ComponentActivity() {
             web.reload()
         }
         web.onResume()
-        // Time spent talking to her counts as using it, so it doesn't dim the moment she's done.
-        if (!dimmed.value) lastTouch.longValue = System.currentTimeMillis()
         if (Prefs.wakeWord(this)) {
             // Heard her name: she talks over whatever's showing (dimmed stays dimmed underneath) and comes back to it.
             val w = wake ?: WakeListener(this, onHeard = { talk() }, onSilenced = { listening.value = Listening.BLOCKED })
@@ -503,12 +500,12 @@ class DashboardActivity : ComponentActivity() {
     }
 
     /**
-     * Home pressed while this is the home screen: back to the first dashboard. Back from your chats with
-     * EXTRA_IDLE: straight to the screen saver.
+     * Home pressed while this is the home screen: back to the first dashboard. Another screen left alone,
+     * with EXTRA_IDLE: straight to the screen saver.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Back from your chats after a while: straight to the screen saver.
+        // Another Lena screen was left alone for a while: straight to the screen saver.
         if (dashboardMode && intent.getBooleanExtra(EXTRA_IDLE, false) && ::web.isInitialized) {
             dim()
             return
@@ -559,17 +556,18 @@ class DashboardActivity : ComponentActivity() {
                 delay(60_000)
             }
         }
-        // The screen saver after a while without a touch (in dashboard mode only); while it shows, watch
-        // the motion sensor.
+        // The screen saver after a while without a touch on any Lena screen (in dashboard mode only); while
+        // it shows, watch the motion sensor.
         LaunchedEffect(Unit) {
-            val seconds = Prefs.dimSeconds(this@DashboardActivity)
             val motion = Prefs.motionEntity(this@DashboardActivity).trim()
             while (true) {
                 delay(3_000)
-                // Talking to her (listening, thinking, speaking) counts as someone being there, so the
-                // wait starts again once she's done rather than ending mid-answer.
-                if (Busy.talking) lastTouch.longValue = System.currentTimeMillis()
-                if (dashboardMode && !dimmed.value && seconds > 0 && System.currentTimeMillis() - lastTouch.longValue > seconds * 1000L &&
+                // Read each time, so a change in Settings counts without restarting the wall display.
+                val seconds = Prefs.dimSeconds(this@DashboardActivity)
+                // Talking to her (listening, thinking, speaking) and typing count as someone being there,
+                // so the wait starts again once they're done rather than ending mid-answer.
+                if (Busy.talking || WallDisplay.typing(this@DashboardActivity)) WallDisplay.touched()
+                if (dashboardMode && !dimmed.value && seconds > 0 && WallDisplay.idleMillis() > seconds * 1000L &&
                     now.feelings?.moment != "Worried") dim()
                 if (dimmed.value && motion.isNotEmpty()) {
                     val state = runCatching { house.state(motion) }.getOrNull()

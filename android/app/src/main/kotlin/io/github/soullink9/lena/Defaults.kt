@@ -1,21 +1,23 @@
-// Written by tools/defaults.py from adjustments/defaults.csv. Don't edit it by hand: change the CSV's
-// "Change to" column and run `python3 tools/defaults.py apply`.
+// Written by tools/defaults.py from adjustments/defaults.env. Don't edit it by hand: type the new
+// value after the setting's = sign there and run `python3 tools/defaults.py apply`.
 
 package io.github.soullink9.lena
 
 /**
  * Where every setting starts on a new install, and what Return to defaults goes back to. Prefs.kt
- * reads these; adjustments/defaults.csv is where they're changed.
+ * reads these; adjustments/defaults.env is where they're changed.
  */
 object Defaults {
+    /** Connections › Who answers › Lena answers through: Open WebUI */
+    val ANSWERS: Answerer = Answerer.OPEN_WEBUI
     /** Connections › Model › Her context size: 32768 */
     const val CONTEXT_TOKENS: Int = 32_768
-    /** Wall display › Screensaver › Screen saver after: 5 minutes */
-    const val DIM_SECONDS: Int = 300
+    /** Wall display › Screensaver › Screen saver after: 2 minutes */
+    const val DIM_SECONDS: Int = 120
     /** Wall display › Screensaver › Back from your chats after: 1 minute */
     const val RETURN_SECONDS: Int = 60
-    /** Wall display › Screensaver › Each photo for: 15 seconds */
-    const val SLIDE_SECONDS: Int = 15
+    /** Wall display › Screensaver › Each photo for: 1 minute */
+    const val SLIDE_SECONDS: Int = 60
     /** Wall display › Screensaver › Transition: Fade */
     val SLIDE_TRANSITION: SlideTransition = SlideTransition.FADE
     /** Wall display › Screensaver › Shuffle: On */
