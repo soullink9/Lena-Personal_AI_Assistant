@@ -16,10 +16,12 @@ Lena is two things working together:
 
 **Drawer**
 - **Lena** at the top, with whether your server is reachable (and its Open WebUI version), and **how she feels** if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
+- **Search chats.** Results replace the list, as many as fit; **See all results** at the bottom opens every one in All chats.
 - Then your chats, in this order, as many as fit. The drawer never scrolls:
   - **Pinned** chats, the same as Open WebUI's sidebar (up to five; Settings → Chat screen → **Pinned chats**: 3, 5, 8 or 12).
   - Your **folders** (Open WebUI's folders). Tap one to open or close it; open folders show their chats. Open WebUI remembers which are open, so its sidebar matches. (Settings → Chat screen → **Folders** leaves them out of the menu.)
   - **Recent** chats, newest first.
+- **Your order:** the **Reorder** button (⇅) on the Pinned and Folders headings puts them in the order you like, with up and down arrows. Open WebUI keeps no order for either, so it's kept on this phone; All chats uses it too. Chats you pin later come first until you reorder again, and folders inside folders stay under their parent.
 - **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Chat screen → All chats list style): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
 - **Long-press** any chat, in the drawer or All chats, to **pin** (or unpin) it, **move it to a folder** (or out of one, or into a new folder), **rename** or **delete** it (deleting removes it from Open WebUI too). A spinner marks a chat that's still being answered.
 - Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
@@ -36,7 +38,9 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 ## Settings
 
-Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives. The list is grouped by what you're doing:
+Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives.
+
+Below it, the settings are in **categories that fold open**: each shows a one-line summary of how it's set, and tapping it shows its rows (it remembers which you left open). A setting with several choices shows **only the current one**; tap it for the list, with a line on each choice. **How she looks** and the **Model** are picked right in the list; the rest open their page.
 
 | Section | What's in it |
 |---|---|
@@ -45,7 +49,7 @@ Open them from the drawer (or long-press Lena's icon). **Search settings** at th
 | **Chats** | **Model** for new chats, the sheet and scheduled prompts, and **Chat screen**: **Lena's look** for Open WebUI's pages (off for Open WebUI's own), **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
 | **Prompts** | **Quick prompts** and **Scheduled prompts**. |
 | **This phone** | **Notifications** (reply notifications and house alerts) and **Widget & tile**. |
-| **Wall display** | Starting it, dashboards, the screen saver and photo frame, the wake word. |
+| **Wall display** | Making it the home screen, starting it, dashboards, the screen saver and photo frame, the wake word. |
 | **About** | **Updates** and **Logs**, and the version. |
 
 ## Talking to Lena
@@ -123,12 +127,14 @@ Connect Home Assistant under **Settings → Home Assistant**: its address and a 
 
 ## Wall display
 
-**Settings → Wall display** turns a tablet on the wall (or a docked phone) into a home panel: your Home Assistant dashboards while someone's using it, a photo frame or her clock when no one is, and her name to talk to her from across the room. Everything for it is on that one page:
+**Settings → Wall display** turns a tablet on the wall (or a docked phone) into a home panel: your Home Assistant dashboards while someone's using it, a photo frame or her clock when no one is, and her name to talk to her from across the room.
 
-| On the page | What it does |
+**Dashboard mode is the home screen.** Only when Lena's wall display is the device's home screen are the dashboards and your chats **full screen**, kept on, and only then does the **screen saver** come on by itself and your chats go back to it when left alone. Anywhere else (on your phone, say), **Home** shows your dashboards as a normal screen with Android's bars, which sleeps as usual. The **Chat | Home** switch keeps the same view both ways.
+
+| In the category | What it does |
 |---|---|
-| **Start the wall display** | Full screen and kept on; back leaves it. Without Home Assistant connected it's just the idle screen. |
-| **Make it this tablet's home screen** | Android's choice of home app; pick Lena. Home then always brings the wall display back, and **Apps** in its bar lists everything else on the tablet. |
+| **Make it this device's home screen** | Android's choice of home app; pick Lena. That's dashboard mode: full screen and the screen saver. Home then always brings the wall display back, and **Apps** in its bar lists everything else on the tablet. |
+| **Start the wall display** | Opens the dashboards (full screen in dashboard mode); back leaves it. Without Home Assistant connected it's just the idle screen. |
 | **Dashboards** | The Home Assistant dashboards it shows. |
 | **When no one's around** | When the screen saver starts, what it shows (her clock or a photo frame), when your chats give way back to it, and what wakes it up. |
 | **Wake word** | Saying her name to talk to her. |
@@ -152,11 +158,11 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 
 The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
-**Your chats, then back.** Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up and while she's still answering. Switching back to **Home** yourself does the same at once. On a tablet where the wall display is the home screen, this applies however your chats were opened.
+**Your chats, then back** (dashboard mode only). Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up and while she's still answering. Switching back to **Home** yourself does the same at once. It applies however your chats were opened.
 
 ### When no one's around
 
-After a while without a touch (**Screen saver after**: 30 seconds, 1, 2, 5, 10, 15 or 30 minutes, an hour, or never; 5 minutes by default) the dashboards give way to the screen saver, which shows one of these. Android's own screen saver shows the same.
+In dashboard mode, after a while without a touch (**Screen saver after**: 30 seconds, 1, 2, 5, 10, 15 or 30 minutes, an hour, or never; 5 minutes by default) the dashboards give way to the screen saver, which shows one of these. Android's own screen saver shows the same.
 
 - **Her clock:** the time, the date, the weather, how she feels and the last thing she said, on black. It drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
 - **Photo frame:** an album from Home Assistant's media: Immich's albums, people, tags and favorites (with Home Assistant's Immich integration), your My media folders, or any other media source with photos. Choose how long each photo shows (5 seconds to 5 minutes), the transition (fade, slide, slow zoom and fade, or none), shuffle, how photos fit the screen, and whether the time and her mood sit in a corner.

@@ -64,6 +64,10 @@ Memories need **Admin Panel → Settings → General → Memories** (or your acc
 
 The page didn't get Lena's token. Check **Settings → Home Assistant → Test connection**, and that the dashboard path is right (open `https://<your Home Assistant>/<path>` in a browser). Updating **Android System WebView** helps if it's very old; the sign-in needs its newer features.
 
+## The wall display isn't full screen, or the screen saver never comes on
+
+Both happen only in dashboard mode: when Lena's wall display is the device's **home screen** (Settings → Wall display → **Make it this device's home screen**, then pick Lena). The category's summary says whether it is. Anywhere else the dashboards are a normal screen that sleeps as usual, on purpose, so a phone doesn't stay lit.
+
 ## The wake word starts by mistake
 
 Open **Settings → Logs** and look for "Heard …": each says how sure she was and what she needed.
