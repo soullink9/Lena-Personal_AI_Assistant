@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#FFFFFF</color>
+    <color name="bg">#FAF9F5</color>
     <!-- The logo's background: the app icon, the launch screen and the shortcut circles. -->
     <color name="icon_bg">#040513</color>
     <!-- Taken from the logo; used for notification accents. -->

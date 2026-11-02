@@ -42,7 +42,7 @@
   --color-blue-700: #b5583a !important;
 
   /* Lena's own names for the few colours set directly below. */
-  --lena-page: #faf9f5;
+  --lena-page: #faf9f5; /* also pageBackground() in Theme.kt and "bg" in colors.xml */
   --lena-ink: #141413;
   --lena-bubble: #f0eee6;
   --lena-box: #ffffff;

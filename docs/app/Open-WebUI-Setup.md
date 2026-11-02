@@ -6,7 +6,7 @@ Lena shows your real Open WebUI, so almost everything works as it does in a brow
 
 ## HTTPS
 
-Lena only connects over `https://`. Android also refuses microphone access to plain `http://` pages, so call mode can't work without it.
+Lena only connects over `https://`. Android also refuses microphone access to plain `http://` pages, so Open WebUI's voice input can't work without it.
 
 Any of these work:
 
@@ -27,7 +27,7 @@ In Open WebUI: **Admin Panel → Settings → Audio**.
 | Speech-to-Text engine | A server engine, such as Whisper (local) or an OpenAI-compatible endpoint. **Not** "Web API". |
 | Text-to-Speech engine | A server engine, such as your own TTS service or an OpenAI-compatible endpoint. **Not** "Web API". |
 
-If either is set to "Web API", call mode will open but either won't hear you or won't answer out loud.
+If either is set to "Web API", talking to Lena with **Your server** or **Your server's voice** either won't hear you or won't answer out loud.
 
 Talking to Lena in the sheet uses the same text-to-speech for her voice, and the same speech-to-text if you set **Hearing you** to **Your server**.
 
@@ -35,7 +35,7 @@ Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but 
 
 ## Picking a model
 
-**Settings → Model** decides which model new chats, calls, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in). **Lena, automatically** uses the model built from the Modelfile (`lena`), or one named Lena. If your server has neither, new chats use Open WebUI's default and the Ask sheet and scheduled prompts use the first model on your list.
+**Settings → Model** decides which model new chats, the Ask sheet and scheduled prompts use. Pick it from the list (it fills in once you're signed in). **Lena, automatically** uses the model built from the Modelfile (`lena`), or one named Lena. If your server has neither, new chats use Open WebUI's default and the Ask sheet and scheduled prompts use the first model on your list.
 
 You can still start a chat with any model by tapping the title in the top bar.
 
@@ -67,4 +67,4 @@ Passkeys and security keys may not work inside Lena, because Android's web view 
 
 ## Open WebUI version
 
-Lena uses Open WebUI's `call` and `model` web address options, which have been part of Open WebUI since 2024. Any current version works.
+Lena uses Open WebUI's `model` and `temporary-chat` web address options, its folders and its notes, all part of current Open WebUI. Any current version works.

@@ -13,6 +13,7 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Dropdown | `select.lena_moment` | Her reaction to something that just happened, or **Nothing**. Attributes: `reason`, `since`. Fades on its own. |
 | To-do list | `todo.lena_memory` | Her memory. Add, edit, reorder and delete items like any to-do list. Tick one off to retire it; she only uses open items. |
 | Action | `lena.feel` | Sets her moment, with a reason. For your own automations, and used by Open WebUI. |
+| Action | `lena.add_event` | Adds an event to a calendar with Home Assistant's `calendar.create_event`: a calendar's name, a title, a start (`2026-11-14` for all day, `2026-11-14T15:30` at a time), and optionally an end, a location and a description. Returns what was added. Used by Open WebUI's Lena tool. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |
 | Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
 | Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
@@ -31,7 +32,15 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
    - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), and who's home;
    - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason;
    - what she remembers, and when to remember or forget something.
-5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact` and `record_feeling`.
+5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact`, `record_feeling` and, when there's a calendar she can write to, `add_calendar_event`.
+
+### Calendars
+
+Home Assistant's own tools let her **read** calendars but not add to them, so asking her to put something on the calendar used to fail. `add_calendar_event` fills that gap: it adds the event with Home Assistant's `calendar.create_event` action, the same as adding one in the calendar's own screen.
+
+- She can add to calendars that are **exposed to Assist** and **take new events** (a Local Calendar, Google Calendar, CalDAV and the like; holiday and other read-only calendars can't), by their names as shown in Home Assistant.
+- Times are the house's time zone. An all-day event is given by days, and its end is the last day it covers ("Friday to Sunday"); a timed event without an end lasts an hour, as in Home Assistant's own dialog.
+- If something's wrong (a calendar name she got wrong, an end before the start, the calendar refusing), the tool tells her why so she can fix it or tell you, and nothing is added.
 
 You can see exactly what was sent in the voice assistant's debug view (Settings → Voice assistants → your assistant → ⋮ → Debug).
 

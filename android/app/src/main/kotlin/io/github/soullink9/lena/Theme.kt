@@ -26,9 +26,12 @@ fun LenaTheme(content: @Composable () -> Unit) {
     )
 }
 
-/** Open WebUI's own page background, so the top bar runs straight into the chat. */
+/**
+ * The page background of Open WebUI with Lena's look (assets/css/open_webui.css, --lena-page), so the top
+ * bar runs straight into the chat. Keep the two in step, and "bg" in res/values and res/values-night colors.xml.
+ */
 @Composable
-fun pageBackground(): Color = if (isSystemInDarkTheme()) Color(0xFF171717) else Color.White
+fun pageBackground(): Color = if (isSystemInDarkTheme()) Color(0xFF262624) else Color(0xFFFAF9F5)
 
 /** Lena's logo as a round avatar, as on the app icon. */
 @Composable

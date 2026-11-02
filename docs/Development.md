@@ -24,6 +24,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   │   ├── brain.py               what moves her feelings: plain Python, no Home Assistant
 │   │   ├── core.py                runs the brain in Home Assistant, saves feelings and memory
 │   │   ├── llm_api.py             the "Lena" choice for conversation agents, and her tools
+│   │   ├── events.py              adding calendar events (her tool and lena.add_event)
 │   │   ├── view.py                GET /api/lena/context for Open WebUI and the app
 │   │   ├── select.py, todo.py     her dropdowns and her memory list
 │   │   ├── config_flow.py         adding and configuring her in the UI
@@ -33,7 +34,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   └── pytest.ini
 ├── open-webui/
 │   ├── lena_filter.py             feelings and memory into chats
-│   └── lena_tools.py              remember, forget, feel
+│   └── lena_tools.py              remember, forget, feel, add calendar events
 ├── android/                       the Lena app (Gradle project)
 │   └── app/src/main/kotlin/io/github/soullink9/lena/
 ├── voice/
@@ -65,6 +66,8 @@ The app build only runs when something in `android/` or its workflow changes, an
 | An entity ID the integration creates | The [integration](home-assistant/Integration.md) and [installation](home-assistant/Installation.md) pages, the `memory_list` setting of the Open WebUI tool, and `DEFAULT_MEMORY_LIST` in the app's `Prefs.kt` |
 | What `/api/lena/context` returns | `view.py`, `open-webui/lena_filter.py`, `HomeAssistant.kt` in the app, and the [integration](home-assistant/Integration.md) page |
 | How `forget_fact` picks a memory | `best_match` in `brain.py` and `_best_match` in `open-webui/lena_tools.py` |
+| How calendar events are added | `events.py` (shared by `add_calendar_event` and `lena.add_event`), the `add_calendar_event` method's description in `open-webui/lena_tools.py`, `services.yaml` and `strings.json`, and [Calendars](home-assistant/Integration.md#calendars) |
+| Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](app/How-It-Works.md). It relies on Open WebUI's Tailwind colour variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Conversation) in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |

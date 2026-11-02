@@ -8,16 +8,16 @@
 - **Certificate errors** show as a blank page. Make sure the certificate is valid for that name, or that your certificate authority is installed on the phone. See [Open WebUI Setup](Open-WebUI-Setup.md#https).
 - **Away from home**, the phone needs a route to your server, such as your VPN or Tailscale.
 
-## Call mode opens but doesn't hear me
+## Talking to Lena doesn't hear me (with Your server)
 
 - **Microphone permission:** Settings → Apps → Lena → Permissions → Microphone → Allow while using the app.
 - **Speech-to-text engine:** must be a server engine, not "Web API". See [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines).
 - **Another app has the microphone**, such as a phone call or a voice recorder. Close it and try again.
 
-## Call mode hears me but doesn't answer out loud
+## She doesn't answer out loud (with Your server's voice)
 
 - **Text-to-speech engine:** must be a server engine, not "Web API".
-- **Media volume:** call replies play at media volume, not call volume.
+- **Media volume:** her replies play at media volume, not call volume.
 
 ## The assistant gesture opens something else
 
@@ -26,7 +26,7 @@
 
 ## Lena isn't listed as a digital assistant
 
-Restart the phone after installing, then look again. A few phone makers hide this setting or limit it to their own assistant; the Call shortcut on your home screen works everywhere.
+Restart the phone after installing, then look again. A few phone makers hide this setting or limit it to their own assistant; the Talk shortcut (long-press Lena's icon), the widget and the Quick Settings tile work everywhere.
 
 ## Open WebUI's header shows up again
 
@@ -39,6 +39,16 @@ Lena's native features use your sign-in from the page. Sign in on the main scree
 ## The Ask sheet says "Couldn't reach your server"
 
 Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale).
+
+## Folders don't show
+
+Folders need Open WebUI's folders feature, which an admin can turn off for everyone or for your account (Admin Panel → Users, the Folders permission). Without it, the drawer and All chats just leave folders out, and **Move to folder** says they're turned off.
+
+## Lena says she added a calendar event, but it isn't there, or she can't add one
+
+- She can only add to calendars that are **exposed to Assist** (Settings → Voice assistants → Expose) and that **take new events** (a Local Calendar, Google Calendar, CalDAV and the like; holiday and other read-only calendars can't). Open the calendar in Home Assistant and check you can add an event there by hand.
+- In Open WebUI and the app, update **Lena (remember, forget, feel, calendar)** in Workspace → Tools to the one in this release, so she has the calendar tool.
+- She's told to say she added it only after it worked; if it failed, she gets Home Assistant's reason and should tell you.
 
 ## Memory & knowledge says a feature is turned off
 

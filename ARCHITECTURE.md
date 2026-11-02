@@ -43,7 +43,7 @@ flowchart LR
 | Component | Where | Owns |
 |---|---|---|
 | Her character | `ollama/Modelfile` | Who she is, how she talks, house rules. Put first in every conversation with a `MESSAGE system` line, which apps can't remove (a `SYSTEM` prompt would be replaced by any app's own). |
-| Lena integration | `home-assistant/custom_components/lena/` | Her feelings, her memory list, her context text, her tools for Home Assistant's agents, alerts, and two HTTP views for the other clients. |
+| Lena integration | `home-assistant/custom_components/lena/` | Her feelings, her memory list, her context text, her tools for Home Assistant's agents (including adding calendar events, which Home Assistant's own tools can't), alerts, and two HTTP views for the other clients. |
 | Open WebUI filter and tool | `open-webui/` | Bringing her context into chats, and letting her remember, forget and react there. |
 | Android app | `android/` | The phone and tablet experience. Holds no server state of its own beyond settings. |
 | Voice bridge | `voice/bridge/` | Making Home Assistant's Piper and Whisper available to Open WebUI through an OpenAI-shaped API. |
@@ -73,7 +73,7 @@ flowchart TB
 ## Open WebUI
 
 - **The filter** (`inlet`) runs before every request to the `lena` model: it fetches `/api/lena/context` (cached for a minute) and appends it to the system message. If Home Assistant is down she simply chats without it.
-- **The tool** exposes `remember`, `forget` and `feel` to the model; each calls a Home Assistant action over REST, so the memory list and feelings stay in one place.
+- **The tool** exposes `remember`, `forget`, `feel` and `add_calendar_event` to the model; each calls a Home Assistant action over REST (`lena.add_event` for events, sharing `events.py` with her voice tool), so the memory list, feelings and calendar rules stay in one place.
 - Open WebUI keeps your chats, memories, notes, tools, knowledge and speech settings. The app reuses all of that through Open WebUI's own API rather than reimplementing it.
 
 ## The Android app
@@ -82,6 +82,7 @@ flowchart TB
 flowchart TB
     subgraph UI
         Main["MainActivity<br/>web view + drawer"]
+        Chats["ChatsActivity<br/>All chats, folders"]
         Ask["AskActivity<br/>6 looks"]
         Dash["DashboardActivity"]
         Disp["DisplayActivity / LenaDream<br/>screen saver"]
@@ -102,6 +103,7 @@ flowchart TB
         Logs["Logs.kt<br/>rolling file"]
     end
     Main --> Api
+    Chats --> Api
     Ask --> Api & Voice & House
     Dash --> House & Wake
     Disp --> Wake & House
@@ -114,6 +116,7 @@ flowchart TB
 Design choices worth knowing before changing anything:
 
 - **One sign-in, the page's own.** You sign in to Open WebUI inside the web view (password, LDAP or single sign-on, even behind a proxy like Authentik). The native features read the resulting `token` cookie and send it only to your server's origin, so there's no API key to manage. If the session ends, `SignIn.kt` can sign in again with details you chose to save, encrypted with an Android keystore key.
+- **Open WebUI's page is restyled, not rebuilt.** `assets/css/open_webui.css` (top frame only) recolours Open WebUI through its Tailwind colour variables for a warm, Claude.ai-like look and hides its call button; the drawer, All chats and the Chat | Home switch are native. If Open WebUI's markup changes, the page falls back to its own look.
 - **Answers are written server-side and followed by polling.** `Api.ask` saves your message and an empty reply into the chat, then asks Open WebUI's `/api/chat/completions` to answer it with the model's tools, exactly as the web page does. The app then polls the chat until the reply is marked done. That way an answer finishes even if you close the screen, and "Lena finished" notifications can pick it up.
 - **One chat for talking to Lena.** The Ask screen always continues the pinned "Assistant Lena" chat, found by id and, failing that, by name, so it's the same conversation on every device. Half the model's context is given to it, newest first.
 - **Notes for one request only.** The phone's time, "this will be read aloud", the lock-screen caution and a scheduled prompt's real text go in a system message with that request and are never saved into the chat.

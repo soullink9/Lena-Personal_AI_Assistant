@@ -10,7 +10,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 
 | File | What it does |
 |---|---|
-| `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar and drawer (pinned and recent chats), hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
+| `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar (logo and Chat \| Home switch) and drawer (pinned chats, folders and recent chats, only what fits), Lena's look for Open WebUI's pages, hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
 | `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat, speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
 | `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
 | `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
@@ -20,18 +20,21 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
+| `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies) and the hidden call button, added to the top frame. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. |
 | `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |
 | `java/…/MicroFrontend.java` | A line-for-line port of TensorFlow Lite Micro's audio front end, checked bit for bit against the C on every build. |
+| `ChatsActivity.kt` | All chats: pinned chats, folders (new, rename, delete) and your whole history, with search. |
+| `Chats.kt` | What the drawer and All chats share: chat rows in each list style, grouping by day, and the long-press menu (pin, move to folder, rename, delete) with its dialogs. |
 | `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |
 | `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers, schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
 | `Updates.kt` | Updating from GitHub releases: checking, downloading, verifying and installing. |
 | `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Logs. |
-| `Widgets.kt` | The Quick Settings tile and the home screen widget. |
+| `Widgets.kt` | The Quick Settings tile (Talk to Lena) and the home screen widget. |
 | `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |
 | `Theme.kt` | Material You colours. |
 
@@ -65,13 +68,15 @@ Lena never asks for an API key. It reads Open WebUI's `token` cookie from the we
 | Call | Used for |
 |---|---|
 | `GET /api/version` | Server status in the drawer |
-| `GET /api/models` | Model picker; tools and default features for the Ask sheet |
-| `GET /api/v1/chats/?page=1`, `GET /api/v1/chats/search` | The drawer's chat list and search |
+| `GET /api/models` | Settings → Model; finding Lena; tools and default features for the Ask sheet |
+| `GET /api/v1/chats/?page=`, `GET /api/v1/chats/search` | Recent chats in the drawer, history and search in All chats |
+| `GET /api/v1/folders/`, `POST /api/v1/folders/`, `POST /api/v1/folders/{id}/update`, `POST /api/v1/folders/{id}/update/expanded`, `DELETE /api/v1/folders/{id}?delete_contents=false` | Folders: listing, new, rename, open or closed (shared with Open WebUI's sidebar), delete keeping the chats |
+| `GET /api/v1/chats/folder/{id}/list?page=`, `POST /api/v1/chats/{id}/folder` | A folder's chats; moving a chat into or out of a folder |
 | `GET /api/v1/chats/{id}` | Chat titles and models, and following an answer as it's written |
 | `GET /api/tasks/chat/{id}` | Whether an answer is still running |
 | `POST /api/v1/chats/new`, `POST /api/chat/completions` | Starting a chat from the sheet or a scheduled prompt, using Open WebUI's server-side tool loop |
 | `POST /api/v1/chats/{id}` | Adding a follow-up to a sheet conversation; renaming a chat |
-| `GET /api/v1/chats/pinned`, `POST /api/v1/chats/{id}/pin` | The drawer's pinned chats and Pin/Unpin; pinning **Assistant Lena** when it's created |
+| `GET /api/v1/chats/pinned`, `POST /api/v1/chats/{id}/pin` | Pinned chats in the drawer and All chats, and Pin/Unpin; pinning **Assistant Lena** when it's created |
 | `POST /api/v1/auths/signin`, `POST /api/v1/auths/ldap` | Signing in by herself, only if you turn it on |
 | `GET /api/v1/users/user/settings`, `GET /api/config` | Whether to use Open WebUI's memory feature (your setting, or the server default) |
 | `GET /api/v1/memories/`, `POST /api/v1/memories/add`, `POST /api/v1/memories/{id}/update`, `DELETE /api/v1/memories/{id}` | Memories |

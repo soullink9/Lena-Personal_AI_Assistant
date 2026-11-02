@@ -5,27 +5,32 @@
 Lena is two things working together:
 
 - **Your real Open WebUI page** for chatting, inside Android's built-in web view (the same engine as Chrome, updated through the Play Store). Everything Open WebUI does, including your tools, works as it does in a browser.
-- **A native Android shell** around it, plus features that talk to Open WebUI's API directly: the drawer's chat list, the Ask sheet, notifications and scheduled prompts. They use the sign-in you already made inside Lena; there's no API key to set up.
+- **A native Android shell** around it, plus features that talk to Open WebUI's API directly: the drawer's chats and folders, All chats, the Ask sheet, notifications and scheduled prompts. They use the sign-in you already made inside Lena; there's no API key to set up.
 
 ## The main screen
 
 **Top bar**
 - **☰** opens the drawer.
-- **The title** is the current chat's model, with her avatar when it's Lena. Tap it to start a new chat with another model.
-- **Temporary chat** (one Open WebUI doesn't save), **New chat** and **Voice call** on the right.
+- **Lena's logo**, then the **Chat | Home** switch: **Home** opens your Home Assistant dashboards (the wall display), and the same switch there brings you back to your chats. It shows once Home Assistant is set up in Settings.
+- **Temporary chat** (one Open WebUI doesn't save) and **New chat** on the right.
 
 **Drawer**
 - **Lena** at the top, with whether your server is reachable (and its Open WebUI version), and **how she feels** if you've connected Home Assistant: her mood, energy and any reaction, and why ("Grumpy · Groggy, It just started raining").
-- **Search**, then your **pinned chats** and your **recent chats**, grouped by day, taking up most of the drawer. How they're listed is up to you (Settings → Appearance → Chat list): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. A spinner marks a chat that's still being answered.
-- **Pinned chats** come first, the same as Open WebUI's sidebar. Up to five show (Settings → Appearance → **Pinned chats in the menu**: 3, 5, 8 or 12); with more, **View all** shows the rest and **Show fewer** folds them away again.
-- **Long-press** a chat to **pin** (or unpin), **rename** or **delete** it (deleting removes it from Open WebUI too).
+- Then your chats, in this order, as many as fit. The drawer never scrolls:
+  - **Pinned** chats, the same as Open WebUI's sidebar (up to five; Settings → Appearance → **Pinned chats in the menu**: 3, 5, 8 or 12).
+  - Your **folders** (Open WebUI's folders). Tap one to open or close it; open folders show their chats. Open WebUI remembers which are open, so its sidebar matches.
+  - **Recent** chats, newest first.
+- **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Appearance → All chats): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
+- **Long-press** any chat, in the drawer or All chats, to **pin** (or unpin) it, **move it to a folder** (or out of one, or into a new folder), **rename** or **delete** it (deleting removes it from Open WebUI too). A spinner marks a chat that's still being answered.
 - Along the bottom, three buttons: **Settings**, **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below) and **Reload**.
+
+**Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). It recolours Open WebUI through its colour settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
 
 **Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings.
 
 Lena hides Open WebUI's own header and sidebar because the top bar and drawer replace them. If an Open WebUI update changes its page, the header may simply reappear until Lena catches up; nothing breaks.
 
-**New chats** use your chosen model (Settings → Model), unless you pick another from the title.
+**New chats** use your chosen model (Settings → Model). To pick another model for one chat, turn on **Open WebUI's own menus** and use its model selector.
 
 **Back** goes back within Open WebUI, then closes Lena to the background. **Swiping right from the middle of the left edge** opens the drawer instead of going back; Android lets an app take over only part of an edge, so higher or lower on the left edge, and the right edge, still go back.
 
@@ -44,7 +49,7 @@ The assistant gesture opens Lena over whatever you're doing, already listening, 
 | **Island** | A small black pill at the top showing what's happening; her answer drops down under it like a notification. Tap her avatar to talk. |
 | **Subtitles** | No panel at all: her words appear at the bottom of the screen over a soft fade, like film subtitles. |
 
-Every look listens, answers, speaks and keeps listening the same way; only the Sheet shows earlier turns. In the others, **⋮** has everything that doesn't fit: type or talk, new conversation, photos, copy, voice call and open in Lena. Tapping empty space closes any of them.
+Every look listens, answers, speaks and keeps listening the same way; only the Sheet shows earlier turns. In the others, **⋮** has everything that doesn't fit: type or talk, new conversation, photos, copy and open in Lena. Tapping empty space closes any of them.
 
 1. **Talk.** Your words appear as you speak. When you stop, Lena sends them. Tap the mic to send early.
 2. **Lena answers** on your server with your model's tools, shows the reply as it's written, then **reads it aloud**. Tap the button while she's talking to stop her. When you talk (rather than type), Lena tells her the reply will be read aloud, so she answers the way she would in the kitchen: short, plain sentences, no lists or formatting.
@@ -57,7 +62,7 @@ Every look listens, answers, speaks and keeps listening the same way; only the S
 - A conversation that never ends would outgrow any model, so Lena gives it **half of the model's context** (set **Her context size** under Settings → Conversation; 32,768 by default), filled from the newest exchange back. For short spoken exchanges that's usually 50 to 80 of them. The other half stays free for her system prompt, tools, tool results and reply. The chat itself keeps everything, and **Continue in Lena** opens it in the full app.
 
 - The **keyboard** button switches to typing (and the mic button back). Lena only reads replies aloud when you spoke.
-- The **waveform** button switches to a full voice call, and the **expand** button opens the full app.
+- The **expand** button opens the full app.
 - Your **quick prompts** appear as chips when typing.
 - Tap outside the sheet to close it. If Lena is still answering, you get a notification when she's done.
 
@@ -65,8 +70,8 @@ Every look listens, answers, speaks and keeps listening the same way; only the S
 
 | Setting | Choices |
 |---|---|
-| Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as call mode. |
-| Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as call mode. **The phone's voice**: Android's text-to-speech. **Off**. |
+| Hearing you | **On this phone** (default): Android's on-device speech recognition, which shows your words as you speak, and the audio never leaves the phone. **Your server**: Open WebUI's speech-to-text, the same as its voice input. |
+| Lena's voice | **Your server's voice** (default): Open WebUI's text-to-speech, the same voice as reading a reply aloud there. **The phone's voice**: Android's text-to-speech. **Off**. |
 | Keep listening | **After every reply** (default), **Only when Lena asks a question** (like Home Assistant's "continue conversation"), or **Off**. |
 | Her context size (Conversation) | Your model's context length in tokens (32,768 by default). Half of it holds the ongoing conversation. |
 
@@ -82,7 +87,7 @@ Other ways in: **Talk to Lena** on the widget and the app icon's long-press menu
 
 - She starts a fresh conversation. Your **Assistant Lena** chat and its history stay hidden.
 - Her mood shows, but not the reasons.
-- No photos, and opening the app, a chat or a call asks you to unlock first.
+- No photos, and opening the app or a chat asks you to unlock first.
 - She's told the person may not be you, so she shouldn't unlock, open or disarm anything, or share personal details, earlier conversations or what she remembers.
 
 That last part is an instruction to her, not a lock: anyone holding your phone can still talk to her, and a model can be talked round. If your Home Assistant exposes locks, garage doors or alarms to her, think about that before turning this on.
@@ -124,15 +129,16 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 | From left to right | What it does |
 |---|---|
 | **Menu** | Home Assistant's sidebar, with all its dashboards, settings and the rest. Back is your device's back gesture (or button): up out of a subview, or back through what you opened. |
+| **Chat \| Home** | The same switch as on the main screen: **Chat** opens your chats. |
 | **Time, date and weather** | |
 | **The dashboard's views** | Its view tabs, as chips (only when it has more than one). |
 | **Dashboards** | Switches between the dashboards you added here (only when there's more than one). |
 | **Lena** | Her mood and why. Tap to talk to her. |
-| **Chats, Reload, Apps, Settings** | Your chats, reload the dashboard, the tablet's other apps, and Lena's settings. |
+| **Reload, Apps, Settings** | Reload the dashboard, the tablet's other apps, and Lena's settings. |
 
 The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Map, Logbook, History, Media and so on): their header goes too, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Its settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.
 
-**Your chats, then back.** Open your chats from the bar and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up, during a voice call, and while she's still answering. On a tablet where the wall display is the home screen, this applies however your chats were opened.
+**Your chats, then back.** Open your chats with the **Chat** switch and walk away, and after a minute without a touch (Settings → Wall display → When no one's around → **Back from your chats after**: 30 seconds to 10 minutes, or never) it goes back to the dashboards and straight to the screen saver. It waits while the keyboard is up and while she's still answering. Switching back to **Home** yourself does the same at once. On a tablet where the wall display is the home screen, this applies however your chats were opened.
 
 ### When no one's around
 
@@ -182,21 +188,17 @@ When something in your house worries her (a leak, smoke, a door left open: the s
 
 Share text or a link from any app and pick **Ask Lena**. It goes into the sheet's text box so you can add what you want ("Summarise this", "Is this right?") before sending. Nothing is sent until you tap send.
 
-## Voice calls
+## No voice calls
 
-Start one from the top bar, the drawer, the Quick Settings tile, the widget, the app icon's long-press menu, or the assistant gesture. Calls use Open WebUI's own call mode.
-
-- The screen stays on during a call.
-- The first call asks for microphone permission.
-- If you leave Lena mid-call, Android cuts the app off from the microphone until you come back.
+Lena has no voice calls: talking to her is the Ask sheet (the assistant gesture, the tile, the widget, the wake word), which listens, answers aloud and listens again. Open WebUI's own call button is hidden inside the app too. To hide it in the browser as well, an Open WebUI admin can turn off the **Call** permission for users (Admin Panel → Users → Groups, or the default permissions).
 
 ## Quick Settings tile
 
-Settings → Widget & tile → **Add the Quick Settings tile**. Tapping **Call Lena** in the pull-down shade starts a call (after unlocking).
+Settings → Widget & tile → **Add the Quick Settings tile**. Tapping **Talk to Lena** in the pull-down shade opens the sheet, listening, the same as the assistant gesture (including its lock-screen setting).
 
 ## Home screen widget
 
-Settings → Widget & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Voice call**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
+Settings → Widget & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
 
 Turn on **Her mood on the widget** (Settings → Widget & tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
 
@@ -255,7 +257,7 @@ The details are stored encrypted with a key that never leaves the phone (Android
 | Permission | Why |
 |---|---|
 | Internet | To reach your Open WebUI (and your Home Assistant, if you add it). |
-| Microphone | Talking to Lena, call mode, voice input and the wake word. Asked the first time. In the main app, only your Open WebUI address can use it. |
+| Microphone | Talking to Lena, Open WebUI's voice input and the wake word. Asked the first time. In the main app, only your Open WebUI address can use it. |
 | Notifications | "Lena finished", scheduled prompts and house alerts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |
 | Change audio settings | Needed by Android's web view to use the microphone. It never prompts. |
