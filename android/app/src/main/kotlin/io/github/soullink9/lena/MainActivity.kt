@@ -59,6 +59,7 @@ import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -128,6 +129,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
@@ -150,8 +154,6 @@ class MainActivity : ComponentActivity() {
         const val ACTION_SETTINGS = "io.github.soullink9.lena.SETTINGS"
         const val EXTRA_CHAT_ID = "chat_id"
         const val EXTRA_TEXT = "text"
-        /** Opened from the wall display: after a while without a touch, go back to it. */
-        const val EXTRA_FROM_WALL = "from_wall"
 
         /**
          * Hides Open WebUI's own header and sidebar; the drawer and top bar replace them. Top frame only:
@@ -212,7 +214,12 @@ class MainActivity : ComponentActivity() {
     /** Whether Lena's look is on for Open WebUI's pages (the top bar matches the page either way). */
     private val lenaLook = mutableStateOf(true)
 
-    private var fromWall = false
+    /**
+     * Dashboard mode: Lena's wall display is this device's home screen. Then (and only then) this screen is
+     * full screen like the dashboards, and goes back to them and their screen saver when left alone.
+     * Otherwise both are normal screens with the status and navigation bars.
+     */
+    private var dashboardMode = false
     private var lastInteraction = System.currentTimeMillis()
 
     private var pendingMic: PermissionRequest? = null
@@ -264,14 +271,25 @@ class MainActivity : ComponentActivity() {
         val restored = savedInstanceState?.getString("url")?.takeIf { isServer(Uri.parse(it)) }
         if (restored != null) web.loadUrl(restored) else handle(intent, fresh = true)
         askForNotificationsOnce()
-        fromWall = intent?.getBooleanExtra(EXTRA_FROM_WALL, false) == true || wallIsHome()
+        applyWindowMode()
         watchForIdle()
     }
 
-    /** The wall display is this tablet's home screen, so your chats are a visit from it. */
-    private fun wallIsHome(): Boolean {
-        val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo
-        return home?.packageName == packageName && home.name == DashboardActivity::class.java.name
+    /**
+     * Full screen in dashboard mode (the wall display is the home screen), so switching between Chat and
+     * Home keeps the same view; a normal screen otherwise. Checked again on every return, since the home
+     * app can be changed in Android's settings meanwhile.
+     */
+    private fun applyWindowMode() {
+        dashboardMode = DashboardActivity.isHomeScreen(this)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            if (dashboardMode) {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
     }
 
     /** Every touch or key on this screen: the wall display's return timer starts again. */
@@ -281,8 +299,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Opened from the wall display and then left alone for a while (Settings → Wall display → When
-     * no one's around): back to the dashboards, straight to the screen saver. Not while the
+     * In dashboard mode, left alone for a while (Settings → Wall display → When no one's around → Back
+     * from your chats after): back to the dashboards, straight to the screen saver. Not while the
      * keyboard is up, or while she's still answering.
      */
     private fun watchForIdle() {
@@ -290,7 +308,7 @@ class MainActivity : ComponentActivity() {
             while (true) {
                 delay(5_000)
                 val seconds = Prefs.returnSeconds(this@MainActivity)
-                if (!fromWall || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
+                if (!dashboardMode || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
                 val typing = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView)
                     ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
                 if (typing) { lastInteraction = System.currentTimeMillis(); continue }
@@ -303,7 +321,6 @@ class MainActivity : ComponentActivity() {
                         .putExtra(DashboardActivity.EXTRA_IDLE, true)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 )
-                fromWall = false
                 finish()
                 return@launch
             }
@@ -333,7 +350,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        fromWall = intent.getBooleanExtra(EXTRA_FROM_WALL, false) || wallIsHome()
         lastInteraction = System.currentTimeMillis()
         handle(intent, fresh = false)
     }
@@ -373,16 +389,14 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The Chat | Home switch: Home opens the wall display's dashboards. A visit from the wall display
-     * ends there, as when it's left alone; otherwise your chats stay open behind it.
+     * The Chat | Home switch: Home opens the dashboards, in the same view as this screen (full screen in
+     * dashboard mode, normal otherwise). In dashboard mode your chats were a visit from the home screen,
+     * so they close, as when they're left alone.
      */
     private fun switchTo(screen: MainScreen) {
         if (screen != MainScreen.HOME) return
         startActivity(Intent(this, DashboardActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        if (fromWall) {
-            fromWall = false
-            finish()
-        }
+        if (dashboardMode) finish()
     }
 
     /** The chat id in a page address (…/c/<id>), allowing for Open WebUI served under a path. */
@@ -597,6 +611,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
+        applyWindowMode()
         if (::web.isInitialized) {
             val look = Prefs.lenaLook(this)
             if (look != lenaLook.value) {
@@ -661,6 +676,9 @@ class MainActivity : ComponentActivity() {
         var feelings by remember { mutableStateOf<Feelings?>(null) }
         var checked by remember { mutableStateOf(false) }
         var refresh by remember { mutableIntStateOf(0) }
+        var query by remember { mutableStateOf("") }
+        var results by remember { mutableStateOf<List<ChatItem>?>(null) }
+        var reordering by remember { mutableStateOf<Reorder?>(null) }
         val chatId = chatIdOf(currentUrl.value)
         val actions = remember {
             ChatActions(this, api, scope, onChanged = { refresh++ }, onDeleted = { id -> if (id == chatIdOf(currentUrl.value)) openNew() })
@@ -679,10 +697,10 @@ class MainActivity : ComponentActivity() {
             checked = true
             feelings = HomeAssistant.from(this@MainActivity)?.let { runCatching { it.feelings() }.getOrNull() }
             try {
-                pinned = runCatching { api.pinned() }.getOrDefault(pinned)
+                pinned = runCatching { inYourOrder(this@MainActivity, api.pinned()) }.getOrDefault(pinned)
                 // None when they're off in Settings → Chat screen, or turned off on the server.
                 folders = if (!Prefs.drawerFolders(this@MainActivity)) emptyList()
-                    else runCatching { api.folders() }.getOrDefault(emptyList())
+                    else runCatching { api.folders(Prefs.folderOrder(this@MainActivity)) }.getOrDefault(emptyList())
                 folders.forEach { f ->
                     if (openFolders[f.id] == null) openFolders[f.id] = f.expanded
                     if (openFolders[f.id] == true) folderChats[f.id] = runCatching { api.folderChats(f.id) }.getOrDefault(emptyList())
@@ -694,6 +712,13 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {
                 chatsError = if (version == null) null else "Couldn't load your chats"
             }
+        }
+
+        // Search as you type (after a short pause), from the drawer's search box.
+        LaunchedEffect(query) {
+            if (query.isBlank()) { results = null; return@LaunchedEffect }
+            delay(300)
+            results = runCatching { api.search(query.trim()) }.getOrDefault(emptyList())
         }
 
         /**
@@ -727,10 +752,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         feelings?.let { FeelingsLine(it, Modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp)) }
+                        SearchField(query, "Search chats", Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) { query = it }
 
-                        // Pinned, folders, then recent: as many as fit, never scrolling.
-                        FitColumn(Modifier.weight(1f).padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
-                            DrawerChats(
+                        // Search results, or pinned, folders, then recent: as many as fit, never scrolling.
+                        FitColumn(Modifier.weight(1f).padding(start = 12.dp, end = 12.dp, top = 8.dp)) {
+                            if (query.isNotBlank()) DrawerResults(results, pinned.map { it.id }.toSet(), chatId, actions) { id ->
+                                closeThen { openChat(id) }
+                            } else DrawerChats(
                                 pinned = pinned.take(Prefs.pinnedShown(this@MainActivity)),
                                 pinnedIds = pinned.map { it.id }.toSet(),
                                 folders = folders,
@@ -741,6 +769,8 @@ class MainActivity : ComponentActivity() {
                                 currentId = chatId,
                                 actions = actions,
                                 onOpen = { id -> closeThen { openChat(id) } },
+                                onReorderPinned = { reordering = Reorder.PINNED },
+                                onReorderFolders = { reordering = Reorder.FOLDERS },
                                 onFolder = { f ->
                                     val open = openFolders[f.id] != true
                                     openFolders[f.id] = open
@@ -752,17 +782,23 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // Everything else: pinned, folders and your whole history, with search.
+                        // Everything else: pinned, folders and your whole history, with search (and while
+                        // searching, every result, since the menu shows only what fits).
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
                                 .clip(RoundedCornerShape(24.dp))
-                                .clickable { closeThen { startActivity(Intent(this@MainActivity, ChatsActivity::class.java)) } }
+                                .clickable {
+                                    val all = Intent(this@MainActivity, ChatsActivity::class.java)
+                                    if (query.isNotBlank()) all.putExtra(ChatsActivity.EXTRA_QUERY, query.trim())
+                                    closeThen { startActivity(all) }
+                                }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                         ) {
                             Icon(Icons.AutoMirrored.Outlined.List, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("View all chats", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                            Text(if (query.isNotBlank()) "See all results" else "View all chats",
+                                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
@@ -816,12 +852,45 @@ class MainActivity : ComponentActivity() {
         }
 
         actions.Dialogs()
+
+        when (reordering) {
+            Reorder.PINNED -> ReorderDialog("Order of pinned chats", pinned.map { it.id to it.title }) { ids ->
+                reordering = null
+                if (ids != null) { Prefs.setPinnedOrder(this@MainActivity, ids); refresh++ }
+            }
+            Reorder.FOLDERS -> ReorderDialog("Order of folders", folders.filter { it.depth == 0 }.map { it.id to it.name }) { ids ->
+                reordering = null
+                if (ids != null) { Prefs.setFolderOrder(this@MainActivity, ids); refresh++ }
+            }
+            null -> Unit
+        }
+    }
+
+    /** What's being put in order from the menu: your pinned chats, or your folders. */
+    private enum class Reorder { PINNED, FOLDERS }
+
+    /** Search results in the drawer, as many as fit; See all results below opens the rest in All chats. */
+    @Composable
+    private fun DrawerResults(results: List<ChatItem>?, pinnedIds: Set<String>, currentId: String?, actions: ChatActions, onOpen: (String) -> Unit) {
+        when {
+            results == null -> ListHint("Searching…")
+            results.isEmpty() -> ListHint("No matching chats")
+            else -> {
+                DrawerHeading("Results")
+                results.forEach { c ->
+                    actions.WithMenu(c, c.id in pinnedIds) { longPress ->
+                        ChatLine(c, c.id == currentId, null, 40.dp, 16.dp, RoundedCornerShape(20.dp), Color.Transparent, { onOpen(c.id) }, longPress)
+                    }
+                }
+            }
+        }
     }
 
     /**
      * The drawer's chats, as children of a FitColumn (so whatever doesn't fit is left out): your pinned
-     * chats, then each folder (tap to open or close it; open ones show their chats), then your recent
-     * chats. Long-press a chat for Pin, Move to folder, Rename and Delete.
+     * chats, then your folders (tap one to open or close it; open ones show their chats), then your recent
+     * chats. Pinned chats and folders are in your own order (the Reorder button on their heading).
+     * Long-press a chat for Pin, Move to folder, Rename and Delete.
      */
     @Composable
     private fun DrawerChats(
@@ -835,6 +904,8 @@ class MainActivity : ComponentActivity() {
         currentId: String?,
         actions: ChatActions,
         onOpen: (String) -> Unit,
+        onReorderPinned: () -> Unit,
+        onReorderFolders: () -> Unit,
         onFolder: (Api.Folder) -> Unit,
     ) {
         /** One chat in the drawer, indented inside a folder. */
@@ -847,9 +918,10 @@ class MainActivity : ComponentActivity() {
         }
 
         if (pinned.isNotEmpty()) {
-            DrawerHeading(PINNED_LABEL)
+            DrawerHeading(PINNED_LABEL, if (pinned.size > 1) onReorderPinned else null)
             pinned.forEach { Line(it) }
         }
+        if (folders.isNotEmpty()) DrawerHeading("Folders", if (folders.count { it.depth == 0 } > 1) onReorderFolders else null)
         folders.forEach { f ->
             val open = openFolders[f.id] == true
             FoldHeader(f.label, null, open, if (open) Icons.Outlined.FolderOpen else Icons.Outlined.Folder) { onFolder(f) }
@@ -873,15 +945,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** A small coloured label over a part of the drawer (Pinned, Recent). */
+    /**
+     * A small coloured label over a part of the drawer (Pinned, Folders, Recent), with a Reorder button
+     * when that part can be put in your own order.
+     */
     @Composable
-    private fun DrawerHeading(text: String) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.layoutId(FIT_HEADING).padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
-        )
+    private fun DrawerHeading(text: String, onReorder: (() -> Unit)? = null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.layoutId(FIT_HEADING).fillMaxWidth().padding(start = 16.dp, top = if (onReorder != null) 4.dp else 12.dp),
+        ) {
+            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f).padding(bottom = if (onReorder != null) 0.dp else 4.dp))
+            if (onReorder != null) IconButton(onClick = onReorder) {
+                Icon(Icons.Outlined.SwapVert, "Reorder $text", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 
     /**

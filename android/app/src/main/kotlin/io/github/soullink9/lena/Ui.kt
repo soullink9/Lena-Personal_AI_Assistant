@@ -39,6 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.Role
@@ -159,30 +163,86 @@ fun Footnote(text: String, modifier: Modifier = Modifier) {
         modifier = modifier.padding(horizontal = 20.dp))
 }
 
-/** A row showing the current choice; tapping it opens a short list to pick from. Keeps long option lists off the page. */
+/**
+ * A row showing only the current choice; tapping it opens every option to pick from. Settings uses it for
+ * anything with more than two choices, so pages stay short. detail adds a line under an option in the
+ * list; enabled greys out options that can't be picked (detail can say why).
+ */
 @Composable
-fun <T> PickItem(icon: ImageVector?, title: String, options: List<Pair<T, String>>, selected: T, onPick: (T) -> Unit) {
+fun <T> PickItem(
+    icon: ImageVector?,
+    title: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    detail: (T) -> String? = { null },
+    enabled: (T) -> Boolean = { true },
+    onPick: (T) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Item(icon, title, options.firstOrNull { it.first == selected }?.second ?: "Choose") { open = true }
     if (open) AlertDialog(
         onDismissRequest = { open = false },
         title = { Text(title) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 options.forEach { (value, label) ->
+                    val can = enabled(value)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable { onPick(value); open = false }.padding(vertical = 4.dp),
+                            .clickable(enabled = can) { onPick(value); open = false }.padding(vertical = 4.dp),
                     ) {
-                        RadioButton(selected = value == selected, onClick = null, modifier = Modifier.padding(horizontal = 8.dp))
-                        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 10.dp))
+                        RadioButton(selected = value == selected, onClick = null, enabled = can, modifier = Modifier.padding(horizontal = 8.dp))
+                        Column(Modifier.padding(vertical = 8.dp)) {
+                            Text(label, style = MaterialTheme.typography.bodyLarge,
+                                color = if (can) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                            detail(value)?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
     )
+}
+
+/**
+ * A settings category that folds open: its name and a one-line summary of how it's set, and tapping it
+ * shows its rows underneath. Keeps the main settings list short.
+ */
+@Composable
+fun Category(
+    icon: ImageVector,
+    title: String,
+    summary: String,
+    open: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "category")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Group {
+            Item(
+                icon = icon,
+                title = title,
+                summary = summary,
+                container = if (open) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+                trailing = {
+                    Icon(Icons.Rounded.ExpandMore, if (open) "Close" else "Open",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 16.dp).rotate(turn))
+                },
+                onClick = onToggle,
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(visible = open) {
+            Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Group(content = content)
+            }
+        }
+    }
 }
 
 // ---- Lena's two main screens ---------------------------------------------------------------

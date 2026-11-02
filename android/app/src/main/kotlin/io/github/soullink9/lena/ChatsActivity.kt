@@ -61,12 +61,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * All chats: everything the drawer has no room for. Your pinned chats, your folders with their chats,
- * and your whole history (a page at a time), with search. Long-press a chat to pin it, move it to a
+ * All chats: everything the drawer has no room for. Your pinned chats and your folders (in the order you
+ * set in the menu) with their chats, and your whole history (a page at a time), with search. Long-press a chat to pin it, move it to a
  * folder, rename or delete it; long-press a folder to rename or delete it. Opening a chat goes back to
  * the main screen with it.
  */
 class ChatsActivity : ComponentActivity() {
+
+    companion object {
+        /** Search for this straight away (See all results, from the menu's search). */
+        const val EXTRA_QUERY = "query"
+    }
 
     private lateinit var api: Api
 
@@ -104,7 +109,7 @@ class ChatsActivity : ComponentActivity() {
         val style = remember { Prefs.chatList(this) }
         val folded = remember { mutableStateMapOf<String, Boolean>() }
         var refresh by remember { mutableIntStateOf(0) }
-        var query by remember { mutableStateOf("") }
+        var query by remember { mutableStateOf(intent.getStringExtra(EXTRA_QUERY).orEmpty()) }
         var results by remember { mutableStateOf<List<ChatItem>?>(null) }
         var pinned by remember { mutableStateOf<List<ChatItem>>(emptyList()) }
         var folders by remember { mutableStateOf<List<FolderState>?>(null) } // null: none, or folders are off
@@ -133,8 +138,8 @@ class ChatsActivity : ComponentActivity() {
         // Everything, again after any change: pinned, folders (and the chats of open ones), history page 1.
         LaunchedEffect(refresh) {
             try {
-                pinned = runCatching { api.pinned() }.getOrDefault(pinned)
-                val loaded = runCatching { api.folders() }.getOrNull()
+                pinned = runCatching { inYourOrder(this@ChatsActivity, api.pinned()) }.getOrDefault(pinned)
+                val loaded = runCatching { api.folders(Prefs.folderOrder(this@ChatsActivity)) }.getOrNull()
                 val before = folders.orEmpty().associateBy { it.folder.id }
                 folders = loaded?.map { f -> FolderState(f).also { s -> before[f.id]?.let { s.open = it.open } } }
                 folders?.filter { it.open }?.forEach { loadFolder(it) }

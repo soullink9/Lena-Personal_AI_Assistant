@@ -416,6 +416,35 @@ object Prefs {
     /** Folders in the menu. On by default. */
     fun drawerFolders(c: Context): Boolean = p(c).getBoolean("drawer_folders", true)
 
+    /** Which categories of the main settings list are open (by name), so Settings opens as you left it. */
+    fun settingsOpen(c: Context): Set<String> = p(c).getStringSet("settings_open", null)?.toSet() ?: emptySet()
+
+    fun setSettingsOpen(c: Context, open: Set<String>) {
+        p(c).edit().putStringSet("settings_open", open).apply()
+    }
+
+    /**
+     * Your order for pinned chats and for folders in the menu, as chat or folder ids, first to last.
+     * Open WebUI keeps no order of its own for either, so it's kept here, on this phone.
+     */
+    fun pinnedOrder(c: Context): List<String> = idList(c, "pinned_order")
+
+    fun setPinnedOrder(c: Context, ids: List<String>) = setIdList(c, "pinned_order", ids)
+
+    fun folderOrder(c: Context): List<String> = idList(c, "folder_order")
+
+    fun setFolderOrder(c: Context, ids: List<String>) = setIdList(c, "folder_order", ids)
+
+    /** A list of ids saved as a JSON array; empty when there's none. */
+    private fun idList(c: Context, key: String): List<String> = runCatching {
+        val a = JSONArray(p(c).getString(key, "[]"))
+        List(a.length()) { a.getString(it) }
+    }.getOrDefault(emptyList())
+
+    private fun setIdList(c: Context, key: String, ids: List<String>) {
+        p(c).edit().putString(key, JSONArray(ids).toString()).apply()
+    }
+
     /** Whether, and how, to sign in to Open WebUI by herself. */
     fun autoSignIn(c: Context): AutoSignIn =
         enumPref(c, "auto_sign_in", AutoSignIn.OFF)

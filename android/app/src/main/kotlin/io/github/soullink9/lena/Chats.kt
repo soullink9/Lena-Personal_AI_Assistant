@@ -32,6 +32,9 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,6 +84,53 @@ import kotlinx.coroutines.launch
 
 /** The label of the pinned chats' group. */
 const val PINNED_LABEL = "Pinned"
+
+/**
+ * Pinned chats in your order (Prefs.pinnedOrder, set with Reorder in the menu). Chats pinned since you
+ * last reordered come first, newest first, so a new pin is easy to find.
+ */
+fun inYourOrder(context: Context, pinned: List<ChatItem>): List<ChatItem> {
+    val position = Prefs.pinnedOrder(context).withIndex().associate { it.value to it.index }
+    val (known, fresh) = pinned.partition { it.id in position }
+    return fresh.sortedByDescending { it.updatedMillis } + known.sortedBy { position[it.id] }
+}
+
+/**
+ * Put things in order: each row has up and down arrows. onDone gets the ids in the new order, or null if
+ * you cancel. Used for pinned chats and folders in the menu.
+ */
+@Composable
+fun ReorderDialog(title: String, items: List<Pair<String, String>>, onDone: (List<String>?) -> Unit) {
+    var list by remember { mutableStateOf(items) }
+
+    /** Moves the row at [from] by [by] places (-1 up, +1 down). */
+    fun move(from: Int, by: Int) {
+        val to = from + by
+        if (to !in list.indices) return
+        val next = list.toMutableList()
+        next.add(to, next.removeAt(from))
+        list = next
+    }
+
+    AlertDialog(
+        onDismissRequest = { onDone(null) },
+        title = { Text(title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                list.forEachIndexed { i, (_, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text(label, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f))
+                        IconButton(onClick = { move(i, -1) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move $label up") }
+                        IconButton(onClick = { move(i, 1) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move $label down") }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onDone(list.map { it.first }) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = { onDone(null) }) { Text("Cancel") } },
+    )
+}
 
 /**
  * What can be done to a chat from a list, and the dialogs that ask first. Both chat lists use one of

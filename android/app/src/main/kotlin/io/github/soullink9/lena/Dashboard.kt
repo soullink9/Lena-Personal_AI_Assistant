@@ -3,6 +3,7 @@ package io.github.soullink9.lena
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -111,6 +112,16 @@ class DashboardActivity : ComponentActivity() {
         const val EXTRA_IDLE = "idle"
 
         /**
+         * Dashboard mode: the wall display is this device's home screen (Android settings → Default apps →
+         * Home app → Lena). Only then are the dashboards and your chats full screen, and only then does the
+         * screen saver come on by itself. Anywhere else, the wall display is a normal screen.
+         */
+        fun isHomeScreen(c: Context): Boolean {
+            val home = c.packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo
+            return home?.packageName == c.packageName && home.name == DashboardActivity::class.java.name
+        }
+
+        /**
          * Paths on Home Assistant's address that aren't its frontend: other apps served through it
          * (add-on ingress, the Ingress Proxy integration and other integrations' views, all under
          * /api/), your own files in www (/local/), HACS's files and the frontend's static files.
@@ -147,9 +158,12 @@ class DashboardActivity : ComponentActivity() {
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
 
+    /** Whether this is the home screen (see [isHomeScreen]): full screen and the screen saver. */
+    private var dashboardMode = false
+
     /**
-     * Needs Home Assistant's address and token; without them it opens Settings. Kept on and full screen,
-     * and asks for the microphone if the wake word is on.
+     * Needs Home Assistant's address and token; without them it opens Settings. Full screen and kept on in
+     * dashboard mode, and asks for the microphone if the wake word is on.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -166,19 +180,35 @@ class DashboardActivity : ComponentActivity() {
         base = Uri.parse(server)
         token = saved
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        applyWindowMode()
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
         web = createWebView()
         open(Prefs.dashboards(this).first(), reload = true)
         setContent { LenaTheme { Screen() } }
-        if (intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
+        if (dashboardMode && intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
+    }
+
+    /**
+     * Dashboard mode (the home screen): full screen, kept on, and the screen saver allowed. Otherwise a
+     * normal screen with Android's bars, which sleeps as usual. Checked again on every return, since the
+     * home app can be changed in Android's settings meanwhile.
+     */
+    private fun applyWindowMode() {
+        dashboardMode = isHomeScreen(this)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            if (dashboardMode) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                show(WindowInsetsCompat.Type.systemBars())
+                if (dimmed.value) wakeUp()
+            }
+        }
     }
 
     // ---- Home Assistant in a web view ------------------------------------------------------
@@ -328,13 +358,13 @@ class DashboardActivity : ComponentActivity() {
     }
 
     /**
-     * The Chat | Home switch's Chat: your chats, as a visit from the wall display (so after a while
-     * alone they come back here, if that's set in Settings → Wall display).
+     * The Chat | Home switch's Chat: your chats, in the same view as this screen. In dashboard mode they're
+     * a visit, and come back here after a while alone (Settings → Wall display → When no one's around).
      */
     private fun openChats() {
         startActivity(
             Intent(this, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_FROM_WALL, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
 
@@ -423,6 +453,7 @@ class DashboardActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (!::web.isInitialized) return
+        applyWindowMode()
         web.onResume()
         // Time spent talking to her counts as using it, so it doesn't dim the moment she's done.
         if (!dimmed.value) lastTouch.longValue = System.currentTimeMillis()
@@ -455,7 +486,7 @@ class DashboardActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Back from your chats after a while: straight to the screen saver.
-        if (intent.getBooleanExtra(EXTRA_IDLE, false) && ::web.isInitialized) {
+        if (dashboardMode && intent.getBooleanExtra(EXTRA_IDLE, false) && ::web.isInitialized) {
             dim()
             return
         }
@@ -505,13 +536,14 @@ class DashboardActivity : ComponentActivity() {
                 delay(60_000)
             }
         }
-        // The screen saver after a while without a touch; while it shows, watch the motion sensor.
+        // The screen saver after a while without a touch (in dashboard mode only); while it shows, watch
+        // the motion sensor.
         LaunchedEffect(Unit) {
             val seconds = Prefs.dimSeconds(this@DashboardActivity)
             val motion = Prefs.motionEntity(this@DashboardActivity).trim()
             while (true) {
                 delay(3_000)
-                if (!dimmed.value && seconds > 0 && System.currentTimeMillis() - lastTouch.longValue > seconds * 1000L &&
+                if (dashboardMode && !dimmed.value && seconds > 0 && System.currentTimeMillis() - lastTouch.longValue > seconds * 1000L &&
                     now.feelings?.moment != "Worried") dim()
                 if (dimmed.value && motion.isNotEmpty()) {
                     val state = runCatching { house.state(motion) }.getOrNull()
@@ -524,12 +556,12 @@ class DashboardActivity : ComponentActivity() {
                 apps -> apps = false
                 header.value.subview || web.canGoBack() -> back()
                 // As the home screen, back has nowhere to go; otherwise it leaves.
-                !isHome() -> finish()
+                !isHomeScreen(this@DashboardActivity) -> finish()
             }
         }
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
                 else Strip(now, clock, dashboards, onTalk = ::talk, onApps = { apps = true })
@@ -541,12 +573,6 @@ class DashboardActivity : ComponentActivity() {
             }
             if (apps) Apps(onClose = { apps = false })
         }
-    }
-
-    /** Whether the wall display is the tablet's home app, where back has nowhere to go. */
-    private fun isHome(): Boolean {
-        val home = packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
-        return home?.activityInfo?.packageName == packageName
     }
 
     /**

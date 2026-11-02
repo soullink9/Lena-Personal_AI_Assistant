@@ -320,11 +320,25 @@ class Api(server: String, private val context: Context? = null) {
     // lists them as one list in tree order, with the inner ones' names shown as "Outer › Inner".
     // The feature can be turned off for your account, which comes back as ForbiddenException.
 
-    /** A folder of chats: its name as shown (with its parents'), and whether it's open in Open WebUI's sidebar. */
-    data class Folder(val id: String, val name: String, val label: String, val expanded: Boolean)
+    /**
+     * A folder of chats: its name as shown (with its parents'), whether it's open in Open WebUI's sidebar,
+     * and where it sits (depth 0 is a top-level folder).
+     */
+    data class Folder(
+        val id: String,
+        val name: String,
+        val label: String,
+        val expanded: Boolean,
+        val parentId: String? = null,
+        val depth: Int = 0,
+    )
 
-    /** Your folders, in tree order: each folder followed by the ones inside it, alphabetically. */
-    suspend fun folders(): List<Folder> {
+    /**
+     * Your folders, in tree order: each folder followed by the ones inside it. Folders side by side follow
+     * [order] (folder ids, from your own reordering; Open WebUI keeps none), and any not in it come after,
+     * alphabetically.
+     */
+    suspend fun folders(order: List<String> = emptyList()): List<Folder> {
         val a = JSONArray(request("GET", "/api/v1/folders/"))
         data class Raw(val id: String, val name: String, val parent: String?, val expanded: Boolean)
         val raw = List(a.length()) { i ->
@@ -336,16 +350,19 @@ class Api(server: String, private val context: Context? = null) {
         val children = raw.groupBy { it.parent?.takeIf { p -> p in ids } }
         val out = mutableListOf<Folder>()
 
+        val position = order.withIndex().associate { it.value to it.index }
+        val byOrder = compareBy<Raw>({ position[it.id] ?: Int.MAX_VALUE }, { it.name.lowercase() })
+
         /** Adds a folder's children under it, depth first; seen guards against a loop in the data. */
-        fun addChildren(parent: String?, prefix: String, seen: MutableSet<String>) {
-            for (f in children[parent].orEmpty().sortedBy { it.name.lowercase() }) {
+        fun addChildren(parent: String?, prefix: String, depth: Int, seen: MutableSet<String>) {
+            for (f in children[parent].orEmpty().sortedWith(byOrder)) {
                 if (!seen.add(f.id)) continue
                 val label = if (prefix.isEmpty()) f.name else "$prefix › ${f.name}"
-                out += Folder(f.id, f.name, label, f.expanded)
-                addChildren(f.id, label, seen)
+                out += Folder(f.id, f.name, label, f.expanded, parent, depth)
+                addChildren(f.id, label, depth + 1, seen)
             }
         }
-        addChildren(null, "", mutableSetOf())
+        addChildren(null, "", 0, mutableSetOf())
         return out
     }
 
