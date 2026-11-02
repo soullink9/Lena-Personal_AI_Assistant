@@ -39,10 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.Role
@@ -206,43 +204,6 @@ fun <T> PickItem(
         },
         confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
     )
-}
-
-/**
- * A settings category that folds open: its name and a one-line summary of how it's set, and tapping it
- * shows its rows underneath. Keeps the main settings list short.
- */
-@Composable
-fun Category(
-    icon: ImageVector,
-    title: String,
-    summary: String,
-    open: Boolean,
-    onToggle: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val turn by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "category")
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Group {
-            Item(
-                icon = icon,
-                title = title,
-                summary = summary,
-                container = if (open) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
-                trailing = {
-                    Icon(Icons.Rounded.ExpandMore, if (open) "Close" else "Open",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 16.dp).rotate(turn))
-                },
-                onClick = onToggle,
-            )
-        }
-        androidx.compose.animation.AnimatedVisibility(visible = open) {
-            Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Group(content = content)
-            }
-        }
-    }
 }
 
 // ---- Lena's two main screens ---------------------------------------------------------------

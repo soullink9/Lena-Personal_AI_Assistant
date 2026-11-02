@@ -183,6 +183,8 @@ data class Settings(
     val homeSwitch: Boolean = true,
     /** Your Open WebUI folders in the menu (All chats always has them). */
     val drawerFolders: Boolean = true,
+    /** The wake word listens whenever Lena is open (her chats too), not only on the wall display. */
+    val wakeEverywhere: Boolean = false,
     val autoSignIn: AutoSignIn = AutoSignIn.OFF,
     val motionEntity: String = "",
     val slides: Slides = Slides(),
@@ -306,6 +308,7 @@ object Prefs {
         lenaLook = lenaLook(c),
         homeSwitch = homeSwitch(c),
         drawerFolders = drawerFolders(c),
+        wakeEverywhere = wakeEverywhere(c),
         autoSignIn = autoSignIn(c),
         motionEntity = motionEntity(c),
         slides = slides(c),
@@ -345,6 +348,7 @@ object Prefs {
             .putBoolean("lena_look", s.lenaLook)
             .putBoolean("home_switch", s.homeSwitch)
             .putBoolean("drawer_folders", s.drawerFolders)
+            .putBoolean("wake_everywhere", s.wakeEverywhere)
             .putString("auto_sign_in", s.autoSignIn.name)
             .putString("dashboards", JSONArray().apply {
                 s.dashboards.filter { it.path.isNotBlank() }.forEach { put(JSONObject().put("name", it.name).put("path", it.path)) }
@@ -416,12 +420,11 @@ object Prefs {
     /** Folders in the menu. On by default. */
     fun drawerFolders(c: Context): Boolean = p(c).getBoolean("drawer_folders", true)
 
-    /** Which categories of the main settings list are open (by name), so Settings opens as you left it. */
-    fun settingsOpen(c: Context): Set<String> = p(c).getStringSet("settings_open", null)?.toSet() ?: emptySet()
-
-    fun setSettingsOpen(c: Context, open: Set<String>) {
-        p(c).edit().putStringSet("settings_open", open).apply()
-    }
+    /**
+     * Where the wake word listens: false only on the wall display and its screen saver (the default),
+     * true whenever Lena is open, her chats too.
+     */
+    fun wakeEverywhere(c: Context): Boolean = p(c).getBoolean("wake_everywhere", false)
 
     /**
      * Your order for pinned chats and for folders in the menu, as chat or folder ids, first to last.

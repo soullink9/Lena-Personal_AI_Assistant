@@ -220,6 +220,12 @@ class MainActivity : ComponentActivity() {
      * Otherwise both are normal screens with the status and navigation bars.
      */
     private var dashboardMode = false
+
+    /**
+     * The wake word, when it's set to listen whenever Lena is open (Settings → Talking to Lena → Wake word
+     * → Listens). Stopped while you're away, and while the page itself uses the microphone.
+     */
+    private var wake: WakeListener? = null
     private var lastInteraction = System.currentTimeMillis()
 
     private var pendingMic: PermissionRequest? = null
@@ -543,6 +549,9 @@ class MainActivity : ComponentActivity() {
                 req.deny()
                 return
             }
+            // Only one thing can hold the microphone: the page's voice input wins over the wake word until
+            // you next come back to this screen.
+            wake?.stop()
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 req.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
             } else {
@@ -606,12 +615,14 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Picks up changes made in Settings while away: the Chat | Home switch (and whether Home Assistant is
-     * set up), Lena's look, and whether Open WebUI's own menus show.
+     * set up), full screen in dashboard mode, the wake word, Lena's look, and whether Open WebUI's own
+     * menus show.
      */
     override fun onResume() {
         super.onResume()
         hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
         applyWindowMode()
+        listenForName()
         if (::web.isInitialized) {
             val look = Prefs.lenaLook(this)
             if (look != lenaLook.value) {
@@ -630,11 +641,28 @@ class MainActivity : ComponentActivity() {
 
     /** Saves cookies to disk now, so the sign-in survives Android stopping the app in the background. */
     override fun onPause() {
+        wake?.stop()
         if (::web.isInitialized) {
             web.onPause()
             CookieManager.getInstance().flush()
         }
         super.onPause()
+    }
+
+    /**
+     * Listens for her name while this screen is showing, when the wake word is on and set to listen
+     * whenever Lena is open. Hearing it opens the sheet, listening, over your chats.
+     */
+    private fun listenForName() {
+        if (!Prefs.wakeWord(this) || !Prefs.wakeEverywhere(this)) {
+            wake?.stop()
+            return
+        }
+        val listener = wake ?: WakeListener(this, onHeard = {
+            wake?.stop()
+            startActivity(AskActivity.intent(this, talk = true))
+        }).also { wake = it }
+        listener.start() // false without the microphone permission or the model; then it simply doesn't listen
     }
 
     /** Leaving while Lena is still answering: watch for the end and notify. */
