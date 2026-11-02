@@ -1,0 +1,30 @@
+Setting,Change to,Possible values,Current default
+Connections › Model › Her context size,,A whole number from 2048 to 1048576,32768
+Wall display › Screensaver › Screen saver after,,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; 15 minutes; 30 minutes; 1 hour; Never,5 minutes
+Wall display › Screensaver › Back from your chats after,,30 seconds; 1 minute; 2 minutes; 5 minutes; 10 minutes; Never,1 minute
+Wall display › Screensaver › Each photo for,,5 seconds; 10 seconds; 15 seconds; 30 seconds; 1 minute; 5 minutes,15 seconds
+Wall display › Screensaver › Transition,,Fade; Slide; Slow zoom and fade; None,Fade
+Wall display › Screensaver › Shuffle,,On; Off,On
+Wall display › Screensaver › Fit,,Smart; Fill the screen; Whole photo,Smart
+Wall display › Screensaver › Time and her mood on top,,On; Off,On
+Wall display › Screensaver › Her dim clock at night,,On; Off,On
+Talking to Lena › Wake word › Listen for her name,,On; Off,Off
+Talking to Lena › Wake word › Listens,,Only on the wall display; Whenever Lena is open,Only on the wall display
+Talking to Lena › Wake word › Her name,,Hey Lena; Lena; Hey Jarvis,Hey Lena
+Talking to Lena › Wake word › How sure she must be,,Fewer false starts; Balanced; Easier to wake,Balanced
+Talking to Lena › How she looks and sounds › Her look,,Orb; Sheet; Glow; Bar; Island; Subtitles,Orb
+Talking to Lena › How she looks and sounds › Hearing you,,On this phone; Your server,On this phone
+Talking to Lena › How she looks and sounds › Her voice,,Your server's voice; The phone's voice; Don't read replies aloud,Your server's voice
+Talking to Lena › How she looks and sounds › Her voice follows her mood,,On; Off,Off
+Talking to Lena › How she looks and sounds › Keep listening,,After every reply; When she asks a question; Off,After every reply
+Talking to Lena › Interacting with Lena › The assistant gesture opens,,Talk to Lena; Type to Lena; New chat,Talk to Lena
+Talking to Lena › Interacting with Lena › On the lock screen,,On; Off,Off
+Chat screen configuration › Chat screen › Lena's look,,On; Off,On
+Chat screen configuration › Chat screen › Open WebUI's own menus,,On; Off,Off
+Chat screen configuration › Chat screen › Chat | Home switch,,On; Off,On
+Chat screen configuration › Chat screen › Pinned chats,,3; 5; 8; 12,5
+Chat screen configuration › Chat screen › Folders,,On; Off,On
+Chat screen configuration › Chat screen › All chats list style,,Slim groups; Rounded groups; Flat list; Title and time; Timeline; Folding days,Slim groups
+Device customization › Notifications › Reply notifications,,On; Off,On
+Device customization › Notifications › Alerts on this phone,,On; Off,Off
+Device customization › Widgets & tile › Her mood on the widget,,On; Off,Off

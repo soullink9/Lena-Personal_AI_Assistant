@@ -15,7 +15,7 @@ How the repository is organised and how to change it without breaking things. Th
 ├── LICENSE                        GPL-3.0
 ├── THIRD_PARTY_NOTICES.md         included models and code, and their licences
 ├── .env.example                   the environment variables the project reads
-├── adjustments/                   change requests, reviewed before every build (TEMPLATE.md, README.md)
+├── adjustments/defaults.csv       every default setting: change one in its "Change to" column
 ├── ollama/
 │   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog
@@ -43,6 +43,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   └── bridge/                    Wyoming bridge for Open WebUI
 ├── tools/
 │   ├── check.py                   offline checks
+│   ├── defaults.py                applies adjustments/defaults.csv to the app's Defaults.kt
 │   └── make_images.py             app icon, notification icon and avatars from the logo
 ├── docs/                          everything in detail
 │   ├── assets/                    the logo, avatar and GitHub social preview
@@ -72,7 +73,7 @@ The app build only runs when something in `android/` or its workflow changes, an
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `android/.../Prefs.kt` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |
-| A setting in the app | `Settings` and `Prefs` in `Prefs.kt`, its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
+| A setting in the app | `Settings` and `Prefs` in `Prefs.kt` (its default comes from `Defaults.kt`, written from `adjustments/defaults.csv` by `tools/defaults.py`; add a row there for a new one), its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |
 
 ## Running the checks

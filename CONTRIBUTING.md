@@ -2,9 +2,9 @@
 
 This is a personal project shared in case it helps someone, so replies and merges may be slow. Issues and pull requests are still welcome.
 
-## Asking for a change
+## Changing a default setting
 
-Copy [`adjustments/TEMPLATE.md`](adjustments/TEMPLATE.md) into `adjustments/`, fill it in and commit it (on GitHub, **Add file → Upload files** works). Every adjustment is reviewed before the next build and release; see [adjustments/README.md](adjustments/README.md).
+Where every setting starts (on a new install, and after Return to defaults) is in [`adjustments/defaults.csv`](adjustments/defaults.csv): the setting, a **Change to** column, its possible values, and the current default. Fill in **Change to** and commit; it's applied before the next build. See [adjustments/README.md](adjustments/README.md).
 
 ## Reporting a problem
 

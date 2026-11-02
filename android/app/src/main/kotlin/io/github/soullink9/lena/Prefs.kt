@@ -58,12 +58,12 @@ data class Slides(
     val on: Boolean = false,
     val album: String = "",
     val albumName: String = "",
-    val seconds: Int = 15,
-    val transition: SlideTransition = SlideTransition.FADE,
-    val shuffle: Boolean = true,
-    val framing: Framing = Framing.SMART,
-    val overlay: Boolean = true,
-    val clockAtNight: Boolean = true,
+    val seconds: Int = Defaults.SLIDE_SECONDS,
+    val transition: SlideTransition = Defaults.SLIDE_TRANSITION,
+    val shuffle: Boolean = Defaults.SLIDE_SHUFFLE,
+    val framing: Framing = Defaults.SLIDE_FRAMING,
+    val overlay: Boolean = Defaults.SLIDE_OVERLAY,
+    val clockAtNight: Boolean = Defaults.SLIDE_CLOCK_AT_NIGHT,
 )
 
 /** One of your Home Assistant dashboards, shown as a tab in dashboard mode. */
@@ -152,39 +152,39 @@ data class Settings(
     val server: String = "",
     val model: String = "",
     val signIn: String = "",
-    val assist: AssistAction = AssistAction.ASK,
-    val notifyReplies: Boolean = true,
+    val assist: AssistAction = Defaults.ASSIST,
+    val notifyReplies: Boolean = Defaults.NOTIFY_REPLIES,
     val quickPrompts: List<String> = emptyList(),
     val schedules: List<Schedule> = emptyList(),
-    val hearing: Hearing = Hearing.PHONE,
-    val speaking: Speaking = Speaking.SERVER,
-    val followUp: FollowUp = FollowUp.ALWAYS,
-    val contextTokens: Int = 32_768,
+    val hearing: Hearing = Defaults.HEARING,
+    val speaking: Speaking = Defaults.SPEAKING,
+    val followUp: FollowUp = Defaults.FOLLOW_UP,
+    val contextTokens: Int = Defaults.CONTEXT_TOKENS,
     val haServer: String = "",
-    val moodVoice: Boolean = false,
-    val widgetMood: Boolean = false,
-    val lockScreen: Boolean = false,
-    val openWebUiMenus: Boolean = false,
-    val chatList: ChatListStyle = ChatListStyle.SLIM,
-    val askStyle: AskStyle = AskStyle.ORB,
-    val alerts: Boolean = false,
-    val wakeWord: Boolean = false,
-    val wakePhrase: WakePhrase = WakePhrase.HEY_LENA,
-    val wakeSensitivity: WakeSensitivity = WakeSensitivity.BALANCED,
+    val moodVoice: Boolean = Defaults.MOOD_VOICE,
+    val widgetMood: Boolean = Defaults.WIDGET_MOOD,
+    val lockScreen: Boolean = Defaults.LOCK_SCREEN,
+    val openWebUiMenus: Boolean = Defaults.OPEN_WEBUI_MENUS,
+    val chatList: ChatListStyle = Defaults.CHAT_LIST,
+    val askStyle: AskStyle = Defaults.ASK_STYLE,
+    val alerts: Boolean = Defaults.ALERTS,
+    val wakeWord: Boolean = Defaults.WAKE_WORD,
+    val wakePhrase: WakePhrase = Defaults.WAKE_PHRASE,
+    val wakeSensitivity: WakeSensitivity = Defaults.WAKE_SENSITIVITY,
     val dashboards: List<Dashboard> = listOf(Dashboard("Home", "lovelace")),
     /** Seconds without a touch before the wall display's screen saver; 0 never. */
-    val dimSeconds: Int = 300,
+    val dimSeconds: Int = Defaults.DIM_SECONDS,
     /** Seconds without a touch in your chats, opened from the wall display, before it goes back; 0 never. */
-    val returnSeconds: Int = 60,
-    val pinnedShown: Int = 5,
+    val returnSeconds: Int = Defaults.RETURN_SECONDS,
+    val pinnedShown: Int = Defaults.PINNED_SHOWN,
     /** Lena's warm look for Open WebUI's pages (assets/css/open_webui.css); off shows Open WebUI's own. */
-    val lenaLook: Boolean = true,
+    val lenaLook: Boolean = Defaults.LENA_LOOK,
     /** The Chat | Home switch at the top of the main screen (it shows only with Home Assistant set up). */
-    val homeSwitch: Boolean = true,
+    val homeSwitch: Boolean = Defaults.HOME_SWITCH,
     /** Your Open WebUI folders in the menu (All chats always has them). */
-    val drawerFolders: Boolean = true,
+    val drawerFolders: Boolean = Defaults.DRAWER_FOLDERS,
     /** The wake word listens whenever Lena is open (her chats too), not only on the wall display. */
-    val wakeEverywhere: Boolean = false,
+    val wakeEverywhere: Boolean = Defaults.WAKE_EVERYWHERE,
     val autoSignIn: AutoSignIn = AutoSignIn.OFF,
     val motionEntity: String = "",
     val slides: Slides = Slides(),
@@ -226,39 +226,39 @@ object Prefs {
             ?: models.firstOrNull { it.name.equals("lena", ignoreCase = true) }
 
     /** Her voice gets a little slower, faster, lower or brighter with her mood (needs Home Assistant). */
-    fun moodVoice(c: Context): Boolean = p(c).getBoolean("mood_voice", false)
+    fun moodVoice(c: Context): Boolean = p(c).getBoolean("mood_voice", Defaults.MOOD_VOICE)
 
     /** The widget shows how she feels (needs Home Assistant). */
-    fun widgetMood(c: Context): Boolean = p(c).getBoolean("widget_mood", false)
+    fun widgetMood(c: Context): Boolean = p(c).getBoolean("widget_mood", Defaults.WIDGET_MOOD)
 
     /** The assistant gesture opens the sheet over the lock screen, in its private mode. */
-    fun lockScreen(c: Context): Boolean = p(c).getBoolean("lock_screen", false)
+    fun lockScreen(c: Context): Boolean = p(c).getBoolean("lock_screen", Defaults.LOCK_SCREEN)
 
     /** Your Home Assistant, for Lena's feelings and shared memory. Null when not set. */
     fun haServer(c: Context): String? = p(c).getString("ha_server", "")?.ifBlank { null }
     /** Extra sign-in addresses (a sign-in proxy) that may load inside the app, space-separated. */
     fun signIn(c: Context): String = p(c).getString("sign_in", "") ?: ""
     /** Notify when an answer you walked away from is finished. */
-    fun notifyReplies(c: Context): Boolean = p(c).getBoolean("notify_replies", true)
+    fun notifyReplies(c: Context): Boolean = p(c).getBoolean("notify_replies", Defaults.NOTIFY_REPLIES)
 
     /** What the assistant gesture opens. */
     fun assistAction(c: Context): AssistAction =
-        enumPref(c, "assist_action", AssistAction.ASK)
+        enumPref(c, "assist_action", Defaults.ASSIST)
 
     /** Who turns your voice into text: the phone or your server. */
     fun hearing(c: Context): Hearing =
-        enumPref(c, "hearing", Hearing.PHONE)
+        enumPref(c, "hearing", Defaults.HEARING)
 
     /** Who reads her replies aloud: your server, the phone, or nobody. */
     fun speaking(c: Context): Speaking =
-        enumPref(c, "speaking", Speaking.SERVER)
+        enumPref(c, "speaking", Defaults.SPEAKING)
 
     /** When the mic opens again after she answers. */
     fun followUp(c: Context): FollowUp =
-        enumPref(c, "follow_up", FollowUp.ALWAYS)
+        enumPref(c, "follow_up", Defaults.FOLLOW_UP)
 
     /** The model's context size in tokens; half of it holds the ongoing conversation. */
-    fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", 32_768)
+    fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", Defaults.CONTEXT_TOKENS)
 
     /** The chat that conversation lives in, once it exists. */
     fun assistChat(c: Context): String? = p(c).getString("assist_chat", null)
@@ -390,10 +390,10 @@ object Prefs {
     }
 
     /** Show Open WebUI's own header and sidebar under Lena's. */
-    fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", false)
+    fun showOpenWebUiMenus(c: Context): Boolean = p(c).getBoolean("show_owui_menus", Defaults.OPEN_WEBUI_MENUS)
 
     /** This phone checks Home Assistant every 15 minutes and tells you when she's worried. */
-    fun alerts(c: Context): Boolean = p(c).getBoolean("alerts", false)
+    fun alerts(c: Context): Boolean = p(c).getBoolean("alerts", Defaults.ALERTS)
 
     /** What the last alert was about, so the same worry isn't announced twice. */
     fun lastAlert(c: Context): String? = p(c).getString("last_alert", null)
@@ -401,7 +401,7 @@ object Prefs {
     fun setLastAlert(c: Context, reason: String?) = p(c).edit().putString("last_alert", reason).apply()
 
     /** Display mode and the screen saver listen for the wake word. */
-    fun wakeWord(c: Context): Boolean = p(c).getBoolean("wake_word", false)
+    fun wakeWord(c: Context): Boolean = p(c).getBoolean("wake_word", Defaults.WAKE_WORD)
 
     /** Dashboard mode's tabs; Home Assistant's default dashboard until you add your own. */
     fun dashboards(c: Context): List<Dashboard> {
@@ -416,37 +416,37 @@ object Prefs {
         on = p(c).getBoolean("slides_on", false),
         album = p(c).getString("slides_album", "") ?: "",
         albumName = p(c).getString("slides_album_name", "") ?: "",
-        seconds = p(c).getInt("slides_seconds", 15),
-        transition = enumPref(c, "slides_transition", SlideTransition.FADE),
-        shuffle = p(c).getBoolean("slides_shuffle", true),
-        framing = enumPref(c, "slides_framing", Framing.SMART),
-        overlay = p(c).getBoolean("slides_overlay", true),
-        clockAtNight = p(c).getBoolean("slides_night", true),
+        seconds = p(c).getInt("slides_seconds", Defaults.SLIDE_SECONDS),
+        transition = enumPref(c, "slides_transition", Defaults.SLIDE_TRANSITION),
+        shuffle = p(c).getBoolean("slides_shuffle", Defaults.SLIDE_SHUFFLE),
+        framing = enumPref(c, "slides_framing", Defaults.SLIDE_FRAMING),
+        overlay = p(c).getBoolean("slides_overlay", Defaults.SLIDE_OVERLAY),
+        clockAtNight = p(c).getBoolean("slides_night", Defaults.SLIDE_CLOCK_AT_NIGHT),
     )
 
     /** Seconds without a touch before the wall display's screen saver; 0 never. */
-    fun dimSeconds(c: Context): Int = p(c).getInt("dim_seconds", 300)
+    fun dimSeconds(c: Context): Int = p(c).getInt("dim_seconds", Defaults.DIM_SECONDS)
 
     /** Seconds without a touch in your chats, opened from the wall display, before it goes back to it; 0 never. */
-    fun returnSeconds(c: Context): Int = p(c).getInt("return_seconds", 60)
+    fun returnSeconds(c: Context): Int = p(c).getInt("return_seconds", Defaults.RETURN_SECONDS)
 
     /** How many pinned chats the menu shows before "View all". */
-    fun pinnedShown(c: Context): Int = p(c).getInt("pinned_shown", 5)
+    fun pinnedShown(c: Context): Int = p(c).getInt("pinned_shown", Defaults.PINNED_SHOWN)
 
     /** Lena's look for Open WebUI's pages, rather than Open WebUI's own. On by default. */
-    fun lenaLook(c: Context): Boolean = p(c).getBoolean("lena_look", true)
+    fun lenaLook(c: Context): Boolean = p(c).getBoolean("lena_look", Defaults.LENA_LOOK)
 
     /** The Chat | Home switch on the main screen (when Home Assistant is set up). On by default. */
-    fun homeSwitch(c: Context): Boolean = p(c).getBoolean("home_switch", true)
+    fun homeSwitch(c: Context): Boolean = p(c).getBoolean("home_switch", Defaults.HOME_SWITCH)
 
     /** Folders in the menu. On by default. */
-    fun drawerFolders(c: Context): Boolean = p(c).getBoolean("drawer_folders", true)
+    fun drawerFolders(c: Context): Boolean = p(c).getBoolean("drawer_folders", Defaults.DRAWER_FOLDERS)
 
     /**
      * Where the wake word listens: false only on the wall display and its screen saver (the default),
      * true whenever Lena is open, her chats too.
      */
-    fun wakeEverywhere(c: Context): Boolean = p(c).getBoolean("wake_everywhere", false)
+    fun wakeEverywhere(c: Context): Boolean = p(c).getBoolean("wake_everywhere", Defaults.WAKE_EVERYWHERE)
 
     /**
      * Your order for pinned chats and for folders in the menu, as chat or folder ids, first to last.
@@ -476,22 +476,22 @@ object Prefs {
 
     /** How sure the wake word must be. */
     fun wakeSensitivity(c: Context): WakeSensitivity =
-        enumPref(c, "wake_sensitivity", WakeSensitivity.BALANCED)
+        enumPref(c, "wake_sensitivity", Defaults.WAKE_SENSITIVITY)
 
     /** A motion or presence sensor that wakes dashboard mode, or blank. */
     fun motionEntity(c: Context): String = p(c).getString("motion_entity", "") ?: ""
 
     /** Which wake word: Hey Lena unless you chose another. */
     fun wakePhrase(c: Context): WakePhrase =
-        enumPref(c, "wake_phrase", WakePhrase.HEY_LENA)
+        enumPref(c, "wake_phrase", Defaults.WAKE_PHRASE)
 
     /** How the drawer lists your chats. */
     fun chatList(c: Context): ChatListStyle =
-        enumPref(c, "chat_list", ChatListStyle.SLIM)
+        enumPref(c, "chat_list", Defaults.CHAT_LIST)
 
     /** How talking to Lena looks. */
     fun askStyle(c: Context): AskStyle =
-        enumPref(c, "ask_style", AskStyle.ORB)
+        enumPref(c, "ask_style", Defaults.ASK_STYLE)
 
     /**
      * A random secret only Lena knows. Lena's own widget and shortcuts include it, so a prompt

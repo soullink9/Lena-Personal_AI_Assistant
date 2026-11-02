@@ -27,6 +27,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check and the listening loop. |
 | `java/…/MicroFrontend.java` | A line-for-line port of TensorFlow Lite Micro's audio front end, checked bit for bit against the C on every build. |
 | `ChatsActivity.kt` | All chats: pinned chats, folders (new, rename, delete) and your whole history, with search. |
+| `Defaults.kt` | Every setting's default, written from `adjustments/defaults.csv` by `tools/defaults.py`. Don't edit it by hand. |
 | `Refresh.kt` | Settings → Refresh all connections: open screens reload their page when next shown. |
 | `Chats.kt` | What the drawer and All chats share: chat and folder rows in each list style (one row look for both), grouping by day, and the long-press menu (pin, move to folder, rename, delete) with its dialogs. |
 | `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |

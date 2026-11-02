@@ -26,26 +26,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Requests in adjustments/ are reviewed before every build (see adjustments/README.md): list the open
-      # ones in the run's summary, and warn about any still marked New. The release job below won't publish
-      # while one is New.
-      - name: Adjustments
+      # Requested default changes (adjustments/defaults.csv, "Change to") are applied before every build;
+      # list any still waiting in the run's summary. The release job below won't publish while one is.
+      - name: Default settings waiting
         run: |
+          waiting=$(python3 tools/defaults.py waiting || true)
           {
-            echo "### Adjustments"
-            found=0
-            for f in adjustments/*.md; do
-              case "$(basename "$f")" in README.md|TEMPLATE.md) continue ;; esac
-              [ -f "$f" ] || continue
-              found=1
-              status=$(sed -n 's/^Status:[[:space:]]*\([A-Za-z]*\).*/\1/p' "$f" | head -1)
-              echo "- \`$f\`: ${status:-no Status line} — $(head -1 "$f" | sed 's/^# *//')"
-            done
-            [ "$found" = 1 ] || echo "None open."
+            echo "### Default settings"
+            if [ -n "$waiting" ]; then
+              echo "Waiting to be applied (python3 tools/defaults.py apply):"
+              echo "$waiting"
+            else
+              echo "Nothing waiting."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
-          for f in $(grep -l '^Status:[[:space:]]*New' adjustments/*.md 2>/dev/null | grep -v -e README.md -e TEMPLATE.md); do
-            echo "::warning file=$f::Not reviewed yet (Status: New)"
-          done
+          if [ -n "$waiting" ]; then echo "::warning file=adjustments/defaults.csv::Default changes waiting to be applied"; fi
 
       # Plain Gradle download, checked against Gradle's published SHA-256. No third-party setup actions.
       - name: Install Gradle
@@ -128,14 +123,14 @@ jobs:
         with:
           sparse-checkout: |
             CHANGELOG.md
-            adjustments/
+            adjustments/defaults.csv
+            tools/defaults.py
           sparse-checkout-cone-mode: false
-      # Every adjustment must be reviewed before a release.
-      - name: No unreviewed adjustments
+      # Every requested default change must be applied (and reviewed) before a release.
+      - name: No default changes waiting
         run: |
-          new=$(grep -l '^Status:[[:space:]]*New' adjustments/*.md 2>/dev/null | grep -v -e README.md -e TEMPLATE.md || true)
-          if [ -n "$new" ]; then
-            for f in $new; do echo "::error file=$f::Review this adjustment before releasing (its Status is New)"; done
+          if ! python3 tools/defaults.py waiting; then
+            echo "::error file=adjustments/defaults.csv::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
             exit 1
           fi
       - name: Publish release

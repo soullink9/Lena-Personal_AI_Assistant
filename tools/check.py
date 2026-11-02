@@ -182,12 +182,14 @@ check(re.search(r'^MESSAGE system """', modelfile, re.M) is not None and modelfi
 check(re.search(r"^SYSTEM ", modelfile, re.M) is None,
       "Modelfile has no SYSTEM line (apps would replace it; her character belongs in MESSAGE system)")
 ctx = re.search(r"^PARAMETER num_ctx (\d+)", modelfile, re.M)
-app_ctx = re.search(r"contextTokens: Int = ([\d_]+)", APP_PREFS.read_text()) if APP_PREFS.exists() else None
+# The app's default comes from adjustments/defaults.csv by way of Defaults.kt.
+APP_DEFAULTS = APP_PREFS.parent / "Defaults.kt"
+app_ctx = re.search(r"CONTEXT_TOKENS: Int = ([\d_]+)", APP_DEFAULTS.read_text()) if APP_DEFAULTS.exists() else None
 if ctx and app_ctx:
     check(int(ctx.group(1)) == int(app_ctx.group(1).replace("_", "")),
           f"Modelfile num_ctx ({ctx.group(1)}) matches the app's default context size ({app_ctx.group(1)})")
 else:
-    check(False, "found num_ctx in the Modelfile and the context size default in Prefs.kt")
+    check(False, "found num_ctx in the Modelfile and the context size default in Defaults.kt")
 
 # ---- 7. Python files compile ---------------------------------------------------------------------
 for path in [BRIDGE, OWUI_FILTER, OWUI_TOOLS, *sorted(LENA.glob("*.py")), *sorted((ROOT / "home-assistant" / "tests").glob("*.py"))]:
@@ -299,18 +301,17 @@ for path in shipped_python:
 manifest = json.loads((ROOT / "home-assistant/custom_components/lena/manifest.json").read_text())
 check(manifest.get("requirements", []) == [], "the integration installs no Python packages (manifest requirements is empty)")
 
-# ---- 12. Adjustments are reviewed before a build ---------------------------------------------------
-# Requests in adjustments/ (see adjustments/README.md) must be read before every build and release:
-# each has a Status, and none may still be New.
+# ---- 12. Default settings: requested changes are applied before a build -------------------------
+# adjustments/defaults.csv is where defaults are changed (see adjustments/README.md). Every "Change to"
+# must be applied (python3 tools/defaults.py apply) before a build, and the app's Defaults.kt must match.
 
-STATUSES = {"New", "Reviewed", "Declined", "Done"}
-for path in sorted((ROOT / "adjustments").rglob("*.md")):
-    if path.name in ("README.md", "TEMPLATE.md"):
-        continue
-    found = re.search(r"^Status:\s*(\w+)", path.read_text(), re.M)
-    status = found.group(1) if found else None
-    check(status in STATUSES, f"{rel(path)} has a Status line (New, Reviewed, Declined or Done)")
-    check(status != "New", f"{rel(path)} has been reviewed (its Status is no longer New)")
+sys.path.insert(0, str(ROOT / "tools"))
+import defaults  # noqa: E402 - the tools folder, added just above
+
+issues = defaults.check()
+for issue in issues:
+    check(False, f"adjustments/defaults.csv: {issue}")
+check(not issues, "adjustments/defaults.csv is applied and matches Defaults.kt")
 
 print()
 if failures:

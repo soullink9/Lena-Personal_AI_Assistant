@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.4] - 2026-11-02
+
+### Project
+
+- **Default settings in one spreadsheet:** `adjustments/defaults.csv` lists every setting that has a default, with four columns: the setting (as it's named in Settings), **Change to**, its possible values, and the current default. Fill in **Change to** and commit; before the next build it's checked and applied (`python3 tools/defaults.py apply`) into the app's `Defaults.kt`, which is now the only place the app takes its defaults from. Checks fail and releases won't publish while a change is waiting. This replaces the adjustment template from 0.6.3.
+
 ## [0.6.3] - 2026-11-02
 
 No longer called a beta: versions are plain numbers from here on (still below 1.0, so settings may still change).
@@ -16,7 +22,7 @@ No longer called a beta: versions are plain numbers from here on (still below 1.
 
 ### Project
 
-- **Adjustments:** drop a file in `adjustments/` (copy `adjustments/TEMPLATE.md`) to ask for a change. Every build reviews them first, and a release won't publish while any is still marked New.
+- **Adjustments:** a template for change requests in `adjustments/` (replaced in 0.6.4 by `adjustments/defaults.csv`).
 
 ## [0.6.2-beta] - 2026-11-02
 
