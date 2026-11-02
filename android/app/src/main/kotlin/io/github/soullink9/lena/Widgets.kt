@@ -37,10 +37,10 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Quick Settings tile: start a voice call from the pull-down shade. */
+/** Quick Settings tile: talk to Lena from the pull-down shade (the sheet, already listening). */
 class LenaTile : TileService() {
 
-    /** The tile shows as an idle button labelled Call Lena whenever the shade opens. */
+    /** The tile shows as an idle button labelled Talk to Lena whenever the shade opens. */
     override fun onStartListening() {
         qsTile?.apply {
             state = Tile.STATE_INACTIVE
@@ -50,19 +50,18 @@ class LenaTile : TileService() {
     }
 
     /**
-     * Starts a call in the full app, after unlocking, and closes the shade (Android 14+ requires a
-     * PendingIntent for that).
+     * Opens the sheet, listening, and closes the shade (Android 14+ requires a PendingIntent for that).
+     * The sheet handles the lock screen itself, as it does for the assistant gesture.
      */
     override fun onClick() {
-        val call = Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_CALL)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val pi = PendingIntent.getActivity(this, 0, call, PendingIntent.FLAG_IMMUTABLE)
-        if (isLocked) unlockAndRun { startActivityAndCollapse(pi) } else startActivityAndCollapse(pi)
+        val talk = AskActivity.intent(this, talk = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val pi = PendingIntent.getActivity(this, 0, talk, PendingIntent.FLAG_IMMUTABLE)
+        startActivityAndCollapse(pi)
     }
 }
 
 /**
- * Home screen widget: Talk, Call, Type and New chat, plus your first three quick prompts, and
+ * Home screen widget: Talk, Type and New chat, plus your first three quick prompts, and
  * (if you turn it on) how Lena feels. Only her mood shows here, never the reasons, since anyone
  * can see your home screen.
  */
@@ -81,7 +80,7 @@ class LenaWidget : GlanceAppWidget() {
     }
 
     /**
-     * The widget itself: her name and mood, the four action buttons, then the quick prompts, in your
+     * The widget itself: her name and mood, the three action buttons, then the quick prompts, in your
      * wallpaper's colours.
      */
     @Composable
@@ -107,9 +106,7 @@ class LenaWidget : GlanceAppWidget() {
                         style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 12.sp),
                     )
                 }
-                Action(R.drawable.ic_glyph_call, "Talk to Lena", AskActivity.intent(c, talk = true))
-                Spacer(GlanceModifier.width(8.dp))
-                Action(R.drawable.ic_stat_lena, "Voice call", Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_CALL))
+                Action(R.drawable.ic_glyph_talk, "Talk to Lena", AskActivity.intent(c, talk = true))
                 Spacer(GlanceModifier.width(8.dp))
                 Action(R.drawable.ic_glyph_ask, "Type to Lena", AskActivity.intent(c))
                 Spacer(GlanceModifier.width(8.dp))

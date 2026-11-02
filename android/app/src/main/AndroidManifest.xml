@@ -100,7 +100,7 @@
             <meta-data android:name="android.service.dream" android:resource="@xml/lena_dream" />
         </service>
 
-        <!-- The Ask sheet. Handles the assistant gesture (it can also hand off to a call or a new chat)
+        <!-- The Ask sheet. Handles the assistant gesture (it can also hand off to a new chat)
              and "Share to Lena". Shared text only fills the box; nothing is sent until you tap send. -->
         <activity
             android:name=".AskActivity"
@@ -122,6 +122,11 @@
             </intent-filter>
         </activity>
 
+        <!-- All chats: pinned, folders and history, opened from the drawer. -->
+        <activity
+            android:name=".ChatsActivity"
+            android:exported="false" />
+
         <activity
             android:name=".MemoryActivity"
             android:exported="false"
@@ -135,7 +140,7 @@
         <service
             android:name=".LenaTile"
             android:exported="true"
-            android:icon="@drawable/ic_glyph_call"
+            android:icon="@drawable/ic_glyph_talk"
             android:label="@string/tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

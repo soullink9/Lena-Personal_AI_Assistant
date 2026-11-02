@@ -68,7 +68,6 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Stop
@@ -250,13 +249,9 @@ class AskActivity : ComponentActivity() {
         }
         api = Api(server, applicationContext)
 
-        // The assistant gesture can open a call or a chat instead of the sheet.
-        if (intent.action == Intent.ACTION_ASSIST) {
-            when (Prefs.assistAction(this)) {
-                AssistAction.CALL -> return forward(MainActivity.ACTION_CALL)
-                AssistAction.CHAT -> return forward(MainActivity.ACTION_NEW_CHAT)
-                else -> Unit
-            }
+        // The assistant gesture can open a new chat instead of the sheet.
+        if (intent.action == Intent.ACTION_ASSIST && Prefs.assistAction(this) == AssistAction.CHAT) {
+            return forward(MainActivity.ACTION_NEW_CHAT)
         }
         startTalking = wantsTalk(intent)
         from = fromOf(intent)
@@ -318,7 +313,7 @@ class AskActivity : ComponentActivity() {
         })
     }
 
-    /** Hands over to the full app (a call, a new chat), after unlocking if needed, and closes the sheet. */
+    /** Hands over to the full app (a new chat), after unlocking if needed, and closes the sheet. */
     private fun forward(action: String) {
         if (locked.value) return unlockThen { forward(action) }
         startActivity(Intent(this, MainActivity::class.java).setAction(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -762,7 +757,6 @@ class AskActivity : ComponentActivity() {
             },
             choosePhoto = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             removePhoto = { photo = null },
-            call = { forward(MainActivity.ACTION_CALL) },
             open = {
                 val id = chatId
                 if (id != null) openChat(id) else unlockThen {
@@ -815,7 +809,6 @@ class AskActivity : ComponentActivity() {
         val takePhoto: () -> Unit,
         val choosePhoto: () -> Unit,
         val removePhoto: () -> Unit,
-        val call: () -> Unit,
         val open: () -> Unit,
         val copy: () -> Unit,
         val close: () -> Unit,
@@ -920,11 +913,6 @@ class AskActivity : ComponentActivity() {
                         onClick = { open = false; a.copy() },
                     )
                 }
-                DropdownMenuItem(
-                    text = { Text("Voice call") },
-                    leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
-                    onClick = { open = false; a.call() },
-                )
                 DropdownMenuItem(
                     text = { Text(if (a.chatId != null) "Open this chat in Lena" else "Open Lena") },
                     leadingIcon = { Icon(Icons.Outlined.OpenInFull, null) },

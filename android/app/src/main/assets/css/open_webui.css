@@ -1,0 +1,125 @@
+/*
+ * Lena's look for Open WebUI's pages inside the app (MainActivity adds it to the top frame only).
+ *
+ * A warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of pure white
+ * and grey, a clay accent, and replies set in a serif. Fonts are the phone's own (no downloads).
+ *
+ * How it works: Open WebUI is built with Tailwind 4, whose colours are CSS variables
+ * (--color-gray-50 … --color-gray-950, --color-blue-…). Redefining those recolours the whole page
+ * at once, in light and dark mode alike, without depending on Open WebUI's markup. Only a few
+ * things are styled by name (the page, the message box, your messages, replies, the send button),
+ * and those use ids and classes from Open WebUI's source that have been stable for a long time.
+ * If an update renames one, that part simply goes back to Open WebUI's own look.
+ *
+ * Also here: Open WebUI's voice-call button is hidden, since Lena has no calls.
+ */
+
+/* ---- Colours ----------------------------------------------------------------------------- */
+
+:root {
+  /* Warm greys, light to dark. Dark mode uses the dark end, so one scale serves both. */
+  --color-gray-50: #faf9f5 !important;
+  --color-gray-100: #f0eee6 !important;
+  --color-gray-200: #e5e3d9 !important;
+  --color-gray-300: #d1cfc5 !important;
+  --color-gray-400: #a8a69e !important;
+  --color-gray-500: #85837c !important;
+  --color-gray-600: #5e5d59 !important;
+  --color-gray-700: #45443f !important;
+  --color-gray-800: #30302e !important;
+  --color-gray-850: #2a2a28 !important;
+  --color-gray-900: #262624 !important;
+  --color-gray-950: #1f1e1d !important;
+
+  /* Open WebUI's blue accents (links, switches, focus rings) become clay. */
+  --color-blue-50: #fbf0eb !important;
+  --color-blue-100: #f6ded4 !important;
+  --color-blue-200: #efc4b3 !important;
+  --color-blue-300: #e6a68e !important;
+  --color-blue-400: #e08a6b !important;
+  --color-blue-500: #d97757 !important;
+  --color-blue-600: #c96442 !important;
+  --color-blue-700: #b5583a !important;
+
+  /* Lena's own names for the few colours set directly below. */
+  --lena-page: #faf9f5;
+  --lena-ink: #141413;
+  --lena-bubble: #f0eee6;
+  --lena-box: #ffffff;
+  --lena-box-line: rgba(31, 30, 29, 0.15);
+  --lena-accent: #c96442;
+  --lena-accent-pressed: #b5583a;
+  --lena-on-accent: #ffffff;
+}
+
+html.dark {
+  --lena-page: #262624;
+  --lena-ink: #faf9f5;
+  --lena-bubble: #141413;
+  --lena-box: #30302e;
+  --lena-box-line: rgba(250, 249, 245, 0.12);
+  --lena-accent: #d97757;
+  --lena-accent-pressed: #c96442;
+  --lena-on-accent: #ffffff;
+}
+
+/* ---- The page ---------------------------------------------------------------------------- */
+
+html,
+body,
+.app > div {
+  background-color: var(--lena-page) !important;
+}
+
+/* ---- The message box --------------------------------------------------------------------- */
+
+#message-input-container {
+  background-color: var(--lena-box) !important;
+  border: 1px solid var(--lena-box-line) !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.035) !important;
+  backdrop-filter: none !important;
+}
+
+/* Send: a clay square-ish button, as in Claude.ai. */
+#send-message-button:not(:disabled) {
+  background-color: var(--lena-accent) !important;
+  color: var(--lena-on-accent) !important;
+  border-radius: 0.6rem !important;
+}
+
+#send-message-button:not(:disabled):active {
+  background-color: var(--lena-accent-pressed) !important;
+}
+
+/* ---- Messages ---------------------------------------------------------------------------- */
+
+/* Your messages: a soft bubble set apart from the page. */
+.user-message .rounded-3xl[class*="max-w-[90%]"] {
+  background-color: var(--lena-bubble) !important;
+  color: var(--lena-ink) !important;
+  border-radius: 1rem !important;
+}
+
+/* Her replies: a serif with room to breathe. Code keeps its monospace. */
+.chat-assistant #response-content-container .markdown-prose {
+  font-family: ui-serif, "Noto Serif", "Source Serif Pro", Georgia, serif;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--lena-ink);
+}
+
+.chat-assistant #response-content-container .markdown-prose :is(pre, code, kbd, samp) {
+  font-family: ui-monospace, "JetBrains Mono", "Roboto Mono", monospace;
+  font-size: 0.9em;
+}
+
+/* ---- No voice calls ---------------------------------------------------------------------- */
+
+/* Open WebUI's call button sits where Send is while the box is empty. Its label is the only stable
+   handle; "Voice mode" and "Return to call" are its English labels. */
+button[aria-label="Voice mode"],
+button[aria-label="Return to call"],
+button.call-active {
+  display: none !important;
+}

@@ -8,8 +8,11 @@ import java.security.SecureRandom
 import java.util.Locale
 import java.util.UUID
 
-/** What the assistant gesture opens: talk (the Ask sheet, listening), type (the Ask sheet, keyboard), a call or a chat. */
-enum class AssistAction { ASK, TYPE, CALL, CHAT }
+/**
+ * What the assistant gesture opens: talk (the Ask sheet, listening), type (the Ask sheet, keyboard) or a new
+ * chat. (A saved choice from before calls were removed reads as the default, talk.)
+ */
+enum class AssistAction { ASK, TYPE, CHAT }
 
 /** Who turns your voice into text in the Ask sheet. */
 enum class Hearing { PHONE, SERVER }
@@ -20,7 +23,7 @@ enum class Speaking { SERVER, PHONE, OFF }
 /** When the mic opens again after Lena answers a spoken question. */
 enum class FollowUp { ALWAYS, QUESTIONS, OFF }
 
-/** How the drawer lists your chats. */
+/** How All chats lists your chats (the drawer has one compact look, to fit as much as it can). */
 enum class ChatListStyle(val label: String, val detail: String) {
     SLIM("Slim groups", "Rounded groups, but tighter"),
     GROUPS("Rounded groups", "Each day in its own rounded group"),

@@ -36,6 +36,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 
 // Lena's look: rows in rounded groups with a thin gap between them, like a phone's own
 // settings. Settings, Memory & knowledge and the drawer all use these.
@@ -174,3 +184,80 @@ fun <T> PickItem(icon: ImageVector?, title: String, options: List<Pair<T, String
         confirmButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
     )
 }
+
+// ---- Lena's two main screens ---------------------------------------------------------------
+
+/** Lena's two main screens: your chats (Open WebUI) and Home Assistant's dashboards. */
+enum class MainScreen(val label: String) { CHAT("Chat"), HOME("Home") }
+
+/**
+ * The small Chat | Home switch at the top left of both main screens, beside Lena's logo. The current
+ * screen is highlighted; tapping the other one goes there.
+ */
+@Composable
+fun ScreenSwitcher(current: MainScreen, onSwitch: (MainScreen) -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier.clip(RoundedCornerShape(50)).background(cs.surfaceContainerHigh).padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        MainScreen.entries.forEach { screen ->
+            val on = screen == current
+            val icon = if (screen == MainScreen.CHAT) Icons.Outlined.ChatBubbleOutline else Icons.Outlined.Home
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.clip(RoundedCornerShape(50))
+                    .background(if (on) cs.secondaryContainer else Color.Transparent)
+                    .semantics { selected = on; role = Role.Tab }
+                    .clickable(enabled = !on) { onSwitch(screen) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                val ink = if (on) cs.onSecondaryContainer else cs.onSurfaceVariant
+                Icon(icon, null, tint = ink, modifier = Modifier.size(18.dp))
+                Text(screen.label, style = MaterialTheme.typography.labelLarge, color = ink)
+            }
+        }
+    }
+}
+
+// ---- A column that never scrolls ------------------------------------------------------------
+
+/** Marks a heading in a FitColumn, so it's left out when nothing under it fits. */
+const val FIT_HEADING = "heading"
+
+/**
+ * A column that shows only what fits, top to bottom, and never scrolls: the first child that doesn't
+ * fit, and everything after it, is left out. A heading (Modifier.layoutId(FIT_HEADING)) left at the
+ * bottom with nothing under it goes too. The drawer uses it, with View all chats for the rest.
+ */
+@Composable
+fun FitColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Layout(content, modifier) { measurables, constraints ->
+        val each = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
+        val height = constraints.maxHeight
+        val shown = mutableListOf<Int>()
+        val placeables = mutableListOf<androidx.compose.ui.layout.Placeable>()
+        var used = 0
+        for ((index, measurable) in measurables.withIndex()) {
+            val placeable = measurable.measure(each)
+            if (used + placeable.height > height) break
+            placeables += placeable
+            shown += index
+            used += placeable.height
+        }
+        // A heading at the very end has nothing under it on screen: leave it out.
+        while (shown.isNotEmpty() && measurables[shown.last()].layoutId == FIT_HEADING) {
+            shown.removeAt(shown.size - 1)
+            used -= placeables.removeAt(placeables.size - 1).height
+        }
+        layout(constraints.maxWidth, height) {
+            var y = 0
+            placeables.forEach { p ->
+                p.place(0, y)
+                y += p.height
+            }
+        }
+    }
+}
+

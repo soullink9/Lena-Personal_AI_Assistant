@@ -756,7 +756,7 @@ class SettingsActivity : ComponentActivity() {
     /** Which model talks to you: Lena (found by name on your server) unless you pick another. */
     @Composable
     private fun ModelPage(s: Settings, models: List<Model>, set: (Settings) -> Unit) {
-        Footnote("Used for new chats, voice calls, the sheet and scheduled prompts.")
+        Footnote("Used for new chats, the sheet and scheduled prompts.")
         Group {
             ChoiceItem("Lena, automatically", "The model built from the Modelfile, or Open WebUI's default if there isn't one", s.model.isBlank()) {
                 set(s.copy(model = ""))
@@ -814,12 +814,12 @@ class SettingsActivity : ComponentActivity() {
             ChoiceItem("On this phone",
                 if (phoneEar) "Your words appear as you speak. The audio never leaves the phone." else "Not available on this phone; your server is used.",
                 s.hearing == Hearing.PHONE) { set(s.copy(hearing = Hearing.PHONE)) }
-            ChoiceItem("Your server", "Open WebUI's speech-to-text, the same as call mode", s.hearing == Hearing.SERVER) {
+            ChoiceItem("Your server", "Open WebUI's speech-to-text, the same as its voice input", s.hearing == Hearing.SERVER) {
                 set(s.copy(hearing = Hearing.SERVER))
             }
         }
         Section("Her voice") {
-            ChoiceItem("Your server's voice", "Open WebUI's text-to-speech, the same as call mode", s.speaking == Speaking.SERVER) {
+            ChoiceItem("Your server's voice", "Open WebUI's text-to-speech, the same as reading a reply aloud there", s.speaking == Speaking.SERVER) {
                 set(s.copy(speaking = Speaking.SERVER))
             }
             ChoiceItem("The phone's voice", "Android's text-to-speech", s.speaking == Speaking.PHONE) { set(s.copy(speaking = Speaking.PHONE)) }
@@ -1046,8 +1046,8 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Group {
-            Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, call, type, new chat and your quick prompts") { addWidget() }
-            Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Start a voice call from the notification shade") { addTile() }
+            Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, type, new chat and your quick prompts") { addWidget() }
+            Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
         }
     }
 
@@ -1170,7 +1170,7 @@ class SettingsActivity : ComponentActivity() {
                 set(s.copy(returnSeconds = it))
             }
         }
-        Footnote("Opened your chats from the wall display and walked away? After this long it goes back to the dashboards and straight to the screen saver. Not while you're typing, in a voice call, or while she's still answering.")
+        Footnote("Opened your chats from the wall display and walked away? After this long it goes back to the dashboards and straight to the screen saver. Not while you're typing or while she's still answering.")
 
         SectionTitle("Show")
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -1307,15 +1307,18 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote("Every look listens, answers and speaks the same way. The sheet is the only one that shows earlier turns; the others show what's happening now.")
-        Section("Chat list") {
+        Section("All chats") {
             ChatListStyle.entries.forEach { c -> ChoiceItem(c.label, c.detail, s.chatList == c) { set(s.copy(chatList = c)) } }
         }
         Group {
-            PickItem(Icons.Outlined.PushPin, "Pinned chats in the menu", listOf(3, 5, 8, 12).map { it to "Up to $it, then View all" }, s.pinnedShown) {
+            PickItem(Icons.Outlined.PushPin, "Pinned chats in the menu", listOf(3, 5, 8, 12).map { it to "Up to $it" }, s.pinnedShown) {
                 set(s.copy(pinnedShown = it))
             }
         }
-        Footnote("Pin a chat by long-pressing it in the menu. Pinned chats sit at the top.")
+        Footnote(
+            "The menu shows your pinned chats, your folders and your latest chats, as many as fit, and never scrolls. " +
+                "View all chats has everything, in the style above. Long-press a chat to pin it, move it to a folder, rename or delete it."
+        )
     }
 
     // ---- Words for the list -----------------------------------------------------------------
@@ -1330,7 +1333,6 @@ class SettingsActivity : ComponentActivity() {
     private fun gestureLabel(a: AssistAction) = when (a) {
         AssistAction.ASK -> "Talk to Lena"
         AssistAction.TYPE -> "Type to Lena"
-        AssistAction.CALL -> "Voice call"
         AssistAction.CHAT -> "New chat"
     }
 
@@ -1338,7 +1340,6 @@ class SettingsActivity : ComponentActivity() {
     private fun gestureDetail(a: AssistAction) = when (a) {
         AssistAction.ASK -> "Listens straight away, over whatever you're doing"
         AssistAction.TYPE -> "The same sheet, with the keyboard"
-        AssistAction.CALL -> "Straight into a voice call"
         AssistAction.CHAT -> "Opens Lena on a new chat"
     }
 
@@ -1358,12 +1359,12 @@ class SettingsActivity : ComponentActivity() {
         if (DateFormat.is24HourFormat(this)) "%02d:%02d".format(h, m)
         else "%d:%02d %s".format(if (h % 12 == 0) 12 else h % 12, m, if (h < 12) "AM" else "PM")
 
-    /** Asks Android to add the Call Lena tile to Quick Settings; Android shows its own confirmation. */
+    /** Asks Android to add the Talk to Lena tile to Quick Settings; Android shows its own confirmation. */
     private fun addTile() {
         getSystemService(StatusBarManager::class.java).requestAddTileService(
             ComponentName(this, LenaTile::class.java),
             getString(R.string.tile_label),
-            PlatformIcon.createWithResource(this, R.drawable.ic_glyph_call),
+            PlatformIcon.createWithResource(this, R.drawable.ic_glyph_talk),
             mainExecutor,
         ) { }
     }

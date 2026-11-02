@@ -11,7 +11,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -56,6 +55,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -68,7 +71,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -117,6 +119,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -141,7 +144,6 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
 
     companion object {
-        const val ACTION_CALL = "io.github.soullink9.lena.CALL"
         const val ACTION_NEW_CHAT = "io.github.soullink9.lena.NEW_CHAT"
         const val ACTION_TEMP_CHAT = "io.github.soullink9.lena.TEMP_CHAT"
         const val ACTION_OPEN_CHAT = "io.github.soullink9.lena.OPEN_CHAT"
@@ -150,7 +152,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TEXT = "text"
         /** Opened from the wall display: after a while without a touch, go back to it. */
         const val EXTRA_FROM_WALL = "from_wall"
-        private const val PINNED = "Pinned"
 
         /**
          * Hides Open WebUI's own header and sidebar; the drawer and top bar replace them. Top frame only:
@@ -176,10 +177,23 @@ class MainActivity : ComponentActivity() {
     private val signIn = mutableListOf<Uri>()
     private var shellScript: ScriptHandler? = null
 
+    /**
+     * Lena's look for Open WebUI's pages (assets/css/open_webui.css), as a script that adds it once, in
+     * the top frame only, like the shell style above.
+     */
+    private val themeScript by lazy {
+        val css = assets.open("css/open_webui.css").bufferedReader().use { it.readText() }
+        "(function(){if(window.top!==window||document.getElementById('lena-theme'))return;" +
+            "var s=document.createElement('style');s.id='lena-theme';s.textContent=${JSONObject.quote(css)};" +
+            "(document.head||document.documentElement).appendChild(s);})();"
+    }
+
     private val currentUrl = mutableStateOf("")
     private val canGoBack = mutableStateOf(false)
     private val showMenus = mutableStateOf(false)
-    private val chatStyle = mutableStateOf(ChatListStyle.SLIM)
+
+    /** Whether Home Assistant is set up, so the Chat | Home switch has somewhere to go. */
+    private val hasHome = mutableStateOf(false)
 
     private var fromWall = false
     private var lastInteraction = System.currentTimeMillis()
@@ -221,10 +235,11 @@ class MainActivity : ComponentActivity() {
         api = Api(url, applicationContext)
         Prefs.signIn(this).split(" ").filter { it.isNotBlank() }.forEach { signIn += Uri.parse(it) }
         showMenus.value = Prefs.showOpenWebUiMenus(this)
-        chatStyle.value = Prefs.chatList(this)
+        hasHome.value = HomeAssistant.from(this) != null
 
         enableEdgeToEdge()
         web = createWebView()
+        addTheme()
         applyShellStyle()
         setContent { LenaTheme { Shell() } }
         // Switching dark mode rebuilds the screen so the page re-themes; come back to the same chat.
@@ -250,7 +265,7 @@ class MainActivity : ComponentActivity() {
     /**
      * Opened from the wall display and then left alone for a while (Settings → Wall display → When
      * no one's around): back to the dashboards, straight to the screen saver. Not while the
-     * keyboard is up, during a voice call, or while she's still answering.
+     * keyboard is up, or while she's still answering.
      */
     private fun watchForIdle() {
         lifecycleScope.launch {
@@ -260,8 +275,7 @@ class MainActivity : ComponentActivity() {
                 if (!fromWall || seconds <= 0 || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) continue
                 val typing = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView)
                     ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-                val calling = Uri.parse(currentUrl.value).getQueryParameter("call") == "true"
-                if (typing || calling) { lastInteraction = System.currentTimeMillis(); continue }
+                if (typing) { lastInteraction = System.currentTimeMillis(); continue }
                 if (System.currentTimeMillis() - lastInteraction < seconds * 1000L) continue
                 val answering = chatIdOf(currentUrl.value)?.let { id -> runCatching { api.runningTasks(id) }.getOrDefault(0) > 0 } == true
                 if (answering) { lastInteraction = System.currentTimeMillis(); continue }
@@ -307,12 +321,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Opens what an intent asks for: a call, a new or temporary chat, a chat by id, or Settings. From the
-     * launcher, a fresh start opens a new chat and an already-open Lena just comes back as it was.
+     * Opens what an intent asks for: a new or temporary chat, a chat by id, or Settings. From the
+     * launcher, a fresh start opens a new chat and an already-open Lena just comes back as it was. (An
+     * old "Voice call" shortcut from before calls were removed lands here too, like the launcher.)
      */
     private fun handle(i: Intent?, fresh: Boolean) {
         when (i?.action) {
-            ACTION_CALL -> openNew(call = true)
             ACTION_NEW_CHAT -> openNew(text = i.getStringExtra(EXTRA_TEXT))
             ACTION_TEMP_CHAT -> openNew(temporary = true)
             ACTION_OPEN_CHAT -> i.getStringExtra(EXTRA_CHAT_ID)?.let { openChat(it) } ?: run { if (fresh) openNew() }
@@ -324,29 +338,33 @@ class MainActivity : ComponentActivity() {
     // ---- Navigation -------------------------------------------------------------------------
 
     /**
-     * A new chat with your model, through Open WebUI's own URL parameters: call mode, a temporary chat, or
-     * text already in the box (never sent by itself).
+     * A new chat with your model, through Open WebUI's own URL parameters: a temporary chat, or text
+     * already in the box (never sent by itself).
      */
-    private fun openNew(model: String? = null, call: Boolean = false, temporary: Boolean = false, text: String? = null) {
+    private fun openNew(temporary: Boolean = false, text: String? = null) {
         val b = server.buildUpon()
-        (model ?: Prefs.effectiveModel(this))?.let { b.appendQueryParameter("model", it) }
-        if (call) b.appendQueryParameter("call", "true")
+        Prefs.effectiveModel(this)?.let { b.appendQueryParameter("model", it) }
         if (temporary) b.appendQueryParameter("temporary-chat", "true")
         if (!text.isNullOrBlank()) b.appendQueryParameter("q", text) // fills the box; never sends by itself
-        keepScreenOn(call)
         web.loadUrl(b.build().toString())
     }
 
     /** Opens one of your chats by id. */
     private fun openChat(id: String) {
-        keepScreenOn(false)
         web.loadUrl(server.buildUpon().appendPath("c").appendPath(id).build().toString())
     }
 
-    /** Keeps the screen on during a voice call, where you're talking rather than touching it. */
-    private fun keepScreenOn(on: Boolean) {
-        if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    /**
+     * The Chat | Home switch: Home opens the wall display's dashboards. A visit from the wall display
+     * ends there, as when it's left alone; otherwise your chats stay open behind it.
+     */
+    private fun switchTo(screen: MainScreen) {
+        if (screen != MainScreen.HOME) return
+        startActivity(Intent(this, DashboardActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        if (fromWall) {
+            fromWall = false
+            finish()
+        }
     }
 
     /** The chat id in a page address (…/c/<id>), allowing for Open WebUI served under a path. */
@@ -385,6 +403,13 @@ class MainActivity : ComponentActivity() {
 
     /** Your server's origin (scheme, host and port), which the shell style and sign-in checks are scoped to. */
     private fun serverOrigin(): String = "https://${server.host}" + if (server.port == -1) "" else ":${server.port}"
+
+    /** Adds Lena's look to Open WebUI's pages on every page load (assets/css/open_webui.css). */
+    private fun addTheme() {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(web, themeScript, setOf(serverOrigin()))
+        }
+    }
 
     /** Adds or removes the style that hides Open WebUI's header, now and on every page load. */
     private fun applyShellStyle() {
@@ -457,11 +482,13 @@ class MainActivity : ComponentActivity() {
         }
 
         /**
-         * On web views without document-start scripts, the shell style goes in once the page has loaded
-         * instead.
+         * On web views without document-start scripts, Lena's look and the shell style go in once the page
+         * has loaded instead.
          */
         override fun onPageFinished(view: WebView, url: String?) {
             canGoBack.value = view.canGoBack()
+            val older = !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+            if (older && isServer(url?.let { Uri.parse(it) })) view.evaluateJavascript(themeScript, null)
             if (!showMenus.value && shellScript == null && isServer(url?.let { Uri.parse(it) })) {
                 view.evaluateJavascript(ADD_STYLE, null) // older web views without document-start scripts
             }
@@ -471,7 +498,7 @@ class MainActivity : ComponentActivity() {
     /** Mic for your server only; no camera, no location. Plus the file picker for attachments. */
     private inner class Chrome : WebChromeClient() {
         /**
-         * The page may use the microphone (call mode, voice input) only when it's your server asking, and
+         * The page may use the microphone (voice input) only when it's your server asking, and
          * only after Lena has Android's permission; the camera and everything else are refused.
          */
         override fun onPermissionRequest(req: PermissionRequest) {
@@ -542,12 +569,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Picks up changes made in Settings while away: the chat list style and whether Open WebUI's own menus
-     * show.
+     * Picks up changes made in Settings while away: whether Home Assistant is set up (for the Chat | Home
+     * switch) and whether Open WebUI's own menus show.
      */
     override fun onResume() {
         super.onResume()
-        chatStyle.value = Prefs.chatList(this) // chosen in Settings → Appearance
+        hasHome.value = HomeAssistant.from(this) != null
         if (::web.isInitialized) {
             web.onResume()
             // "Show Open WebUI's own menus" lives in Settings; pick up a change made there.
@@ -589,54 +616,49 @@ class MainActivity : ComponentActivity() {
     // ---- The native shell -------------------------------------------------------------------
 
     /**
-     * The whole screen: the drawer with her status, search, pinned and recent chats and three buttons; the
-     * top bar with the model menu and new-chat buttons; and the page.
+     * The whole screen: the drawer (her status, then as many pinned chats, folders and recent chats as
+     * fit, View all chats, and three buttons); the top bar with Lena's logo, the Chat | Home switch and
+     * the new-chat buttons; and the page.
      */
     @Composable
     private fun Shell() {
         val scope = rememberCoroutineScope()
         val drawer = rememberDrawerState(DrawerValue.Closed)
-        var models by remember { mutableStateOf<List<Model>>(emptyList()) }
-        var chats by remember { mutableStateOf<List<ChatItem>?>(null) }
+        var recent by remember { mutableStateOf<List<ChatItem>?>(null) }
         var pinned by remember { mutableStateOf<List<ChatItem>>(emptyList()) }
-        var allPinned by remember { mutableStateOf(false) }
+        var folders by remember { mutableStateOf<List<Api.Folder>>(emptyList()) }
+        val openFolders = remember { mutableStateMapOf<String, Boolean>() }
+        val folderChats = remember { mutableStateMapOf<String, List<ChatItem>>() }
         var chatsError by remember { mutableStateOf<String?>(null) }
-        var query by remember { mutableStateOf("") }
         var version by remember { mutableStateOf<String?>(null) }
         var feelings by remember { mutableStateOf<Feelings?>(null) }
         var checked by remember { mutableStateOf(false) }
-        var title by remember { mutableStateOf("Lena") }
-        var titleIsLena by remember { mutableStateOf(false) }
-        var modelMenu by remember { mutableStateOf(false) }
         var refresh by remember { mutableIntStateOf(0) }
-        var renaming by remember { mutableStateOf<ChatItem?>(null) }
-        var deleting by remember { mutableStateOf<ChatItem?>(null) }
-        val url = currentUrl.value
-        val chatId = chatIdOf(url)
+        val chatId = chatIdOf(currentUrl.value)
+        val actions = remember {
+            ChatActions(this, api, scope, onChanged = { refresh++ }, onDeleted = { id -> if (id == chatIdOf(currentUrl.value)) openNew() })
+        }
 
+        // Remember which model is Lena, for new chats and the sheet.
         LaunchedEffect(Unit) {
-            models = runCatching { api.models() }.getOrDefault(emptyList())
+            val models = runCatching { api.models() }.getOrDefault(emptyList())
             if (models.isNotEmpty()) Prefs.rememberLena(this@MainActivity, models)
         }
 
-        // Title: the current chat's model, or the model a new chat will use.
-        LaunchedEffect(chatId, url, models) {
-            val id = if (chatId != null) runCatching { api.chatModel(chatId) }.getOrNull()
-            else Uri.parse(url).getQueryParameter("model") ?: Prefs.effectiveModel(this@MainActivity)
-            title = models.firstOrNull { it.id == id }?.name ?: id ?: "Lena"
-            titleIsLena = id != null && id == Prefs.lenaIn(models)?.id
-        }
-
-        // Fill the drawer when it opens, and as you search.
-        LaunchedEffect(drawer.isOpen, query, refresh) {
+        // Fill the drawer when it opens, and after a change made from it.
+        LaunchedEffect(drawer.isOpen, refresh) {
             if (!drawer.isOpen) return@LaunchedEffect
-            if (query.isNotBlank()) delay(300)
             version = api.version()
             checked = true
             feelings = HomeAssistant.from(this@MainActivity)?.let { runCatching { it.feelings() }.getOrNull() }
             try {
-                chats = if (query.isBlank()) api.chats() else api.search(query.trim())
-                pinned = if (query.isBlank()) runCatching { api.pinned() }.getOrDefault(pinned) else emptyList()
+                pinned = runCatching { api.pinned() }.getOrDefault(pinned)
+                folders = runCatching { api.folders() }.getOrDefault(emptyList()) // none, or folders are off
+                folders.forEach { f ->
+                    if (openFolders[f.id] == null) openFolders[f.id] = f.expanded
+                    if (openFolders[f.id] == true) folderChats[f.id] = runCatching { api.folderChats(f.id) }.getOrDefault(emptyList())
+                }
+                recent = api.chats()
                 chatsError = null
             } catch (_: AuthException) {
                 chatsError = "Sign in to see your chats"
@@ -677,23 +699,43 @@ class MainActivity : ComponentActivity() {
                         }
                         feelings?.let { FeelingsLine(it, Modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp)) }
 
-                        // Search, then your chats
-                        SearchField(query, "Search chats", Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) { query = it }
-                        ChatList(
-                            chats, chatsError, query.isNotBlank(), chatId, chatStyle.value, Modifier.weight(1f),
-                            pinned = pinned,
-                            pinnedLimit = if (allPinned) Int.MAX_VALUE else Prefs.pinnedShown(this@MainActivity),
-                            onAllPinned = { allPinned = !allPinned },
-                            onOpen = { id -> closeThen { openChat(id) } },
-                            onPin = { c ->
-                                scope.launch {
-                                    if (runCatching { api.togglePin(c.id) }.isFailure) toast("Couldn't pin the chat")
-                                    refresh++
-                                }
-                            },
-                            onRename = { renaming = it },
-                            onDelete = { deleting = it },
-                        )
+                        // Pinned, folders, then recent: as many as fit, never scrolling.
+                        FitColumn(Modifier.weight(1f).padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
+                            DrawerChats(
+                                pinned = pinned.take(Prefs.pinnedShown(this@MainActivity)),
+                                pinnedIds = pinned.map { it.id }.toSet(),
+                                folders = folders,
+                                openFolders = openFolders,
+                                folderChats = folderChats,
+                                recent = recent,
+                                error = chatsError,
+                                currentId = chatId,
+                                actions = actions,
+                                onOpen = { id -> closeThen { openChat(id) } },
+                                onFolder = { f ->
+                                    val open = openFolders[f.id] != true
+                                    openFolders[f.id] = open
+                                    scope.launch {
+                                        runCatching { api.setFolderExpanded(f.id, open) }
+                                        if (open) folderChats[f.id] = runCatching { api.folderChats(f.id) }.getOrDefault(emptyList())
+                                    }
+                                },
+                            )
+                        }
+
+                        // Everything else: pinned, folders and your whole history, with search.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .clickable { closeThen { startActivity(Intent(this@MainActivity, ChatsActivity::class.java)) } }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.List, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("View all chats", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
 
                         // Settings, memory and reload, side by side
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -722,37 +764,17 @@ class MainActivity : ComponentActivity() {
                             IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Rounded.Menu, "Menu") }
                         },
                         title = {
-                            Box {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
-                                        .clickable(enabled = models.isNotEmpty()) { modelMenu = true }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                ) {
-                                    if (titleIsLena) LenaAvatar(26.dp, Modifier.padding(end = 10.dp))
-                                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
-                                    if (models.isNotEmpty()) Icon(Icons.Rounded.ExpandMore, null)
-                                }
-                                DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                                    Text(
-                                        "New chat with…",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    )
-                                    models.forEach { m ->
-                                        DropdownMenuItem(text = { Text(m.name) }, onClick = {
-                                            modelMenu = false
-                                            openNew(model = m.id)
-                                        })
-                                    }
-                                }
+                            // Lena's logo, then the switch between your chats and the dashboards (when
+                            // Home Assistant is set up; without it there's only one screen).
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                LenaAvatar(28.dp)
+                                if (hasHome.value) ScreenSwitcher(MainScreen.CHAT, ::switchTo)
+                                else Text("Lena", style = MaterialTheme.typography.titleMedium)
                             }
                         },
                         actions = {
                             IconButton(onClick = { openNew(temporary = true) }) { Icon(Icons.Outlined.VisibilityOff, "Temporary chat") }
                             IconButton(onClick = { openNew() }) { Icon(Icons.Outlined.AddComment, "New chat") }
-                            IconButton(onClick = { openNew(call = true) }) { Icon(Icons.Rounded.GraphicEq, "Voice call") }
                         },
                     )
                 },
@@ -764,51 +786,74 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        renaming?.let { c ->
-            var newTitle by remember(c.id) { mutableStateOf(c.title) }
-            AlertDialog(
-                onDismissRequest = { renaming = null },
-                title = { Text("Rename chat") },
-                text = { OutlinedTextField(value = newTitle, onValueChange = { newTitle = it }, singleLine = true) },
-                confirmButton = {
-                    TextButton(enabled = newTitle.isNotBlank(), onClick = {
-                        val t = newTitle.trim()
-                        renaming = null
-                        scope.launch {
-                            if (runCatching { api.renameChat(c.id, t) }.isFailure) toast("Couldn't rename the chat")
-                            refresh++
-                        }
-                    }) { Text("Rename") }
-                },
-                dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
-            )
+        actions.Dialogs()
+    }
+
+    /**
+     * The drawer's chats, as children of a FitColumn (so whatever doesn't fit is left out): your pinned
+     * chats, then each folder (tap to open or close it; open ones show their chats), then your recent
+     * chats. Long-press a chat for Pin, Move to folder, Rename and Delete.
+     */
+    @Composable
+    private fun DrawerChats(
+        pinned: List<ChatItem>,
+        pinnedIds: Set<String>,
+        folders: List<Api.Folder>,
+        openFolders: Map<String, Boolean>,
+        folderChats: Map<String, List<ChatItem>>,
+        recent: List<ChatItem>?,
+        error: String?,
+        currentId: String?,
+        actions: ChatActions,
+        onOpen: (String) -> Unit,
+        onFolder: (Api.Folder) -> Unit,
+    ) {
+        /** One chat in the drawer, indented inside a folder. */
+        @Composable
+        fun Line(c: ChatItem, indent: Boolean = false) {
+            actions.WithMenu(c, c.id in pinnedIds) { longPress ->
+                ChatLine(c, c.id == currentId, null, 40.dp, if (indent) 44.dp else 16.dp, RoundedCornerShape(20.dp),
+                    Color.Transparent, { onOpen(c.id) }, longPress)
+            }
         }
 
-        deleting?.let { c ->
-            AlertDialog(
-                onDismissRequest = { deleting = null },
-                title = { Text("Delete chat?") },
-                text = { Text("\u201C${c.title}\u201D will be deleted from Open WebUI too.") },
-                confirmButton = {
-                    TextButton(
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        onClick = {
-                            deleting = null
-                            scope.launch {
-                                if (runCatching { api.deleteChat(c.id) }.isFailure) toast("Couldn't delete the chat")
-                                else if (c.id == chatIdOf(currentUrl.value)) openNew()
-                                refresh++
-                            }
-                        },
-                    ) { Text("Delete") }
-                },
-                dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
-            )
+        if (pinned.isNotEmpty()) {
+            DrawerHeading(PINNED_LABEL)
+            pinned.forEach { Line(it) }
+        }
+        folders.forEach { f ->
+            val open = openFolders[f.id] == true
+            FoldHeader(f.label, null, open, if (open) Icons.Outlined.FolderOpen else Icons.Outlined.Folder) { onFolder(f) }
+            if (open) {
+                val chats = folderChats[f.id]
+                when {
+                    chats == null -> ListHint("Loading…", Modifier.padding(start = 28.dp))
+                    chats.isEmpty() -> ListHint("No chats in this folder", Modifier.padding(start = 28.dp))
+                    else -> chats.forEach { Line(it, indent = true) }
+                }
+            }
+        }
+        when {
+            error != null -> ListHint(error)
+            recent == null -> ListHint("Loading…")
+            recent.isEmpty() && pinned.isEmpty() && folders.isEmpty() -> ListHint("No chats yet")
+            recent.isNotEmpty() -> {
+                DrawerHeading("Recent")
+                recent.forEach { Line(it) }
+            }
         }
     }
 
-    /** A short message at the bottom of the screen. */
-    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+    /** A small coloured label over a part of the drawer (Pinned, Recent). */
+    @Composable
+    private fun DrawerHeading(text: String) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.layoutId(FIT_HEADING).padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+        )
+    }
 
     /**
      * A strip down the left edge that opens the menu when you swipe right from it, instead of
@@ -859,295 +904,5 @@ class MainActivity : ComponentActivity() {
             Box(Modifier.size(7.dp).clip(CircleShape).background(color))
             Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-
-    /**
-     * Your chats in the chosen style, pinned ones first (up to the limit, then View all), the rest grouped
-     * by day. Every style shares the same long-press menu.
-     */
-    @Composable
-    private fun ChatList(
-        chats: List<ChatItem>?,
-        error: String?,
-        searching: Boolean,
-        currentId: String?,
-        style: ChatListStyle,
-        modifier: Modifier,
-        pinned: List<ChatItem>,
-        pinnedLimit: Int,
-        onAllPinned: () -> Unit,
-        onOpen: (String) -> Unit,
-        onPin: (ChatItem) -> Unit,
-        onRename: (ChatItem) -> Unit,
-        onDelete: (ChatItem) -> Unit,
-    ) {
-        val folded = remember { mutableStateMapOf<String, Boolean>() } // folding days: which are open
-        val pinnedIds = pinned.map { it.id }.toSet()
-        val side = when (style) {
-            ChatListStyle.GROUPS, ChatListStyle.SLIM -> 12.dp
-            ChatListStyle.TIMED -> 0.dp
-            else -> 8.dp
-        }
-        LazyColumn(modifier, contentPadding = PaddingValues(start = side, end = side, top = 4.dp, bottom = 12.dp)) {
-            when {
-                error != null -> item { Hint(error) }
-                chats == null -> item { Hint("Loading…") }
-                chats.isEmpty() && (searching || pinned.isEmpty()) -> item { Hint(if (searching) "No matching chats" else "No chats yet") }
-                else -> {
-                    // Pinned chats first, as their own group: up to the limit, then "View all".
-                    val shownPinned = pinned.take(pinnedLimit)
-                    val groups = if (searching) listOf("Results" to chats)
-                    else (if (shownPinned.isNotEmpty()) listOf(PINNED to shownPinned) else emptyList()) + group(chats)
-                    groups.forEachIndexed { index, (label, list) ->
-                        val row: @Composable (ChatItem, @Composable (ChatItem, () -> Unit) -> Unit) -> Unit = { c, look ->
-                            WithChatMenu(c.id in pinnedIds, { onPin(c) }, { onRename(c) }, { onDelete(c) }) { longPress -> look(c, longPress) }
-                        }
-                        when (style) {
-                            ChatListStyle.GROUPS -> item(key = "g-$label") {
-                                // One rounded group per day, like the rest of the app.
-                                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    SectionTitle(label, Modifier.padding(start = 4.dp))
-                                    Group {
-                                        list.forEach { c ->
-                                            row(c) { it, longPress ->
-                                                Item(
-                                                    icon = null, title = it.title, summary = null,
-                                                    selected = it.id == currentId,
-                                                    container = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                                    maxTitleLines = 1,
-                                                    trailing = if (it.active) { { Spinner(Modifier.padding(end = 12.dp)) } } else null,
-                                                    onLongClick = longPress,
-                                                    onClick = { onOpen(it.id) },
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            ChatListStyle.SLIM -> item(key = "s-$label") {
-                                Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(start = 16.dp, top = 2.dp))
-                                    Column(Modifier.clip(RoundedCornerShape(16.dp)), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                        list.forEach { c ->
-                                            row(c) { it, longPress ->
-                                                ChatLine(it, it.id == currentId, null, 44.dp, 16.dp, RectangleShape,
-                                                    MaterialTheme.colorScheme.surfaceContainerHigh, { onOpen(it.id) }, longPress)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            ChatListStyle.FLAT, ChatListStyle.TIMED -> {
-                                val timed = style == ChatListStyle.TIMED
-                                item(key = "h-$label") {
-                                    Text(
-                                        label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (timed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(start = if (timed) 20.dp else 12.dp, top = 14.dp, bottom = 4.dp),
-                                    )
-                                }
-                                items(list, key = { it.id }) { c ->
-                                    row(c) { it, longPress ->
-                                        if (timed) ChatLine(it, it.id == currentId, whenLabel(it.updatedMillis), 44.dp, 20.dp, RectangleShape,
-                                            Color.Transparent, { onOpen(it.id) }, longPress)
-                                        else ChatLine(it, it.id == currentId, null, 40.dp, 12.dp, RoundedCornerShape(20.dp),
-                                            Color.Transparent, { onOpen(it.id) }, longPress)
-                                    }
-                                }
-                            }
-                            ChatListStyle.TIMELINE -> item(key = "t-$label") {
-                                val line = MaterialTheme.colorScheme.outlineVariant
-                                val dot = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                val filled = index == 0
-                                Column(
-                                    Modifier.fillMaxWidth()
-                                        .drawBehind {
-                                            val x = 14.dp.toPx()
-                                            val y = 12.dp.toPx()
-                                            val r = 5.dp.toPx()
-                                            drawLine(line, Offset(x, y + r + 4.dp.toPx()), Offset(x, size.height), strokeWidth = 2.dp.toPx())
-                                            if (filled) drawCircle(dot, r, Offset(x, y))
-                                            else drawCircle(dot, r - 1.dp.toPx(), Offset(x, y), style = Stroke(2.dp.toPx()))
-                                        }
-                                        .padding(start = 28.dp, top = 4.dp, bottom = 8.dp),
-                                ) {
-                                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(start = 10.dp, bottom = 4.dp))
-                                    list.forEach { c ->
-                                        row(c) { it, longPress ->
-                                            ChatLine(it, it.id == currentId, null, 36.dp, 10.dp, RoundedCornerShape(18.dp),
-                                                Color.Transparent, { onOpen(it.id) }, longPress)
-                                        }
-                                    }
-                                }
-                            }
-                            ChatListStyle.FOLDING -> {
-                                val open = folded[label] ?: (searching || label == PINNED || label == "Today" || label == "Yesterday")
-                                item(key = "f-$label") { FoldHeader(label, if (label == PINNED) pinned.size else list.size, open) { folded[label] = !open } }
-                                if (open) items(list, key = { it.id }) { c ->
-                                    row(c) { it, longPress ->
-                                        ChatLine(it, it.id == currentId, null, 40.dp, 24.dp, RoundedCornerShape(20.dp),
-                                            Color.Transparent, { onOpen(it.id) }, longPress)
-                                    }
-                                }
-                            }
-                        }
-                        if (label == PINNED && (pinned.size > pinnedLimit || pinnedLimit == Int.MAX_VALUE && pinned.size > Prefs.pinnedShown(this@MainActivity))) {
-                            item(key = "pinned-more") {
-                                val all = pinnedLimit == Int.MAX_VALUE
-                                TextButton(onClick = onAllPinned, modifier = Modifier.padding(start = 4.dp)) {
-                                    Text(if (all) "Show fewer" else "View all ${pinned.size} pinned")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /** Long-press any chat to pin, rename or delete it. */
-    @Composable
-    private fun WithChatMenu(
-        pinned: Boolean, onPin: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit,
-        content: @Composable (longPress: () -> Unit) -> Unit,
-    ) {
-        var menu by remember { mutableStateOf(false) }
-        val haptics = LocalHapticFeedback.current
-        Box {
-            content {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                menu = true
-            }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(
-                    text = { Text(if (pinned) "Unpin" else "Pin") },
-                    leadingIcon = { Icon(Icons.Outlined.PushPin, null) },
-                    onClick = { menu = false; onPin() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
-                    onClick = { menu = false; onRename() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    leadingIcon = { Icon(Icons.Outlined.Delete, null) },
-                    onClick = { menu = false; onDelete() },
-                )
-            }
-        }
-    }
-
-    /** A one-line chat row: the slim, flat, timed, timeline and folding lists. */
-    @OptIn(ExperimentalFoundationApi::class)
-    @Composable
-    private fun ChatLine(
-        c: ChatItem, selected: Boolean, time: String?, height: Dp, start: Dp, shape: Shape, idle: Color,
-        onOpen: () -> Unit, onLongClick: () -> Unit,
-    ) {
-        val cs = MaterialTheme.colorScheme
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().height(height).clip(shape)
-                .background(if (selected) cs.secondaryContainer else idle)
-                .combinedClickable(onClick = onOpen, onLongClick = onLongClick)
-                .padding(start = start, end = if (time != null) 20.dp else 12.dp),
-        ) {
-            Text(
-                c.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                color = if (selected) cs.onSecondaryContainer else cs.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            when {
-                c.active -> Spinner(Modifier.padding(start = 12.dp))
-                time != null -> Text(time, style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp))
-            }
-        }
-    }
-
-    /** A day in the folding list: tap to open or close it. */
-    @Composable
-    private fun FoldHeader(label: String, count: Int, open: Boolean, onToggle: () -> Unit) {
-        val turn by animateFloatAsState(if (open) 180f else 0f, label = "fold")
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(22.dp))
-                .clickable(onClickLabel = if (open) "Close $label" else "Open $label", onClick = onToggle)
-                .padding(horizontal = 12.dp),
-        ) {
-            Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            Text(
-                count.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-            Icon(Icons.Rounded.ExpandMore, null, Modifier.rotate(turn), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-
-    /** The small spinner on a chat that's still being answered. */
-    @Composable
-    private fun Spinner(modifier: Modifier = Modifier) {
-        CircularProgressIndicator(modifier.size(14.dp), strokeWidth = 2.dp)
-    }
-
-    /** When a chat was last used: the time today and yesterday, the weekday this week, else the date. */
-    private fun whenLabel(t: Long): String {
-        val day = 24 * 60 * 60 * 1000L
-        val today = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val date = Date(t)
-        val pattern = { skeleton: String -> SimpleDateFormat(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), Locale.getDefault()) }
-        return when {
-            t >= today - day -> DateFormat.getTimeFormat(this).format(date)
-            t >= today - 6 * day -> pattern("EEE").format(date)
-            Calendar.getInstance().apply { timeInMillis = t }.get(Calendar.YEAR) == Calendar.getInstance().get(Calendar.YEAR) ->
-                pattern("MMMd").format(date)
-            else -> pattern("yMMMd").format(date)
-        }
-    }
-
-    /** A grey line in the list: loading, empty, or why it couldn't load. */
-    @Composable
-    private fun Hint(text: String) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
-    }
-
-    /**
-     * Groups chats by when they were last used, as Open WebUI's sidebar does: Today, Yesterday, the
-     * previous 7 and 30 days, and Older.
-     */
-    private fun group(chats: List<ChatItem>): List<Pair<String, List<ChatItem>>> {
-        val today = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val day = 24 * 60 * 60 * 1000L
-        val label = { t: Long ->
-            when {
-                t >= today -> "Today"
-                t >= today - day -> "Yesterday"
-                t >= today - 7 * day -> "Previous 7 days"
-                t >= today - 30 * day -> "Previous 30 days"
-                else -> "Older"
-            }
-        }
-        return chats.groupBy { label(it.updatedMillis) }.toList()
     }
 }

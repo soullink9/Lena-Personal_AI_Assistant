@@ -49,7 +49,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
@@ -328,6 +327,17 @@ class DashboardActivity : ComponentActivity() {
         WebViewCompat.addDocumentStartJavaScript(view, script, origins)
     }
 
+    /**
+     * The Chat | Home switch's Chat: your chats, as a visit from the wall display (so after a while
+     * alone they come back here, if that's set in Settings → Wall display).
+     */
+    private fun openChats() {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_FROM_WALL, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
     /** Calls one of the page's `window.lena` functions (assets/js/home_assistant.js), if it's there yet. */
     private fun callPage(function: String, argument: String? = null) {
         val arg = argument?.let { JSONObject.quote(it) } ?: ""
@@ -540,8 +550,8 @@ class DashboardActivity : ComponentActivity() {
     }
 
     /**
-     * The one bar across the top: Home Assistant's menu (back is the back gesture), the time and weather, the
-     * dashboard's views, how she feels (tap to talk), and your chats, reload, apps and settings.
+     * The one bar across the top: Home Assistant's menu (back is the back gesture), the Chat | Home switch,
+     * the time and weather, the dashboard's views, how she feels (tap to talk), and reload, apps and settings.
      */
     @Composable
     private fun Strip(now: HouseNow, clock: Date, dashboards: List<Dashboard>, onTalk: () -> Unit, onApps: () -> Unit) {
@@ -554,6 +564,7 @@ class DashboardActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
+                ScreenSwitcher(MainScreen.HOME, { if (it == MainScreen.CHAT) openChats() })
                 Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
                     Text(DateFormat.getTimeFormat(this@DashboardActivity).format(clock), style = MaterialTheme.typography.titleLarge)
                     Text(
@@ -611,12 +622,6 @@ class DashboardActivity : ComponentActivity() {
                     }
                     Icon(Icons.Rounded.Mic, "Talk to Lena", tint = MaterialTheme.colorScheme.primary)
                 }
-                FilledTonalIconButton(onClick = {
-                    startActivity(
-                        Intent(this@DashboardActivity, MainActivity::class.java)
-                            .putExtra(MainActivity.EXTRA_FROM_WALL, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }) { Icon(Icons.Outlined.Forum, "Chats") }
                 FilledTonalIconButton(onClick = { web.reload() }) { Icon(Icons.Outlined.Refresh, "Reload the dashboard") }
                 FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
                 FilledTonalIconButton(onClick = {

@@ -30,8 +30,17 @@ class ConflictException : IOException("Changed elsewhere")
  */
 data class Model(val id: String, val name: String, val toolIds: List<String>, val features: Set<String>)
 
-/** A chat in the drawer. active means an answer is still being written. */
-data class ChatItem(val id: String, val title: String, val updatedMillis: Long, val active: Boolean)
+/**
+ * A chat in a list. active means an answer is still being written; folderId is the folder it's in, when
+ * the list it came from says so (a folder's own list always does).
+ */
+data class ChatItem(
+    val id: String,
+    val title: String,
+    val updatedMillis: Long,
+    val active: Boolean,
+    val folderId: String? = null,
+)
 
 /** Her answer so far, and whether it's finished. */
 data class Reply(val content: String, val done: Boolean)
@@ -49,6 +58,12 @@ class Api(server: String, private val context: Context? = null) {
     private val base = server.trimEnd('/')
 
     companion object {
+        /** How many chats Open WebUI sends per page of your chat list. */
+        const val CHATS_PER_PAGE = 60
+
+        /** How many chats Open WebUI sends per page of a folder's list. */
+        const val FOLDER_CHATS_PER_PAGE = 10
+
         /**
          * An Api for the saved server, or null before one is set. It gets the app's context so it can sign
          * in again by itself.
@@ -259,8 +274,11 @@ class Api(server: String, private val context: Context? = null) {
         return all.firstOrNull { it.id == wanted } ?: Prefs.lenaIn(all) ?: all.firstOrNull()
     }
 
-    /** Your chats, newest first: not the pinned ones (see [pinned]) or those in folders, as in Open WebUI's sidebar. */
-    suspend fun chats(): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/?page=1"))
+    /**
+     * One page of your chats, newest first: not the pinned ones (see [pinned]) or those in folders, as in
+     * Open WebUI's sidebar. Open WebUI sends [CHATS_PER_PAGE] a page.
+     */
+    suspend fun chats(page: Int = 1): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/?page=$page"))
 
     /** Your pinned chats. */
     suspend fun pinned(): List<ChatItem> = parseChats(request("GET", "/api/v1/chats/pinned"))
@@ -291,8 +309,76 @@ class Api(server: String, private val context: Context? = null) {
                 title = o.optString("title").ifBlank { "New chat" },
                 updatedMillis = toMillis(o.optLong("updated_at")),
                 active = o.optBoolean("active", false),
+                folderId = o.optString("folder_id").takeIf { !o.isNull("folder_id") && it.isNotBlank() },
             )
         }
+    }
+
+    // ---- Folders ----------------------------------------------------------------------------
+    //
+    // Open WebUI's folders group chats ("Group" in the app). Folders can sit inside folders; the app
+    // lists them as one list in tree order, with the inner ones' names shown as "Outer › Inner".
+    // The feature can be turned off for your account, which comes back as ForbiddenException.
+
+    /** A folder of chats: its name as shown (with its parents'), and whether it's open in Open WebUI's sidebar. */
+    data class Folder(val id: String, val name: String, val label: String, val expanded: Boolean)
+
+    /** Your folders, in tree order: each folder followed by the ones inside it, alphabetically. */
+    suspend fun folders(): List<Folder> {
+        val a = JSONArray(request("GET", "/api/v1/folders/"))
+        data class Raw(val id: String, val name: String, val parent: String?, val expanded: Boolean)
+        val raw = List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            Raw(o.getString("id"), o.optString("name"), o.optString("parent_id").takeIf { !o.isNull("parent_id") && it.isNotBlank() },
+                o.optBoolean("is_expanded", false))
+        }
+        val ids = raw.map { it.id }.toSet()
+        val children = raw.groupBy { it.parent?.takeIf { p -> p in ids } }
+        val out = mutableListOf<Folder>()
+
+        /** Adds a folder's children under it, depth first; seen guards against a loop in the data. */
+        fun addChildren(parent: String?, prefix: String, seen: MutableSet<String>) {
+            for (f in children[parent].orEmpty().sortedBy { it.name.lowercase() }) {
+                if (!seen.add(f.id)) continue
+                val label = if (prefix.isEmpty()) f.name else "$prefix › ${f.name}"
+                out += Folder(f.id, f.name, label, f.expanded)
+                addChildren(f.id, label, seen)
+            }
+        }
+        addChildren(null, "", mutableSetOf())
+        return out
+    }
+
+    /** One page of the chats directly in a folder, newest first; Open WebUI sends [FOLDER_CHATS_PER_PAGE] a page. */
+    suspend fun folderChats(folderId: String, page: Int = 1): List<ChatItem> =
+        parseChats(request("GET", "/api/v1/chats/folder/${enc(folderId)}/list?page=$page")).map { it.copy(folderId = folderId) }
+
+    /** Makes a new folder at the top level and returns it. */
+    suspend fun createFolder(name: String): Folder {
+        val o = JSONObject(request("POST", "/api/v1/folders/", JSONObject().put("name", name)))
+        val id = o.optString("id")
+        if (id.isBlank()) throw IOException("Open WebUI didn't make the folder")
+        return Folder(id, o.optString("name", name), o.optString("name", name), o.optBoolean("is_expanded", false))
+    }
+
+    /** Renames a folder. */
+    suspend fun renameFolder(id: String, name: String) {
+        request("POST", "/api/v1/folders/${enc(id)}/update", JSONObject().put("name", name))
+    }
+
+    /** Deletes a folder (and the folders inside it), keeping its chats: they move out to your chat list. */
+    suspend fun deleteFolder(id: String) {
+        request("DELETE", "/api/v1/folders/${enc(id)}?delete_contents=false")
+    }
+
+    /** Opens or closes a folder, remembered by Open WebUI so its sidebar matches. */
+    suspend fun setFolderExpanded(id: String, expanded: Boolean) {
+        request("POST", "/api/v1/folders/${enc(id)}/update/expanded", JSONObject().put("is_expanded", expanded))
+    }
+
+    /** Moves a chat into a folder, or out of any folder when folderId is null. */
+    suspend fun moveChat(chatId: String, folderId: String?) {
+        request("POST", "/api/v1/chats/${enc(chatId)}/folder", JSONObject().put("folder_id", folderId ?: JSONObject.NULL))
     }
 
     /**

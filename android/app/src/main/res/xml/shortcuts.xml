@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Long-press the app icon for these. Your quick prompts are added beside them. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
-    <shortcut android:enabled="true" android:icon="@drawable/ic_shortcut_call"
+    <shortcut android:enabled="true" android:icon="@drawable/ic_shortcut_talk"
         android:shortcutId="talk" android:shortcutShortLabel="@string/shortcut_talk">
         <intent android:action="io.github.soullink9.lena.TALK"
             android:targetClass="io.github.soullink9.lena.AskActivity"
-            android:targetPackage="io.github.soullink9.lena" />
-    </shortcut>
-    <shortcut android:enabled="true" android:icon="@drawable/ic_shortcut_wave"
-        android:shortcutId="call" android:shortcutShortLabel="@string/shortcut_call">
-        <intent android:action="io.github.soullink9.lena.CALL"
-            android:targetClass="io.github.soullink9.lena.MainActivity"
             android:targetPackage="io.github.soullink9.lena" />
     </shortcut>
     <shortcut android:enabled="true" android:icon="@drawable/ic_shortcut_ask"
