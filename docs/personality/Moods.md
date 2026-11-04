@@ -33,7 +33,9 @@ How she acts on it is part of her baseline in the Modelfile: show it, don't anno
 ## The feelings
 
 **Moods:** Content, Cheerful, Playful, Smug, Curious, Focused, Restless, Wistful, Grumpy, Uneasy, Fond.
+
 **Energy:** Groggy, Steady, Wired, Drained.
+
 **Moments:** Pleased, Amused, Proud, Touched, Delighted, Exasperated, Offended, Worried, Relieved, and **Nothing** for no reaction.
 
 ## What moves her
