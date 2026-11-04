@@ -8,8 +8,6 @@ Note: Built with the assistance of Claude.ai. I'm putting it here now so you don
 
 # Lena: a personal AI assistant on your own hardware
 
-> **v0.6.6.** Everything works day to day; settings may still change before 1.0. See the [changelog](CHANGELOG.md).
-
 Lena is a Jarvis-style assistant that runs entirely on your own servers. She's one character everywhere you meet her: in Home Assistant's voice assistant, in Open WebUI, and in an Android app that makes her your phone's assistant. She's sharp, sassy and quietly caring. She runs your home, uses your Open WebUI tools, remembers what you tell her, and has feelings that change for real reasons.
 
 - **One personality, everywhere.** Her whole character is built into her Ollama model, so she's the same Lena in every app, whatever instructions the app adds.
