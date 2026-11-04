@@ -6,6 +6,8 @@ Note: Built with the assistance of Claude.ai. I'm putting it here now so you don
 
 <p align="center"><img src="docs/assets/lena-logo.png" width="200" alt="Lena's logo"></p>
 
+<p align="center"><img src="home-assistant/custom_components/lena/brand/dark_logo.png" width="200" alt="Lena's logo"></p>
+
 # Lena: a personal AI assistant on your own hardware
 
 > **v0.6.6.** Everything works day to day; settings may still change before 1.0. See the [changelog](CHANGELOG.md).
