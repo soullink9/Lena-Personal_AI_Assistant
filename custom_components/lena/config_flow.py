@@ -117,7 +117,7 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             vol.Optional(CONF_ALERT_AGENT, description=default(CONF_ALERT_AGENT)): ConversationAgentSelector(),
             vol.Optional(CONF_ALERT_ALL_CLEAR, default=o.get(CONF_ALERT_ALL_CLEAR, brain.DEFAULTS[CONF_ALERT_ALL_CLEAR])): BooleanSelector(),
             # Her memory: how often she tidies it, and with which AI Task (empty: Home Assistant's default).
-            vol.Required(CONF_TIDY_DAYS, description=default(CONF_TIDY_DAYS)): _number(0, 90, "days"),
+            vol.Optional(CONF_TIDY_DAYS, description=default(CONF_TIDY_DAYS)): _number(0, 90, "days"),
             vol.Optional(CONF_TIDY_TASK, description=default(CONF_TIDY_TASK)):
                 EntitySelector(EntitySelectorConfig(domain="ai_task")),
         })
