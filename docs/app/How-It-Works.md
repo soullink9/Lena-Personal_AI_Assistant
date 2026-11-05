@@ -125,6 +125,10 @@ On the wall display, the screen goes to 40% brightness for photos and 2% for the
 - **Hey Lena:** a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/Tater-Wake-Words), the same kind of model Home Assistant's voice satellites run, trained and measured at about one false start every ten hours of background sound. Two words are much harder to say by accident than one.
 - **Lena** (the default for new setups): the same kind of model for just her name. Quicker to say, but ordinary speech and TV set it off more often, which is why **Fewer false starts** (below) is the default too.
 - **Hey Jarvis:** [openWakeWord](https://github.com/dscripka/openWakeWord)'s ready-made model, free for personal, non-commercial use.
+- **Okay Nabu**, **Hey Mycroft** and **Alexa:** Home Assistant's standard wake words, the microWakeWord models its Voice Preview Edition runs (Apache 2.0). An Echo speaker in the room will answer to Alexa too.
+- **Hey Home Assistant:** Home Assistant's experimental model; it may start by mistake more often than the others.
+
+**"Stop"**, like on Home Assistant Voice: say it while a timer or alarm rings to stop it, or, with the wake word on, while she's speaking to stop her mid-sentence. It's ESPHome's own stop model, always at its own setting.
 
 The app computes exactly the sound features Home Assistant's voice devices do: its front end is a line-for-line port of TensorFlow Lite Micro's, checked bit for bit against the original on every build.
 
@@ -135,6 +139,12 @@ The app computes exactly the sound features Home Assistant's voice devices do: i
 - She can't be woken in the first second after she starts listening, while the sound features settle (that's when a false start is likeliest, for example as the wall display comes up after a restart), nor again until she's calmed down after the last time.
 - ESPHome's own **voice check** (a small model that tells speech from other sound) has to agree someone is speaking, so music, a TV jingle or a dropped pan can't wake her. What it turns away is noted in Settings → Software version → Logs.
 - Each time she wakes, Settings → Software version → Logs says how sure she was and what she needed, which helps when choosing the setting above.
+
+### Timers and alarms
+
+Lena keeps her own timers and alarms on the device. Ask her: "set a 10 minute pasta timer", "timer for an hour and a half", "wake me up at 6:45" (the morning, unless you say otherwise), "set an alarm for 7 pm", "how long is left?", "when is my alarm?", "cancel the pasta timer", "cancel all alarms". She understands these herself, in English, before anything is sent anywhere: they don't go to Open WebUI or Assist (in Assist mode they're still kept in her chat), they answer at once, and they work without a connection. A longer or less clear sentence goes on to her as usual.
+
+They're set on Android's alarm clock, like a clock app's, so they ring on time while the tablet sleeps, and they're set again after a restart (one missed by less than five minutes while it was off rings when it's back). When one rings, the alarm sound plays at the alarm volume and a full-screen **Stop** appears (over the lock screen too), with **Snooze** for 10 minutes on an alarm; saying "stop" works on that screen. It stops by itself after 10 minutes. The next one counts down on the dashboards' bar and on the screensaver; tap it, or open Settings → Device customization → **Alarms & timers**, to see them all, cancel one, or set a quick timer or an alarm by hand.
 
 **When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 

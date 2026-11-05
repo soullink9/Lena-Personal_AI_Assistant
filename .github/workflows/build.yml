@@ -68,6 +68,10 @@ jobs:
       - name: Check the wake word front end against the original C
         run: tools/frontend_check/run.sh
 
+      # What she understands on her own (timers, alarms, "stop"), on example sentences.
+      - name: Check timers and alarms by voice
+        run: tools/commands_check/run.sh
+
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner.
       - name: Build
         id: build

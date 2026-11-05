@@ -136,7 +136,7 @@ object Logs {
     }.getOrDefault(emptyList()).reversed()
 }
 
-/** Starts the log, catches crashes into it, and tidies away an update once it's installed. */
+/** Starts the log, catches crashes into it, tidies away an update once it's installed, and readies the ringing. */
 class LenaApp : Application() {
     /**
      * Starts the log before anything else, then records any crash before Android's own handler ends the
@@ -151,5 +151,7 @@ class LenaApp : Application() {
             previous?.uncaughtException(thread, error)
         }
         Updates.cleanUp(this)
+        AppVisible.track(this)
+        Ringing.channel(this)
     }
 }

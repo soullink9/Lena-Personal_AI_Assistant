@@ -474,7 +474,8 @@ class AskActivity : ComponentActivity() {
 
         /**
          * Reads the answer aloud, then listens again or (on a wall screen) closes after a moment. If your
-         * server's voice fails, the phone's voice takes over for the rest of the sheet.
+         * server's voice fails, the phone's voice takes over for the rest of the sheet. With the wake word on,
+         * "stop" ([StopWord]) stops her mid-sentence.
          */
         fun speakThenMaybeListen(answer: String) {
             val voice = mouth ?: newMouth().also { mouth = it }
@@ -490,10 +491,22 @@ class AskActivity : ComponentActivity() {
             phase = Phase.SPEAKING
             val tone = if (Prefs.moodVoice(this@AskActivity)) VoiceTone.of(feelings) else VoiceTone()
             voice.tone = tone
+            // With the wake word on, saying "stop" while she speaks stops her, like Home Assistant Voice.
+            val stopWord = if (Prefs.wakeWord(this@AskActivity)) StopWord.listener(this@AskActivity) {
+                if (phase == Phase.SPEAKING) {
+                    Logs.i("Ask", "Heard “stop”; she stops speaking")
+                    job?.cancel()
+                    mouth?.stop()
+                    phase = Phase.IDLE
+                    closeAfter(3_000)
+                }
+            } else null
             job = scope.launch {
+                stopWord?.start()
                 try {
                     withSpeechFocus(this@AskActivity) { voice.say(plain) }
                 } catch (c: CancellationException) {
+                    stopWord?.stop()
                     throw c
                 } catch (e: Exception) {
                     // Your server's voice failed (for example, no text-to-speech engine set): use the phone's.
@@ -503,6 +516,7 @@ class AskActivity : ComponentActivity() {
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
                     }
                 }
+                stopWord?.stop()
                 if (listenAgainAfter(plain)) listen(true) else {
                     phase = Phase.IDLE
                     closeAfter(5_000)
@@ -542,7 +556,8 @@ class AskActivity : ComponentActivity() {
 
         /**
          * Sends a question to whoever answers (Settings → Connections → Who answers), then speaks the
-         * answer if you spoke. Errors become a short note on the sheet rather than a crash.
+         * answer if you spoke. Timers and alarms are hers ([Commands]) and never leave the device. Errors
+         * become a short note on the sheet rather than a crash.
          */
         fun send(q: String, spoken: Boolean) {
             val image = photo
@@ -568,13 +583,21 @@ class AskActivity : ComponentActivity() {
             job = scope.launch {
                 try {
                     ready.await()
-                    // Joins the check started when the sheet opened (or makes one if that was a while ago).
-                    Connections.ensure(this@AskActivity)
-                    if (viaAssist) {
-                        working = true
-                        turn.answer = askAssist(turn.question)
+                    // Her own timers and alarms ("set a 10 minute timer") are answered here, at once and
+                    // without a connection; everything else goes to whoever answers.
+                    val own = if (image == null) Commands.handle(this@AskActivity, turn.question) else null
+                    if (own != null) {
+                        turn.answer = own
+                        if (viaAssist) AssistLog.add(this@AskActivity, turn.question, own)
                     } else {
-                        askOpenWebUi(turn, image, spoken)
+                        // Joins the check started when the sheet opened (or makes one if that was a while ago).
+                        Connections.ensure(this@AskActivity)
+                        if (viaAssist) {
+                            working = true
+                            turn.answer = askAssist(turn.question)
+                        } else {
+                            askOpenWebUi(turn, image, spoken)
+                        }
                     }
                     turn.done = true
                     working = false

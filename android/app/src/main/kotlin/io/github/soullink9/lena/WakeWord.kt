@@ -50,11 +50,14 @@ object WakeWord {
     fun available(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c)): Boolean =
         runCatching { c.assets.list(DIR)?.contains(phrase.file) == true }.getOrDefault(false)
 
-    /** The engine for a phrase: microWakeWord for Hey Lena and Lena, openWakeWord for Hey Jarvis. */
+    /**
+     * The engine for a phrase: openWakeWord for Hey Jarvis, microWakeWord for the rest (Hey Lena, Lena, and
+     * Home Assistant's standard ones from ESPHome).
+     */
     fun open(c: Context, phrase: WakePhrase = Prefs.wakePhrase(c), sensitivity: WakeSensitivity = Prefs.wakeSensitivity(c)): WakeEngine =
         when (phrase) {
-            WakePhrase.HEY_LENA, WakePhrase.LENA -> MicroWakeWord(c, phrase.file, sensitivity)
             WakePhrase.JARVIS -> OpenWakeWord(c, phrase.file, sensitivity)
+            else -> MicroWakeWord(c, phrase.file, sensitivity)
         }
 
     /** Whether an asset is bundled. */
@@ -337,6 +340,10 @@ class WakeListener(
     private val onHeard: () -> Unit,
     private val onSilenced: () -> Unit = {},
     private val onScore: (Float) -> Unit = {},
+    /** Another microWakeWord model to listen for instead of her name ("stop.tflite" for [StopWord]). */
+    private val model: String? = null,
+    /** What it listens for, for the log. */
+    private val label: String? = null,
 ) {
     companion object {
         /**
@@ -367,7 +374,7 @@ class WakeListener(
      */
     fun start(): Boolean {
         if (running) return true
-        if (!WakeWord.available(context)) return false
+        if (if (model != null) !WakeWord.has(context, model) else !WakeWord.available(context)) return false
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return false
         running = true
         thread = Thread({ loop() }, "lena-wake").also { it.start() }
@@ -386,9 +393,11 @@ class WakeListener(
      */
     @SuppressLint("MissingPermission") // checked in start()
     private fun loop() {
-        val phrase = Prefs.wakePhrase(context)
-        val model = runCatching { WakeWord.open(context) }.getOrElse {
-            Logs.e("Wake word", "Couldn't load the ${phrase.label} model", it)
+        val phrase = label ?: Prefs.wakePhrase(context).label
+        val model = runCatching {
+            if (this.model != null) MicroWakeWord(context, this.model, WakeSensitivity.BALANCED) else WakeWord.open(context)
+        }.getOrElse {
+            Logs.e("Wake word", "Couldn't load the $phrase model", it)
             running = false
             return
         }
@@ -431,10 +440,10 @@ class WakeListener(
                 main.post { onScore(r.score) }
                 if (r.notSpeech && System.currentTimeMillis() - lastIgnored > 60_000) {
                     lastIgnored = System.currentTimeMillis()
-                    Logs.i("Wake word", "Something sounded like \u201C${phrase.label}\u201D (%.2f) but wasn't a voice; ignored".format(r.score))
+                    Logs.i("Wake word", "Something sounded like \u201C$phrase\u201D (%.2f) but wasn't a voice; ignored".format(r.score))
                 }
                 if (r.heard) {
-                    Logs.i("Wake word", "Heard \u201C${phrase.label}\u201D (%.2f, needs %.2f)".format(r.score, model.threshold))
+                    Logs.i("Wake word", "Heard \u201C$phrase\u201D (%.2f, needs %.2f)".format(r.score, model.threshold))
                     running = false
                     main.post(onHeard)
                 }
@@ -446,4 +455,20 @@ class WakeListener(
             model.close()
         }
     }
+}
+
+/**
+ * "Stop", like Home Assistant Voice: while a timer or alarm rings ([RingActivity]) or she's speaking (the
+ * sheet), saying it stops her. ESPHome's own stop model (microWakeWord, Apache 2.0), always at its own
+ * setting; nothing happens if this build lacks it.
+ */
+object StopWord {
+    private const val MODEL = "stop.tflite"
+
+    /** Whether this build has the stop model. */
+    fun available(c: Context): Boolean = WakeWord.has(c, MODEL)
+
+    /** A listener for "stop" that calls [onStop] (on the main thread) when it hears it. Call start() on it. */
+    fun listener(c: Context, onStop: () -> Unit): WakeListener =
+        WakeListener(c, onHeard = onStop, model = MODEL, label = "Stop")
 }

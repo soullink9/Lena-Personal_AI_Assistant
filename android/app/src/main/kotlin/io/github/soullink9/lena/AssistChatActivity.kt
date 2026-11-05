@@ -168,7 +168,10 @@ class AssistChatActivity : ComponentActivity() {
             if (count > 0) list.animateScrollToItem(count - 1)
         }
 
-        /** Sends what you typed to Assist; the answer shows when it comes. */
+        /**
+         * Sends what you typed to Assist; the answer shows when it comes. Timers and alarms are answered here
+         * by Lena herself ([Commands]).
+         */
         fun send() {
             val question = text.trim()
             if (question.isEmpty() || waiting != null) return
@@ -176,7 +179,9 @@ class AssistChatActivity : ComponentActivity() {
             waiting = question
             scope.launch {
                 try {
-                    AssistChat.ask(this@AssistChatActivity, question)
+                    val own = Commands.handle(this@AssistChatActivity, question)
+                    if (own != null) AssistLog.add(this@AssistChatActivity, question, own)
+                    else AssistChat.ask(this@AssistChatActivity, question)
                 } catch (e: HaAuthException) {
                     toast("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.")
                 } catch (e: IllegalStateException) {

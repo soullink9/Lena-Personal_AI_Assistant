@@ -639,7 +639,7 @@ class DashboardActivity : ComponentActivity() {
 
     /**
      * The one bar across the top: Home Assistant's menu (back is the back gesture), the Chat | Home switch,
-     * the time and weather, the dashboard's views, how she feels (tap to talk), and apps and settings.
+     * the time and weather, the next timer or alarm, the dashboard's views, how she feels (tap to talk), and apps and settings.
      * (Reloading is Settings → Connections → Refresh all connections.)
      */
     @Composable
@@ -671,6 +671,13 @@ class DashboardActivity : ComponentActivity() {
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
                     )
                 }
+                // The next timer or alarm, counting down; a tap shows them all.
+                NextCountdown(
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable {
+                        startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java).setAction(SettingsActivity.ACTION_ALARMS))
+                    }.background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
                 // The dashboard's views, where Home Assistant's tabs were.
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

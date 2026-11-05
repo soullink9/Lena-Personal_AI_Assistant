@@ -12,6 +12,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Sets scheduled prompts again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Lena's own timers and alarms: exact alarm clock times, the ringing as a foreground service that
+         plays sound, and the ringing screen over the lock screen. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Installing an update you downloaded in Settings > Software version > Updates (Android asks you to confirm each time). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -182,6 +188,21 @@
         <receiver android:name=".ScheduleReceiver" android:exported="false" />
         <!-- Android's installer reports an update's progress here. -->
         <receiver android:name=".UpdateReceiver" android:exported="false" />
+
+        <!-- Lena's timers and alarms: Android's alarm clock fires the receiver, the service rings, and the
+             screen shows what's ringing with Stop and Snooze. -->
+        <receiver android:name=".CountdownReceiver" android:exported="false" />
+        <service
+            android:name=".RingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <activity
+            android:name=".RingActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
 
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>

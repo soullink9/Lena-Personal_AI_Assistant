@@ -85,6 +85,10 @@ enum class WakePhrase(val label: String, val file: String, val detail: String) {
     HEY_LENA("Hey Lena", "hey_lena.tflite", "Two words, so far fewer false starts. A microWakeWord model, like Home Assistant's voice satellites."),
     LENA("Lena", "lena.tflite", "Just her name: quicker to say, but ordinary speech wakes her more often"),
     JARVIS("Hey Jarvis", "hey_jarvis_v0.1.tflite", "openWakeWord's model, free for personal, non-commercial use"),
+    OKAY_NABU("Okay Nabu", "okay_nabu.tflite", "Home Assistant Voice's own wake word"),
+    HEY_MYCROFT("Hey Mycroft", "hey_mycroft.tflite", "One of Home Assistant's standard wake words"),
+    ALEXA("Alexa", "alexa.tflite", "One of Home Assistant's standard wake words. Nearby Echo speakers will hear it too."),
+    HEY_HOME_ASSISTANT("Hey Home Assistant", "hey_home_assistant.tflite", "Home Assistant's experimental model: may start by mistake more often"),
 }
 
 /** How often a scheduled prompt runs. */

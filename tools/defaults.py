@@ -140,7 +140,9 @@ SETTINGS = [
     Setting("Talking to Lena › Wake word › Listens", "WAKE_EVERYWHERE", "Boolean", {
         "Only on the wall display": "false", "Whenever Lena is open": "true"}),
     Setting("Talking to Lena › Wake word › Her name", "WAKE_PHRASE", "WakePhrase", {
-        "Hey Lena": "WakePhrase.HEY_LENA", "Lena": "WakePhrase.LENA", "Hey Jarvis": "WakePhrase.JARVIS"}),
+        "Hey Lena": "WakePhrase.HEY_LENA", "Lena": "WakePhrase.LENA", "Hey Jarvis": "WakePhrase.JARVIS",
+        "Okay Nabu": "WakePhrase.OKAY_NABU", "Hey Mycroft": "WakePhrase.HEY_MYCROFT", "Alexa": "WakePhrase.ALEXA",
+        "Hey Home Assistant": "WakePhrase.HEY_HOME_ASSISTANT"}),
     Setting("Talking to Lena › Wake word › How sure she must be", "WAKE_SENSITIVITY", "WakeSensitivity", {
         "Fewer false starts": "WakeSensitivity.STRICT", "Balanced": "WakeSensitivity.BALANCED",
         "Easier to wake": "WakeSensitivity.RELAXED"}),

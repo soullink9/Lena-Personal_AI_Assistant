@@ -171,6 +171,8 @@ fun LenaDisplay(locked: Boolean, listening: Listening, onTalk: () -> Unit) {
                 DateFormat.getTimeFormat(context).format(now).replace(Regex("\\s?[AaPp]\\.?[Mm]\\.?$"), ""),
                 color = ink, fontSize = clockSize, fontWeight = FontWeight.Light, lineHeight = clockSize, maxLines = 1,
             )
+            // The next timer or alarm, if one is set
+            NextCountdown(Modifier.padding(top = 8.dp), color = soft, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(20.dp))
 
             // How she feels

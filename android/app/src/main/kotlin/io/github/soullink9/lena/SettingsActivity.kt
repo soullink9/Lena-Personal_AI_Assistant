@@ -53,6 +53,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
@@ -145,6 +150,11 @@ import kotlinx.coroutines.launch
  */
 class SettingsActivity : ComponentActivity() {
 
+    companion object {
+        /** Opens Settings straight on Alarms & timers (from Android's alarm icon and the clock). */
+        const val ACTION_ALARMS = "io.github.soullink9.lena.ALARMS"
+    }
+
     /**
      * The pages of Settings. One activity shows them all, so changes save as you go and the update download
      * carries on while you look at other pages.
@@ -158,6 +168,7 @@ class SettingsActivity : ComponentActivity() {
         CHAT_SCREEN("Chat screen", Area.CHAT_SCREEN),
         NOTIFICATIONS("Notifications", Area.DEVICE), PHONE("Widgets & tile", Area.DEVICE),
         QUICK("Quick prompts", Area.DEVICE), SCHEDULED("Scheduled prompts", Area.DEVICE), SCHEDULE("Scheduled prompt", Area.DEVICE),
+        ALARMS("Alarms & timers", Area.DEVICE),
         DEVELOPMENT("Development", Area.ABOUT), UPDATES("Updates", Area.ABOUT);
 
         /**
@@ -225,7 +236,7 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun Screen() {
         var s by remember { mutableStateOf(original) }
-        var page by remember { mutableStateOf(Page.MAIN) }
+        var page by remember { mutableStateOf(if (intent.action == ACTION_ALARMS) Page.ALARMS else Page.MAIN) }
         var editing by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") } // Search settings; kept while you look at a result
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
@@ -307,6 +318,7 @@ class SettingsActivity : ComponentActivity() {
                             Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
                             Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
                             Page.WAKE -> WakePage(s, ::set)
+                            Page.ALARMS -> AlarmsPage()
                             Page.DEVELOPMENT -> DevelopmentPage(s, ::set) { page = it }
                             Page.UPDATES -> UpdatesPage()
                         }
@@ -389,6 +401,10 @@ class SettingsActivity : ComponentActivity() {
                 if (s.schedules.isEmpty()) "None yet" else s.schedules.filter { it.enabled }.joinToString(", ") { it.title }.ifBlank { "All paused" }) {
                 open(Page.SCHEDULED)
             }
+            val countdowns by Timers.items(this@SettingsActivity).collectAsState()
+            Item(Icons.Outlined.Alarm, "Alarms & timers", countdowns.orEmpty().let { list ->
+                if (list.isEmpty()) "None set" else list.joinToString(", ") { it.name(this@SettingsActivity) }
+            }) { open(Page.ALARMS) }
         }
         Section(Area.ABOUT.title) {
             // Opens the Development page (Updates, Logs, Return to defaults), which has no row of its own.
@@ -405,6 +421,63 @@ class SettingsActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Alarms & timers: Lena's own, set here or by asking her ("set a 10 minute timer", "wake me up at 6:30").
+     * Each shows when it rings and can be cancelled; quick timers and an alarm can be set right here.
+     */
+    @Composable
+    private fun AlarmsPage() {
+        val items by Timers.items(this).collectAsState()
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(1_000)
+            }
+        }
+        val list = items.orEmpty()
+        if (list.isNotEmpty()) Group {
+            list.forEach { item ->
+                val summary = when (item.kind) {
+                    CountdownKind.TIMER -> "${Timers.countdown(item.at - now)} left · rings at ${Timers.clock(this@SettingsActivity, item.at)}"
+                    CountdownKind.ALARM -> "Rings ${Timers.day(item.at)}"
+                }
+                Item(
+                    if (item.kind == CountdownKind.TIMER) Icons.Outlined.Timer else Icons.Outlined.Alarm,
+                    item.name(this@SettingsActivity), summary,
+                    trailing = {
+                        IconButton(onClick = { Timers.cancel(this@SettingsActivity, item.id) }) { Icon(Icons.Outlined.Close, "Cancel") }
+                    },
+                ) {}
+            }
+        }
+        Group {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = rowModifier().padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                Icon(Icons.Outlined.Timer, null, Modifier.size(24.dp))
+                Spacer(Modifier.width(12.dp))
+                listOf(1, 5, 10, 15).forEach { minutes ->
+                    AssistChip(onClick = { Timers.addTimer(this@SettingsActivity, minutes * 60_000L) }, label = { Text("$minutes min") })
+                }
+            }
+            Item(Icons.Outlined.Alarm, "Set an alarm", "Rings at the next time you pick") {
+                val at = java.util.Calendar.getInstance()
+                android.app.TimePickerDialog(
+                    this@SettingsActivity,
+                    { _, hour, minute -> Timers.addAlarm(this@SettingsActivity, hour, minute) },
+                    at.get(java.util.Calendar.HOUR_OF_DAY), at.get(java.util.Calendar.MINUTE),
+                    android.text.format.DateFormat.is24HourFormat(this@SettingsActivity),
+                ).show()
+            }
+        }
+        Footnote("Or ask her: “set a 10 minute pasta timer”, “wake me up at 6:30”, “how long is left?”, “cancel my alarm”. " +
+            "They ring on this device with the alarm sound, even while it sleeps, and show on the dashboards and the screensaver. " +
+            "Say “stop” or tap Stop when one rings; an alarm can snooze for 10 minutes.")
     }
 
     /**
@@ -602,7 +675,8 @@ class SettingsActivity : ComponentActivity() {
             Findable("Widget", "home screen launcher mood on widget", Page.PHONE),
             Findable("Quick Settings tile", "notification shade pull-down tile talk", Page.PHONE),
             Findable("Quick prompts", "shortcuts one tap chips widget prompts", Page.QUICK),
-            Findable("Scheduled prompts", "briefing morning schedule repeat timer daily recurring automatic", Page.SCHEDULED),
+            Findable("Scheduled prompts", "briefing morning schedule repeat daily recurring automatic", Page.SCHEDULED),
+            Findable("Alarms & timers", "alarm timer wake up countdown ring snooze kitchen clock", Page.ALARMS),
         )
     }
 
