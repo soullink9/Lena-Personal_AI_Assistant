@@ -210,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
     """The bridge's HTTP API, shaped like OpenAI's audio endpoints so Open WebUI can use it as an
     "OpenAI" speech engine.
     """
-    server_version = "LenaVoiceBridge/0.6.7"
+    server_version = "LenaVoiceBridge/0.6.8"
 
     def log_message(self, fmt, *args):
         """Request lines go to the same log, with the caller's address."""
