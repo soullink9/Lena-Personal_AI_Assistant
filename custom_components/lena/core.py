@@ -16,6 +16,7 @@ from typing import Any
 
 import yaml
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
@@ -29,10 +30,12 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from . import brain
+from . import brain, tidy
 from .const import (
     CONF_ALERT_AGENT,
     CONF_ALERT_ALL_CLEAR,
+    CONF_TIDY_DAYS,
+    CONF_TIDY_TASK,
     CONF_ALERT_PHONES,
     CONF_AWAY_HOURS,
     CONF_BEDTIME,
@@ -103,7 +106,9 @@ class LenaCore:
         self.entry = entry
         self.catalog = catalog
         self.feelings = brain.Feelings()
-        self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed"}
+        self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed", "added"}
+        self.tidied: datetime | None = None  # when she last tidied her memory
+        self.memory_backup: dict[str, Any] | None = None  # {"at", "items"}: the list before her last tidy
         self._rng = random.Random()
         self._state_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.feelings")
         self._memory_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.memory")
@@ -153,7 +158,10 @@ class LenaCore:
             f.energy = "Steady" if "Steady" in self.catalog.energies else next(iter(self.catalog.energies))
         if f.moment != brain.NOTHING and f.moment not in self.catalog.moments:
             f.moment = brain.NOTHING
-        self.memory = (await self._memory_store.async_load() or {}).get("items", [])
+        saved_memory = await self._memory_store.async_load() or {}
+        self.memory = saved_memory.get("items", [])
+        self.tidied = _dt(saved_memory.get("tidied"))
+        self.memory_backup = saved_memory.get("backup")
 
         hass = self.hass
         wake = _parse_time(self.opt(CONF_MORNING), brain.DEFAULTS["morning"])
@@ -249,13 +257,17 @@ class LenaCore:
     @callback
     def memory_changed(self) -> None:
         """Saves the memory list and updates the to-do entity."""
-        self._memory_store.async_delay_save(lambda: {"items": self.memory}, 1)
+        self._memory_store.async_delay_save(lambda: {
+            "items": self.memory,
+            "tidied": self.tidied.isoformat() if self.tidied else None,
+            "backup": self.memory_backup,
+        }, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATED)
 
     @callback
     def remember(self, fact: str) -> dict[str, str]:
         """Adds a fact to her memory and returns the new item."""
-        item = {"uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action"}
+        item = {"uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action", "added": dt_util.now().isoformat()}
         self.memory.append(item)
         self.memory_changed()
         return item
@@ -271,6 +283,70 @@ class LenaCore:
         self.memory.remove(match)
         self.memory_changed()
         return match["summary"]
+
+    @property
+    def tidy_due(self) -> bool:
+        """Whether it's time for her to tidy her memory (Configure: every so many days; 0 never)."""
+        days = int(self.opt(CONF_TIDY_DAYS) or 0)
+        if days <= 0:
+            return False
+        return self.tidied is None or dt_util.now() - self.tidied >= timedelta(days=days)
+
+    async def async_tidy_memory(self) -> tidy.Plan | None:
+        """Tidies her memory with Home Assistant's AI Task: combines, clarifies and retires lines (see
+        tidy.py), keeping a copy first so lena.undo_memory_tidy can put it back, and tells you what changed
+        in a notification. Returns what changed, or None when there was too little to tidy. Raises
+        tidy.TidyError when the AI Task isn't there or its answer can't be used; nothing changes then.
+        """
+        open_items = [m for m in self.memory if m.get("status") != "completed"]
+        if len(open_items) < tidy.MIN_ITEMS:
+            return None
+        if not self.hass.services.has_service("ai_task", "generate_data"):
+            raise tidy.TidyError("Home Assistant has no AI Task set up (Settings > System > General > AI suggestions)")
+        now = dt_util.now()
+        request: dict[str, Any] = {"task_name": "Tidy Lena's memory", "instructions": tidy.instructions(open_items, now)}
+        if task := self.opt(CONF_TIDY_TASK):
+            request["entity_id"] = task
+        try:
+            reply = await self.hass.services.async_call("ai_task", "generate_data", request, blocking=True, return_response=True)
+        except Exception as err:  # noqa: BLE001 - any failure of the model just means no tidy this time
+            raise tidy.TidyError(f"The AI Task didn't answer: {err}") from err
+        before = [dict(m) for m in self.memory]
+        result = tidy.plan(self.memory, (reply or {}).get("data"), now)
+        self.tidied = now
+        if result.changed:
+            self.memory_backup = {"at": now.isoformat(), "items": before}
+            self.memory[:] = result.memory
+            persistent_notification.async_create(
+                self.hass,
+                f"{result.summary()}\n\nTo put it back as it was, run the action **Lena: Undo memory tidy**.",
+                title="Lena tidied her memory",
+                notification_id="lena_memory_tidy",
+            )
+            _LOGGER.info("Tidied her memory: %s combined, %s clarified, %s retired",
+                         len(result.combined), len(result.clarified), len(result.retired))
+        self.memory_changed()
+        return result
+
+    @callback
+    def undo_memory_tidy(self) -> bool:
+        """Puts her memory back as it was before her last tidy. False if there's nothing to undo."""
+        if not self.memory_backup:
+            return False
+        self.memory[:] = self.memory_backup["items"]
+        self.memory_backup = None
+        self.memory_changed()
+        persistent_notification.async_dismiss(self.hass, "lena_memory_tidy")
+        return True
+
+    async def _tidy_if_due(self) -> None:
+        """At bedtime, when it's time: tidies her memory, and only logs it if that didn't work."""
+        if not self.tidy_due:
+            return
+        try:
+            await self.async_tidy_memory()
+        except tidy.TidyError as err:
+            _LOGGER.warning("Lena didn't tidy her memory: %s", err)
 
     # ---- What she's told -------------------------------------------------------------------
 
@@ -416,8 +492,9 @@ class LenaCore:
 
     @callback
     def _on_bedtime(self, now: datetime) -> None:
-        """Bedtime: she winds down."""
+        """Bedtime: she winds down, and now and then tidies her memory."""
         self.apply(brain.bedtime(self.catalog), "bedtime")
+        self.hass.async_create_task(self._tidy_if_due())
 
     @callback
     def _on_hour(self, now: datetime) -> None:

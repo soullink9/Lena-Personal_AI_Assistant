@@ -53,3 +53,7 @@ announce:
       default: false
       selector:
         boolean:
+
+tidy_memory:
+
+undo_memory_tidy:

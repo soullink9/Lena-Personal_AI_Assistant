@@ -2,7 +2,7 @@
 
 Sets up one Lena (there's only ever one), her Mood, Energy and Moment dropdowns, her memory
 to-do list, the "Lena" choice under Control Home Assistant in a conversation agent, the
-lena.feel, lena.add_event and lena.announce actions, /api/lena/context for Open WebUI and the Lena
+lena.feel, lena.add_event, lena.announce, lena.tidy_memory and lena.undo_memory_tidy actions, /api/lena/context for Open WebUI and the Lena
 app, /api/lena/media for the app's photo slideshow, and /api/lena/display, where each Lena app
 registers as a display you can put in a room (see displays.py).
 """
@@ -16,7 +16,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr, llm
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from . import events
+from . import events, tidy
 from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
@@ -120,6 +120,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
         supports_response=SupportsResponse.NONE,
     )
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "announce"))
+
+    async def tidy_memory(call: ServiceCall) -> dict:
+        """The lena.tidy_memory action: she tidies her memory now (combining, clarifying, retiring) and
+        says what changed. A problem (no AI Task, an answer that can't be used safely) is an error, and
+        nothing changes.
+        """
+        try:
+            result = await core.async_tidy_memory()
+        except tidy.TidyError as error:
+            raise ServiceValidationError(str(error)) from error
+        if result is None:
+            return {"changed": False, "summary": "There's too little in her memory to tidy."}
+        return {"changed": result.changed, "summary": result.summary() or "Nothing needed changing."}
+
+    hass.services.async_register(DOMAIN, "tidy_memory", tidy_memory, supports_response=SupportsResponse.OPTIONAL)
+    entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "tidy_memory"))
+
+    async def undo_memory_tidy(call: ServiceCall) -> None:
+        """The lena.undo_memory_tidy action: her memory as it was before her last tidy."""
+        if not core.undo_memory_tidy():
+            raise ServiceValidationError("There's no tidy to undo")
+
+    hass.services.async_register(DOMAIN, "undo_memory_tidy", undo_memory_tidy, supports_response=SupportsResponse.NONE)
+    entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "undo_memory_tidy"))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

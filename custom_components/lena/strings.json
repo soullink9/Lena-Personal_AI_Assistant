@@ -30,7 +30,9 @@
           "moment_minutes": "Reactions fade after",
           "alert_phones": "Tell these phones when she's worried",
           "alert_agent": "Write alerts in her words with",
-          "alert_all_clear": "Also tell them when it's sorted"
+          "alert_all_clear": "Also tell them when it's sorted",
+          "memory_tidy_days": "She tidies her memory every",
+          "memory_tidy_task": "Tidy it with"
         },
         "data_description": {
           "people": "Coming home after a while makes her delighted; an empty house makes her restless.",
@@ -41,7 +43,9 @@
           "moment_minutes": "How long a reaction, like being pleased or exasperated, lasts.",
           "alert_phones": "Phones with the Home Assistant companion app. Tapping the alert opens the Lena app, listening.",
           "alert_agent": "Your Lena conversation agent. She writes each alert herself; leave empty to send the plain reason instead.",
-          "alert_all_clear": "A second alert when the sensor clears, replacing the first."
+          "alert_all_clear": "A second alert when the sensor clears, replacing the first.",
+          "memory_tidy_days": "She combines lines about the same thing, makes vague ones clear and ticks off outdated ones, at bedtime, then tells you what changed (Lena: Undo memory tidy puts it back). 0 never.",
+          "memory_tidy_task": "An AI Task entity, such as your Ollama's. Empty: Home Assistant's default (Settings > System > General > AI suggestions)."
         }
       }
     }
@@ -138,6 +142,14 @@
           "description": "After saying it, she listens, and answers what you say back."
         }
       }
+    },
+    "tidy_memory": {
+      "name": "Tidy memory",
+      "description": "Lena tidies her memory now: she combines lines about the same thing, makes vague ones clear and retires (ticks off) outdated ones, using Home Assistant's AI Task. She also does this on her own; see Configure."
+    },
+    "undo_memory_tidy": {
+      "name": "Undo memory tidy",
+      "description": "Puts her memory back as it was before her last tidy."
     }
   }
 }

@@ -102,6 +102,7 @@ DEFAULTS = {
     "mood_change_chance": 40,
     "moment_minutes": 20,
     "alert_all_clear": True,
+    "memory_tidy_days": 7,
 }
 
 

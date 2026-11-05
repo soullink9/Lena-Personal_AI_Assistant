@@ -21,6 +21,7 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 ### Home Assistant integration
 
 - **Displays:** each Lena app registers itself (`POST /api/lena/display`) as a device under Lena. Put it in a room in Home Assistant and it becomes room-aware: Assist hears which display a question came from, and the app learns the room's speakers. Displays you no longer use can be deleted.
+- **She tidies her own memory:** every 7 days by default, at bedtime, with Home Assistant's AI Task: she combines lines about the same thing, clarifies vague ones, and ticks off outdated ones (never more than half at once, never lines you ticked off). A notification says what changed, and **Lena: Undo memory tidy** puts it back. **Lena: Tidy memory** runs it now; Configure sets how often (0 never) and which AI Task.
 - **`lena.announce`:** says a message on chosen displays, or all of them, optionally listening for an answer afterwards. Each display has an **Announcement** event entity that fires with it, usable in automations too.
 
 ## [0.6.7] - 2026-11-04

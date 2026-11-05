@@ -35,6 +35,8 @@ from .const import (
     CONF_MOOD_HOLD_HOURS,
     CONF_MORNING,
     CONF_PEOPLE,
+    CONF_TIDY_DAYS,
+    CONF_TIDY_TASK,
     CONF_WEATHER,
     CONF_WEATHER_CHANCE,
     CONF_WORRIES,
@@ -70,7 +72,7 @@ def _number(low: float, high: float, unit: str, step: float = 1) -> NumberSelect
 
 
 class LenaOptionsFlow(OptionsFlowWithReload):
-    """Configure: her house, her day, and how quickly her feelings move."""
+    """Configure: her house, her day, how quickly her feelings move, alerts, and tidying her memory."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Configure: the people, sensors and calendars she watches, her day, how moody she is, and
@@ -114,5 +116,9 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             )),
             vol.Optional(CONF_ALERT_AGENT, description=default(CONF_ALERT_AGENT)): ConversationAgentSelector(),
             vol.Optional(CONF_ALERT_ALL_CLEAR, default=o.get(CONF_ALERT_ALL_CLEAR, brain.DEFAULTS[CONF_ALERT_ALL_CLEAR])): BooleanSelector(),
+            # Her memory: how often she tidies it, and with which AI Task (empty: Home Assistant's default).
+            vol.Required(CONF_TIDY_DAYS, description=default(CONF_TIDY_DAYS)): _number(0, 90, "days"),
+            vol.Optional(CONF_TIDY_TASK, description=default(CONF_TIDY_TASK)):
+                EntitySelector(EntitySelectorConfig(domain="ai_task")),
         })
         return self.async_show_form(step_id="init", data_schema=schema)

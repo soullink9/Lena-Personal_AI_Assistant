@@ -1,10 +1,20 @@
 {
   "domain": "lena",
   "name": "Lena",
-  "after_dependencies": ["calendar", "conversation", "http", "media_source"],
-  "codeowners": ["@soullink9"],
+  "after_dependencies": [
+    "ai_task",
+    "calendar",
+    "conversation",
+    "http",
+    "media_source"
+  ],
+  "codeowners": [
+    "@soullink9"
+  ],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/soullink9/Lena-Personal_AI_Assistant/blob/main/docs/home-assistant/Installation.md",
   "integration_type": "service",
   "iot_class": "calculated",

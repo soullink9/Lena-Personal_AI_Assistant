@@ -515,7 +515,7 @@ async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client
     assert first["name"] == "Kitchen tablet" and first["area"] is None and first["speakers"] == []
     assert first["announce_entity"] and first["announce_entity"].startswith("event.")
     device = dr.async_get(hass).async_get(first["device_id"])
-    assert device is not None and entry.entry_id in device.config_entries
+    assert device is not None and device in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
 
     # Put in the kitchen, with two speakers there and one elsewhere.
     kitchen = ar.async_get(hass).async_create("Kitchen")
@@ -548,5 +548,63 @@ async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client
     assert hass.states.get(entity) is not None
     from custom_components.lena import async_remove_config_entry_device
     assert await async_remove_config_entry_device(hass, entry, device)
-    lena = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "lena")})
+    lena = next(d for d in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id) if (DOMAIN, "lena") in d.identifiers)
     assert lena is not None and not await async_remove_config_entry_device(hass, entry, lena)
+
+
+async def test_memory_tidy_and_undo(hass: HomeAssistant, freezer) -> None:
+    """She tidies her memory with the AI Task at bedtime once it's due: combining, clarifying and
+    retiring (ticking off) lines, telling you what changed, and undo puts it all back. An answer that
+    would retire too much changes nothing.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+
+    freezer.move_to("2026-11-05 12:00:00")
+    entry = await setup(hass, options=dict(OPTIONS, memory_tidy_task="ai_task.ollama"))
+    core = entry.runtime_data
+    for fact in ("Alex likes coffee.", "Alex takes it black.", "sam dentist thing", "The party is on October 3.", "Yuki is a husky."):
+        core.remember(fact)
+    core.memory[-1]["status"] = "completed"  # one she was told to retire: never touched
+    before = [dict(m) for m in core.memory]
+
+    answer = {"memories": [
+        {"text": "Alex likes coffee, black.", "from": [1, 2]},
+        {"text": "Sam has a dentist appointment to remember.", "from": [3]},
+    ]}
+    asked = async_mock_service(hass, "ai_task", "generate_data", response={"conversation_id": "x", "data": answer},
+                               supports_response=SupportsResponse.ONLY)
+    reply = await hass.services.async_call(DOMAIN, "tidy_memory", {}, blocking=True, return_response=True)
+    assert asked[0].data["entity_id"] == "ai_task.ollama"
+    assert "1. Alex likes coffee. (saved today)" in asked[0].data["instructions"]
+    assert "Yuki" not in asked[0].data["instructions"]  # ticked off: not hers to tidy
+    assert reply["changed"] and "Combined 2 into: Alex likes coffee, black." in reply["summary"]
+    assert core.memories() == ["Alex likes coffee, black.", "Sam has a dentist appointment to remember."]
+    assert {m["summary"]: m["status"] for m in core.memory}["The party is on October 3."] == "completed"
+
+    # Undo puts it back exactly, once.
+    await hass.services.async_call(DOMAIN, "undo_memory_tidy", {}, blocking=True)
+    assert core.memory == before
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "undo_memory_tidy", {}, blocking=True)
+
+    # Too much retired at once: refused, nothing changes.
+    hass.services.async_remove("ai_task", "generate_data")
+    async_mock_service(hass, "ai_task", "generate_data",
+                       response={"conversation_id": "x", "data": {"memories": [{"text": "Alex likes coffee.", "from": [1]}]}},
+                       supports_response=SupportsResponse.ONLY)
+    with pytest.raises(ServiceValidationError, match="retire 3 of 4"):
+        await hass.services.async_call(DOMAIN, "tidy_memory", {}, blocking=True, return_response=True)
+    assert core.memory == before
+
+    # At bedtime, only once it's due (every 7 days by default; it just tried, so not yet).
+    hass.services.async_remove("ai_task", "generate_data")
+    again = async_mock_service(hass, "ai_task", "generate_data", response={"conversation_id": "x", "data": answer},
+                               supports_response=SupportsResponse.ONLY)
+    freezer.move_to("2026-11-05 22:30:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert not again
+    freezer.move_to("2026-11-12 22:30:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(again) == 1 and core.memories()[0] == "Alex likes coffee, black."

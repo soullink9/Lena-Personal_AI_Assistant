@@ -15,6 +15,7 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Action | `lena.feel` | Sets her moment, with a reason. For your own automations, and used by Open WebUI. |
 | Action | `lena.add_event` | Adds an event to a calendar with Home Assistant's `calendar.create_event`: a calendar's name, a title, a start (`2026-11-14` for all day, `2026-11-14T15:30` at a time), and optionally an end, a location and a description. Returns what was added. Used by Open WebUI's Lena tool. |
 | Action | `lena.announce` | Says a message on Lena's displays, like Home Assistant Voice's announcements: choose displays (all of them if none), the message, and **Listen for an answer** to have her listen afterwards. |
+| Action | `lena.tidy_memory`, `lena.undo_memory_tidy` | She tidies her memory now (combining, clarifying, retiring outdated lines; see [Memory](Memory.md)) and says what changed; undo puts it back as it was. She also tidies on her own, every 7 days by default. |
 | Device | Each Lena display | Every Lena app with Home Assistant set up registers itself as a device under Lena, named after the tablet or phone. Put it in a room (its **Area**) and it's room-aware. Delete one you no longer use. |
 | Event | `event.<display>_announcement` | Each display's announcements (`message`, `listen`), which its app watches and says. Usable as an automation trigger. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |

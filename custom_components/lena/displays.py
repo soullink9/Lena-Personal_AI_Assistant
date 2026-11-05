@@ -131,7 +131,9 @@ class LenaDisplayView(HomeAssistantView):
             return self.json_message("A display needs an id of letters, digits and dashes", status_code=400)
 
         registry = dr.async_get(hass)
-        existing = registry.async_get_device(identifiers={(DOMAIN, DISPLAY_PREFIX + display_id)})
+        # Looked up among Lena's own devices: Home Assistant's lookups by identifier have changed between
+        # versions.
+        existing = next((d for d in displays(hass, core.entry.entry_id) if display_id_of(d) == display_id), None)
         device = registry.async_get_or_create(config_entry_id=core.entry.entry_id, **display_info(display_id, name))
         if existing is None:
             async_dispatcher_send(hass, SIGNAL_NEW_DISPLAY, device.id)

@@ -19,6 +19,8 @@ CONF_MOMENT_MINUTES = "moment_minutes"
 CONF_ALERT_PHONES = "alert_phones"
 CONF_ALERT_AGENT = "alert_agent"
 CONF_ALERT_ALL_CLEAR = "alert_all_clear"
+CONF_TIDY_DAYS = "memory_tidy_days"
+CONF_TIDY_TASK = "memory_tidy_task"
 
 # Tapping an alert on a phone opens the Lena app, listening (through the Home Assistant companion app).
 OPEN_LENA = "intent:#Intent;action=io.github.soullink9.lena.TALK;launchFlags=0x10000000;component=io.github.soullink9.lena/.AskActivity;end"
