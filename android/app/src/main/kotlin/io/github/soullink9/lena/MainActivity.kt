@@ -264,6 +264,12 @@ class MainActivity : ComponentActivity() {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // With Assist answering (Settings → Who answers), Lena's own chat is the chat screen.
+        if (Prefs.answers(this) == Answerer.ASSIST && intent?.action != ACTION_SETTINGS) {
+            startActivity(Intent(this, AssistChatActivity::class.java))
+            finish()
+            return
+        }
         val url = Prefs.server(this)
         if (url == null || intent?.action == ACTION_SETTINGS) {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -296,7 +302,7 @@ class MainActivity : ComponentActivity() {
         askForNotificationsOnce()
         applyWindowMode()
         // The wall display's screensaver, here too; not while she's still answering the open chat.
-        WallDisplay.watch(this) { answering() }
+        WallDisplay.watch(this, stillWorking = { answering() })
         watchForIdle()
     }
 
@@ -649,6 +655,12 @@ class MainActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
+        // Switched to Assist answering in Settings meanwhile: Lena's own chat takes over.
+        if (Prefs.answers(this) == Answerer.ASSIST) {
+            startActivity(Intent(this, AssistChatActivity::class.java))
+            finish()
+            return
+        }
         hasHome.value = HomeAssistant.from(this) != null && Prefs.homeSwitch(this)
         applyWindowMode()
         listenForName()

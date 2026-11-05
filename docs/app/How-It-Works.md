@@ -56,13 +56,13 @@ Below it, the settings are in sections, and every row says how it's set and open
 
 ### Who answers
 
-Settings → Connections → **Who answers** picks who replies when you talk to her: **Open WebUI** (the default: your Lena model, with every conversation kept in your chats) or **Home Assistant Assist** (Home Assistant's conversation agent, through its `/api/conversation/process`). With Assist, everything that asks her goes to Home Assistant: the sheet, however it's opened (the assistant gesture, the wake word, the tile, the widget, quick prompts, sharing to her), and scheduled prompts. Her chats screen is still Open WebUI's.
+Settings → Connections → **Who answers** picks who replies when you talk to her: **Open WebUI** (the default: your Lena model, with every conversation kept in your chats) or **Home Assistant Assist** (Home Assistant's conversation agent, through its `/api/conversation/process`). It's there so Lena works without Open WebUI at all. With Assist, everything that asks her goes to Home Assistant: the sheet, however it's opened (the assistant gesture, the wake word, the tile, the widget, quick prompts, sharing to her), typing in the chat, and scheduled prompts.
 
 - **Conversation agent:** Home Assistant's choice (the assistant set in Home Assistant → Settings → Voice assistants), or any agent it has, listed from its `conversation.*` entities (Home Assistant's own Assist, or an AI agent such as Ollama's).
 - Talking to her continues one Assist conversation, the way the Assistant Lena chat does with Open WebUI; **New conversation** starts another. Home Assistant forgets a conversation after a while of quiet, and then the next one simply starts fresh.
 - Assist takes words only, so the photo buttons are hidden. It can switch things in your home, so from the lock screen it waits until you unlock.
-- Its answers aren't saved to your chats: they're on the sheet while it's open, and a scheduled prompt's answer is in its notification (a schedule's chat name isn't used).
-- Hearing you and her voice still follow **How she looks and sounds** ("your server" there is Open WebUI). Her mood still comes from the Lena integration.
+- **The chat screen is Lena's own:** one conversation kept on this device, newest at the bottom. Type to her there, or tap the mic for the sheet. Everything you ask her, typed, spoken, quick prompts and scheduled prompts (marked as such), is kept there with her full answer; a scheduled prompt's notification opens it. **New conversation** at the top starts a new Assist conversation and marks where it began. Its menu has Settings, her memory and, on the wall display, Apps.
+- **Settings that are only about Open WebUI step aside:** its connection and the model, the chat screen's look, menu and list options (the Chat | Home switch stays), reply notifications, a scheduled prompt's chat, and "your server" for hearing and her voice (the phone hears you and speaks). **Memory** shows only her own memory, from the Lena integration, as does her mood.
 
 **Any screen size.** On a foldable's outer screen (or any narrow screen) her clock, the photo frame's clock and the orb shrink to fit, and the drawer leaves a strip of the page showing. On a wide inner screen or a tablet, Settings, All chats and Memory & knowledge stay a readable width in the middle. Folding or unfolding keeps your chat open.
 
@@ -185,7 +185,7 @@ Settings → Scheduled prompts lists them by **name**, each with when it runs an
 | **What she's asked** | The prompt. |
 | **Show the prompt in the chat** | Off (the default): the chat shows just the prompt's name ("Morning briefing") and her answer, and the prompt itself goes to her with that one request, unsaved. On: the chat shows the whole prompt, like any question. |
 | **Time** and **Repeats** | Every day, weekdays, weekends, on the days you pick, every few hours (1 to 12, from the time until midnight), once a month (on a day you pick; the 29th to 31st mean the month's last day in shorter months) or once (on a date). The next run is shown under **On**. |
-| **Chat** | Optional. Every run goes into the chat with this name, made the first time; give several prompts the same chat to keep them in one history, such as a morning and an evening briefing in "Daily briefings". Empty: each run is a chat of its own. |
+| **Chat** | Every run goes into the chat with this name, made the first time: **Assistant Lena** (the one talking to her uses) unless you change it. Give several prompts the same chat to keep them in one history, such as a morning and an evening briefing in "Daily briefings". Empty: a new chat of its own each time. |
 | **Run it now** | Asks her straight away, to try it out. |
 
 At each time Lena sends the prompt to your chosen model, waits for the answer and notifies you with it. The conversation is saved in your Open WebUI history. Android runs these alarms within a few minutes of the time to save battery, and after a restart Lena sets them again.

@@ -55,10 +55,12 @@ object WallDisplay {
 
     /**
      * While [a] is on screen: in dashboard mode, keeps the display on and brings up the screensaver once no
-     * one has touched any screen for the set time. [stillWorking] is asked only when the time is up, so a
-     * check that needs the network (is she still answering?) isn't made every few seconds.
+     * one has touched any screen for the set time. With [backToDashboard] (a chat screen), it also goes back
+     * to the dashboards after Back from your chats after, whichever comes first. [stillWorking] is asked
+     * only when a time is up, so a check that needs the network (is she still answering?) isn't made every
+     * few seconds.
      */
-    fun watch(a: ComponentActivity, stillWorking: suspend () -> Boolean = { false }) {
+    fun watch(a: ComponentActivity, backToDashboard: Boolean = false, stillWorking: suspend () -> Boolean = { false }) {
         a.lifecycleScope.launch {
             a.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 // Checked on every return, since the home app can be changed in Android's settings meanwhile.
@@ -67,22 +69,32 @@ object WallDisplay {
                 if (!home) return@repeatOnLifecycle
                 while (true) {
                     delay(3_000)
-                    val seconds = Prefs.dimSeconds(a)
-                    if (seconds <= 0) continue
                     if (Busy.talking || typing(a)) {
                         touched()
                         continue
                     }
-                    if (idleMillis() < seconds * 1000L) continue
+                    val idle = idleMillis()
+                    val dim = Prefs.dimSeconds(a)
+                    val back = if (backToDashboard) Prefs.returnSeconds(a) else 0
+                    val dimDue = dim > 0 && idle >= dim * 1000L
+                    val backDue = back > 0 && idle >= back * 1000L
+                    if (!dimDue && !backDue) continue
                     if (stillWorking()) {
                         touched()
                         continue
                     }
-                    showScreensaver(a)
+                    if (dimDue) showScreensaver(a) else showDashboard(a)
                     return@repeatOnLifecycle
                 }
             }
         }
+    }
+
+    /** Back to the dashboards (a chat screen left alone for Back from your chats after). */
+    private fun showDashboard(a: Activity) {
+        Logs.i("Wall display", "Chats left alone for a while; back to the dashboards")
+        a.startActivity(Intent(a, DashboardActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        a.finish()
     }
 
     /**

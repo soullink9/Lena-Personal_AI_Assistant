@@ -20,6 +20,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, Assist (its conversation agents and `/api/conversation/process`), and the encrypted secret store (`Secrets`). |
 | `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver. |
+| `AssistChat.kt`, `AssistChatActivity.kt` | Assist mode (Settings → Who answers): asking Assist (`AssistChat`), the conversation kept on the device (`AssistLog`), and Lena's own chat screen, which the chat screen hands over to. |
 | `Apps.kt` | The apps list for the wall display (dashboards and chats' menu), and choosing which apps it shows. |
 | `DashboardWeb.kt` | Keeps the dashboards' web view when its screen closes and hands it to the next one, so switching Chat \| Home stays one app and Home Assistant isn't loaded again. Page messages go to the screen showing it. |
 | `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |

@@ -227,7 +227,18 @@ class AskActivity : ComponentActivity() {
         var done by mutableStateOf(false)
     }
 
-    private lateinit var api: Api
+    /**
+     * Your Open WebUI, if it's set up. With Assist answering (Settings → Who answers) it isn't needed: the
+     * sheet then hears you and speaks on the phone itself.
+     */
+    private var openWebUi: Api? = null
+
+    /** Open WebUI, for what only it does (asking it, its chat, its speech engines). */
+    private val api: Api get() = openWebUi ?: throw IllegalStateException("Set up Open WebUI in Settings → Connections.")
+
+    /** Whether Assist answers (Settings → Who answers), so the sheet never needs Open WebUI. */
+    private var viaAssist = false
+
     private var ear: Ear? = null
     private var fallbackEar: Ear? = null // your server, when the phone couldn't listen this time
     private var mouth: Mouth? = null
@@ -248,13 +259,15 @@ class AskActivity : ComponentActivity() {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        viaAssist = Prefs.answers(this) == Answerer.ASSIST
         val server = Prefs.server(this)
-        if (server == null) {
+        if (server == null && !viaAssist) {
             startActivity(Intent(this, SettingsActivity::class.java))
             finish()
             return
         }
-        api = Api(server, applicationContext)
+        // With Assist answering, Open WebUI isn't used even when it's set up (Settings → Who answers).
+        openWebUi = if (viaAssist) null else server?.let { Api(it, applicationContext) }
 
         // The assistant gesture can open a new chat instead of the sheet.
         if (intent.action == Intent.ACTION_ASSIST && Prefs.assistAction(this) == AssistAction.CHAT) {
@@ -340,15 +353,27 @@ class AskActivity : ComponentActivity() {
         finish()
     }
 
-    /** The phone's recognizer when chosen and available, otherwise your server's speech-to-text. */
-    private fun newEar(): Ear =
-        if (Prefs.hearing(this) == Hearing.PHONE && PhoneEar.available(this)) PhoneEar(this) else ServerEar(api)
+    /**
+     * The phone's recognizer when chosen and available, otherwise your server's speech-to-text. Without
+     * Open WebUI (Assist answering) it's always the phone's.
+     */
+    private fun newEar(): Ear {
+        val server = openWebUi
+        return if (server == null || (Prefs.hearing(this) == Hearing.PHONE && PhoneEar.available(this))) PhoneEar(this)
+        else ServerEar(server)
+    }
 
-    /** The voice chosen in Settings, or none when replies aren't read aloud. */
-    private fun newMouth(): Mouth? = when (Prefs.speaking(this)) {
-        Speaking.SERVER -> ServerMouth(this, api)
-        Speaking.PHONE -> PhoneMouth(this)
-        Speaking.OFF -> null
+    /**
+     * The voice chosen in Settings, or none when replies aren't read aloud. "Your server's voice" is Open
+     * WebUI's, so without it (Assist answering) the phone's voice reads instead.
+     */
+    private fun newMouth(): Mouth? {
+        val server = openWebUi
+        return when (Prefs.speaking(this)) {
+            Speaking.SERVER -> if (server != null) ServerMouth(this, server) else PhoneMouth(this)
+            Speaking.PHONE -> PhoneMouth(this)
+            Speaking.OFF -> null
+        }
     }
 
     /** Leaving mid-answer: Lena keeps watching and notifies you when it's done. */
@@ -409,10 +434,7 @@ class AskActivity : ComponentActivity() {
         val ongoing = !startedLocked
         var photo by remember { mutableStateOf<Photo?>(null) }
         val ready = remember { CompletableDeferred<Unit>() } // the ongoing chat has been looked up
-        // Settings → Connections → Who answers: Home Assistant's Assist instead of Open WebUI.
-        val viaAssist = remember { Prefs.answers(this@AskActivity) == Answerer.ASSIST }
         // Assist's ongoing conversation, continued the way the Assistant Lena chat is with Open WebUI.
-        var assistConversation by remember { mutableStateOf(if (ongoing && viaAssist) Prefs.assistConversation(this@AskActivity) else null) }
         val focus = remember { FocusRequester() }
         val scroll = rememberScrollState()
 
@@ -489,17 +511,10 @@ class AskActivity : ComponentActivity() {
         }
 
         /**
-         * Asks Home Assistant's Assist, continuing its conversation, and returns its answer. Assist has no
-         * history Lena can show and no photos, and a blank answer still gets a line so the turn doesn't
-         * look stuck.
+         * Asks Home Assistant's Assist and returns its answer; it goes into Lena's own chat too (see
+         * [AssistChat]). It continues the ongoing Assist conversation, except from the lock screen.
          */
-        suspend fun askAssist(question: String): String {
-            val ha = house ?: throw IllegalStateException("Set up Home Assistant in Settings → Connections to talk through Assist.")
-            val reply = ha.converse(question, Prefs.assistAgent(this@AskActivity), assistConversation)
-            assistConversation = reply.conversationId
-            if (ongoing) Prefs.setAssistConversation(this@AskActivity, reply.conversationId)
-            return reply.speech.ifBlank { "(Assist didn't say anything.)" }
-        }
+        suspend fun askAssist(question: String): String = AssistChat.ask(this@AskActivity, question, conversation = ongoing)
 
         /**
          * Sends a question (with any photo) into the Assistant Lena chat and follows the answer into
@@ -610,9 +625,11 @@ class AskActivity : ComponentActivity() {
             }
         }
 
-        // Your server's speech-to-text, for when the phone's recognizer can't listen this time.
+        // Your server's speech-to-text, for when the phone's recognizer can't listen this time. Without
+        // Open WebUI (Assist answering) there's no server to fall back on.
         suspend fun hearViaServer(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String = try {
-            ServerEar(api).also { fallbackEar = it }.listen(onPartial, onLevel)
+            val server = openWebUi
+            if (server == null) "" else ServerEar(server).also { fallbackEar = it }.listen(onPartial, onLevel)
         } catch (c: CancellationException) {
             throw c
         } catch (_: AuthException) {
@@ -641,11 +658,18 @@ class AskActivity : ComponentActivity() {
             } catch (c: CancellationException) {
                 throw c
             } catch (_: EarUnavailable) {
-                // The phone's speech model is still downloading: use your server meanwhile.
+                // The phone's speech model is still downloading: use your server meanwhile, if there is one.
                 e.release()
-                ear = ServerEar(api)
-                note = "The phone's speech model is downloading; using your server for now."
-                hearViaServer(onPartial, onLevel)
+                val server = openWebUi
+                if (server == null) {
+                    ear = null
+                    note = "The phone's speech model is downloading. Try again in a minute."
+                    ""
+                } else {
+                    ear = ServerEar(server)
+                    note = "The phone's speech model is downloading; using your server for now."
+                    hearViaServer(onPartial, onLevel)
+                }
             } catch (err: EarError) {
                 Logs.w("Voice", "The phone couldn't listen: ${err.describe()}")
                 if (err.code == android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
@@ -823,12 +847,11 @@ class AskActivity : ComponentActivity() {
                 turns.clear()
                 chatId = null
                 lastReplyId = null
-                assistConversation = null
                 note = null
                 heard = ""
                 if (ongoing) {
                     Prefs.setAssistChat(this@AskActivity, null)
-                    Prefs.setAssistConversation(this@AskActivity, null)
+                    if (viaAssist) scope.launch { AssistChat.newConversation(this@AskActivity) }
                 }
                 phase = Phase.IDLE
                 if (!typing) listen(false)

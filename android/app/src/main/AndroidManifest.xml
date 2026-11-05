@@ -78,6 +78,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Lena's own chat, when Home Assistant's Assist answers instead of Open WebUI. -->
+        <activity
+            android:name=".AssistChatActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Settings > Logs. -->
         <activity android:name=".LogsActivity" android:exported="false" android:label="Logs" />
 

@@ -333,12 +333,14 @@ class SettingsActivity : ComponentActivity() {
         }
         val modelName = models.firstOrNull { it.id == s.model }?.name ?: s.model.ifBlank { "Lena, automatically" }
         Section(Area.CONNECTIONS.title) {
-            Item(Icons.Outlined.Language, "Open WebUI", host(s.server) ?: "Not set") { open(Page.OPEN_WEBUI) }
+            // With Assist answering, Open WebUI isn't used at all, so its rows step aside.
+            val assist = s.answers == Answerer.ASSIST
+            if (!assist) Item(Icons.Outlined.Language, "Open WebUI", host(s.server) ?: "Not set") { open(Page.OPEN_WEBUI) }
             Item(Icons.Outlined.Home, "Home Assistant", if (house) host(s.haServer) ?: "Connected" else "Not connected") {
                 open(Page.HOME_ASSISTANT)
             }
             Item(Icons.Outlined.Assistant, "Who answers", s.answers.label) { open(Page.WHO_ANSWERS) }
-            Item(Icons.Outlined.SmartToy, "Model", "$modelName · %,d tokens".format(s.contextTokens)) { open(Page.MODEL) }
+            if (!assist) Item(Icons.Outlined.SmartToy, "Model", "$modelName · %,d tokens".format(s.contextTokens)) { open(Page.MODEL) }
             RefreshItem()
         }
         Section(Area.WALL.title) {
@@ -372,7 +374,10 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Section(Area.CHAT_SCREEN.title) {
-            Item(Icons.Outlined.ViewSidebar, "Chat screen", chatScreenLabel(s)) { open(Page.CHAT_SCREEN) }
+            Item(Icons.Outlined.ViewSidebar, "Chat screen",
+                if (s.answers == Answerer.ASSIST) (if (s.homeSwitch) "Chat | Home switch on" else "Chat | Home switch off") else chatScreenLabel(s)) {
+                open(Page.CHAT_SCREEN)
+            }
         }
         Section(Area.DEVICE.title) {
             Item(Icons.Outlined.Notifications, "Notifications", notificationsLabel(s)) { open(Page.NOTIFICATIONS) }
@@ -605,7 +610,9 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun SearchResults(query: String, open: (Page) -> Unit) {
         val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
-        val found = findable.filter { f ->
+        // Open WebUI's own pages don't come up while Assist answers (they aren't in the list either).
+        val openWebUiOnly = if (Prefs.answers(this) == Answerer.ASSIST) setOf(Page.OPEN_WEBUI, Page.MODEL) else emptySet()
+        val found = findable.filter { f -> f.page !in openWebUiOnly }.filter { f ->
             val text = listOf(f.title, f.words, f.page?.title.orEmpty(), f.section?.title.orEmpty()).joinToString(" ").lowercase()
             words.all { it in text }
         }
@@ -1017,9 +1024,12 @@ class SettingsActivity : ComponentActivity() {
     /** What Lena tells you about: replies you left, and worries at home. */
     @Composable
     private fun NotificationsPage(s: Settings, set: (Settings) -> Unit) {
-        Group {
-            SwitchItem(Icons.Outlined.Notifications, "Reply notifications", "When she finishes a reply you left before it was done", s.notifyReplies) {
-                set(s.copy(notifyReplies = it))
+        // Reply notifications follow Open WebUI's answers, which aren't used while Assist answers.
+        if (s.answers != Answerer.ASSIST) {
+            Group {
+                SwitchItem(Icons.Outlined.Notifications, "Reply notifications", "When she finishes a reply you left before it was done", s.notifyReplies) {
+                    set(s.copy(notifyReplies = it))
+                }
             }
         }
         Footnote("Scheduled prompts always notify you with their answer.")
@@ -1095,7 +1105,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote(
             "With Assist, everything that asks her goes to Home Assistant: talking to her (the assistant gesture, the wake word, " +
-                "the tile, the widget and quick prompts) and scheduled prompts. Her chats screen is still Open WebUI's."
+                "the tile, the widget and quick prompts), typing in the chat and scheduled prompts."
         )
         if (s.answers != Answerer.ASSIST) return
         if (!hasHouse()) {
@@ -1126,9 +1136,9 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote(
-            "Assist takes words only, so photos are off. It can switch things in your home, so from the lock screen it waits until you " +
-                "unlock. Its answers aren't saved to your chats: they're on the sheet while it's open, and in the notification for a " +
-                "scheduled prompt. Hearing you and her voice still follow How she looks and sounds (“your server” there is Open WebUI)."
+            "Open WebUI isn't needed: the chat screen becomes Lena's own, kept on this device, where everything you ask (typed, spoken, " +
+                "quick and scheduled prompts) is kept with her full answer, and the phone hears you and speaks. Assist takes words only, so " +
+                "photos are off. It can switch things in your home, so from the lock screen it waits until you unlock."
         )
     }
 
@@ -1167,8 +1177,10 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("Every look listens, answers and speaks the same way. The sheet is the only one that shows earlier turns; the others show what's happening now.")
         val phoneEar = remember { PhoneEar.available(this) }
+        // "Your server" is Open WebUI's speech, which isn't used while Assist answers: the phone hears and speaks.
+        val assist = s.answers == Answerer.ASSIST
         Section("How she sounds") {
-            PickItem(Icons.Outlined.Hearing, "Hearing you",
+            if (!assist) PickItem(Icons.Outlined.Hearing, "Hearing you",
                 listOf(Hearing.PHONE to "On this phone", Hearing.SERVER to "Your server"), s.hearing,
                 detail = {
                     when (it) {
@@ -1177,7 +1189,13 @@ class SettingsActivity : ComponentActivity() {
                     }
                 }) { set(s.copy(hearing = it)) }
             PickItem(Icons.Outlined.RecordVoiceOver, "Her voice",
-                listOf(Speaking.SERVER to "Your server's voice", Speaking.PHONE to "The phone's voice", Speaking.OFF to "Don't read replies aloud"), s.speaking,
+                listOfNotNull(
+                    if (assist) null else Speaking.SERVER to "Your server's voice",
+                    Speaking.PHONE to "The phone's voice",
+                    Speaking.OFF to "Don't read replies aloud",
+                ),
+                // Your server's voice reads as the phone's while Assist answers.
+                if (assist && s.speaking == Speaking.SERVER) Speaking.PHONE else s.speaking,
                 detail = {
                     when (it) {
                         Speaking.SERVER -> "Open WebUI's text-to-speech, the same as reading a reply aloud there"
@@ -1319,19 +1337,22 @@ class SettingsActivity : ComponentActivity() {
             }
         }
 
-        Section("Where it goes") {
-            FieldItem {
-                OutlinedTextField(
-                    value = sch.chat, onValueChange = { put(sch.copy(chat = it)) },
-                    label = { Text("Chat (optional)") }, placeholder = { Text("e.g. Daily briefings") }, singleLine = true,
-                    supportingText = { Text("Every run goes into the chat with this name, made the first time. Give several prompts the same one to share a history. Empty: a new chat each time.") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            val others = s.schedules.map { it.chat.trim() }.filter { it.isNotEmpty() && it != sch.chat.trim() }.distinct()
-            if (others.isNotEmpty()) FieldItem {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    others.take(4).forEach { name -> AssistChip(onClick = { put(sch.copy(chat = name)) }, label = { Text(name) }) }
+        // The chat a prompt goes into is an Open WebUI chat; with Assist answering, answers land in Lena's own.
+        if (s.answers != Answerer.ASSIST) {
+            Section("Where it goes") {
+                FieldItem {
+                    OutlinedTextField(
+                        value = sch.chat, onValueChange = { put(sch.copy(chat = it)) },
+                        label = { Text("Chat") }, placeholder = { Text("Empty: a new chat each time") }, singleLine = true,
+                        supportingText = { Text("Every run goes into the chat with this name ($ASSISTANT_CHAT unless you change it), made the first time. Give several prompts the same one to share a history.") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                val others = (listOf(ASSISTANT_CHAT) + s.schedules.map { it.chat.trim() }).filter { it.isNotEmpty() && it != sch.chat.trim() }.distinct()
+                if (others.isNotEmpty()) FieldItem {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        others.take(4).forEach { name -> AssistChip(onClick = { put(sch.copy(chat = name)) }, label = { Text(name) }) }
+                    }
                 }
             }
         }
@@ -1366,7 +1387,8 @@ class SettingsActivity : ComponentActivity() {
             Repeat.ONCE -> "Once, " + (if (sch.date > 0) java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
                 .format(java.time.LocalDate.ofEpochDay(sch.date)) else "date not set") + " at $time"
         }
-        return whenText + if (sch.chat.isNotBlank()) " · into “${sch.chat.trim()}”" else ""
+        val intoChat = sch.chat.isNotBlank() && Prefs.answers(this) != Answerer.ASSIST
+        return whenText + if (intoChat) " · into “${sch.chat.trim()}”" else ""
     }
 
     /** When a scheduled prompt runs next, in the phone's 12- or 24-hour style. */
@@ -1590,6 +1612,17 @@ class SettingsActivity : ComponentActivity() {
      */
     @Composable
     private fun ChatScreenPage(s: Settings, set: (Settings) -> Unit) {
+        // With Assist answering the chat screen is Lena's own: only the Chat | Home switch applies.
+        if (s.answers == Answerer.ASSIST) {
+            Group {
+                SwitchItem(Icons.Outlined.Home, "Chat | Home switch",
+                    if (hasHouse()) "At the top of the chat, to switch to your dashboards" else "Shows once Home Assistant is connected", s.homeSwitch) {
+                    set(s.copy(homeSwitch = it))
+                }
+            }
+            Footnote("The other chat screen settings are for Open WebUI's chats, which aren't used while Assist answers (Connections → Who answers).")
+            return
+        }
         Section("The page") {
             SwitchItem(Icons.Outlined.Palette, "Lena's look", "Warm colours, a clay accent and replies in a serif. Off: Open WebUI's own look.", s.lenaLook) {
                 set(s.copy(lenaLook = it))

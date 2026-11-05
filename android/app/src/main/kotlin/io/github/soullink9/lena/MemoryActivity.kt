@@ -79,7 +79,11 @@ import kotlinx.coroutines.launch
  */
 class MemoryActivity : ComponentActivity() {
 
-    private lateinit var api: Api
+    /** Your Open WebUI, unless it isn't used (Assist answers, or it isn't set up): then only her memory shows. */
+    private var openWebUiApi: Api? = null
+
+    /** Open WebUI, for its tabs (which only exist when [openWebUiApi] does). */
+    private val api: Api get() = openWebUiApi ?: throw IllegalStateException("Open WebUI isn't used")
     private var house: HomeAssistant? = null
 
     /** One list of memories: where they come from and how to change them. */
@@ -134,12 +138,19 @@ class MemoryActivity : ComponentActivity() {
         WallDisplay.touched()
     }
 
-    /** Needs your Open WebUI; Home Assistant is optional (without it there's no Hers tab). */
+    /**
+     * Your Open WebUI and Home Assistant, each optional: without Home Assistant there's no Hers tab, and
+     * without Open WebUI (or when Assist answers, Settings → Who answers) only Hers shows.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WallDisplay.watch(this)
-        api = Api.from(this) ?: run { finish(); return }
+        openWebUiApi = if (Prefs.answers(this) == Answerer.ASSIST) null else Api.from(this)
         house = HomeAssistant.from(this)
+        if (openWebUiApi == null && house == null) {
+            finish()
+            return
+        }
         enableEdgeToEdge()
         setContent { LenaTheme { Screen() } }
     }
@@ -169,7 +180,8 @@ class MemoryActivity : ComponentActivity() {
     private fun Screen() {
         // Hers (Home Assistant) first when it's connected, then Open WebUI's memories, notes and knowledge.
         val tabs = remember {
-            listOfNotNull(
+            if (openWebUiApi == null) listOf("Hers")
+            else listOfNotNull(
                 if (house != null) "Hers" else null,
                 if (house != null) "Open WebUI" else "Memories",
                 "Notes",
@@ -222,7 +234,8 @@ class MemoryActivity : ComponentActivity() {
                     .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (openKnowledge == null && openNote == null) {
+                // One tab (only her memory) needs no tab row.
+                if (openKnowledge == null && openNote == null && tabs.size > 1) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         tabs.forEachIndexed { i, name ->
                             SegmentedButton(

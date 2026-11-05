@@ -16,12 +16,13 @@ enum class AssistAction { ASK, TYPE, CHAT }
 
 /**
  * Who answers when you talk to Lena: Open WebUI (her chats, with history you can open) or Home Assistant's
- * Assist (its conversation agent). With Assist, everything that asks her goes there: the sheet (gesture,
- * wake word, tile, widget, quick prompts) and scheduled prompts. Her chats screen is still Open WebUI's.
+ * Assist (its conversation agent), for people who don't use Open WebUI at all. With Assist, everything
+ * that asks her goes there (the sheet, quick prompts, scheduled prompts), the chat screen is Lena's own
+ * (AssistChatActivity, kept on this device), and settings that are only about Open WebUI step aside.
  */
 enum class Answerer(val label: String, val detail: String) {
     OPEN_WEBUI("Open WebUI", "Your Lena model, with every conversation kept in your chats"),
-    ASSIST("Home Assistant Assist", "Home Assistant's conversation agent. Nothing is saved to your chats."),
+    ASSIST("Home Assistant Assist", "Home Assistant's conversation agent, with Lena's own chat on this device. No Open WebUI needed."),
 }
 
 /** Who turns your voice into text in the Ask sheet. */
@@ -104,7 +105,8 @@ data class Schedule(
     val minute: Int = 0,
     val prompt: String = "",
     val enabled: Boolean = true,
-    val chat: String = "",
+    /** The chat every run goes into: Assistant Lena unless you name another; blank for a chat of its own each time. */
+    val chat: String = ASSISTANT_CHAT,
     val repeat: Repeat = Repeat.DAILY,
     /** For [Repeat.DAYS]: ISO days of the week, 1 = Monday ... 7 = Sunday. */
     val days: Set<Int> = setOf(1, 2, 3, 4, 5),
@@ -302,7 +304,18 @@ object Prefs {
     /** Your scheduled prompts. A damaged list reads as empty rather than crashing the app. */
     fun schedules(c: Context): List<Schedule> {
         val a = runCatching { JSONArray(p(c).getString("schedules", "[]")) }.getOrDefault(JSONArray())
-        return List(a.length()) { Schedule.fromJson(a.getJSONObject(it)) }
+        val list = List(a.length()) { Schedule.fromJson(a.getJSONObject(it)) }
+        // Once, when scheduled prompts started going into Assistant Lena by default: the ones made before,
+        // with no chat named, go there too. Clearing it afterwards still means a chat of its own each time.
+        if (!p(c).getBoolean("schedules_assistant_chat", false)) {
+            val moved = list.map { if (it.chat.isBlank()) it.copy(chat = ASSISTANT_CHAT) else it }
+            p(c).edit()
+                .putString("schedules", JSONArray(moved.map { it.toJson() }).toString())
+                .putBoolean("schedules_assistant_chat", true)
+                .apply()
+            return moved
+        }
+        return list
     }
 
     /**

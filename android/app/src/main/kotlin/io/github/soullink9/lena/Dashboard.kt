@@ -416,10 +416,8 @@ class DashboardActivity : ComponentActivity() {
      * a visit, and come back here after a while alone (Settings → Wall display → When no one's around).
      */
     private fun openChats() {
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        // Open WebUI's chats, or Lena's own chat when Assist answers.
+        startActivity(AssistChatActivity.intent(this).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     /** Calls one of the page's `window.lena` functions (assets/js/home_assistant.js), if it's there yet. */

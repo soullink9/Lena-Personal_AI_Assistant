@@ -214,9 +214,9 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     /**
-     * Sends the prompt to Home Assistant's Assist and notifies you with its answer. Assist keeps no chats
-     * Lena can open, so the schedule's chat name isn't used: each run is a conversation of its own, and
-     * the answer is in the notification.
+     * Sends the prompt to Home Assistant's Assist and notifies you with the start of its answer. The whole
+     * answer is in Lena's own chat ([AssistLog]), which the notification opens. Each run asks on its own,
+     * outside the ongoing conversation, and the schedule's chat name isn't used.
      */
     private suspend fun throughAssist(c: Context, schedule: Schedule): Result {
         val title = schedule.title
@@ -226,8 +226,8 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             return Result.success()
         }
         return try {
-            val reply = house.converse(schedule.prompt, Prefs.assistAgent(c), conversationId = null)
-            val text = Markdown.plain(reply.speech).take(900).ifBlank { "Assist didn't say anything." }
+            val answer = AssistChat.ask(c, schedule.prompt, label = "Scheduled · $title", conversation = false)
+            val text = Markdown.plain(answer).take(900).ifBlank { "Assist didn't say anything." }
             Notify.show(c, Notify.SCHEDULED, title, text, null)
             Result.success()
         } catch (_: HaAuthException) {
