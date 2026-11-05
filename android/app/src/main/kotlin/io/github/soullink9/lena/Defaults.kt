@@ -30,20 +30,20 @@ object Defaults {
     const val SLIDE_CLOCK_AT_NIGHT: Boolean = true
     /** Talking to Lena › Wake word › Listen for her name: Off */
     const val WAKE_WORD: Boolean = false
-    /** Talking to Lena › Wake word › Listens: Only on the wall display */
-    const val WAKE_EVERYWHERE: Boolean = false
-    /** Talking to Lena › Wake word › Her name: Hey Lena */
-    val WAKE_PHRASE: WakePhrase = WakePhrase.HEY_LENA
-    /** Talking to Lena › Wake word › How sure she must be: Balanced */
-    val WAKE_SENSITIVITY: WakeSensitivity = WakeSensitivity.BALANCED
+    /** Talking to Lena › Wake word › Listens: Whenever Lena is open */
+    const val WAKE_EVERYWHERE: Boolean = true
+    /** Talking to Lena › Wake word › Her name: Lena */
+    val WAKE_PHRASE: WakePhrase = WakePhrase.LENA
+    /** Talking to Lena › Wake word › How sure she must be: Fewer false starts */
+    val WAKE_SENSITIVITY: WakeSensitivity = WakeSensitivity.STRICT
     /** Talking to Lena › How she looks and sounds › Her look: Orb */
     val ASK_STYLE: AskStyle = AskStyle.ORB
     /** Talking to Lena › How she looks and sounds › Hearing you: On this phone */
     val HEARING: Hearing = Hearing.PHONE
     /** Talking to Lena › How she looks and sounds › Her voice: Your server's voice */
     val SPEAKING: Speaking = Speaking.SERVER
-    /** Talking to Lena › How she looks and sounds › Her voice follows her mood: Off */
-    const val MOOD_VOICE: Boolean = false
+    /** Talking to Lena › How she looks and sounds › Her voice follows her mood: On */
+    const val MOOD_VOICE: Boolean = true
     /** Talking to Lena › How she looks and sounds › Keep listening: After every reply */
     val FOLLOW_UP: FollowUp = FollowUp.ALWAYS
     /** Talking to Lena › Interacting with Lena › The assistant gesture opens: Talk to Lena */
@@ -62,8 +62,8 @@ object Defaults {
     const val DRAWER_FOLDERS: Boolean = true
     /** Chat screen configuration › Chat screen › All chats list style: Slim groups */
     val CHAT_LIST: ChatListStyle = ChatListStyle.SLIM
-    /** Device customization › Notifications › Reply notifications: On */
-    const val NOTIFY_REPLIES: Boolean = true
+    /** Device customization › Notifications › Reply notifications: Off */
+    const val NOTIFY_REPLIES: Boolean = false
     /** Device customization › Notifications › Alerts on this phone: Off */
     const val ALERTS: Boolean = false
     /** Device customization › Widgets & tile › Her mood on the widget: Off */

@@ -118,15 +118,15 @@ On the wall display, the screen goes to 40% brightness for photos and 2% for the
 
 ### Wake word
 
-**Settings → Wake word** lets Lena listen for her name. **Listens** chooses where: **Only on the wall display** (the dashboards and the screensaver; the default), or **Whenever Lena is open**, your chats too (it stops when you leave Lena, and while Open WebUI's own voice input uses the microphone). Nothing listens until you turn it on, and even then it only ever opens Lena when it hears her name; the wall display never starts listening by itself when it starts. Choose:
+**Settings → Wake word** lets Lena listen for her name. **Listens** chooses where: **Only on the wall display** (the dashboards and the screensaver), or **Whenever Lena is open** (the default), your chats too (it stops when you leave Lena, and while Open WebUI's own voice input uses the microphone). Nothing listens until you turn it on, and even then it only ever opens Lena when it hears her name; the wall display never starts listening by itself when it starts. Choose:
 
-- **Hey Lena** (the default for new setups): a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/Tater-Wake-Words), the same kind of model Home Assistant's voice satellites run, trained and measured at about one false start every ten hours of background sound. Two words are much harder to say by accident than one.
-- **Lena:** the same kind of model for just her name. Quicker to say, but ordinary speech and TV set it off more often.
+- **Hey Lena:** a [microWakeWord](https://github.com/kahrendt/microWakeWord) model by [Tater Totterson](https://github.com/TaterTotterson/Tater-Wake-Words), the same kind of model Home Assistant's voice satellites run, trained and measured at about one false start every ten hours of background sound. Two words are much harder to say by accident than one.
+- **Lena** (the default for new setups): the same kind of model for just her name. Quicker to say, but ordinary speech and TV set it off more often, which is why **Fewer false starts** (below) is the default too.
 - **Hey Jarvis:** [openWakeWord](https://github.com/dscripka/openWakeWord)'s ready-made model, free for personal, non-commercial use.
 
 The app computes exactly the sound features Home Assistant's voice devices do: its front end is a line-for-line port of TensorFlow Lite Micro's, checked bit for bit against the original on every build.
 
-**How sure she must be:** **Balanced** uses each model's own setting. **Fewer false starts** needs her to be surer, for longer (the average over a longer stretch of sound has to pass a higher bar). **Easier to wake** lowers the bar, for a big room.
+**How sure she must be:** **Balanced** uses each model's own setting. **Fewer false starts** (the default) needs her to be surer, for longer (the average over a longer stretch of sound has to pass a higher bar). **Easier to wake** lowers the bar, for a big room.
 
 **Against false starts**, she decides the way ESPHome does on Home Assistant's voice devices:
 
@@ -169,7 +169,7 @@ Settings → Quick prompts. Up to six. They appear as chips in the sheet when ty
 
 ## "Lena finished" notifications
 
-If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. Turn it off with **Reply notifications** in Settings → Notifications.
+If you leave Lena (or close the sheet) while she's still answering, Lena keeps an eye on the chat and notifies you with the start of the reply when it's done. Tap it to open the chat. It's off on a new setup: turn it on with **Reply notifications** in Settings → Notifications.
 
 Lena watches for up to about nine minutes. Android may delay the check a little to save battery.
 
