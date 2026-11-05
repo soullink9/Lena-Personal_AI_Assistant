@@ -62,6 +62,18 @@
       "memory": {
         "name": "Memory"
       }
+    },
+    "event": {
+      "announcement": {
+        "name": "Announcement",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "announce": "Announce"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
@@ -106,6 +118,24 @@
         "description": {
           "name": "Description",
           "description": "Details to keep with it."
+        }
+      }
+    },
+    "announce": {
+      "name": "Announce",
+      "description": "Says a message on Lena's displays (the Lena app on a tablet or phone), like Home Assistant Voice's announcements.",
+      "fields": {
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena displays to say it on. Leave empty for all of them."
+        },
+        "message": {
+          "name": "Message",
+          "description": "What she says."
+        },
+        "listen": {
+          "name": "Listen for an answer",
+          "description": "After saying it, she listens, and answers what you say back."
         }
       }
     }

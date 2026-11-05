@@ -26,8 +26,9 @@ import kotlinx.coroutines.launch
  * Typing, talking to her in the sheet ([Busy.talking]) and, on a chat, her still answering count as
  * someone being there: the wait starts again once they're done.
  *
- * Each screen calls [watch] in onCreate and [touched] from onUserInteraction(). The dashboard has the
- * screensaver itself, so it only uses the clock.
+ * Each screen calls [watch] in onCreate and [touched] from onUserInteraction(); [watch] also says
+ * Home Assistant's announcements there ([Announcements]). The dashboard has the screensaver itself, so it
+ * only uses the clock (and watches for announcements itself).
  */
 object WallDisplay {
 
@@ -61,6 +62,8 @@ object WallDisplay {
      * few seconds.
      */
     fun watch(a: ComponentActivity, backToDashboard: Boolean = false, stillWorking: suspend () -> Boolean = { false }) {
+        // Announcements from Home Assistant are said on whichever screen is showing.
+        Announcements.watch(a)
         a.lifecycleScope.launch {
             a.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 // Checked on every return, since the home app can be changed in Android's settings meanwhile.

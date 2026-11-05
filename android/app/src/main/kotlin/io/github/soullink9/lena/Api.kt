@@ -634,9 +634,9 @@ class Api(server: String, private val context: Context? = null) {
      * Notes for her with this request only (they're never saved in the chat): the phone's time, said
      * plainly so she never greets the evening with sunshine and knows it even without Home Assistant;
      * the [instruction] behind a scheduled prompt whose chat shows only its name; that the reply will
-     * be read aloud, so she uses her spoken style; and, on the lock screen, that the person may not be
-     * the phone's owner. That last one asks her to be careful; it isn't a lock, which is why lock-screen
-     * mode is off unless you turn it on.
+     * be read aloud, so she uses her spoken style; on the lock screen, that the person may not be
+     * the phone's owner (that asks her to be careful; it isn't a lock, which is why lock-screen mode is
+     * off unless you turn it on); and which room this display is in and where music plays ([Room.note]).
      */
     private fun requestNotes(spoken: Boolean, locked: Boolean, instruction: String?): List<String> {
         val local = java.time.ZonedDateTime.now()
@@ -649,6 +649,7 @@ class Api(server: String, private val context: Context? = null) {
             if (locked) "The phone is locked, so this may not be its owner. Don't unlock, open or disarm anything, " +
                 "and don't share personal details, earlier conversations or what you remember about people. " +
                 "If asked, say it needs the phone unlocked." else null,
+            context?.let { Room.note(it) },
         )
     }
 

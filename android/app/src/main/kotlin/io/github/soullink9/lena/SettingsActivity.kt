@@ -58,6 +58,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
@@ -639,6 +641,8 @@ class SettingsActivity : ComponentActivity() {
             Findable("Sign-in address", "authentik proxy sso single sign-on login", Page.OPEN_WEBUI),
             Findable("Sign in by herself", "auto sign-in automatic login password email ldap signed out session restart", Page.OPEN_WEBUI),
             Findable("Home Assistant address and token", "ha url connect long-lived access token test connection integration", Page.HOME_ASSISTANT),
+            Findable("This display's room", "area room satellite voice preview where location", Page.HOME_ASSISTANT),
+            Findable("Music plays on", "music speaker music assistant media player whole home audio radio", Page.HOME_ASSISTANT),
             Findable("Who answers", "open webui home assistant assist conversation agent voice assistant answers through", Page.WHO_ANSWERS),
             Findable("Assist's conversation agent", "home assistant assist agent ollama openai google conversation", Page.WHO_ANSWERS),
             Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
@@ -1092,7 +1096,41 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.NotificationImportant, "Alerts on this phone", if (s.alerts) "On" else "Off") { open(Page.NOTIFICATIONS) }
             Item(Icons.Outlined.Dashboard, "Wall display dashboards", "Your dashboards on a tablet") { open(Page.WALL_DASHBOARDS) }
         }
+        DisplayRoom(scope)
         Footnote("Home Assistant also gives the wall display its dashboards and photos, and the Chat | Home switch somewhere to go.")
+    }
+
+    /**
+     * This display in Home Assistant ([Room]): the room it's in (set in Home Assistant, on its device under
+     * Lena) and where music plays when no room is named.
+     */
+    @Composable
+    private fun DisplayRoom(scope: kotlinx.coroutines.CoroutineScope) {
+        val room by Room.info(this).collectAsState()
+        var chosen by remember { mutableStateOf(Room.chosenSpeaker(this)) }
+        var all by remember { mutableStateOf<List<Speaker>>(emptyList()) }
+        LaunchedEffect(Unit) {
+            Room.refresh(this@SettingsActivity, force = true)
+            all = runCatching { HomeAssistant.from(this@SettingsActivity)?.speakers() }.getOrNull().orEmpty()
+        }
+        val info = room ?: return
+        Group {
+            Item(Icons.Outlined.Place, "This display's room",
+                info.area?.let { "${info.name} is in the $it" }
+                    ?: "Not in a room yet. In Home Assistant, open “${info.name}” under the Lena integration and choose its area.") {
+                scope.launch { Room.refresh(this@SettingsActivity, force = true) }
+            }
+            val automatic = info.speakers.firstOrNull()?.let { "With the room: ${it.name}" } ?: "With the room (no speaker there yet)"
+            val options = listOf("" to automatic) + (info.speakers + all).distinctBy { it.entityId }.map { it.entityId to it.name }
+            PickItem(Icons.Outlined.Speaker, "Music plays on", options, chosen,
+                detail = { id -> if (id.isEmpty()) "The room's Music Assistant player first" else null }) {
+                chosen = it
+                Room.chooseSpeaker(this@SettingsActivity, it)
+            }
+        }
+        Footnote("Like Home Assistant Voice: Assist hears which room you're in, so “turn on the lights” means this room's; " +
+            "Lena is told the room too, and plays music here unless you name another room (or the whole home). " +
+            "Announcements (the lena.announce action) are said here.")
     }
 
     /** What Lena tells you about: replies you left, and worries at home. */

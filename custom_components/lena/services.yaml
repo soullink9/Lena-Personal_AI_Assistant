@@ -36,3 +36,20 @@ add_event:
     description:
       selector:
         text:
+
+announce:
+  fields:
+    device_id:
+      selector:
+        device:
+          integration: lena
+          multiple: true
+    message:
+      required: true
+      example: Dinner's ready!
+      selector:
+        text:
+    listen:
+      default: false
+      selector:
+        boolean:

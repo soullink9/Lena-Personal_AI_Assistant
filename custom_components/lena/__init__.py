@@ -2,8 +2,9 @@
 
 Sets up one Lena (there's only ever one), her Mood, Energy and Moment dropdowns, her memory
 to-do list, the "Lena" choice under Control Home Assistant in a conversation agent, the
-lena.feel and lena.add_event actions, /api/lena/context for Open WebUI and the Lena app, and
-/api/lena/media for the app's photo slideshow.
+lena.feel, lena.add_event and lena.announce actions, /api/lena/context for Open WebUI and the Lena
+app, /api/lena/media for the app's photo slideshow, and /api/lena/display, where each Lena app
+registers as a display you can put in a room (see displays.py).
 """
 
 from __future__ import annotations
@@ -12,16 +13,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import config_validation as cv, llm
+from homeassistant.helpers import config_validation as cv, device_registry as dr, llm
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from . import events
 from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
+from .displays import LenaDisplayView, display_id_of, displays
+from .event import SIGNAL_ANNOUNCE
 from .llm_api import LenaAPI
 from .view import LenaContextView, LenaMediaView
 
-PLATFORMS = [Platform.SELECT, Platform.TODO]
+PLATFORMS = [Platform.EVENT, Platform.SELECT, Platform.TODO]
 
 type LenaConfigEntry = ConfigEntry[LenaCore]
 
@@ -43,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     if not hass.data.get(f"{DOMAIN}_view"):
         hass.http.register_view(LenaContextView())
         hass.http.register_view(LenaMediaView())
+        hass.http.register_view(LenaDisplayView())
         hass.data[f"{DOMAIN}_view"] = True
 
     async def feel(call: ServiceCall) -> None:
@@ -89,8 +94,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     )
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "add_event"))
 
+    async def announce(call: ServiceCall) -> None:
+        """The lena.announce action: says a message on the chosen displays (all of them if none is
+        chosen), like Home Assistant Voice's announcements. With listen, she then listens for an answer.
+        """
+        everyone = displays(hass, entry.entry_id)
+        chosen = call.data.get("device_id") or [d.id for d in everyone]
+        known = {d.id for d in everyone}
+        unknown = [d for d in chosen if d not in known]
+        if unknown or not chosen:
+            raise ServiceValidationError(
+                "Choose Lena displays (devices under the Lena integration)" if unknown else
+                "No Lena displays yet: open the Lena app with Home Assistant set up, and it registers itself"
+            )
+        for device_id in chosen:
+            async_dispatcher_send(hass, SIGNAL_ANNOUNCE.format(device_id), call.data["message"], call.data["listen"])
+
+    hass.services.async_register(
+        DOMAIN, "announce", announce,
+        schema=vol.Schema({
+            vol.Optional("device_id"): vol.All(cv.ensure_list, [cv.string]),
+            vol.Required("message"): cv.string,
+            vol.Optional("listen", default=False): cv.boolean,
+        }),
+        supports_response=SupportsResponse.NONE,
+    )
+    entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "announce"))
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_remove_config_entry_device(hass: HomeAssistant, entry: LenaConfigEntry, device: dr.DeviceEntry) -> bool:
+    """A display can be deleted in Home Assistant (a tablet you no longer use); it registers again if
+    its app is still set up. Lena herself can't be.
+    """
+    return display_id_of(device) is not None
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:

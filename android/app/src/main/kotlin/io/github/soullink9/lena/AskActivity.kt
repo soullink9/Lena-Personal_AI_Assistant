@@ -150,6 +150,8 @@ class AskActivity : ComponentActivity() {
         private const val EXTRA_KEY = "key"
 
         private const val EXTRA_FROM = "from"
+        private const val EXTRA_ANNOUNCE = "announce"
+        private const val EXTRA_LISTEN = "listen"
 
         /**
          * Opens the sheet; with [prompt], sends it straight away (only Lena's own widget and shortcuts
@@ -164,6 +166,19 @@ class AskActivity : ComponentActivity() {
                     if (prompt != null) putExtra(EXTRA_PROMPT, prompt).putExtra(EXTRA_KEY, Prefs.launchKey(c))
                     if (from != null) putExtra(EXTRA_FROM, from.name)
                 }
+
+        /**
+         * Opens the sheet to say an announcement from Home Assistant ([Announcements]); with [listen], she
+         * then listens for an answer. Only Lena's own key lets it speak, as with a prompt.
+         */
+        fun announce(c: Context, message: String, listen: Boolean, from: From? = null): Intent =
+            Intent(c, AskActivity::class.java)
+                .setAction(ACTION_ASK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(EXTRA_ANNOUNCE, message)
+                .putExtra(EXTRA_LISTEN, listen)
+                .putExtra(EXTRA_KEY, Prefs.launchKey(c))
+                .apply { if (from != null) putExtra(EXTRA_FROM, from.name) }
 
         /**
          * Things people say to end a conversation. Said on their own, she doesn't answer them; the
@@ -287,6 +302,9 @@ class AskActivity : ComponentActivity() {
         } else ""
         val auto = intent.getStringExtra(EXTRA_PROMPT)
             ?.takeIf { intent.getStringExtra(EXTRA_KEY) == Prefs.launchKey(this) }
+        val announcement = intent.getStringExtra(EXTRA_ANNOUNCE)
+            ?.takeIf { intent.getStringExtra(EXTRA_KEY) == Prefs.launchKey(this) }
+            ?.let { it to intent.getBooleanExtra(EXTRA_LISTEN, false) }
 
         style = Prefs.askStyle(this)
         // The orb blurs whatever's behind it, where the phone supports it (otherwise it just darkens).
@@ -297,7 +315,7 @@ class AskActivity : ComponentActivity() {
         // On the wall display the screen never goes dark, the sheet included.
         if (DashboardActivity.isHomeScreen(this)) WallDisplay.keepScreenOn(this, true)
         enableEdgeToEdge()
-        setContent { LenaTheme { Sheet(shared, auto) } }
+        setContent { LenaTheme { Sheet(shared, auto, announcement) } }
     }
 
     /**
@@ -405,7 +423,7 @@ class AskActivity : ComponentActivity() {
      * itself on a wall screen), drawn by whichever look is chosen.
      */
     @Composable
-    private fun Sheet(initial: String, autoPrompt: String?) {
+    private fun Sheet(initial: String, autoPrompt: String?, announcement: Pair<String, Boolean>? = null) {
         val scope = rememberCoroutineScope()
         val view = LocalView.current
         var typing by remember { mutableStateOf(!startTalking) }
@@ -477,11 +495,11 @@ class AskActivity : ComponentActivity() {
          * server's voice fails, the phone's voice takes over for the rest of the sheet. With the wake word on,
          * "stop" ([StopWord]) stops her mid-sentence.
          */
-        fun speakThenMaybeListen(answer: String) {
+        fun speakThenMaybeListen(answer: String, listenAfter: Boolean? = null) {
             val voice = mouth ?: newMouth().also { mouth = it }
             val plain = Markdown.plain(answer)
             if (voice == null || plain.isBlank()) {
-                if (plain.isNotBlank() && listenAgainAfter(plain)) listen(true) else {
+                if (plain.isNotBlank() && (listenAfter ?: listenAgainAfter(plain))) listen(true) else {
                     phase = Phase.IDLE
                     // Not read aloud: time to read it first.
                     closeAfter((4_000L + plain.length * 50L).coerceAtMost(30_000L))
@@ -517,7 +535,7 @@ class AskActivity : ComponentActivity() {
                     }
                 }
                 stopWord?.stop()
-                if (listenAgainAfter(plain)) listen(true) else {
+                if (listenAfter ?: listenAgainAfter(plain)) listen(true) else {
                     phase = Phase.IDLE
                     closeAfter(5_000)
                 }
@@ -814,6 +832,13 @@ class AskActivity : ComponentActivity() {
         }
         LaunchedEffect(restart.intValue) {
             when {
+                // An announcement from Home Assistant: said like one of her answers, then (if it asks) she listens.
+                restart.intValue == 0 && announcement != null -> {
+                    val (message, listenAfter) = announcement
+                    turns += Turn("Announcement").also { it.answer = message; it.done = true }
+                    typing = false
+                    speakThenMaybeListen(message, listenAfter)
+                }
                 restart.intValue == 0 && autoPrompt != null -> send(autoPrompt, spoken = false)
                 restart.intValue > 0 || !typing -> listen(false)
                 else -> runCatching { focus.requestFocus() }

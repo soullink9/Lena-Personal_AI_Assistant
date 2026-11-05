@@ -495,3 +495,58 @@ async def test_add_event_action(hass: HomeAssistant) -> None:
             await hass.services.async_call(
                 DOMAIN, "add_event", {"calendar": calendar, "title": "x", "start": "2026-11-16"}, blocking=True,
             )
+
+
+async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client) -> None:
+    """The app registers as a display, put in a room it learns that room and its speakers (Music
+    Assistant's first), lena.announce reaches it through its Announcement, and it can be deleted.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+    from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
+
+    entry = await setup(hass)
+    client = await hass_client()
+
+    # Bad ids are refused; a good one becomes a device with an Announcement.
+    assert (await client.post("/api/lena/display", json={"id": "../x", "name": "Kitchen tablet"})).status == 400
+    response = await client.post("/api/lena/display", json={"id": "abc-123", "name": "Kitchen tablet"})
+    assert response.status == 200
+    first = await response.json()
+    assert first["name"] == "Kitchen tablet" and first["area"] is None and first["speakers"] == []
+    assert first["announce_entity"] and first["announce_entity"].startswith("event.")
+    device = dr.async_get(hass).async_get(first["device_id"])
+    assert device is not None and entry.entry_id in device.config_entries
+
+    # Put in the kitchen, with two speakers there and one elsewhere.
+    kitchen = ar.async_get(hass).async_create("Kitchen")
+    dr.async_get(hass).async_update_device(device.id, area_id=kitchen.id)
+    reg = er.async_get(hass)
+    for platform, object_id, area in (("cast", "kitchen_cast", kitchen.id), ("music_assistant", "kitchen_ma", kitchen.id),
+                                      ("cast", "den_cast", None)):
+        e = reg.async_get_or_create("media_player", platform, object_id, suggested_object_id=object_id)
+        reg.async_update_entity(e.entity_id, area_id=area)
+        hass.states.async_set(e.entity_id, "idle", {"friendly_name": object_id.replace("_", " ").title()})
+    again = await (await client.post("/api/lena/display", json={"id": "abc-123", "name": "Kitchen tablet"})).json()
+    assert again["device_id"] == first["device_id"] and again["announce_entity"] == first["announce_entity"]
+    assert again["area"] == {"id": kitchen.id, "name": "Kitchen"}
+    assert [s["entity_id"] for s in again["speakers"]] == ["media_player.kitchen_ma", "media_player.kitchen_cast"]
+    assert again["speakers"][0]["music_assistant"] is True
+
+    # An announcement fires the display's event with the message.
+    entity = first["announce_entity"]
+    await hass.services.async_call(DOMAIN, "announce", {"message": "Dinner's ready!", "listen": True}, blocking=True)
+    await hass.async_block_till_done()
+    state = hass.states.get(entity)
+    assert state.attributes["event_type"] == "announce"
+    assert state.attributes["message"] == "Dinner's ready!" and state.attributes["listen"] is True
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "announce", {"message": "x", "device_id": ["nope"]}, blocking=True)
+
+    # It survives a restart of the integration, and only displays can be deleted.
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity) is not None
+    from custom_components.lena import async_remove_config_entry_device
+    assert await async_remove_config_entry_device(hass, entry, device)
+    lena = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, "lena")})
+    assert lena is not None and not await async_remove_config_entry_device(hass, entry, lena)

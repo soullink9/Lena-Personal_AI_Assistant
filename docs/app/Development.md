@@ -29,6 +29,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
 | `WakeWord.kt` | The wake word engines (microWakeWord and openWakeWord with LiteRT), the voice check, the listening loop, and the "stop" word (`StopWord`). |
 | `Timers.kt`, `Ringing.kt` | Lena's own timers and alarms: kept on the device and set on Android's alarm clock (`Timers`), ringing as a foreground service with a full-screen Stop and Snooze screen (`Ringing`, `RingService`, `RingActivity`), and the next one for the dashboards and screensaver (`NextCountdown`). |
+| `Room.kt`, `Announcements.kt` | This display in Home Assistant: registering with the Lena integration, its room, the room's speakers and where music plays (`Room`, also the room note sent to Open WebUI and the device sent to Assist), and saying `lena.announce` announcements in the sheet (`Announcements`). |
 | `Commands.kt` | What she understands on her own before asking anyone: setting, asking about and cancelling timers and alarms, and "stop" or "snooze" while one rings. `tools/commands_check/run.sh` checks it against example sentences on every build. |
 | `java/…/MicroFrontend.java` | A line-for-line port of TensorFlow Lite Micro's audio front end, checked bit for bit against the C on every build. |
 | `ChatsActivity.kt` | All chats: pinned chats, folders (new, rename, delete) and your whole history, with search. |

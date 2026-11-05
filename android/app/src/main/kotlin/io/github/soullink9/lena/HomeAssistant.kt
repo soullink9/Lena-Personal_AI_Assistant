@@ -186,10 +186,13 @@ class HomeAssistant(server: String, private val token: String) {
      * spoken answer. [agentId] null uses the agent picked in Home Assistant's own Assist settings;
      * [conversationId] continues an earlier conversation, so the agent remembers what was just said. An
      * AI agent can take a while to answer, hence the long wait. The language is Home Assistant's own.
+     * [deviceId] is this display's device ([Room]), so Assist knows which room it's hearing from, as with a
+     * Home Assistant Voice satellite.
      */
-    suspend fun converse(text: String, agentId: String?, conversationId: String?): AssistReply {
+    suspend fun converse(text: String, agentId: String?, conversationId: String?, deviceId: String? = null): AssistReply {
         val body = JSONObject().put("text", text)
         if (agentId != null) body.put("agent_id", agentId)
+        if (deviceId != null) body.put("device_id", deviceId)
         if (conversationId != null) body.put("conversation_id", conversationId)
         val r = JSONObject(call("POST", "/api/conversation/process", body, readTimeoutMs = 180_000))
         val speech = r.optJSONObject("response")
@@ -199,6 +202,36 @@ class HomeAssistant(server: String, private val token: String) {
             .orEmpty()
         val conversation = r.optString("conversation_id").takeIf { it.isNotBlank() && !r.isNull("conversation_id") }
         return AssistReply(speech, conversation)
+    }
+
+    /**
+     * Registers this app as one of Lena's displays (or reads it, once registered) with the Lena integration's
+     * /api/lena/display: its device, room, the room's speakers and its Announcement entity. Throws
+     * IOException("HTTP 404") without the integration.
+     */
+    suspend fun registerDisplay(id: String, name: String): JSONObject =
+        JSONObject(call("POST", "/api/lena/display", JSONObject().put("id", id).put("name", name)))
+
+    /** Every media player in Home Assistant, by name, for choosing where music plays. */
+    suspend fun speakers(): List<Speaker> {
+        val states = JSONArray(call("GET", "/api/states"))
+        return List(states.length()) { states.getJSONObject(it) }
+            .filter { it.optString("entity_id").startsWith("media_player.") }
+            .map { o ->
+                val id = o.optString("entity_id")
+                Speaker(id, o.optJSONObject("attributes")?.optString("friendly_name")?.ifBlank { null } ?: id, false)
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
+    /**
+     * An entity's state and attributes (an Announcement's time, message and listen), or null if it doesn't
+     * exist.
+     */
+    suspend fun stateWithAttributes(entityId: String): JSONObject? = try {
+        JSONObject(call("GET", "/api/states/${enc(entityId)}", readTimeoutMs = 10_000))
+    } catch (e: IOException) {
+        if (e.message == "HTTP 404") null else throw e
     }
 
     /** True when the address and token work. */

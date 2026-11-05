@@ -91,7 +91,8 @@ object AssistLog {
 
 /**
  * Asking Home Assistant's Assist, for everything that asks her in Assist mode: the sheet, Lena's own chat
- * screen and scheduled prompts. Every exchange goes into [AssistLog].
+ * screen and scheduled prompts. Every exchange goes into [AssistLog]. Each question says which display
+ * it's from ([Room]), so Assist knows the room.
  */
 object AssistChat {
 
@@ -104,7 +105,8 @@ object AssistChat {
     suspend fun ask(c: Context, question: String, label: String? = null, conversation: Boolean = true): String {
         val ha = HomeAssistant.from(c)
             ?: throw IllegalStateException("Set up Home Assistant in Settings → Connections to talk through Assist.")
-        val reply = ha.converse(question, Prefs.assistAgent(c), if (conversation) Prefs.assistConversation(c) else null)
+        val reply = ha.converse(question, Prefs.assistAgent(c), if (conversation) Prefs.assistConversation(c) else null,
+            deviceId = Room.info(c).value?.deviceId)
         if (conversation) Prefs.setAssistConversation(c, reply.conversationId)
         val answer = reply.speech.ifBlank { "(Assist didn't say anything.)" }
         AssistLog.add(c, question, answer, label)

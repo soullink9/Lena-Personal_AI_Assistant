@@ -129,6 +129,8 @@ object Connections {
         if (!openWebUi) Logs.w(TAG, "Open WebUI isn't answering, or the session ended and she can't sign in by herself")
         if (!homeAssistant) Logs.w(TAG, "Home Assistant isn't answering, or didn't accept Lena's token")
         if (openWebUi && homeAssistant) lastGood = SystemClock.elapsedRealtime()
+        // Which room this display is in, now and then (see Room).
+        if (homeAssistant) Room.refresh(c)
     }
 
     /**

@@ -14,9 +14,13 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | To-do list | `todo.lena_memory` | Her memory. Add, edit, reorder and delete items like any to-do list. Tick one off to retire it; she only uses open items. |
 | Action | `lena.feel` | Sets her moment, with a reason. For your own automations, and used by Open WebUI. |
 | Action | `lena.add_event` | Adds an event to a calendar with Home Assistant's `calendar.create_event`: a calendar's name, a title, a start (`2026-11-14` for all day, `2026-11-14T15:30` at a time), and optionally an end, a location and a description. Returns what was added. Used by Open WebUI's Lena tool. |
+| Action | `lena.announce` | Says a message on Lena's displays, like Home Assistant Voice's announcements: choose displays (all of them if none), the message, and **Listen for an answer** to have her listen afterwards. |
+| Device | Each Lena display | Every Lena app with Home Assistant set up registers itself as a device under Lena, named after the tablet or phone. Put it in a room (its **Area**) and it's room-aware. Delete one you no longer use. |
+| Event | `event.<display>_announcement` | Each display's announcements (`message`, `listen`), which its app watches and says. Usable as an automation trigger. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |
 | Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
 | Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
+| Address | `POST /api/lena/display` | Where each Lena app registers as a display and learns its room, the room's speakers and its Announcement entity. |
 
 Her feelings and memory are saved, so they survive restarts.
 
@@ -60,6 +64,26 @@ Her dropdowns are ordinary entities. Some ideas:
 - `lena.feel` with moment **Proud** and a reason when a long backup finishes.
 - Turn a light warmer when she's **Fond**.
 
+## Displays and rooms
+
+Like a Home Assistant Voice satellite, each Lena app knows where it is once you put it in a room:
+
+1. Open the Lena app with Home Assistant set up (Settings → Connections → Home Assistant). It registers itself; it shows under **Settings → Devices & services → Lena** as a device named after the tablet.
+2. Open that device and set its **Area**, the same as any device.
+
+Then:
+
+- **Room-aware commands:** with **Who answers** set to Assist, every question is sent with the display's device, so Home Assistant knows the room: "turn on the lights" means that room's lights. With Open WebUI, she's told the room with each question.
+- **Music:** the app learns the room's media players (Music Assistant's first). Music, radio or podcasts asked for without naming a room play there (or on the speaker chosen in the app, Settings → Connections → Home Assistant → **Music plays on**). Name another room, or the whole home, and she finds the speakers there: Assist's own Music Assistant commands do this by area, and with Open WebUI she uses her Home Assistant tools.
+- **Announcements:** `lena.announce` says a message on the chosen displays (or all of them). A wall display says it within a few seconds while Lena is on screen; during a conversation, once the conversation ends. With **Listen for an answer**, she listens afterwards and answers.
+
+```yaml
+action: lena.announce
+data:
+  message: Dinner's ready!
+  device_id: [<the kitchen display's device>]
+```
+
 ## /api/lena/context
 
 ```
@@ -79,6 +103,14 @@ Returns:
 ```
 
 Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
+
+## /api/lena/display
+
+```
+POST /api/lena/display   {"id": "<the app's own id>", "name": "Kitchen tablet"}
+```
+
+Registers the app as a display the first time (and adds its Announcement), then just reads it. Returns its `device_id`, `name`, `area` (`{"id", "name"}`, or null), the room's `speakers` (`entity_id`, `name`, `music_assistant`; Music Assistant's first) and its `announce_entity`. Any user's token works.
 
 ## /api/lena/media
 

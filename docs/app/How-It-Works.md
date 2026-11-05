@@ -150,6 +150,14 @@ They're set on Android's alarm clock, like a clock app's, so they ring on time w
 
 It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing (or, set to listen whenever Lena is open, while Lena is on screen), and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
 
+### Rooms, music and announcements
+
+With the Lena integration, the app registers itself in Home Assistant as a display: a device under Lena, named after the tablet. Put that device in a room (its **Area**, in Home Assistant) and Lena knows where she is, like a Home Assistant Voice satellite. Settings → Connections → Home Assistant shows **This display's room**.
+
+- **Room-aware commands:** in Assist mode every question says which display it came from, so "turn on the lights" means that room's. With Open WebUI, she's told the room.
+- **Music:** asked for without naming a room, it plays on the room's speaker (Music Assistant's first), or on the one picked in **Music plays on**. Name another room, or the whole home, and she finds the speakers there.
+- **Announcements:** Home Assistant's `lena.announce` action is said on the wall display within a few seconds, in the sheet like one of her answers, and she listens for an answer if it asks. During a conversation it waits until the conversation ends.
+
 ## House alerts
 
 When something in your house worries her (a leak, smoke, a door left open: the sensors you chose in the Lena integration), she can tell you on your phone, and tapping the alert opens Lena listening so you can ask what's going on.
