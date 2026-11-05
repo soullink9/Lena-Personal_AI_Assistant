@@ -133,6 +133,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Ask Lena: talk (or type) to Lena over whatever app you're in, like Google Assistant or Home
@@ -552,6 +553,8 @@ class AskActivity : ComponentActivity() {
             job = scope.launch {
                 try {
                     ready.await()
+                    // Joins the check started when the sheet opened (or makes one if that was a while ago).
+                    Connections.ensure(this@AskActivity)
                     if (viaAssist) {
                         working = true
                         turn.answer = askAssist(turn.question)
@@ -628,6 +631,10 @@ class AskActivity : ComponentActivity() {
         suspend fun hear(): String {
             val onPartial = { t: String -> heard = t }
             val onLevel = { l: Float -> level = l }
+            // Opened by her name: the wake word lets go of the microphone a moment after it heard her.
+            withTimeoutOrNull(1_500) {
+                while (WakeListener.micsOpen > 0) delay(50)
+            }
             val e = ear ?: newEar().also { ear = it }
             return try {
                 e.listen(onPartial, onLevel)
@@ -635,6 +642,7 @@ class AskActivity : ComponentActivity() {
                 throw c
             } catch (_: EarUnavailable) {
                 // The phone's speech model is still downloading: use your server meanwhile.
+                e.release()
                 ear = ServerEar(api)
                 note = "The phone's speech model is downloading; using your server for now."
                 hearViaServer(onPartial, onLevel)
@@ -712,6 +720,9 @@ class AskActivity : ComponentActivity() {
                 Phase.IDLE -> listen(false)
             }
         }
+
+        // Check the connections while you talk, signing in again if needed, so asking doesn't wait for it.
+        LaunchedEffect(Unit) { Connections.ensure(this@AskActivity) }
 
         LaunchedEffect(Unit) {
             // Assist keeps no history the app can show, and needs no model.

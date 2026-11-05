@@ -163,11 +163,26 @@
   }
 
   // ---- 2 and 3. Hiding the header, and reporting the views -------------------------------------
-  // Pages are built and swapped long after this script runs, so it looks again a few times a
-  // second. Only a change is reported.
+  // Pages are built and swapped long after this script runs, so it looks again: often (every 0.6 s)
+  // for a few seconds after the page loads, after a navigation and after a tap, when things change,
+  // and every 2 s otherwise, since each look makes the page work out its layout. Never while the page
+  // is hidden. Only a change is reported.
 
+  var FAST_MS = 600;
+  var SLOW_MS = 2000;
+  var FAST_FOR_MS = 8000;
   var lastReport = '';
-  setInterval(function () {
+  var busyUntil = Date.now() + FAST_FOR_MS;
+
+  // Something may be changing: look often for a while.
+  function soon() { busyUntil = Date.now() + FAST_FOR_MS; }
+  window.addEventListener('location-changed', soon);
+  window.addEventListener('popstate', soon);
+  document.addEventListener('click', soon, true);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { soon(); look(); } });
+
+  function look() {
+    if (document.hidden) return;
     var state = {found: false};
     try {
       var p = panel();
@@ -204,7 +219,12 @@
       lastReport = report;
       post('header', report);
     }
-  }, 600);
+  }
+
+  (function loop() {
+    look();
+    setTimeout(loop, Date.now() < busyUntil ? FAST_MS : SLOW_MS);
+  })();
 
   // ---- What the app can ask the page to do ---------------------------------------------------
 

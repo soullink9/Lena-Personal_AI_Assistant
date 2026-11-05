@@ -12,7 +12,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 |---|---|
 | `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar (logo and Chat \| Home switch) and drawer (pinned chats, folders and recent chats, only what fits), Lena's look for Open WebUI's pages, hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
 | `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat (or to Home Assistant's Assist, when it answers), speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
-| `Voice.kt` | Listening (on-device recognizer, or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
+| `Voice.kt` | Listening (the on-device recognizer, one for the whole app so Android's session limit is never reached; or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
 | `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
 | `SignIn.kt` | Signing in to Open WebUI by herself with details kept encrypted. |
 | `SettingsActivity.kt` | The settings screen and all its pages, in sections (Connections, Wall display, Talking to Lena, Chat screen configuration, Device customization, About), with **Search settings**. Its `findable` list is what search finds: a new setting needs a line there too. |
@@ -29,6 +29,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `ChatsActivity.kt` | All chats: pinned chats, folders (new, rename, delete) and your whole history, with search. |
 | `Defaults.kt` | Every setting's default, written from `adjustments/defaults.env` by `tools/defaults.py`. Don't edit it by hand. |
 | `Refresh.kt` | Settings → Refresh all connections: open screens reload their page when next shown. |
+| `Connections.kt` | Keeping Open WebUI and Home Assistant ready: tries a dropped connection again once the network is back (`retrying`, used by `Api.kt` and `HomeAssistant.kt`), checks both servers before asking (`ensure`, signing in again by herself), and checks them every few minutes on the wall display (`keepAlive`). |
 | `WallDisplay.kt` | The wall display on every screen: in dashboard mode each screen keeps the display on and, after **Screen saver after** without a touch (one clock for all screens), brings up the dashboard's screen saver. Every screen calls `WallDisplay.watch` in `onCreate` and `WallDisplay.touched` from `onUserInteraction`; a new screen needs both. |
 | `Chats.kt` | What the drawer and All chats share: chat and folder rows in each list style (one row look for both), grouping by day, and the long-press menu (pin, move to folder, rename, delete) with its dialogs. |
 | `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |

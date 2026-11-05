@@ -338,6 +338,23 @@ class WakeListener(
     private val onSilenced: () -> Unit = {},
     private val onScore: (Float) -> Unit = {},
 ) {
+    companion object {
+        /**
+         * How many wake listeners have the microphone open right now. stop() only asks the listening thread
+         * to finish, so the microphone is let go a moment later; the sheet waits for this to reach 0 before
+         * it listens, or the recognizer may find the microphone taken.
+         */
+        @Volatile
+        var micsOpen = 0
+            private set
+
+        @Synchronized
+        private fun opened() { micsOpen++ }
+
+        @Synchronized
+        private fun closed() { micsOpen-- }
+    }
+
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var running = false
     private var thread: Thread? = null
@@ -387,6 +404,7 @@ class WakeListener(
             running = false
             return
         }
+        opened()
         try {
             mic.startRecording()
             val chunk = ShortArray(WakeWord.CHUNK)
@@ -424,6 +442,7 @@ class WakeListener(
         } finally {
             runCatching { mic.stop() }
             mic.release()
+            closed()
             model.close()
         }
     }

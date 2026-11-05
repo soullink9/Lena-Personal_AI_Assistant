@@ -38,7 +38,7 @@ Lena's native features use your sign-in from the page. Sign in on the main scree
 
 ## The Ask sheet says "Couldn't reach your server"
 
-Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale).
+Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale). Lena already tries a dropped connection again, waits for Wi-Fi to come back and signs in again by herself when that's set up (Settings → Open WebUI → **Sign in by herself**), so this means the server really couldn't be reached: Settings → Logs says what happened.
 
 ## Folders don't show
 
@@ -94,6 +94,7 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 - With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server meanwhile. You can also switch to **Your server** in Lena's settings.
 - With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)). Lena also uses it whenever the phone's recognizer can't listen, so it's worth setting up either way.
 - The warning says what went wrong, for example that the microphone is in use by another app.
+- **"Couldn't hear you (error 10)"** (or "still busy with the last time") means Android's speech service hadn't finished with the previous turn. Lena now keeps one recognizer for the whole app, waits for the service and tries again by herself, so this should be rare; if it still shows, check that no other app is listening (a voice assistant's wake word, for example).
 - If the mic doesn't open again after Lena replies, check **Keep listening** in Lena's settings.
 
 ## Lena doesn't speak her replies

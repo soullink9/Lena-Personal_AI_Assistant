@@ -4,6 +4,8 @@
     <!-- Reach your server, and the mic for calls. MODIFY_AUDIO_SETTINGS is a no-prompt permission
          WebView needs for mic capture. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Whether there's a network yet (Wi-Fi reconnecting as the screen wakes), before asking her. No prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Finished-reply and scheduled-prompt notifications; asked for when you turn them on. -->
@@ -58,13 +60,16 @@
         </activity>
 
         <!-- Dashboard mode: your Home Assistant dashboards in a Lena frame. It can be a tablet's
-             home screen (Android settings > Apps > Default apps > Home app > Lena). -->
+             home screen (Android settings > Apps > Default apps > Home app > Lena).
+             Its own task: switching Chat | Home then only brings a screen forward. In one task with the
+             chat screen, each switch destroyed the other screen, and Home Assistant loaded from scratch. -->
         <activity
             android:name=".DashboardActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|density"
             android:exported="true"
             android:label="Lena dashboard"
             android:launchMode="singleTask"
+            android:taskAffinity="io.github.soullink9.lena.dashboard"
             android:resumeWhilePausing="true"
             android:stateNotNeeded="true">
             <intent-filter>

@@ -116,6 +116,7 @@ class Api(server: String, private val context: Context? = null) {
      * - still good: it was a permission, and it's reported as ForbiddenException;
      * - really ended (Open WebUI restarted, say) with automatic sign-in on: sign in again and try once more;
      * - otherwise (ended without automatic sign-in, or the check couldn't tell): signed out.
+     * A dropped connection is tried again first (see [Connections.retrying]).
      */
     private suspend fun call(
         method: String,
@@ -126,7 +127,7 @@ class Api(server: String, private val context: Context? = null) {
         readTimeoutMs: Int = 30_000,
         accept: String = "application/json",
     ): ByteArray = try {
-        callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+        attempt(method, path, body, contentType, auth, readTimeoutMs, accept)
     } catch (e: AuthException) {
         if (!auth) throw e
         when (session()) {
@@ -135,8 +136,34 @@ class Api(server: String, private val context: Context? = null) {
             Session.ENDED -> {
                 val c = context
                 if (c == null || !OpenWebUiSignIn.configured(c) || OpenWebUiSignIn.signIn(c) == null) throw e
-                callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+                attempt(method, path, body, contentType, auth, readTimeoutMs, accept)
             }
+        }
+    }
+
+    /** [callOnce], tried again if the connection dropped. */
+    private suspend fun attempt(
+        method: String,
+        path: String,
+        body: ByteArray?,
+        contentType: String,
+        auth: Boolean,
+        readTimeoutMs: Int,
+        accept: String,
+    ): ByteArray = Connections.retrying(context, method, "Open WebUI $method ${path.substringBefore('?')}") {
+        callOnce(method, path, body, contentType, auth, readTimeoutMs, accept)
+    }
+
+    /**
+     * Makes sure the session is good before an action (see [Connections.ensure]): asks Open WebUI who you
+     * are, and if the session ended, signs in again by herself when that's set up. True when signed in.
+     */
+    suspend fun ensureSession(): Boolean = when (session()) {
+        Session.VALID -> true
+        Session.UNKNOWN -> false
+        Session.ENDED -> {
+            val c = context
+            c != null && OpenWebUiSignIn.configured(c) && OpenWebUiSignIn.signIn(c) != null
         }
     }
 
@@ -147,7 +174,7 @@ class Api(server: String, private val context: Context? = null) {
     private suspend fun session(): Session {
         if (tokenFrom(cookies()) == null) return Session.ENDED
         val failure = runCatching {
-            callOnce("GET", "/api/v1/auths/", null, "application/json", true, 15_000, "application/json")
+            attempt("GET", "/api/v1/auths/", null, "application/json", true, 15_000, "application/json")
         }.exceptionOrNull()
         return when (failure) {
             null -> Session.VALID

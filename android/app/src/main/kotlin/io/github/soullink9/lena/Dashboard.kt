@@ -87,10 +87,12 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Date
@@ -202,6 +204,8 @@ class DashboardActivity : ComponentActivity() {
         open(Prefs.dashboards(this).first(), reload = true)
         setContent { LenaTheme { Screen() } }
         if (dashboardMode && intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
+        // On the wall all day: keep Open WebUI and Home Assistant ready for whenever someone talks to her.
+        Connections.keepAlive(this)
     }
 
     /**
@@ -435,6 +439,8 @@ class DashboardActivity : ComponentActivity() {
         WallDisplay.touched()
         dimmed.value = false
         brightness(-1f)
+        // Someone's here and may talk to her: check the connections now rather than at the next round.
+        lifecycleScope.launch { Connections.ensure(this@DashboardActivity) }
     }
 
     /** The screen saver, at low brightness: 40% for photos (they need light), 2% for the night clock. */
@@ -579,8 +585,9 @@ class DashboardActivity : ComponentActivity() {
             when {
                 apps -> apps = false
                 header.value.subview || web.canGoBack() -> back()
-                // As the home screen, back has nowhere to go; otherwise it leaves.
-                !isHomeScreen(this@DashboardActivity) -> finish()
+                // As the home screen, back has nowhere to go. Otherwise it goes back to where you were, and
+                // the dashboard stays loaded behind, ready for the next time.
+                !isHomeScreen(this@DashboardActivity) -> moveTaskToBack(true)
             }
         }
 

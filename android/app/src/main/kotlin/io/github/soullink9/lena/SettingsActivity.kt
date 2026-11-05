@@ -402,7 +402,7 @@ class SettingsActivity : ComponentActivity() {
                 1 -> "1 problem in the last day"
                 else -> "$problems problems in the last day"
             }) { openLogs() }
-            Item(Icons.Outlined.SettingsBackupRestore, "Return to defaults", "Timings, wake word, look and feel; keeps your connections") {
+            Item(Icons.Outlined.SettingsBackupRestore, "Return to defaults", "Timings, wake word options, look and feel; keeps your connections") {
                 resetting = true
             }
             Row(
@@ -431,10 +431,10 @@ class SettingsActivity : ComponentActivity() {
             title = { Text("Return to defaults?") },
             text = {
                 Text(
-                    "Timings, the wake word, how she looks and sounds, the chat screen, notifications and the screensaver's " +
-                        "options go back to how a new install starts.\n\nKept: your Open WebUI and Home Assistant connections, " +
-                        "the model and context size, your dashboards, the screensaver's album, your quick and scheduled prompts, " +
-                        "and your order of pinned chats and folders."
+                    "Timings, the wake word's options, how she looks and sounds, the chat screen, notifications and the " +
+                        "screensaver's options go back to how a new install starts.\n\nKept: your Open WebUI and Home Assistant " +
+                        "connections, the model and context size, your dashboards, the screensaver's album, whether she listens " +
+                        "for her name, your quick and scheduled prompts, and your order of pinned chats and folders."
                 )
             },
             confirmButton = {

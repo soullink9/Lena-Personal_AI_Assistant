@@ -7,6 +7,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 ### Android app
 
 - **New defaults** (asked for in the defaults file): the wake word is **Lena**, listens **Whenever Lena is open**, with **Fewer false starts**; **Her voice follows her mood** is on; **Reply notifications** are off. Only new installs and **Return to defaults** use them.
+- **Fixed "Couldn't hear you (error 10)"** after the wake word or the assistant button. Android limits how many speech sessions an app may have open; Lena made a new recognizer for every sheet and started each session before the last had closed. Now one recognizer serves the whole app, a session waits for the last to close, a busy recognizer gets a moment and another try, and the sheet waits for the wake word to let go of the microphone.
+- **Connections kept ready:** a request whose connection dropped (Wi-Fi reconnecting as the screen wakes, a connection the server closed while idle) waits for the network and tries again, where that can't send anything twice. Opening the sheet checks Open WebUI and Home Assistant while you talk, signing in again by herself if needed, and asking waits for that check. The wall display checks every few minutes, and when it wakes.
+- **The Home dashboard loads once:** the dashboards now have their own task, so switching **Chat | Home** brings the other screen forward instead of destroying it, and Home Assistant no longer starts from scratch each time. Back on the dashboards (when it isn't the home screen) goes back to where you were and keeps them loaded. Lena's page script also looks at the page less often when nothing's changing, and not at all while it's hidden.
+- **Return to defaults keeps "Listen for her name"**: switching the microphone on or off is never a reset's call. The defaults file marks the settings Return to defaults leaves alone.
 
 ### Project
 

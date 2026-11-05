@@ -310,8 +310,9 @@ object Prefs {
      * connects Lena and what's yours. Kept: the Open WebUI and Home Assistant connections (addresses,
      * sign-in, tokens, signing in by herself), who answers and Assist's agent, the model and her context
      * size, the dashboards and motion sensor, the screensaver's album (and whether the photo frame is on),
-     * your quick and scheduled prompts, and your order of pinned chats and folders. Whether this is the home screen is Android's
-     * setting, so it isn't touched either.
+     * whether she listens for her name (turning the microphone on or off is yours to decide, never a
+     * reset's), your quick and scheduled prompts, and your order of pinned chats and folders. Whether this
+     * is the home screen is Android's setting, so it isn't touched either.
      */
     fun defaultsKeeping(current: Settings): Settings = Settings(
         server = current.server,
@@ -327,6 +328,7 @@ object Prefs {
         quickPrompts = current.quickPrompts,
         schedules = current.schedules,
         slides = Slides(on = current.slides.on, album = current.slides.album, albumName = current.slides.albumName),
+        wakeWord = current.wakeWord,
     )
 
     /** Every setting at once, for the Settings screen. */

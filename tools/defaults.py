@@ -61,13 +61,15 @@ HEADER = """\
 class Setting:
     """One default: its name in Settings, its name in Defaults.kt (also its name in defaults.env), its
     Kotlin type, and its possible values (as shown in the app) with the Kotlin each one becomes. A number
-    setting has no list, only a range."""
+    setting has no list, only a range. reset=False marks one that Return to defaults leaves as it is (see
+    Prefs.defaultsKeeping): its default is only where a new install starts."""
 
     name: str
     const: str
     kotlin_type: str
     values: dict[str, str] | None = None
     number_range: tuple[int, int] | None = None
+    reset: bool = True
 
     def possible(self) -> str:
         """The Possible values comment."""
@@ -116,8 +118,9 @@ def seconds(*options: tuple[str, int]) -> dict[str, str]:
 # file reads like the screen. Keep in step with Prefs.kt (which uses Defaults.*) and the Settings pages.
 SETTINGS = [
     Setting("Connections › Who answers › Lena answers through", "ANSWERS", "Answerer", {
-        "Open WebUI": "Answerer.OPEN_WEBUI", "Home Assistant Assist": "Answerer.ASSIST"}),
-    Setting("Connections › Model › Her context size", "CONTEXT_TOKENS", "Int", number_range=(2048, 1_048_576)),
+        "Open WebUI": "Answerer.OPEN_WEBUI", "Home Assistant Assist": "Answerer.ASSIST"}, reset=False),
+    Setting("Connections › Model › Her context size", "CONTEXT_TOKENS", "Int", number_range=(2048, 1_048_576),
+            reset=False),
     Setting("Wall display › Screensaver › Screen saver after", "DIM_SECONDS", "Int", seconds(
         ("30 seconds", 30), ("1 minute", 60), ("2 minutes", 120), ("5 minutes", 300), ("10 minutes", 600),
         ("15 minutes", 900), ("30 minutes", 1800), ("1 hour", 3600), ("Never", 0))),
@@ -133,7 +136,7 @@ SETTINGS = [
         "Smart": "Framing.SMART", "Fill the screen": "Framing.FILL", "Whole photo": "Framing.WHOLE"}),
     Setting("Wall display › Screensaver › Time and her mood on top", "SLIDE_OVERLAY", "Boolean", ON_OFF),
     Setting("Wall display › Screensaver › Her dim clock at night", "SLIDE_CLOCK_AT_NIGHT", "Boolean", ON_OFF),
-    Setting("Talking to Lena › Wake word › Listen for her name", "WAKE_WORD", "Boolean", ON_OFF),
+    Setting("Talking to Lena › Wake word › Listen for her name", "WAKE_WORD", "Boolean", ON_OFF, reset=False),
     Setting("Talking to Lena › Wake word › Listens", "WAKE_EVERYWHERE", "Boolean", {
         "Only on the wall display": "false", "Whenever Lena is open": "true"}),
     Setting("Talking to Lena › Wake word › Her name", "WAKE_PHRASE", "WakePhrase", {
@@ -223,8 +226,10 @@ def write_env(current: dict[str, str]) -> None:
     """Writes the whole file from SETTINGS: every setting with its comments and an empty value."""
     blocks = [HEADER]
     for setting in SETTINGS:
+        kept = "" if setting.reset else "# Only for new installs: Return to defaults leaves it as it is.\n"
         blocks.append(
             f"# {setting.name}\n"
+            f"{kept}"
             f"# Possible values: {setting.possible()}\n"
             f"# Current default: {current[setting.const]}\n"
             f"{setting.const}=\n"

@@ -52,7 +52,7 @@ Below it, the settings are in sections, and every row says how it's set and open
 | **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets & tile**, **Quick prompts** and **Scheduled prompts**. |
 | **About** | **Updates**, **Logs**, **Return to defaults** and the **software version**. |
 
-**Return to defaults** puts timings, the wake word, how she looks and sounds, the chat screen, notifications and the screensaver's options back to how a new install starts. It keeps your connections (Open WebUI, Home Assistant, signing in by herself, who answers and Assist's agent), the model and context size, your dashboards and motion sensor, the screensaver's album, your quick and scheduled prompts, and your order of pinned chats and folders. It asks first.
+**Return to defaults** puts timings, the wake word's options, how she looks and sounds, the chat screen, notifications and the screensaver's options back to how a new install starts. It keeps your connections (Open WebUI, Home Assistant, signing in by herself, who answers and Assist's agent), the model and context size, your dashboards and motion sensor, the screensaver's album, whether she listens for her name (**Listen for her name** stays as you set it: switching the microphone on or off is never a reset's call), your quick and scheduled prompts, and your order of pinned chats and folders. It asks first.
 
 ### Who answers
 

@@ -72,13 +72,24 @@ class HomeAssistant(server: String, private val token: String) {
 
     /**
      * One request to Home Assistant with the token. A 401 or 403 means the token was refused, which the
-     * screens report differently from Home Assistant being unreachable.
+     * screens report differently from Home Assistant being unreachable. A dropped connection is tried
+     * again (see [Connections.retrying]).
      */
     private suspend fun call(
         method: String,
         path: String,
         body: JSONObject? = null,
         readTimeoutMs: Int = 30_000, // a large album takes a moment to list
+    ): String = Connections.retrying(null, method, "Home Assistant $method ${path.substringBefore('?')}") {
+        callOnce(method, path, body, readTimeoutMs)
+    }
+
+    /** One request, as [call] describes; [call] tries it again if the connection dropped. */
+    private suspend fun callOnce(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        readTimeoutMs: Int,
     ): String = withContext(Dispatchers.IO) {
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
