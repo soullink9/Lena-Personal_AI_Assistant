@@ -62,7 +62,7 @@ The app talks to Open WebUI, so the filter and tool from part 2 work there with 
 
 Full details: [Home Assistant installation](home-assistant/Installation.md). Everything is done in the Home Assistant UI apart from copying one folder:
 
-1. **Copy in the integration:** `home-assistant/custom_components/lena` into your config folder's `custom_components`, then restart.
+1. **Copy in the integration:** `custom_components/lena` into your config folder's `custom_components` (or install it with HACS, see [Home Assistant installation](home-assistant/Installation.md)), then restart.
 2. **Add Lena:** Settings → Devices & services → Add integration → **Lena**. It creates her mood, energy and moment dropdowns and her memory list.
 3. **Configure** it (optional): the people she misses, your weather, special-days calendars and sensors that worry her.
 4. **Connect Ollama:** add the Ollama integration and a conversation agent with the model `lena`. Under **Control Home Assistant** tick **Assist** and **Lena**, leave **Instructions** empty, set the context window to 32768 and keep-alive to -1.

@@ -2,7 +2,7 @@
 
 [← Back to Home Assistant installation](Installation.md)
 
-What the integration creates, what she's told, and what else can use it. Everything lives in `home-assistant/custom_components/lena`.
+What the integration creates, what she's told, and what else can use it. Everything lives in `custom_components/lena`.
 
 ## What it creates
 
@@ -94,10 +94,16 @@ Photos are paths on this Home Assistant (fetch them with the same token). Immich
 
 ## Tests
 
-`home-assistant/tests` runs the integration in a real Home Assistant on every change (`.github/workflows/home-assistant.yml`), against the newest release and 2026.9. To run them yourself:
+`home-assistant/tests` runs the integration in a real Home Assistant on every change (`.github/workflows/home-assistant.yml`), against the newest release its test harness supports and 2026.9. To run them yourself:
 
 ```
 pip install pytest-homeassistant-custom-component
 cd home-assistant
 python -m pytest
 ```
+
+The same workflow also:
+
+- starts the newest Home Assistant on PyPI with Lena added (`home-assistant/startup_check.py`), so a new release is tried the day it's out, before its test harness is published: she must load, `/api/lena/context` must answer with a token, and nothing Home Assistant logs about her may be an error;
+- runs Home Assistant's own integration checks (hassfest) and HACS's;
+- lists anything Home Assistant says Lena uses that's deprecated, as warnings on the run.

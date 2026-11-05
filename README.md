@@ -4,7 +4,7 @@ This project was primarily created for personal use and for my family. While I m
 
 Note: Built with the assistance of Claude.ai. I'm putting it here now so you don't have to hunt for it below.
 
-<p align="center"><img src="home-assistant/custom_components/lena/brand/dark_logo@2x.png" width="500" alt="Lena's logo"></p>
+<p align="center"><img src="custom_components/lena/brand/dark_logo@2x.png" width="500" alt="Lena's logo"></p>
 
 # Lena: a personal AI assistant on your own hardware
 

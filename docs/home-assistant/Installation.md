@@ -11,11 +11,19 @@ Menu names change between Home Assistant versions; if a path doesn't match, look
 - Home Assistant 2026.9 or newer (the integration is tested against 2026.9 and the latest release).
 - Lena built in Ollama ([Getting started, part 1](../Getting-Started.md#1-her-model)).
 - For voice: speech-to-text and text-to-speech connected to Home Assistant, for example Whisper and Piper through the Wyoming integration ([Piper](../voice/Piper.md)). Not needed if you only type to her.
-- A way to copy a folder into your Home Assistant config folder: the File editor or Studio Code Server add-on, a Samba share, or SSH.
+- To install by hand rather than with HACS: a way to copy a folder into your Home Assistant config folder (the File editor or Studio Code Server add-on, a Samba share, or SSH).
 
-## 1. Copy in the integration
+## 1. Install the integration
 
-Copy `home-assistant/custom_components/lena` from this repository into your Home Assistant config folder (the one with `configuration.yaml`), so you have:
+**With HACS, or Home Assistant's Marketplace** (Home Assistant 2026.11 and newer, where HACS is built in): add this repository as a custom repository, type **Integration**:
+
+```
+https://github.com/soullink9/Lena-Personal_AI_Assistant
+```
+
+Then find **Lena**, download it, and restart Home Assistant. Updates then show up there whenever a new version is released. It offers released versions only, never work in progress.
+
+**By hand:** copy `custom_components/lena` from this repository into your Home Assistant config folder (the one with `configuration.yaml`), so you have:
 
 ```
 config/custom_components/lena/__init__.py
@@ -88,4 +96,4 @@ If something's wrong, see [Troubleshooting](Troubleshooting.md). Then finish the
 
 ## Updating
 
-Copy the new `custom_components/lena` folder over the old one and restart. Your edits to `feelings.yaml` would be overwritten, so keep a copy if you've changed it.
+With HACS or the Marketplace, update it there when a new version shows, then restart. By hand, copy the new `custom_components/lena` folder over the old one and restart. Either way, your edits to `feelings.yaml` are overwritten, so keep a copy if you've changed it.

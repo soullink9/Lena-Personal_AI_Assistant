@@ -1,10 +1,11 @@
 name: Home Assistant integration
 
-# Tests custom_components/lena against a real Home Assistant.
+# Tests custom_components/lena against a real Home Assistant, and checks it the way Home Assistant
+# (hassfest) and HACS / Home Assistant's Marketplace do.
 on:
   push:
     branches: [main]
-    paths: ["home-assistant/**", ".github/workflows/home-assistant.yml"]
+    paths: ["custom_components/**", "home-assistant/**", "hacs.json", ".github/workflows/home-assistant.yml"]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The newest Home Assistant, and the oldest the integration supports.
+        # The newest Home Assistant the test harness supports, and the oldest Lena supports (keep that one
+        # last: tools/check.py compares it with hacs.json). The start-up job below tries a release before
+        # its harness is out.
         home-assistant: ["latest", "2026.9"]
     name: test (Home Assistant ${{ matrix.home-assistant }})
     steps:
@@ -55,7 +58,9 @@ jobs:
         working-directory: home-assistant
         run: |
           set -o pipefail
-          if ! python -m pytest -q -p no:cacheprovider 2>&1 | tee "$RUNNER_TEMP/pytest.log"; then
+          # Warnings are logged as they happen, so Home Assistant's notes about Lena using something
+          # deprecated (they name "custom integration 'lena'") can be picked out below.
+          if ! python -m pytest -q -p no:cacheprovider -W default -o log_cli=true --log-cli-level=WARNING 2>&1 | tee "$RUNNER_TEMP/pytest.log"; then
             # Put the failures in the run summary, so they can be read without opening the full log.
             msg=$(grep -E "^(FAILED|ERROR)|Error|assert |^E  " "$RUNNER_TEMP/pytest.log" | head -80 \
               | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
@@ -64,3 +69,56 @@ jobs:
           fi
           ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
           echo "::notice title=Home Assistant $ha::$(tail -1 "$RUNNER_TEMP/pytest.log")"
+          # Anything this Home Assistant says Lena should change before a later release, as a warning on
+          # the run (once each).
+          { grep -iE "custom integration 'lena'|custom_components/lena.*(deprecat|will stop working|no longer)" "$RUNNER_TEMP/pytest.log" || true; } \
+            | sed 's/^.*\(Detected\|custom_components\)/\1/' | sort -u | head -20 \
+            | while read -r line; do echo "::warning title=Home Assistant $ha says::$line"; done
+
+  startup:
+    # The newest Home Assistant on PyPI, even before its test harness is out: Lena must load, her context
+    # must answer over HTTP, and nothing it logs about her may be an error (home-assistant/startup_check.py).
+    name: start-up (newest Home Assistant)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Home Assistant
+        run: |
+          python -m pip install --upgrade pip
+          pip install homeassistant
+          # Without its frontend Home Assistant starts in recovery mode, which leaves custom integrations
+          # out; her tools need the conversation integration. Both at the versions it pins.
+          reqs=$(python -c "import json, pathlib, homeassistant; base = pathlib.Path(homeassistant.__file__).parent / 'components'; print(' '.join(r for name in ('frontend', 'conversation') for r in json.loads((base / name / 'manifest.json').read_text())['requirements']))")
+          echo "Installing: $reqs"
+          pip install $reqs
+      - name: Start it with Lena
+        run: |
+          set -o pipefail
+          ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
+          if ! python home-assistant/startup_check.py "$RUNNER_TEMP/config" 2>&1 | tee "$RUNNER_TEMP/startup.log"; then
+            echo "::error title=Home Assistant $ha::$(grep -E "^(ERROR|CRITICAL|Home Assistant|Her context)" "$RUNNER_TEMP/startup.log" | head -20 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+            exit 1
+          fi
+          echo "::notice title=Home Assistant $ha::$(grep -E "^(Home Assistant|Her context)" "$RUNNER_TEMP/startup.log" | sed ':a;N;$!ba;s/\n/ · /g')"
+          { grep -E "^WARNING:" "$RUNNER_TEMP/startup.log" || true; } | head -20 \
+            | while read -r line; do echo "::warning title=Home Assistant $ha says::$line"; done
+
+  hassfest:
+    # Home Assistant's own checks for an integration: manifest, translations, services.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    # What HACS (and Home Assistant's Marketplace, built from it) checks before it can install Lena.
+    # HACS only validates public repositories, so this waits until the repository is public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration

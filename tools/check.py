@@ -33,7 +33,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-LENA = ROOT / "home-assistant" / "custom_components" / "lena"
+LENA = ROOT / "custom_components" / "lena"
 FEELINGS = LENA / "feelings.yaml"
 OWUI_FILTER = ROOT / "open-webui" / "lena_filter.py"
 OWUI_TOOLS = ROOT / "open-webui" / "lena_tools.py"
@@ -235,7 +235,7 @@ def png_size(path):
         return None
     return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
 
-BRAND = ROOT / "home-assistant/custom_components/lena/brand"
+BRAND = ROOT / "custom_components/lena/brand"
 for name, k in (("icon.png", 1), ("icon@2x.png", 2)):
     size = png_size(BRAND / name) if (BRAND / name).exists() else None
     check(size == (256 * k, 256 * k), f"brand/{name} is a {256 * k}x{256 * k} PNG (got {size})")
@@ -252,7 +252,7 @@ gradle = (ROOT / "android/app/build.gradle.kts").read_text()
 app_version = re.search(r'versionName = "([^"]+)"', gradle).group(1)
 versions = {
     "android/app/build.gradle.kts (versionName)": app_version,
-    "manifest.json": json.loads((ROOT / "home-assistant/custom_components/lena/manifest.json").read_text())["version"],
+    "manifest.json": json.loads((ROOT / "custom_components/lena/manifest.json").read_text())["version"],
 }
 for name in ("lena_filter.py", "lena_tools.py"):
     found = re.search(r"^version: *(\S+)", (ROOT / "open-webui" / name).read_text(), re.M)
@@ -288,7 +288,7 @@ for plugin in sorted(plugins - APPROVED_GRADLE_PLUGINS):
     check(False, f"the Gradle build uses the plugin {plugin}, which isn't approved")
 
 shipped_python = (
-    list((ROOT / "home-assistant/custom_components/lena").glob("*.py"))
+    list((ROOT / "custom_components/lena").glob("*.py"))
     + list((ROOT / "open-webui").glob("*.py"))
     + [ROOT / "voice/bridge/bridge.py"]
 )
@@ -298,7 +298,7 @@ for path in shipped_python:
         if module in sys.stdlib_module_names or module in local_modules or module == "__future__":
             continue
         check(module in APPROVED_PYTHON, f"{rel(path)} imports {module}, which isn't approved")
-manifest = json.loads((ROOT / "home-assistant/custom_components/lena/manifest.json").read_text())
+manifest = json.loads((ROOT / "custom_components/lena/manifest.json").read_text())
 check(manifest.get("requirements", []) == [], "the integration installs no Python packages (manifest requirements is empty)")
 
 # ---- 12. Default settings: requested changes are applied before a build -------------------------
@@ -313,7 +313,22 @@ for issue in issues:
     check(False, f"adjustments/defaults.env: {issue}")
 check(not issues, "adjustments/defaults.env is applied and matches Defaults.kt")
 
-# ---- 13. The wall display debloat script ------------------------------------------------------------
+# ---- 13. HACS and Home Assistant's Marketplace ---------------------------------------------------
+# They install the one integration under custom_components/ at the repository's root, need hacs.json,
+# these manifest keys, and brand images in the integration (https://hacs.xyz/docs/publish/integration).
+
+hacs = json.loads((ROOT / "hacs.json").read_text())
+check(bool(hacs.get("name")), "hacs.json has a name")
+integrations = [p.name for p in (ROOT / "custom_components").iterdir() if p.is_dir() and p.name != "__pycache__"]
+check(integrations == ["lena"], f"custom_components/ holds only lena (found {integrations})")
+for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
+    check(bool(manifest.get(key)), f"the integration's manifest.json has {key}")
+check((LENA / "brand" / "icon.png").exists(), "custom_components/lena/brand/icon.png exists")
+oldest = re.search(r'home-assistant: \[.*"(\d{4}\.\d+)"\]', (ROOT / ".github/workflows/home-assistant.yml").read_text())
+check(oldest is not None and hacs.get("homeassistant", "").startswith(oldest.group(1) + "."),
+      "hacs.json's minimum Home Assistant is the oldest one the tests run on")
+
+# ---- 14. The wall display debloat script ------------------------------------------------------------
 # tools/wall-display-debloat.sh must parse, and its lists (written by tools/debloat_lists.py) must never
 # remove a package it protects.
 

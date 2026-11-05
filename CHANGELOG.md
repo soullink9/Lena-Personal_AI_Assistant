@@ -12,6 +12,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 - **The Home dashboard loads once:** the dashboards now have their own task, so switching **Chat | Home** brings the other screen forward instead of destroying it, and Home Assistant no longer starts from scratch each time. Back on the dashboards (when it isn't the home screen) goes back to where you were and keeps them loaded. Lena's page script also looks at the page less often when nothing's changing, and not at all while it's hidden.
 - **Return to defaults keeps "Listen for her name"**: switching the microphone on or off is never a reset's call. The defaults file marks the settings Return to defaults leaves alone.
 
+### Home Assistant integration
+
+- **Installs with HACS, and with Home Assistant 2026.11's Marketplace** (HACS built in): the integration moved to `custom_components/lena` at the repository's root, where they look for it, with a `hacs.json`. Released versions only. Copying the folder by hand still works the same. The integration's tests now also run Home Assistant's own checks (hassfest) and HACS's, and report anything Home Assistant says Lena should change.
+
 ### Project
 
 - **`tools/wall-display-debloat.sh`** strips a Samsung tablet down to a Lena wall display from a computer with adb: it keeps Lena, the Play Store, Firefox, Calculator, Clock, My Files and Settings (edit the list to keep yours) and what they need, and removes every other Samsung, Google, carrier and preinstalled app it knows to be safe to remove. It previews first, logs what it removes, and `--restore` puts it all back. Its package lists come from the Universal Android Debloater Next Generation project; `tools/debloat_lists.py` updates them. See [Preparing a tablet for the wall display](docs/app/Wall-Display-Tablet.md).

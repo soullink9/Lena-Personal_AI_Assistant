@@ -89,7 +89,7 @@ sp.save(f"{assets}/social-preview.png", optimize=True)
 # used on dark themes. The icon is the logo on its dark tile with rounded corners, the same as
 # the app icon, so its white shape stays visible on light themes too. The logo adds her name:
 # dark text for light themes, white for dark ones.
-brand = f"{REPO}/home-assistant/custom_components/lena/brand"
+brand = f"{REPO}/custom_components/lena/brand"
 os.makedirs(brand, exist_ok=True)
 
 def tile(px):
