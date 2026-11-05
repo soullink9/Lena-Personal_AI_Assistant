@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Fixed: nothing heard after the wake word** (since 0.6.7). The fix for "error 10" kept one speech recognizer for the whole app; when Android restarted its speech service while the tablet sat idle, that recognizer never answered again. Each sheet has its own recognizer again, still with the pause between sessions and the retry that keep error 10 away, and a session that doesn't get ready within a few seconds is given up (once more with a new recognizer, then your server's speech-to-text) instead of leaving her listening to nothing.
+
 ## [0.6.7] - 2026-11-04
 
 ### Android app

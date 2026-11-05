@@ -632,7 +632,7 @@ class AskActivity : ComponentActivity() {
             val onPartial = { t: String -> heard = t }
             val onLevel = { l: Float -> level = l }
             // Opened by her name: the wake word lets go of the microphone a moment after it heard her.
-            withTimeoutOrNull(1_500) {
+            withTimeoutOrNull(1_000) {
                 while (WakeListener.micsOpen > 0) delay(50)
             }
             val e = ear ?: newEar().also { ear = it }

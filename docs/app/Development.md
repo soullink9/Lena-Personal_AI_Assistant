@@ -12,7 +12,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 |---|---|
 | `MainActivity.kt` | The main screen: the web view and its locks (link lock, microphone, file picker), the native top bar (logo and Chat \| Home switch) and drawer (pinned chats, folders and recent chats, only what fits), Lena's look for Open WebUI's pages, hiding Open WebUI's header, signing in by herself on Open WebUI's sign-in page, intents from shortcuts and notifications, and going back to the wall display when left alone. |
 | `AskActivity.kt` | Talking to Lena: the six looks, listening, sending into the Assistant Lena chat (or to Home Assistant's Assist, when it answers), speaking, follow-ups, the lock-screen mode, closing by itself on a wall screen, Share to Lena. |
-| `Voice.kt` | Listening (the on-device recognizer, one for the whole app so Android's session limit is never reached; or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
+| `Voice.kt` | Listening (the on-device recognizer, one per sheet, with a pause between sessions and a watchdog so it can't hang; or recording for your server) and speaking (your server's voice or the phone's), and her tone of voice. |
 | `Api.kt` | Open WebUI's API with the page's sign-in: models, chats, pins, search, memories, notes, knowledge, speech, and starting and following an answer. |
 | `SignIn.kt` | Signing in to Open WebUI by herself with details kept encrypted. |
 | `SettingsActivity.kt` | The settings screen and all its pages, in sections (Connections, Wall display, Talking to Lena, Chat screen configuration, Device customization, About), with **Search settings**. Its `findable` list is what search finds: a new setting needs a line there too. |

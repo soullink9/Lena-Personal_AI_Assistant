@@ -75,12 +75,12 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
  * Android's on-device speech recognizer: shows your words as you speak, and the audio never
  * leaves the phone.
  *
- * Android limits how many recognition sessions one app may have open at once, and the speech service
- * itself runs one at a time; going over either is "error 10" (ERROR_TOO_MANY_REQUESTS). So Lena keeps
- * one recognizer for the whole app ([shared]), created once and reused by every sheet, instead of one per
- * sheet (destroying a recognizer frees its session only some time later). A new session never starts
- * while the last one is open: it's cancelled and given a moment to close first. If the service is still
- * busy anyway, she waits a little longer and tries again.
+ * One recognizer per sheet, destroyed when the sheet closes: a recognizer kept longer can outlive the
+ * speech service it's connected to (Android restarts it while the tablet sits idle) and then never
+ * answers. Within a sheet, the speech service runs one session at a time and refuses a new one while the
+ * last is still closing ("error 10", ERROR_TOO_MANY_REQUESTS), so a new session waits a moment after the
+ * last is cancelled, and a busy recognizer gets a pause and another try. A session that never gets ready
+ * is given up after a few seconds, so listening can't hang; the sheet then uses your server.
  */
 class PhoneEar(private val context: Context) : Ear {
 
@@ -88,32 +88,26 @@ class PhoneEar(private val context: Context) : Ear {
         /** Whether this phone has an on-device recognizer at all (some don't, and then the server is used). */
         fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c)
 
-        /** The app's one recognizer (main thread only). Made from the app's context, so no screen is held. */
-        private var shared: SpeechRecognizer? = null
-
-        /** Whether a session is open on it: started, and no result or error yet (main thread only). */
-        private var sessionOpen = false
-
         /** How long the speech service needs to close a cancelled session before the next can start. */
         private const val SETTLE_MS = 300L
+
+        /** How long a session may take to get ready before it's given up. */
+        private const val READY_TIMEOUT_MS = 5_000L
 
         /** Waits before each retry when the service was busy: it's usually free again within a second. */
         private val BUSY_RETRY_MS = listOf(500L, 1_200L)
 
         /** Errors meaning the service is still busy with an earlier session; waiting is enough. */
         private val BUSY = setOf(SpeechRecognizer.ERROR_TOO_MANY_REQUESTS, SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
-
-        /** The recognizer, made if there isn't one. */
-        private fun recognizer(c: Context): SpeechRecognizer =
-            shared ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(c.applicationContext).also { shared = it }
-
-        /** Throws the recognizer away (its connection broke); the next session makes a new one. */
-        private fun discard() {
-            shared?.destroy()
-            shared = null
-            sessionOpen = false
-        }
     }
+
+    private var recognizer: SpeechRecognizer? = null
+
+    /** Whether a session is open: started, and no result or error yet (main thread only). */
+    private var sessionOpen = false
+
+    /** Counts sessions, so a late cancel only ever touches its own session (main thread only). */
+    private var session = 0
 
     /** Free-form speech with partial results, so your words appear as you speak. */
     private fun request() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -122,7 +116,7 @@ class PhoneEar(private val context: Context) : Ear {
 
     /**
      * Listens once. If the service was still busy (error 10, or "busy"), waits and tries again, up to
-     * twice. If its connection broke, starts over with a new recognizer once.
+     * twice. If the recognizer broke or never got ready, starts over with a new one once.
      */
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String {
         var reconnected = false
@@ -137,7 +131,8 @@ class PhoneEar(private val context: Context) : Ear {
                         delay(BUSY_RETRY_MS[busyTries++])
                     }
                     e.transient && !reconnected -> {
-                        withContext(Dispatchers.Main) { discard() }
+                        Logs.i("Voice", "The phone's recognizer stopped answering (${e.describe()}); starting a new one")
+                        withContext(Dispatchers.Main) { release() }
                         reconnected = true
                         delay(SETTLE_MS)
                     }
@@ -153,24 +148,40 @@ class PhoneEar(private val context: Context) : Ear {
      */
     private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
         withContext(Dispatchers.Main) {
-            val r = recognizer(context)
+            val r = recognizer ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { recognizer = it }
             if (sessionOpen) {
                 // Close the last session and let the service catch up, or this one is refused.
                 r.cancel()
                 sessionOpen = false
                 delay(SETTLE_MS)
             }
+            val mine = ++session
+            val main = android.os.Handler(android.os.Looper.getMainLooper())
             suspendCancellableCoroutine { cont ->
                 var latest = ""
+                var ready = false
+                lateinit var watchdog: Runnable
+                /** Ends this session's bookkeeping, if it's still the current one. */
+                fun close() {
+                    main.removeCallbacks(watchdog)
+                    if (session == mine) sessionOpen = false
+                }
                 /** Finishes with the text, once: the recognizer can call back more than once. */
                 fun done(text: String) {
-                    sessionOpen = false
+                    close()
                     if (cont.isActive) cont.resume(text)
                 }
                 /** Fails with the error, once. */
                 fun fail(e: Exception) {
-                    sessionOpen = false
+                    close()
                     if (cont.isActive) cont.resumeWithException(e)
+                }
+                // Never got ready: the service isn't answering. Give up on it rather than wait forever.
+                watchdog = Runnable {
+                    if (!ready && session == mine) {
+                        runCatching { r.cancel() }
+                        fail(EarError(SpeechRecognizer.ERROR_SERVER_DISCONNECTED))
+                    }
                 }
                 r.setRecognitionListener(object : RecognitionListener {
                     /**
@@ -179,9 +190,14 @@ class PhoneEar(private val context: Context) : Ear {
                      */
                     override fun onRmsChanged(rmsdB: Float) = onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
 
-                    // Callbacks the recognizer requires but Lena doesn't need: she only uses the level,
-                    // the partial and final results, and errors.
-                    override fun onReadyForSpeech(params: Bundle?) {}
+                    /** The microphone is open: from here on it's only a matter of you speaking. */
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        ready = true
+                        main.removeCallbacks(watchdog)
+                    }
+
+                    // Callbacks the recognizer requires but Lena doesn't need: she only uses readiness,
+                    // the level, the partial and final results, and errors.
                     override fun onBeginningOfSpeech() {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
@@ -221,11 +237,16 @@ class PhoneEar(private val context: Context) : Ear {
                 })
                 sessionOpen = true
                 r.startListening(request())
+                main.postDelayed(watchdog, READY_TIMEOUT_MS)
                 cont.invokeOnCancellation {
-                    // Cancellation can come from any thread; the recognizer only takes calls on the main one.
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        runCatching { r.cancel() }
-                        sessionOpen = false
+                    // Can come from any thread; the recognizer only takes calls on the main one. Only this
+                    // session is cancelled, never a newer one that started meanwhile.
+                    main.post {
+                        main.removeCallbacks(watchdog)
+                        if (session == mine && sessionOpen) {
+                            runCatching { r.cancel() }
+                            sessionOpen = false
+                        }
                     }
                 }
             }
@@ -233,18 +254,14 @@ class PhoneEar(private val context: Context) : Ear {
 
     /** Ends listening now; the recognizer then delivers what it has. */
     override fun finish() {
-        shared?.stopListening()
+        recognizer?.stopListening()
     }
 
-    /**
-     * Ends this sheet's session. The recognizer itself stays for the next sheet: making a new one each
-     * time is what used up Android's sessions.
-     */
+    /** Destroys the recognizer, which holds the microphone and a connection to the speech service. */
     override fun release() {
-        if (sessionOpen) {
-            shared?.cancel()
-            sessionOpen = false
-        }
+        recognizer?.destroy()
+        recognizer = null
+        sessionOpen = false
     }
 }
 
