@@ -313,6 +313,25 @@ for issue in issues:
     check(False, f"adjustments/defaults.env: {issue}")
 check(not issues, "adjustments/defaults.env is applied and matches Defaults.kt")
 
+# ---- 13. The wall display debloat script ------------------------------------------------------------
+# tools/wall-display-debloat.sh must parse, and its lists (written by tools/debloat_lists.py) must never
+# remove a package it protects.
+
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+
+debloat = ROOT / "tools/wall-display-debloat.sh"
+if shutil.which("bash"):
+    parsed = subprocess.run(["bash", "-n", str(debloat)], capture_output=True, text=True)
+    check(parsed.returncode == 0, f"tools/wall-display-debloat.sh parses ({parsed.stderr.strip() or 'bash -n'})")
+import debloat_lists  # noqa: E402 - the tools folder, added above
+
+debloat_text = debloat.read_text(encoding="utf-8")
+removing = set(re.findall(r"^([A-Za-z][\w.]*)\|", debloat_text, re.M))
+check(len(removing) > 100, "tools/wall-display-debloat.sh has its package lists")
+overlap = sorted(removing & debloat_lists.protected())
+check(not overlap, f"the debloat script never removes a protected package ({', '.join(overlap) or 'none'})")
+
 print()
 if failures:
     print(f"{len(failures)} check(s) failed.")

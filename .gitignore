@@ -23,6 +23,8 @@ secrets.yaml
 *.env
 # Except Lena's default settings: no secrets, only where each setting starts (see adjustments/README.md).
 !adjustments/defaults.env
+# tools/wall-display-debloat.sh's logs (they name the tablet's serial number)
+debloat-*.log
 
 # Data folders created by the example compose files
 ollama-data/

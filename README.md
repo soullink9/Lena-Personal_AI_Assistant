@@ -51,7 +51,7 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 | **Setup** | [Getting started](docs/Getting-Started.md) · [Lena in Open WebUI](docs/open-webui/Setup.md) · [Home Assistant installation](docs/home-assistant/Installation.md) · [App installation](docs/app/Installation.md) |
 | **Her personality** | [Personality](docs/personality/Personality.md) · [Feelings](docs/personality/Moods.md) · [Memory](docs/home-assistant/Memory.md) |
 | **Home Assistant** | [The Lena integration](docs/home-assistant/Integration.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
-| **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
+| **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Wall display tablet](docs/app/Wall-Display-Tablet.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
 | **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
 | **Development** | [Architecture](ARCHITECTURE.md) · [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) |
 

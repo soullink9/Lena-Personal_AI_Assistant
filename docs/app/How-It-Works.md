@@ -81,6 +81,8 @@ The **Wall display** section of Settings turns a tablet on the wall (or a docked
 
 Open the dashboards with the **Home** switch on the main screen. The wake word is under **Talking to Lena**.
 
+A tablet that's only a wall display can be stripped down to Lena and a few apps you choose: see [Preparing a tablet for the wall display](Wall-Display-Tablet.md).
+
 ### Dashboards
 
 Your dashboards are signed in with the token from Lena's settings, through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each one by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`). Links that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.

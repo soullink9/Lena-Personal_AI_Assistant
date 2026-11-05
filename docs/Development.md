@@ -44,6 +44,8 @@ How the repository is organised and how to change it without breaking things. Th
 ├── tools/
 │   ├── check.py                   offline checks
 │   ├── defaults.py                applies adjustments/defaults.env to the app's Defaults.kt
+│   ├── wall-display-debloat.sh    strips a tablet down to the wall display (run from a computer with adb)
+│   ├── debloat_lists.py           updates that script's package lists from the UAD project's list
 │   └── make_images.py             app icon, notification icon and avatars from the logo
 ├── docs/                          everything in detail
 │   ├── assets/                    the logo, avatar and GitHub social preview

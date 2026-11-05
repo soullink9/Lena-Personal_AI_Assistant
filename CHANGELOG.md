@@ -8,6 +8,9 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 - **New defaults** (asked for in the defaults file): the wake word is **Lena**, listens **Whenever Lena is open**, with **Fewer false starts**; **Her voice follows her mood** is on; **Reply notifications** are off. Only new installs and **Return to defaults** use them.
 
+### Project
+
+- **`tools/wall-display-debloat.sh`** strips a Samsung tablet down to a Lena wall display from a computer with adb: it keeps Lena, the Play Store, Firefox, Calculator, Clock, My Files and Settings (edit the list to keep yours) and what they need, and removes every other Samsung, Google, carrier and preinstalled app it knows to be safe to remove. It previews first, logs what it removes, and `--restore` puts it all back. Its package lists come from the Universal Android Debloater Next Generation project; `tools/debloat_lists.py` updates them. See [Preparing a tablet for the wall display](docs/app/Wall-Display-Tablet.md).
 
 ## [0.6.6] - 2026-11-02
 
