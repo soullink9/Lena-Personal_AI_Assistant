@@ -57,6 +57,7 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.SwapVert
@@ -221,6 +222,12 @@ class MainActivity : ComponentActivity() {
      */
     private var dashboardMode = false
 
+    /** [dashboardMode], for the screen to draw from: Apps is in the menu only then. */
+    private val wallDisplay = mutableStateOf(false)
+
+    /** Whether the apps list is showing (from Apps at the bottom of the menu). */
+    private val showApps = mutableStateOf(false)
+
     /** The Refresh generation this page was loaded at; a newer one reloads it (see [Refresh]). */
     private var refreshSeen = Refresh.generation
 
@@ -274,7 +281,15 @@ class MainActivity : ComponentActivity() {
         web = createWebView()
         applyTheme()
         applyShellStyle()
-        setContent { LenaTheme { Shell() } }
+        setContent {
+            LenaTheme {
+                Box(Modifier.fillMaxSize()) {
+                    Shell()
+                    // The apps list, from Apps at the bottom of the menu (wall display only).
+                    if (showApps.value) AppsDrawer(onClose = { showApps.value = false })
+                }
+            }
+        }
         // Switching dark mode rebuilds the screen so the page re-themes; come back to the same chat.
         val restored = savedInstanceState?.getString("url")?.takeIf { isServer(Uri.parse(it)) }
         if (restored != null) web.loadUrl(restored) else handle(intent, fresh = true)
@@ -292,6 +307,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun applyWindowMode() {
         dashboardMode = DashboardActivity.isHomeScreen(this)
+        wallDisplay.value = dashboardMode
         WindowCompat.getInsetsController(window, window.decorView).apply {
             if (dashboardMode) {
                 hide(WindowInsetsCompat.Type.systemBars())
@@ -514,7 +530,7 @@ class MainActivity : ComponentActivity() {
         }
 
         /**
-         * A page that didn't load goes in the log (for Settings → Logs), without its query, which can hold
+         * A page that didn't load goes in the log (for Settings → Software version → Logs), without its query, which can hold
          * tokens.
          */
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
@@ -849,7 +865,8 @@ class MainActivity : ComponentActivity() {
                             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        // Settings and memory, side by side (reloading is Settings → Refresh all connections)
+                        // Settings, memory and (on the wall display, where there's no launcher) the apps list, side
+                        // by side. Reloading is Settings → Refresh all connections.
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         Row(
                             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -860,6 +877,9 @@ class MainActivity : ComponentActivity() {
                             }
                             DrawerIcon(Icons.Outlined.Psychology, "Memory & knowledge") {
                                 closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
+                            }
+                            if (wallDisplay.value) {
+                                DrawerIcon(Icons.Outlined.Apps, "Apps") { closeThen { showApps.value = true } }
                             }
                         }
                     }

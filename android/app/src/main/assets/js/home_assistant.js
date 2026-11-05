@@ -131,8 +131,11 @@
     return row;
   }
 
-  // Adds Lena's Apps and Settings at the bottom of the menu, once. Returns whether they're there,
-  // so the app knows it can leave them out of its bar.
+  // Whether Apps belongs in the menu: only on the wall display (the app says, through lena.apps).
+  var appsRow = false;
+
+  // Adds Lena's Apps (on the wall display) and Settings at the bottom of the menu, once. Returns
+  // whether they're there, so the app knows it can leave them out of its bar.
   function addMenuItems() {
     var bar = sidebar();
     if (!shadow(bar)) return false;
@@ -140,7 +143,7 @@
       addStyle(bar, 'lena-items-style', MENU_ITEMS_CSS);
       var box = document.createElement('div');
       box.id = 'lena-items';
-      box.appendChild(menuRow(APPS_ICON, 'Apps', 'apps'));
+      if (appsRow) box.appendChild(menuRow(APPS_ICON, 'Apps', 'apps'));
       box.appendChild(menuRow(SETTINGS_ICON, 'Lena settings', 'settings'));
       bar.shadowRoot.appendChild(box);
     }
@@ -235,6 +238,23 @@
   }
 
   window.lena = {
+    // Shows ("on") or leaves out ("off") Apps in the menu: the rows are made again with or without it.
+    apps: function (state) {
+      var wanted = state === 'on';
+      if (wanted === appsRow) return;
+      appsRow = wanted;
+      var bar = sidebar();
+      var rows = shadow(bar) && bar.shadowRoot.getElementById('lena-items');
+      if (rows) rows.remove();
+      look();
+    },
+
+    // Report the views again, for a new dashboard screen that took over this page.
+    report: function () {
+      lastReport = '';
+      look();
+    },
+
     // Up out of a subview, as Home Assistant's own back arrow does.
     back: function () {
       var root = dashboard();

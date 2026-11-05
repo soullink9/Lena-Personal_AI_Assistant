@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Sets scheduled prompts again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Installing an update you downloaded in Settings > Updates (Android asks you to confirm each time). -->
+    <!-- Installing an update you downloaded in Settings > Software version > Updates (Android asks you to confirm each time). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine, and (dashboard
@@ -61,15 +61,14 @@
 
         <!-- Dashboard mode: your Home Assistant dashboards in a Lena frame. It can be a tablet's
              home screen (Android settings > Apps > Default apps > Home app > Lena).
-             Its own task: switching Chat | Home then only brings a screen forward. In one task with the
-             chat screen, each switch destroyed the other screen, and Home Assistant loaded from scratch. -->
+             In the same task as the chat screen (one app in Recents). Its web view outlives the screen
+             (DashboardWeb.kt), so coming back to Home doesn't load Home Assistant again. -->
         <activity
             android:name=".DashboardActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|density"
             android:exported="true"
             android:label="Lena dashboard"
             android:launchMode="singleTask"
-            android:taskAffinity="io.github.soullink9.lena.dashboard"
             android:resumeWhilePausing="true"
             android:stateNotNeeded="true">
             <intent-filter>

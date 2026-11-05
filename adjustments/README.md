@@ -28,4 +28,4 @@ Only comments (`#`) and `NAME=value` lines belong in the file. `apply` rewrites 
 
 ## What a default changes
 
-A default is where a setting starts: on a new install, and after **Settings → About → Return to defaults**. It doesn't change what you've already picked on your phone. Connections (Open WebUI, Home Assistant, who answers and Assist's agent), the model, dashboards, the screensaver's album, **Listen for her name** and your prompts aren't changed by Return to defaults; for those, the default is only where a new install starts.
+A default is where a setting starts: on a new install, and after **Settings → Software version → Return to defaults**. It doesn't change what you've already picked on your phone. Connections (Open WebUI, Home Assistant, who answers and Assist's agent), the model, dashboards, the screensaver's album, **Listen for her name** and your prompts aren't changed by Return to defaults; for those, the default is only where a new install starts.

@@ -65,7 +65,7 @@ import kotlinx.coroutines.withContext
 import java.util.Date
 
 /**
- * Settings → Logs: Lena's own log (problems first), and Android's log for her current run.
+ * Settings → Software version → Logs: Lena's own log (problems first), and Android's log for her current run.
  * Copy or share what you see, for example to ask for help; nothing leaves the phone otherwise.
  */
 class LogsActivity : ComponentActivity() {

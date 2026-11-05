@@ -9,7 +9,7 @@ import java.util.concurrent.Executors
 /**
  * Lena's own log: what went wrong, warnings, and what she was doing, kept in a small file in
  * the app's private storage (two files of at most 256 KB, the older dropped) and readable under
- * Settings → Logs. It records errors and events only: never messages, answers, tokens or
+ * Settings → Software version → Logs. It records errors and events only: never messages, answers, tokens or
  * passwords. Everything also goes to Android's log under "Lena/…".
  */
 object Logs {
@@ -26,7 +26,7 @@ object Logs {
         }
     }
 
-    /** One log entry, as Settings → Logs shows it. */
+    /** One log entry, as Settings → Software version → Logs shows it. */
     data class Entry(val time: Long, val level: Level, val tag: String, val message: String)
 
     private const val MAX = 256 * 1024
@@ -120,7 +120,7 @@ object Logs {
         }.reversed()
     }
 
-    /** Deletes both files, for Clear in Settings → Logs. */
+    /** Deletes both files, for Clear in Settings → Software version → Logs. */
     fun clear() {
         val d = dir ?: return
         synchronized(this) {

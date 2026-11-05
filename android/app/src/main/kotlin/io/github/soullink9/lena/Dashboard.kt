@@ -173,6 +173,9 @@ class DashboardActivity : ComponentActivity() {
     /** Whether this is the home screen (see [isHomeScreen]): full screen and the screen saver. */
     private var dashboardMode = false
 
+    /** [dashboardMode], for the screen to draw from (Apps shows only then). */
+    private val wallDisplay = mutableStateOf(false)
+
     /** The Refresh generation the dashboards were loaded at; a newer one reloads them (see [Refresh]). */
     private var refreshSeen = Refresh.generation
 
@@ -200,8 +203,19 @@ class DashboardActivity : ComponentActivity() {
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
         }
-        web = createWebView()
-        open(Prefs.dashboards(this).first(), reload = true)
+        // The web view kept from the last dashboard screen, page and all (see DashboardWeb), or a new one.
+        val (view, fresh) = DashboardWeb.take(this, "$server|$saved") { createWebView(it) }
+        web = view
+        attachClients(web)
+        if (fresh) {
+            bridge(web)
+            open(Prefs.dashboards(this).first(), reload = true)
+        } else {
+            loaded = true
+            canGoBack.value = web.canGoBack()
+            callPage("report") // the bar needs the page's views again
+            callPage("apps", if (dashboardMode) "on" else "off")
+        }
         setContent { LenaTheme { Screen() } }
         if (dashboardMode && intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
         // On the wall all day: keep Open WebUI and Home Assistant ready for whenever someone talks to her.
@@ -215,6 +229,9 @@ class DashboardActivity : ComponentActivity() {
      */
     private fun applyWindowMode() {
         dashboardMode = isHomeScreen(this)
+        wallDisplay.value = dashboardMode
+        // The page's Apps row in Home Assistant's menu follows the same rule (assets/js/home_assistant.js).
+        if (::web.isInitialized) callPage("apps", if (dashboardMode) "on" else "off")
         WindowCompat.getInsetsController(window, window.decorView).apply {
             if (dashboardMode) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -238,7 +255,7 @@ class DashboardActivity : ComponentActivity() {
      * content URIs, location, pop-ups and plain http off.
      */
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createWebView(): WebView = WebView(this).apply {
+    private fun createWebView(context: android.content.Context): WebView = WebView(context).apply {
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         setBackgroundColor(android.graphics.Color.BLACK)
         settings.apply {
@@ -251,6 +268,13 @@ class DashboardActivity : ComponentActivity() {
             setSupportMultipleWindows(false)
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
+    }
+
+    /**
+     * The web view's clients, which belong to this screen: set again whenever a screen takes the kept
+     * web view. Your Home Assistant loads here; other sites open in your browser.
+     */
+    private fun attachClients(view: WebView) = view.apply {
         webViewClient = object : WebViewClient() {
             /**
              * Your Home Assistant loads here; other sites open in your browser. Frames (iframe and camera
@@ -273,6 +297,7 @@ class DashboardActivity : ComponentActivity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 loaded = true
                 canGoBack.value = view.canGoBack()
+                callPage("apps", if (dashboardMode) "on" else "off")
             }
 
             /** Every navigation, including Home Assistant's in-page ones: whether back has somewhere to go. */
@@ -304,7 +329,6 @@ class DashboardActivity : ComponentActivity() {
                 return true
             }
         }
-        bridge(this)
     }
 
     /**
@@ -323,59 +347,68 @@ class DashboardActivity : ComponentActivity() {
             !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) return
         val origins = setOf(origin())
+        // Registered once per web view, which outlives its screen: the message goes to the screen showing it now.
         WebViewCompat.addWebMessageListener(view, "lenaBridge", origins) { v, message, source, isMainFrame, _ ->
-            if (!isMainFrame || source.toString().trimEnd('/') != origin()) return@addWebMessageListener
-            if (!isFrontend(v.url)) {
-                Logs.w("Dashboard", "Ignored a request from a page that isn't Home Assistant's frontend (${v.url?.let { Uri.parse(it).path }})")
-                return@addWebMessageListener
-            }
-            val m = runCatching { JSONObject(message.data ?: "") }.getOrNull() ?: return@addWebMessageListener
-            when (m.optString("kind")) {
-                "auth" -> {
-                    Logs.i("Dashboard", "Home Assistant asked to sign in; gave it the saved token")
-                    val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthSetToken" }
-                    if (!callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) return@addWebMessageListener
-                    val auth = JSONObject().put("access_token", token).put("expires_in", 1800)
-                    v.evaluateJavascript("window.$callback(true, $auth);", null)
-                }
-                "header" -> {
-                    val h = runCatching { JSONObject(m.optString("payload", "{}")) }.getOrNull() ?: return@addWebMessageListener
-                    val views = h.optJSONArray("views")
-                    header.value = Header(
-                        views = List(views?.length() ?: 0) { i ->
-                            val v = views!!.getJSONObject(i)
-                            View(v.optInt("i"), v.optString("title").ifBlank { v.optString("path") }, v.optString("path"))
-                        },
-                        current = h.optInt("current"),
-                        subview = h.optBoolean("subview"),
-                        menuItems = h.optBoolean("menuItems"),
-                    )
-                }
-                // Lena's rows at the bottom of Home Assistant's menu.
-                "apps" -> { showApps.value = true }
-                "settings" -> { startActivity(Intent(this, SettingsActivity::class.java)) }
-                "revoke" -> {
-                    val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthRevokeToken" }
-                    if (callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) v.evaluateJavascript("window.$callback(true);", null)
-                }
-                "bus" -> {
-                    val msg = runCatching { JSONObject(m.optString("payload", "{}")) }.getOrNull() ?: return@addWebMessageListener
-                    if (msg.optString("type") == "config/get") {
-                        val result = JSONObject()
-                            .put("hasSettingsScreen", false).put("canWriteTag", false).put("hasExoPlayer", false)
-                            .put("canCommissionMatter", false).put("canImportThreadCredentials", false)
-                            .put("hasAssist", false).put("hasBarCodeScanner", 0).put("canSetupImprov", false)
-                        val reply = JSONObject().put("id", msg.opt("id")).put("type", "result").put("success", true).put("result", result)
-                        v.evaluateJavascript("window.externalBus && window.externalBus($reply);", null)
-                    }
-                }
-            }
+            DashboardWeb.host?.onPageMessage(v, message.data, source, isMainFrame)
         }
         // Lena's side of the page (assets/js/home_assistant.js): signing in, hiding Home Assistant's
         // header, reporting the views, and window.lena for the calls below. Android runs it in every
         // frame on this address; the script itself stops in frames and on pages that aren't the frontend.
         val script = assets.open("js/home_assistant.js").bufferedReader().use { it.readText() }
         WebViewCompat.addDocumentStartJavaScript(view, script, origins)
+    }
+
+    /**
+     * A message from the page's script (see [bridge]), for the screen showing the web view. Answered only
+     * from the top frame, on Home Assistant's address, while it shows Home Assistant's own frontend.
+     */
+    fun onPageMessage(v: WebView, data: String?, source: Uri, isMainFrame: Boolean) {
+        if (!isMainFrame || source.toString().trimEnd('/') != origin()) return
+        if (!isFrontend(v.url)) {
+            Logs.w("Dashboard", "Ignored a request from a page that isn't Home Assistant's frontend (${v.url?.let { Uri.parse(it).path }})")
+            return
+        }
+        val m = runCatching { JSONObject(data ?: "") }.getOrNull() ?: return
+        when (m.optString("kind")) {
+            "auth" -> {
+                Logs.i("Dashboard", "Home Assistant asked to sign in; gave it the saved token")
+                val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthSetToken" }
+                if (!callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) return
+                val auth = JSONObject().put("access_token", token).put("expires_in", 1800)
+                v.evaluateJavascript("window.$callback(true, $auth);", null)
+            }
+            "header" -> {
+                val h = runCatching { JSONObject(m.optString("payload", "{}")) }.getOrNull() ?: return
+                val views = h.optJSONArray("views")
+                header.value = Header(
+                    views = List(views?.length() ?: 0) { i ->
+                        val v = views!!.getJSONObject(i)
+                        View(v.optInt("i"), v.optString("title").ifBlank { v.optString("path") }, v.optString("path"))
+                    },
+                    current = h.optInt("current"),
+                    subview = h.optBoolean("subview"),
+                    menuItems = h.optBoolean("menuItems"),
+                )
+            }
+            // Lena's rows at the bottom of Home Assistant's menu.
+            "apps" -> { showApps.value = true }
+            "settings" -> { startActivity(Intent(this, SettingsActivity::class.java)) }
+            "revoke" -> {
+                val callback = JSONObject(m.optString("payload", "{}")).optString("callback").ifBlank { "externalAuthRevokeToken" }
+                if (callback.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) v.evaluateJavascript("window.$callback(true);", null)
+            }
+            "bus" -> {
+                val msg = runCatching { JSONObject(m.optString("payload", "{}")) }.getOrNull() ?: return
+                if (msg.optString("type") == "config/get") {
+                    val result = JSONObject()
+                        .put("hasSettingsScreen", false).put("canWriteTag", false).put("hasExoPlayer", false)
+                        .put("canCommissionMatter", false).put("canImportThreadCredentials", false)
+                        .put("hasAssist", false).put("hasBarCodeScanner", 0).put("canSetupImprov", false)
+                    val reply = JSONObject().put("id", msg.opt("id")).put("type", "result").put("success", true).put("result", result)
+                    v.evaluateJavascript("window.externalBus && window.externalBus($reply);", null)
+                }
+            }
+        }
     }
 
     /**
@@ -524,9 +557,9 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
-    /** Destroys the web view with the screen. */
+    /** Sets the web view aside for the next dashboard screen (see [DashboardWeb]), page and all. */
     override fun onDestroy() {
-        if (::web.isInitialized) web.destroy()
+        if (::web.isInitialized) DashboardWeb.putAside(this)
         super.onDestroy()
     }
 
@@ -585,9 +618,9 @@ class DashboardActivity : ComponentActivity() {
             when {
                 apps -> apps = false
                 header.value.subview || web.canGoBack() -> back()
-                // As the home screen, back has nowhere to go. Otherwise it goes back to where you were, and
-                // the dashboard stays loaded behind, ready for the next time.
-                !isHomeScreen(this@DashboardActivity) -> moveTaskToBack(true)
+                // As the home screen, back has nowhere to go; otherwise it leaves (its page is kept, see
+                // DashboardWeb, so coming back is quick).
+                !isHomeScreen(this@DashboardActivity) -> finish()
             }
         }
 
@@ -602,7 +635,7 @@ class DashboardActivity : ComponentActivity() {
             AnimatedVisibility(visible = dimmed.value, enter = fadeIn(), exit = fadeOut()) {
                 LenaDisplay(locked = false, listening = listening.value, onTalk = ::wakeUp)
             }
-            if (apps) Apps(onClose = { apps = false })
+            if (apps) AppsDrawer(onClose = { apps = false })
         }
     }
 
@@ -685,19 +718,23 @@ class DashboardActivity : ComponentActivity() {
                     Icon(Icons.Rounded.Mic, "Talk to Lena", tint = MaterialTheme.colorScheme.primary)
                 }
                 val openSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }
+                // Apps only on the wall display (dashboard mode), where there's no launcher to open them.
+                val withApps = wallDisplay.value
                 // Apps and Settings live at the bottom of Home Assistant's menu once the page script has put
                 // them there; until then (or if a frontend update stops it), they stay here.
                 if (!h.menuItems) {
                     if (narrow) Box {
                         IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                         DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                            DropdownMenuItem(text = { Text("Apps") }, leadingIcon = { Icon(Icons.Outlined.Apps, null) },
-                                onClick = { more = false; onApps() })
+                            if (withApps) {
+                                DropdownMenuItem(text = { Text("Apps") }, leadingIcon = { Icon(Icons.Outlined.Apps, null) },
+                                    onClick = { more = false; onApps() })
+                            }
                             DropdownMenuItem(text = { Text("Settings") }, leadingIcon = { Icon(Icons.Outlined.Settings, null) },
                                 onClick = { more = false; openSettings() })
                         }
                     } else {
-                        FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
+                        if (withApps) FilledTonalIconButton(onClick = onApps) { Icon(Icons.Outlined.Apps, "Apps") }
                         FilledTonalIconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings") }
                     }
                 }
@@ -723,63 +760,6 @@ class DashboardActivity : ComponentActivity() {
                     Icon(Icons.Rounded.Mic, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Talk to her")
-                }
-            }
-        }
-    }
-
-    // ---- Apps, for when this is the home screen ----------------------------------------------
-
-    /** An app in the apps list. */
-    private data class App(val label: String, val packageName: String, val icon: ImageBitmap)
-
-    /**
-     * Every app with a launcher icon, for when the wall display is the tablet's home screen and there's no
-     * other way to open them.
-     */
-    @Composable
-    private fun Apps(onClose: () -> Unit) {
-        var list by remember { mutableStateOf<List<App>?>(null) }
-        LaunchedEffect(Unit) {
-            list = withContext(Dispatchers.IO) {
-                val pm = packageManager
-                pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-                    .filter { it.activityInfo.packageName != packageName }
-                    .map { r ->
-                        App(
-                            r.loadLabel(pm).toString(),
-                            r.activityInfo.packageName,
-                            r.loadIcon(pm).toBitmap(96, 96, Bitmap.Config.ARGB_8888).asImageBitmap(),
-                        )
-                    }
-                    .distinctBy { it.packageName }
-                    .sortedBy { it.label.lowercase() }
-            }
-        }
-        // Always light text on near-black, whatever the theme, so every app name is readable.
-        Surface(color = Color(0xF2101014), contentColor = Color.White, modifier = Modifier.fillMaxSize()) {
-            Column(Modifier.statusBarsPadding().navigationBarsPadding()) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 12.dp)) {
-                    Text("Apps", style = MaterialTheme.typography.headlineSmall, color = Color.White, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close", tint = Color.White) }
-                }
-                val apps = list
-                if (apps == null) Text("Loading…", Modifier.padding(24.dp), color = Color.White)
-                else LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.fillMaxSize().padding(12.dp)) {
-                    items(apps, key = { it.packageName }) { a ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
-                                onClose()
-                                packageManager.getLaunchIntentForPackage(a.packageName)?.let { startActivity(it) }
-                            }.padding(vertical = 14.dp),
-                        ) {
-                            Image(a.icon, null, Modifier.size(56.dp))
-                            Spacer(Modifier.height(8.dp))
-                            Text(a.label, style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 2, textAlign = TextAlign.Center,
-                                overflow = TextOverflow.Ellipsis)
-                        }
-                    }
                 }
             }
         }

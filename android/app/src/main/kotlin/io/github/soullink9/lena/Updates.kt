@@ -320,8 +320,8 @@ class UpdateReceiver : BroadcastReceiver() {
                     PackageInstaller.STATUS_FAILURE_ABORTED -> "Update cancelled. Tap Install to try again."
                     PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android blocked the update. Turn off Auto Blocker (Security and privacy), then tap Install again."
                     PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
-                        "That update doesn't fit this Lena (a different signing key?). See Settings → Logs."
-                    else -> "The update didn't install. See Settings → Logs."
+                        "That update doesn't fit this Lena (a different signing key?). See Settings → Software version → Logs."
+                    else -> "The update didn't install. See Settings → Software version → Logs."
                 }
                 Toast.makeText(context, friendly, Toast.LENGTH_LONG).show()
             }

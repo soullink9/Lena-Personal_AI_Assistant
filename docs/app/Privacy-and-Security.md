@@ -6,7 +6,7 @@ Lena is built so that your conversations go to your server and nowhere else.
 
 ## What Lena connects to
 
-Your Open WebUI address, any sign-in addresses you add (such as Authentik), your Home Assistant address if you add one, and whatever those pages themselves load. GitHub only when you check for or download an update in Settings → Updates (never in the background). Nothing else: no analytics, no crash reporting sent anywhere, and no server run by anyone else.
+Your Open WebUI address, any sign-in addresses you add (such as Authentik), your Home Assistant address if you add one, and whatever those pages themselves load. GitHub only when you check for or download an update in Settings → Software version → Updates (never in the background). Nothing else: no analytics, no crash reporting sent anywhere, and no server run by anyone else.
 
 Links to other sites open in your normal browser, not in Lena, so those sites never see Lena's storage or your sign-in.
 
@@ -39,7 +39,7 @@ The slideshow asks the Lena integration for an album's photos and downloads each
 
 ## Logs
 
-Settings → Logs shows Lena's own log: problems, warnings and what she was doing (a request that failed and why, the wake word hearing her, an alert sent, a crash with where it happened). It's two small files in Lena's private storage, the oldest part dropped as it fills, and it only leaves the phone if you copy or share it. It records errors and events, never your messages, her answers, tokens or passwords, and anything shaped like a token is blanked out as a precaution. Clear it any time.
+Settings → Software version → Logs shows Lena's own log: problems, warnings and what she was doing (a request that failed and why, the wake word hearing her, an alert sent, a crash with where it happened). It's two small files in Lena's private storage, the oldest part dropped as it fills, and it only leaves the phone if you copy or share it. It records errors and events, never your messages, her answers, tokens or passwords, and anything shaped like a token is blanked out as a precaution. Clear it any time.
 
 ## Updates
 

@@ -158,13 +158,17 @@ class SettingsActivity : ComponentActivity() {
         CHAT_SCREEN("Chat screen", Area.CHAT_SCREEN),
         NOTIFICATIONS("Notifications", Area.DEVICE), PHONE("Widgets & tile", Area.DEVICE),
         QUICK("Quick prompts", Area.DEVICE), SCHEDULED("Scheduled prompts", Area.DEVICE), SCHEDULE("Scheduled prompt", Area.DEVICE),
-        UPDATES("Updates", Area.ABOUT);
+        DEVELOPMENT("Development", Area.ABOUT), UPDATES("Updates", Area.ABOUT);
 
-        /** Where back goes: a scheduled prompt goes back to the list, everything else to the main list. */
+        /**
+         * Where back goes: a scheduled prompt to the list, Updates to Development (the hidden page behind
+         * Software version), everything else to the main list.
+         */
         val parent: Page?
             get() = when (this) {
                 MAIN -> null
                 SCHEDULE -> SCHEDULED
+                UPDATES -> DEVELOPMENT
                 else -> MAIN
             }
 
@@ -278,30 +282,34 @@ class SettingsActivity : ComponentActivity() {
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 label = "page",
             ) { shown ->
-                // Centred and no wider than PAGE_MAX_WIDTH, so pages stay readable on an unfolded screen.
-                Column(
-                    Modifier.fillMaxSize().wrapContentWidth().widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth().verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    when (shown) {
-                        Page.MAIN -> Main(s, models, ::set, query, { query = it }) { page = it }
-                        Page.OPEN_WEBUI -> OpenWebUiPage(s, ::set)
-                        Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set) { page = it }
-                        Page.WHO_ANSWERS -> WhoAnswersPage(s, ::set) { page = it }
-                        Page.MODEL -> ModelPage(s, models, ::set)
-                        Page.GESTURE -> GesturePage(s, ::set)
-                        Page.LOOK_SOUND -> LookSoundPage(s, ::set)
-                        Page.CHAT_SCREEN -> ChatScreenPage(s, ::set)
-                        Page.QUICK -> QuickPage(s, ::set)
-                        Page.SCHEDULED -> ScheduledPage(s, ::set) { id -> editing = id; page = Page.SCHEDULE }
-                        Page.SCHEDULE -> SchedulePage(s, editing, ::set) { page = Page.SCHEDULED }
-                        Page.NOTIFICATIONS -> NotificationsPage(s, ::set)
-                        Page.PHONE -> PhonePage(s, ::set)
-                        Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
-                        Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
-                        Page.WAKE -> WakePage(s, ::set)
-                        Page.UPDATES -> UpdatesPage()
+                // The whole screen scrolls, side margins included; the page inside is centred and no wider than
+                // PAGE_MAX_WIDTH, so it stays readable on an unfolded screen.
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    Column(
+                        Modifier.fillMaxWidth().wrapContentWidth().widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth()
+                            .padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 24.dp).navigationBarsPadding(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        when (shown) {
+                            Page.MAIN -> Main(s, models, ::set, query, { query = it }) { page = it }
+                            Page.OPEN_WEBUI -> OpenWebUiPage(s, ::set)
+                            Page.HOME_ASSISTANT -> HomeAssistantPage(s, ::set) { page = it }
+                            Page.WHO_ANSWERS -> WhoAnswersPage(s, ::set) { page = it }
+                            Page.MODEL -> ModelPage(s, models, ::set)
+                            Page.GESTURE -> GesturePage(s, ::set)
+                            Page.LOOK_SOUND -> LookSoundPage(s, ::set)
+                            Page.CHAT_SCREEN -> ChatScreenPage(s, ::set)
+                            Page.QUICK -> QuickPage(s, ::set)
+                            Page.SCHEDULED -> ScheduledPage(s, ::set) { id -> editing = id; page = Page.SCHEDULE }
+                            Page.SCHEDULE -> SchedulePage(s, editing, ::set) { page = Page.SCHEDULED }
+                            Page.NOTIFICATIONS -> NotificationsPage(s, ::set)
+                            Page.PHONE -> PhonePage(s, ::set)
+                            Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
+                            Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
+                            Page.WAKE -> WakePage(s, ::set)
+                            Page.DEVELOPMENT -> DevelopmentPage(s, ::set) { page = it }
+                            Page.UPDATES -> UpdatesPage()
+                        }
                     }
                 }
             }
@@ -318,15 +326,6 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun Main(s: Settings, models: List<Model>, set: (Settings) -> Unit, query: String, onQuery: (String) -> Unit, open: (Page) -> Unit) {
         val house = hasHouse()
-        var resetting by askReset
-        if (resetting) ResetDialog(
-            onConfirm = {
-                resetting = false
-                set(Prefs.defaultsKeeping(s))
-                Toast.makeText(this, "Back to defaults", Toast.LENGTH_SHORT).show()
-            },
-            onDismiss = { resetting = false },
-        )
         SearchField(query, "Search settings") { onQuery(it) }
         if (query.isNotBlank()) {
             SearchResults(query, open)
@@ -387,6 +386,38 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Section(Area.ABOUT.title) {
+            // Opens the Development page (Updates, Logs, Return to defaults), which has no row of its own.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = rowModifier().clickable { open(Page.DEVELOPMENT) }.padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                LenaAvatar(32.dp)
+                Spacer(Modifier.width(18.dp))
+                Column {
+                    Text("Software version", style = MaterialTheme.typography.titleMedium)
+                    Text("Lena ${appVersion() ?: ""} · your own assistant, on your own hardware", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+
+    /**
+     * Development: the page behind Software version, for keeping the app itself in order rather than for
+     * everyday settings. Updates, Logs and Return to defaults.
+     */
+    @Composable
+    private fun DevelopmentPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        var resetting by askReset
+        if (resetting) ResetDialog(
+            onConfirm = {
+                resetting = false
+                set(Prefs.defaultsKeeping(s))
+                Toast.makeText(this, "Back to defaults", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { resetting = false },
+        )
+        Group {
             val waiting = remember { Updates.pending(this@SettingsActivity) }
             Item(Icons.Outlined.SystemUpdate, "Updates",
                 waiting?.let { "${it.first} downloaded, ready to install" } ?: upd.available ?: "From your GitHub releases") { open(Page.UPDATES) }
@@ -405,22 +436,10 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.SettingsBackupRestore, "Return to defaults", "Timings, wake word options, look and feel; keeps your connections") {
                 resetting = true
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = rowModifier().padding(horizontal = 20.dp, vertical = 16.dp),
-            ) {
-                LenaAvatar(32.dp)
-                Spacer(Modifier.width(18.dp))
-                Column {
-                    Text("Software version", style = MaterialTheme.typography.titleMedium)
-                    Text("Lena ${appVersion() ?: ""} · your own assistant, on your own hardware", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
         }
     }
 
-    /** Whether the Return to defaults question is showing (search can open it too). */
+    /** Whether the Return to defaults question is showing. */
     private val askReset = mutableStateOf(false)
 
     /** Asks before Return to defaults, saying what changes and what's kept. */
@@ -579,9 +598,6 @@ class SettingsActivity : ComponentActivity() {
             Findable("Quick Settings tile", "notification shade pull-down tile talk", Page.PHONE),
             Findable("Quick prompts", "shortcuts one tap chips widget prompts", Page.QUICK),
             Findable("Scheduled prompts", "briefing morning schedule repeat timer daily recurring automatic", Page.SCHEDULED),
-            Findable("Updates", "install download version github auto blocker re-download reinstall release", Page.UPDATES),
-            Findable("Logs", "problems errors debug log troubleshooting", null, Area.ABOUT, ::openLogs),
-            Findable("Return to defaults", "reset restore default factory start over", null, Area.ABOUT) { askReset.value = true },
         )
     }
 
@@ -732,7 +748,7 @@ class SettingsActivity : ComponentActivity() {
                             Updates.install(this@SettingsActivity)
                         } catch (e: Exception) {
                             Logs.e("Updates", "Couldn't start the install", e)
-                            upd.status = "Couldn't start the install. See Settings → Logs."
+                            upd.status = "Couldn't start the install. See Settings → Software version → Logs."
                         }
                     }
                 }
@@ -1532,7 +1548,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("Started by mistake? “Hey Lena” is far less likely to be heard in ordinary talk or on TV than “Lena” on its own, and " +
             "Fewer false starts makes any of them stricter. She also ignores her name until she's been listening for a second, and when " +
-            "a voice check says nobody's speaking (music, a jingle, a clatter). Each start is in Settings → Logs with how sure she was.")
+            "a voice check says nobody's speaking (music, a jingle, a clatter). Each start is in Settings → Software version → Logs with how sure she was.")
         Footnote("Some phones don't let an app use the microphone from the screen saver; it then says so and you tap to talk.")
     }
 

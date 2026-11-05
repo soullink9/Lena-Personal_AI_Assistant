@@ -50,7 +50,7 @@ Below it, the settings are in sections, and every row says how it's set and open
 | **Talking to Lena** | **Make Lena your digital assistant** ↗, **Wake word** (on or off, her name, how sure she must be, and whether she listens only on the wall display or whenever Lena is open), **How she looks and sounds** (her look, who hears you, her voice, keep listening) and **Interacting with Lena** (what the assistant gesture opens, and the lock screen). |
 | **Chat screen configuration** | **Chat screen**: **Lena's look** for Open WebUI's pages, **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
 | **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets & tile**, **Quick prompts** and **Scheduled prompts**. |
-| **About** | **Updates**, **Logs**, **Return to defaults** and the **software version**. |
+| **About** | The **software version**. Tap it for **Development**, a page with no row of its own: **Updates**, **Logs** and **Return to defaults**. |
 
 **Return to defaults** puts timings, the wake word's options, how she looks and sounds, the chat screen, notifications and the screensaver's options back to how a new install starts. It keeps your connections (Open WebUI, Home Assistant, signing in by herself, who answers and Assist's agent), the model and context size, your dashboards and motion sensor, the screensaver's album, whether she listens for her name (**Listen for her name** stays as you set it: switching the microphone on or off is never a reset's call), your quick and scheduled prompts, and your order of pinned chats and folders. It asks first.
 
@@ -74,7 +74,7 @@ The **Wall display** section of Settings turns a tablet on the wall (or a docked
 
 | Row | What it does |
 |---|---|
-| **Make it this device's home screen** | Android's choice of home app; pick Lena. That's dashboard mode: full screen and the screensaver. Home then always brings the wall display back, and **Apps** in its bar lists everything else on the tablet. |
+| **Make it this device's home screen** | Android's choice of home app; pick Lena. That's dashboard mode: full screen and the screensaver. Home then always brings the wall display back, and **Apps** (in Home Assistant's menu, or the bar, and at the bottom of your chats' menu) lists everything else on the tablet. Apps only shows on the wall display, where there's no launcher; its pencil chooses which apps it lists, without changing anything in Android. |
 | **Make it this device's screensaver** | Android's screen saver setting; pick Lena, and the same idle screen appears by itself whenever the device charges. |
 | **Screensaver** | When it starts, what it shows (her clock or a photo frame), when your chats give way back to it, and what wakes it up. |
 | **Dashboards** | The Home Assistant dashboards it shows. |
@@ -133,8 +133,8 @@ The app computes exactly the sound features Home Assistant's voice devices do: i
 **Against false starts**, she decides the way ESPHome does on Home Assistant's voice devices:
 
 - She can't be woken in the first second after she starts listening, while the sound features settle (that's when a false start is likeliest, for example as the wall display comes up after a restart), nor again until she's calmed down after the last time.
-- ESPHome's own **voice check** (a small model that tells speech from other sound) has to agree someone is speaking, so music, a TV jingle or a dropped pan can't wake her. What it turns away is noted in Settings → Logs.
-- Each time she wakes, Settings → Logs says how sure she was and what she needed, which helps when choosing the setting above.
+- ESPHome's own **voice check** (a small model that tells speech from other sound) has to agree someone is speaking, so music, a TV jingle or a dropped pan can't wake her. What it turns away is noted in Settings → Software version → Logs.
+- Each time she wakes, Settings → Software version → Logs says how sure she was and what she needed, which helps when choosing the setting above.
 
 **When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 
@@ -203,11 +203,11 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 
 ## Logs
 
-**Settings → Logs** shows what's been going on: **Problems** (warnings and errors), **Everything** (what she was doing too), and **Android** (Android's own log for Lena's current run, for crashes inside the web pages). Tap an entry for the details, such as where a crash happened. Search, copy, share or clear it from the top bar. The Logs row in settings says how many problems there were in the last day.
+**Settings → Software version → Logs** shows what's been going on: **Problems** (warnings and errors), **Everything** (what she was doing too), and **Android** (Android's own log for Lena's current run, for crashes inside the web pages). Tap an entry for the details, such as where a crash happened. Search, copy, share or clear it from the top bar. The Logs row in settings says how many problems there were in the last day.
 
 ## Updates
 
-**Settings → Updates** checks your GitHub repository's latest release, downloads it, checks it, and installs it, with a token for a private repository. **Re-download and install** gets the latest release again even if you already have it, to repair an install or after the version number was reset. See [Installation → Updating](Installation.md#updating).
+**Settings → Software version → Updates** checks your GitHub repository's latest release, downloads it, checks it, and installs it, with a token for a private repository. **Re-download and install** gets the latest release again even if you already have it, to repair an install or after the version number was reset. See [Installation → Updating](Installation.md#updating).
 
 ## Signing in by herself
 
@@ -224,6 +224,6 @@ The details are stored encrypted with a key that never leaves the phone (Android
 | Notifications | "Lena finished", scheduled prompts and house alerts. Asked the first time you open Lena. |
 | Run at startup | Sets your scheduled prompts again after the phone restarts. |
 | Change audio settings | Needed by Android's web view to use the microphone. It never prompts. |
-| Install apps | Installing an update you downloaded in Settings → Updates. You allow it in Android's settings, and every install asks you to confirm. |
+| Install apps | Installing an update you downloaded in Settings → Software version → Updates. You allow it in Android's settings, and every install asks you to confirm. |
 
 WorkManager, the Jetpack library that runs the background checks, also adds its own no-prompt permissions for network status and keeping the phone awake during a check. Lena never asks for camera, location, contacts or storage.

@@ -7,6 +7,9 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 ### Android app
 
 - **Fixed: nothing heard after the wake word** (since 0.6.7). The fix for "error 10" kept one speech recognizer for the whole app; when Android restarted its speech service while the tablet sat idle, that recognizer never answered again. Each sheet has its own recognizer again, still with the pause between sessions and the retry that keep error 10 away, and a session that doesn't get ready within a few seconds is given up (once more with a new recognizer, then your server's speech-to-text) instead of leaving her listening to nothing.
+- **One app again, with the Chat | Home transitions you had:** the dashboards are back in the same task as your chats (0.6.7 gave them their own, which showed Lena twice in Recents). Home still comes up at once: its page is now kept when the screen closes and handed to the next one, so Home Assistant isn't loaded again.
+- **Settings:** **Updates** is no longer a row of its own. Tap **Software version** (it looks the same) for a hidden **Development** page with **Updates**, **Logs** and **Return to defaults**. Pages now scroll from anywhere on the screen, side margins included.
+- **Apps:** also at the bottom of your chats' menu, as its third button. Apps (there, in Home Assistant's menu and on the dashboards' bar) now shows only on the wall display, where there's no launcher. Its pencil chooses which apps it lists; hidden apps only leave Lena's list.
 
 ## [0.6.7] - 2026-11-04
 

@@ -49,7 +49,7 @@ SETTING_LINE = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=(.*)$")
 HEADER = """\
 # Lena's default settings
 #
-# Where each setting starts on a new install, and what Settings → About → Return to defaults goes back to.
+# Where each setting starts on a new install, and what Settings → Software version → Return to defaults goes back to.
 #
 # To change one: type one of its possible values after its = sign, exactly as listed (no quotes needed),
 # and commit. Leave every other setting empty. Before the next build the change is applied: it becomes

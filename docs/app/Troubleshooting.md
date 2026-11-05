@@ -38,7 +38,7 @@ Lena's native features use your sign-in from the page. Sign in on the main scree
 
 ## The Ask sheet says "Couldn't reach your server"
 
-Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale). Lena already tries a dropped connection again, waits for Wi-Fi to come back and signs in again by herself when that's set up (Settings → Open WebUI → **Sign in by herself**), so this means the server really couldn't be reached: Settings → Logs says what happened.
+Check you can open your Open WebUI in Lena's main screen. Away from home, the phone needs a route to your server (VPN or Tailscale). Lena already tries a dropped connection again, waits for Wi-Fi to come back and signs in again by herself when that's set up (Settings → Open WebUI → **Sign in by herself**), so this means the server really couldn't be reached: Settings → Software version → Logs says what happened.
 
 ## Folders don't show
 
@@ -70,7 +70,7 @@ Both happen only in dashboard mode: when Lena's wall display is the device's **h
 
 ## The wake word starts by mistake
 
-Open **Settings → Logs** and look for "Heard …": each says how sure she was and what she needed.
+Open **Settings → Software version → Logs** and look for "Heard …": each says how sure she was and what she needed.
 
 - Switch to **Hey Lena** (Settings → Wake word). One word on its own, "Lena", is far easier to hear in ordinary talk and on TV.
 - Choose **Fewer false starts** under **How sure she must be**.

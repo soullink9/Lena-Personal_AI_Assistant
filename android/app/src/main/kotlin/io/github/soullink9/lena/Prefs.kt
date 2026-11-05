@@ -494,6 +494,14 @@ object Prefs {
 
     fun folderOrder(c: Context): List<String> = idList(c, "folder_order")
 
+    /**
+     * Apps left out of Lena's apps list (package names). Only the list: Android isn't changed. Not a
+     * setting with a default, so Return to defaults keeps it.
+     */
+    fun hiddenApps(c: Context): Set<String> = idList(c, "hidden_apps").toSet()
+
+    fun setHiddenApps(c: Context, packages: Set<String>) = setIdList(c, "hidden_apps", packages.sorted())
+
     fun setFolderOrder(c: Context, ids: List<String>) = setIdList(c, "folder_order", ids)
 
     /** A list of ids saved as a JSON array; empty when there's none. */

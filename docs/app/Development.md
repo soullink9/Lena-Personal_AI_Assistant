@@ -19,7 +19,9 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Ui.kt` | The shared rows and groups the settings and lists are built from. |
 | `Prefs.kt` | Stored settings, scheduled prompts, and address checks. |
 | `HomeAssistant.kt` | The optional Home Assistant link: her feelings, weather, shared memory, media, Assist (its conversation agents and `/api/conversation/process`), and the encrypted secret store (`Secrets`). |
-| `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver, the apps list. |
+| `Dashboard.kt` | The wall display: Home Assistant in a web view signed in through "external auth", Lena's single bar, the screen saver. |
+| `Apps.kt` | The apps list for the wall display (dashboards and chats' menu), and choosing which apps it shows. |
+| `DashboardWeb.kt` | Keeps the dashboards' web view when its screen closes and hands it to the next one, so switching Chat \| Home stays one app and Home Assistant isn't loaded again. Page messages go to the screen showing it. |
 | `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
 | `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header (and the Ingress Proxy integration's toolbar), Lena's Apps and Settings at the bottom of its menu, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
@@ -37,7 +39,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers (scheduled prompts go to Assist when it answers), schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
 | `Updates.kt` | Updating from GitHub releases: checking, downloading, verifying and installing. |
-| `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Logs. |
+| `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Software version → Logs. |
 | `Widgets.kt` | The Quick Settings tile (Talk to Lena) and the home screen widget. |
 | `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |
 | `Theme.kt` | Material You colours. |
