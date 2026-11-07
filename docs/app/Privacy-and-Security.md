@@ -43,7 +43,7 @@ Settings → Software version → Logs shows Lena's own log: problems, warnings 
 
 ## Updates
 
-Checking and downloading happen only when you tap them. The GitHub token is stored encrypted like the Home Assistant one and sent only to GitHub's API; the download itself comes from GitHub's file storage without the token. Before an update is offered, Lena checks it against the release's SHA-256 file, and that it's Lena, newer, and signed with the same key as the copy you have; Android refuses a different key again when installing. Installing always asks you to confirm.
+Checking and downloading happen only when you tap them, from Lena's public releases on GitHub, without signing in to anything; the download itself comes from GitHub's file storage, over https. Before an update is offered, Lena checks it against the release's SHA-256 file, and that it's Lena, newer, and signed with the same key as the copy you have; Android refuses a different key again when installing. Installing always asks you to confirm.
 
 ## What Lena stores
 

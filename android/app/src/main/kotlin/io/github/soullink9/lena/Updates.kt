@@ -21,16 +21,17 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Updating Lena from your own GitHub repository's releases. A private repository needs a GitHub
- * token that can read it (kept encrypted, like the Home Assistant one, and sent only to GitHub's
- * API). The APK is checked three ways before it's offered: against the release's SHA256SUMS,
+ * Updating Lena from her releases on GitHub (the public repository [REPO], so no token or setup is
+ * needed). The APK is checked three ways before it's offered: against the release's SHA256SUMS,
  * that it's Lena and newer, and that it's signed with the same key as the Lena you have (Android
  * checks that last one again itself). It's kept until it's installed, so you can leave to change
  * a security setting and come back without downloading again, and deleted once the update is in.
  */
 object Updates {
-    const val DEFAULT_REPO = "soullink9/Lena-Personal_AI_Assistant"
-    const val GITHUB_TOKEN = "github_token"
+    const val REPO = "soullink9/Lena-Personal_AI_Assistant"
+
+    /** Where a token for a private repository used to be kept, removed by [cleanUp]. */
+    private const val OLD_TOKEN = "github_token"
     private const val TAG = "Updates"
 
     /**
@@ -39,15 +40,10 @@ object Updates {
      */
     data class Release(val version: String, val notes: String, val apkId: Long, val apkName: String, val size: Long, val sumsId: Long?)
 
-    /** Where the updater keeps its own state (the repository, what's waiting to install). */
+    /** Where the updater keeps its own state (what's waiting to install). */
     private fun p(c: Context) = c.getSharedPreferences("lena-updates", Context.MODE_PRIVATE)
     /** The folder downloaded APKs wait in: private, and deleted once installed. */
     private fun dir(c: Context) = File(c.filesDir, "updates")
-
-    /** The repository releases come from: owner/name. */
-    fun repo(c: Context): String = p(c).getString("repo", null)?.ifBlank { null } ?: DEFAULT_REPO
-    /** Changes the repository releases come from. */
-    fun setRepo(c: Context, repo: String) = p(c).edit().putString("repo", repo.trim()).apply()
 
     /** This Lena's version name. */
     fun installed(c: Context): String =
@@ -71,32 +67,30 @@ object Updates {
     // ---- GitHub ---------------------------------------------------------------------------
 
     /**
-     * A GitHub connection. Redirects aren't followed automatically, so the token is only ever sent to
-     * GitHub's API and not to the storage the download is handed off to.
+     * A GitHub connection, without any sign-in (the repository is public). Redirects aren't followed
+     * automatically, so the hand-off to GitHub's file storage is checked to be https first.
      */
-    private fun open(url: String, accept: String, auth: String?): HttpURLConnection =
+    private fun open(url: String, accept: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
-            instanceFollowRedirects = false // the file is handed off to GitHub's storage; follow that without the token
+            instanceFollowRedirects = false
             connectTimeout = 10_000
             readTimeout = 60_000
             setRequestProperty("Accept", accept)
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            if (auth != null) setRequestProperty("Authorization", "Bearer $auth")
         }
 
-    /** GitHub's refusals in words that say what to check. */
+    /** GitHub's refusals in words that say what to do. */
     private fun problem(code: Int): IOException = IOException(
         when (code) {
-            401 -> "GitHub didn't accept the token. Check it hasn't expired."
-            403 -> "GitHub refused: the token may not have read access to the repository's contents."
-            404 -> "No release found. Check the repository name, and that the token can read it."
+            403, 429 -> "GitHub is limiting checks from this network for now (an hour at most). Try again later."
+            404 -> "No release found on GitHub."
             else -> "GitHub answered HTTP $code."
         }
     )
 
     /** The newest release with an APK in it. */
     suspend fun latest(c: Context): Release = withContext(Dispatchers.IO) {
-        val conn = open("https://api.github.com/repos/${repo(c)}/releases/latest", "application/vnd.github+json", Secrets.get(c, GITHUB_TOKEN))
+        val conn = open("https://api.github.com/repos/$REPO/releases/latest", "application/vnd.github+json")
         try {
             val code = conn.responseCode
             if (code != 200) throw problem(code)
@@ -126,14 +120,14 @@ object Updates {
 
     /** Streams a release file into [to], following GitHub's hand-off to its storage. */
     private fun fetch(c: Context, assetId: Long, to: File, progress: (Long) -> Unit) {
-        var conn = open("https://api.github.com/repos/${repo(c)}/releases/assets/$assetId", "application/octet-stream", Secrets.get(c, GITHUB_TOKEN))
+        var conn = open("https://api.github.com/repos/$REPO/releases/assets/$assetId", "application/octet-stream")
         try {
             var code = conn.responseCode
             if (code in 301..308) {
                 val next = conn.getHeaderField("Location") ?: throw IOException("GitHub sent no download address.")
                 if (!next.startsWith("https://")) throw IOException("GitHub sent an insecure download address.")
                 conn.disconnect()
-                conn = open(next, "application/octet-stream", null)
+                conn = open(next, "application/octet-stream")
                 code = conn.responseCode
             }
             if (code != 200) throw problem(code)
@@ -225,6 +219,12 @@ object Updates {
 
     /** Deletes a downloaded update that's no longer needed (installed, or no longer newer). */
     fun cleanUp(c: Context) {
+        // From when releases could come from another or a private repository: neither is needed now.
+        if (Secrets.has(c, OLD_TOKEN) || p(c).contains("repo")) {
+            Secrets.put(c, OLD_TOKEN, null)
+            p(c).edit().remove("repo").apply()
+            Logs.i(TAG, "Removed the saved GitHub token and repository: updates come from Lena's public releases")
+        }
         val version = p(c).getString("pending_version", null)
         if (version != null && pending(c) == null) {
             dir(c).deleteRecursively()

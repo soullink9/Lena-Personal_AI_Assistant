@@ -839,17 +839,14 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * Updates: what's waiting to install and the steps for it, checking, downloading, Re-download and
-     * install, and where releases come from.
+     * Updates: what's waiting to install and the steps for it, checking, downloading, and Re-download and
+     * install. Releases come from Lena's public repository, so there's nothing to set up.
      */
     @Composable
     private fun UpdatesPage() {
         val installed = remember { Updates.installed(this) }
         var pending by remember { mutableStateOf(Updates.pending(this)) }
         var mayInstall by remember { mutableStateOf(Updates.mayInstall(this)) }
-        var repo by remember { mutableStateOf(Updates.repo(this)) }
-        var token by remember { mutableStateOf("") }
-        var tokenSaved by remember { mutableStateOf(Secrets.has(this, Updates.GITHUB_TOKEN)) }
 
         // Coming back from Android's settings: see what changed.
         val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -870,7 +867,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
 
-        Footnote("This is Lena $installed. Updates come from the releases in your GitHub repository.")
+        Footnote("This is Lena $installed. Updates come from Lena's releases on GitHub.")
 
         pending?.let { (version, file) ->
             Section("Ready to install $version") {
@@ -910,7 +907,7 @@ class SettingsActivity : ComponentActivity() {
         }
 
         Group {
-            Item(Icons.Outlined.Refresh, "Check for updates", upd.status ?: "From $repo") { checkForUpdate() }
+            Item(Icons.Outlined.Refresh, "Check for updates", upd.status ?: "From Lena's releases on GitHub") { checkForUpdate() }
             val r = upd.release
             if (r != null && Updates.newer(r.version, installed) && pending?.first != r.version) {
                 val p = upd.progress
@@ -953,44 +950,6 @@ class SettingsActivity : ComponentActivity() {
             }
         }
 
-        Section("Your repository") {
-            FieldItem {
-                OutlinedTextField(
-                    value = repo, onValueChange = { repo = it.trim(); Updates.setRepo(this@SettingsActivity, it) },
-                    label = { Text("owner/repository") }, singleLine = true,
-                    supportingText = { Text("Where the releases are. Lena's own is ${Updates.DEFAULT_REPO}.") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            FieldItem {
-                OutlinedTextField(
-                    value = token,
-                    onValueChange = {
-                        token = it
-                        if (it.isNotBlank()) {
-                            Secrets.put(this@SettingsActivity, Updates.GITHUB_TOKEN, it.trim())
-                            tokenSaved = true
-                        }
-                    },
-                    label = { Text(if (tokenSaved && token.isBlank()) "GitHub token (saved)" else "GitHub token") },
-                    placeholder = { Text(if (tokenSaved) "Paste a new one to replace it" else "Needed for a private repository") },
-                    supportingText = { Text("Stored encrypted on this phone and sent only to GitHub.") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        if (tokenSaved) IconButton(onClick = {
-                            Secrets.put(this@SettingsActivity, Updates.GITHUB_TOKEN, null)
-                            tokenSaved = false
-                            token = ""
-                        }) { Icon(Icons.Outlined.Delete, "Remove the saved token") }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-        Footnote("For a private repository, make a token on GitHub: Settings → Developer settings → Fine-grained tokens → Generate. " +
-            "Choose only this repository, and under Repository permissions give Contents read-only access. Nothing else.")
     }
 
     /**

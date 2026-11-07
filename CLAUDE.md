@@ -19,6 +19,7 @@ Instructions for AI coding assistants working in this repository. The same rules
 
 - Android: `minSdk`, `targetSdk` and `compileSdk` stay at 36.
 - Home Assistant: everything is set up in the UI; nothing in YAML.
+- Home Assistant baseline: the owner runs 2026.11. Before building something, check whether Home Assistant 2026.11 already does it, and use that instead of building it again.
 - No downloads at build time beyond Gradle's own (models and the C reference are committed).
 - Never commit secrets, tokens, signing keys or personal data. Never ask anyone to paste tokens into a chat.
 - Public README: short, with the Disclosure section at the top; details live in `docs/`.

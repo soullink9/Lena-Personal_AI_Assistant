@@ -76,7 +76,7 @@ How you trigger the assistant depends on your phone and navigation style: usuall
 
 ## Updating
 
-**From the app:** Settings → **Updates**. Releases come from this repository by default (change it under **Your repository** if you build your own). For a private repository, add a GitHub token first: on GitHub, Settings → Developer settings → **Fine-grained tokens** → Generate new token, choose **Only select repositories** with just this one, and under Repository permissions give **Contents** read-only access. Paste it into the token field in Lena (it's stored encrypted and sent only to GitHub). Then:
+**From the app:** Settings → tap **Software version** → **Updates**. Releases come from this repository's public releases, so there's nothing to set up (building your own fork? Point `Updates.REPO` in `Updates.kt` at your repository). Then:
 
 1. **Check for updates**, then **Download**. The APK is checked against the release's `SHA256SUMS`, and that it's Lena, newer, and signed with your key; anything else is thrown away.
 2. **Let Lena install apps** (Android's "Install unknown apps" for Lena) and, if **Auto Blocker** stops the install (Samsung: Settings → Security and privacy → Auto Blocker), turn it off; the button opens Security and privacy, where it's listed. You can leave for those settings and come back: the download waits.
