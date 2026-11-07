@@ -20,6 +20,7 @@ CONF_ALERT_PHONES = "alert_phones"
 CONF_ALERT_AGENT = "alert_agent"
 CONF_ALERT_ALL_CLEAR = "alert_all_clear"
 CONF_TIDY_DAYS = "memory_tidy_days"
+CONF_LOCAL_WEATHER = "local_weather"
 CONF_TIDY_TASK = "memory_tidy_task"
 
 # Tapping an alert on a phone opens the Lena app, listening (through the Home Assistant companion app).

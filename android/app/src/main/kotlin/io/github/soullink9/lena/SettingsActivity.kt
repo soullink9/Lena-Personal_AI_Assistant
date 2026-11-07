@@ -60,6 +60,7 @@ import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Speaker
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
@@ -445,9 +446,10 @@ class SettingsActivity : ComponentActivity() {
                 val summary = when (item.kind) {
                     CountdownKind.TIMER -> "${Timers.countdown(item.at - now)} left · rings at ${Timers.clock(this@SettingsActivity, item.at)}"
                     CountdownKind.ALARM -> "Rings ${Timers.day(item.at)}"
+                    CountdownKind.REMINDER -> "At ${Timers.clock(this@SettingsActivity, item.at)} ${Timers.day(item.at)}"
                 }
                 Item(
-                    if (item.kind == CountdownKind.TIMER) Icons.Outlined.Timer else Icons.Outlined.Alarm,
+                    countdownIcon(item.kind),
                     item.name(this@SettingsActivity), summary,
                     trailing = {
                         IconButton(onClick = { Timers.cancel(this@SettingsActivity, item.id) }) { Icon(Icons.Outlined.Close, "Cancel") }
@@ -517,6 +519,66 @@ class SettingsActivity : ComponentActivity() {
                 resetting = true
             }
         }
+        OptimizeMemory()
+    }
+
+    /**
+     * Optimize memory: runs Lena's memory tidy now (combining, clarifying and retiring lines, as she does by
+     * herself every week), to try it or to run it early, and shows what changed, with Undo.
+     */
+    @Composable
+    private fun OptimizeMemory() {
+        val ha = remember { HomeAssistant.from(this) } ?: return
+        val scope = rememberCoroutineScope()
+        var working by remember { mutableStateOf(false) }
+        var result by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // what happened, and whether Undo applies
+        result?.let { (text, canUndo) ->
+            AlertDialog(
+                onDismissRequest = { result = null },
+                title = { Text("Her memory") },
+                text = { Text(text, modifier = Modifier.verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = { result = null }) { Text("OK") } },
+                dismissButton = if (!canUndo) null else {
+                    {
+                        TextButton(onClick = {
+                            result = null
+                            scope.launch {
+                                result = try {
+                                    ha.undoMemoryTidy()
+                                    "Back as it was before the tidy." to false
+                                } catch (e: HaHttpException) {
+                                    (e.detail ?: "Couldn't undo it.") to false
+                                } catch (e: Exception) {
+                                    "Couldn't reach Home Assistant." to false
+                                }
+                            }
+                        }) { Text("Undo") }
+                    }
+                },
+            )
+        }
+        Group {
+            Item(Icons.Outlined.AutoFixHigh, "Optimize memory",
+                if (working) "Optimizing… her model can take a minute" else "Tidy her memory now instead of waiting for her weekly tidy") {
+                if (working) return@Item
+                working = true
+                scope.launch {
+                    result = try {
+                        val (changed, summary) = ha.tidyMemory()
+                        (if (changed) "She tidied her memory:\n\n$summary" else summary) to changed
+                    } catch (e: HaHttpException) {
+                        (e.detail ?: if (e.code == 400) "She couldn't tidy it this time." else
+                            "Home Assistant doesn't know this yet: update the Lena integration.") to false
+                    } catch (e: Exception) {
+                        "Couldn't reach Home Assistant." to false
+                    } finally {
+                        working = false
+                    }
+                }
+            }
+        }
+        Footnote("Optimize memory asks her model (Home Assistant's AI Task) to combine lines about the same thing, make vague ones " +
+            "clear and tick off outdated ones. You'll see exactly what changed, and Undo puts it back.")
     }
 
     /** Whether the Return to defaults question is showing. */
@@ -658,6 +720,9 @@ class SettingsActivity : ComponentActivity() {
             Findable("Photo frame", "photos album immich slideshow pictures shuffle transition fit crop faces", Page.WALL_IDLE),
             Findable("Her clock", "clock night dim time weather", Page.WALL_IDLE),
             Findable("Motion sensor", "presence wake up binary_sensor motion", Page.WALL_IDLE),
+            Findable("Speaking first", "briefing morning greeting motion proactive announce alert", Page.WALL_IDLE),
+            Findable("Speak through", "speaker tts voice media player sonos echo home assistant speaker", Page.HOME_ASSISTANT),
+            Findable("Adjust her volume", "volume quiet loud noise morning night", Page.LOOK_SOUND),
             Findable("Dashboards", "lovelace path tabs home assistant views wall display", Page.WALL_DASHBOARDS),
             Findable("Make Lena your digital assistant", "default assistant power button corner swipe gesture", null, Area.TALKING, ::openAssistantSettings),
             Findable("Wake word", "hey lena jarvis listen name hotword sensitivity false starts always wall display", Page.WAKE),
@@ -1109,9 +1174,14 @@ class SettingsActivity : ComponentActivity() {
         val room by Room.info(this).collectAsState()
         var chosen by remember { mutableStateOf(Room.chosenSpeaker(this)) }
         var all by remember { mutableStateOf<List<Speaker>>(emptyList()) }
+        var voices by remember { mutableStateOf<List<Speaker>>(emptyList()) }
+        var voiceSpeaker by remember { mutableStateOf(Room.voiceSpeaker(this)) }
+        var voiceEngine by remember { mutableStateOf(Room.voiceEngine(this)) }
         LaunchedEffect(Unit) {
             Room.refresh(this@SettingsActivity, force = true)
-            all = runCatching { HomeAssistant.from(this@SettingsActivity)?.speakers() }.getOrNull().orEmpty()
+            val ha = HomeAssistant.from(this@SettingsActivity)
+            all = runCatching { ha?.speakers() }.getOrNull().orEmpty()
+            voices = runCatching { ha?.voices() }.getOrNull().orEmpty()
         }
         val info = room ?: return
         Group {
@@ -1127,7 +1197,23 @@ class SettingsActivity : ComponentActivity() {
                 chosen = it
                 Room.chooseSpeaker(this@SettingsActivity, it)
             }
+            // Speak through: everything she says on a Home Assistant speaker instead of this device.
+            val through = listOf("" to "This device") + (info.speakers + all).distinctBy { it.entityId }.map { it.entityId to it.name }
+            PickItem(Icons.Outlined.RecordVoiceOver, "Speak through", through, voiceSpeaker,
+                detail = { id -> if (id.isEmpty()) "Her own voice, on this device" else null }) {
+                voiceSpeaker = it
+                if (it.isNotEmpty() && voiceEngine.isEmpty()) voiceEngine = voices.firstOrNull()?.entityId.orEmpty()
+                Room.chooseVoiceSpeaker(this@SettingsActivity, it, voiceEngine)
+            }
+            if (voiceSpeaker.isNotEmpty()) {
+                PickItem(Icons.Outlined.GraphicEq, "Voice on that speaker", voices.map { it.entityId to it.name }, voiceEngine,
+                    detail = { null }) {
+                    voiceEngine = it
+                    Room.chooseVoiceSpeaker(this@SettingsActivity, voiceSpeaker, it)
+                }
+            }
         }
+        if (voiceSpeaker.isNotEmpty() && voices.isEmpty()) Footnote("Speak through needs a text-to-speech voice in Home Assistant (such as Piper): none was found.")
         Footnote("Like Home Assistant Voice: Assist hears which room you're in, so “turn on the lights” means this room's; " +
             "Lena is told the room too, and plays music here unless you name another room (or the whole home). " +
             "Announcements (the lena.announce action) are said here.")
@@ -1315,6 +1401,9 @@ class SettingsActivity : ComponentActivity() {
                         Speaking.OFF -> "Show them only"
                     }
                 }) { set(s.copy(speaking = it)) }
+            SwitchItem(null, "Adjust her volume", "Quieter before 8 AM and after 10 PM, louder when the room is noisy (heard by the wake word)", s.autoVolume) {
+                set(s.copy(autoVolume = it))
+            }
             SwitchItem(null, "Her voice follows her mood", "Slower when she's groggy, brighter when she's cheerful. Needs Home Assistant.", s.moodVoice) {
                 set(s.copy(moodVoice = it))
             }
@@ -1642,6 +1731,24 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("A touch always wakes it, and so does Lena being worried about something at home.")
 
+        SectionTitle("Speaking first")
+        var briefingSensor by remember { mutableStateOf(Room.briefingSensor(this)) }
+        Group {
+            FieldItem {
+                OutlinedTextField(
+                    value = briefingSensor,
+                    onValueChange = { briefingSensor = it; Room.chooseBriefingSensor(this@SettingsActivity, it) },
+                    label = { Text("Motion sensor for her briefing (optional)") },
+                    placeholder = { Text("binary_sensor.kitchen_motion") },
+                    supportingText = { Text("When it sees someone come in, she speaks first. It can be a different sensor from the one above, so the screen can stay a photo frame.") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Footnote("In the morning she gives a short briefing once (the weather, today's calendar, trash day, anything that needs " +
+            "attention), and later in the day she mentions a worry at home once, the first time someone comes in after it starts. " +
+            "Never more than one every half hour. Needs the Lena integration, and this display put in a room.")
+
         if (picking) AlbumPicker(
             onPick = { id, name ->
                 picking = false
@@ -1693,7 +1800,7 @@ class SettingsActivity : ComponentActivity() {
         var level by remember { mutableStateOf(0f) }
         var heard by remember { mutableStateOf(0) }
         val listener = remember {
-            WakeListener(this, onHeard = { heard++; on = false }, onScore = { level = it })
+            WakeListener(this, onHeard = { heard++; on = false }, onScore = { level = it }, relay = false)
         }
         DisposableEffect(Unit) { onDispose { listener.stop() } }
         Item(

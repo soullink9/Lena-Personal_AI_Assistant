@@ -1,9 +1,9 @@
 """
-title: Lena (remember, forget, feel, calendar)
+title: Lena (memory, feelings, calendar, timers, intercom, history)
 author: soullink9
 version: 0.6.8
 license: GPL-3.0
-description: Lets Lena save to and remove from her Home Assistant memory list, record how something made her feel, and add events to your Home Assistant calendars, from Open WebUI and the Lena app.
+description: Lets Lena save, correct and remove her Home Assistant memories, record how something made her feel, add calendar events, set timers, alarms and reminders on her displays, change her volume, speak in another room, and look back at the house's history, from Open WebUI and the Lena app.
 """
 
 # =============================================================================
@@ -12,7 +12,7 @@ description: Lets Lena save to and remove from her Home Assistant memory list, r
 # WHERE THIS GOES
 #   Open WebUI > Workspace > Tools > + (New tool). Paste this whole file and
 #   save. Then attach it to the "lena" model: Workspace > Models > lena >
-#   Tools > tick "Lena (remember, forget, feel, calendar)". The Lena app uses the
+#   Tools > tick "Lena (memory, feelings, calendar, timers, intercom, history)". The Lena app uses the
 #   model's tools automatically.
 #   Fill in the settings (the gear icon next to the tool): the same Home
 #   Assistant address and token as the Lena filter. Any user's token works.
@@ -25,6 +25,15 @@ description: Lets Lena save to and remove from her Home Assistant memory list, r
 #   add_calendar_event runs the lena.add_event action, which adds the event with
 #                      Home Assistant's calendar.create_event, to a calendar
 #                      exposed to Assist that takes new events.
+#   update_fact        corrects a memory in place (lena.update_fact).
+#   set_timer, set_alarm, set_reminder, cancel_timer, list_timers, set_volume
+#                      act on a Lena display: the room named, or the one you're
+#                      talking through (the Lena app says which with each
+#                      question). They ring and speak there.
+#   announce           the intercom: says something on another room's display,
+#                      and can listen there for an answer.
+#   house_history      when something last happened, how long it lasted, or what
+#                      happened today, from Home Assistant's history.
 #
 # The moment names must match feelings.yaml in the Lena integration.
 # tools/check.py checks that.
@@ -113,6 +122,31 @@ class Tools:
         if response:
             url += "?return_response"
         return await asyncio.to_thread(_post, url, self.valves.ha_token, data)
+
+    @staticmethod
+    def _display(metadata: dict | None) -> list[str]:
+        """The Lena display the question came from: the app sends its Home Assistant device with each
+        question (as the variable {{LENA_DISPLAY}}). Empty from the web page.
+        """
+        device = ((metadata or {}).get("variables") or {}).get("{{LENA_DISPLAY}}")
+        return [device] if isinstance(device, str) and device else []
+
+    async def _do(self, service: str, data: dict, metadata: dict | None = None, response: bool = True) -> str:
+        """Runs one of her lena.* actions on a display and returns its answer for her to read, or what went
+        wrong in words she can act on (ask which room, say a time differently).
+        """
+        if not self.valves.ha_token:
+            return "Not set up: the tool has no Home Assistant token."
+        data = {key: value for key, value in data.items() if value not in (None, "")}
+        if metadata is not None and "device_id" not in data and not data.get("room"):
+            if display := self._display(metadata):
+                data["device_id"] = display
+        try:
+            reply = await self._call("lena", service, data, response=response)
+        except Exception as error:
+            return f"Didn't work: {_problem(error)}"
+        answer = reply.get("service_response") if isinstance(reply, dict) else None
+        return json.dumps(answer) if answer else "Done."
 
     async def remember(self, fact: str) -> str:
         """
@@ -205,3 +239,95 @@ class Tools:
         added = (reply or {}).get("service_response", {}) if isinstance(reply, dict) else {}
         when = added.get("start", data["start"])
         return f"Added \"{added.get('added', data['title'])}\" to {added.get('calendar', calendar)}, starting {when}."
+
+    async def update_fact(self, old: str, new: str) -> str:
+        """
+        Correct something you remember when it's changed or was wrong (Alex moved to the night shift), instead
+        of saving a second, conflicting memory.
+        :param old: The memory to change, in a few words.
+        :param new: What it should say now: one short third-person statement.
+        """
+        return await self._do("update_fact", {"old": old, "new": new})
+
+    async def set_timer(self, seconds: int, label: str = "", room: str = "", __metadata__: dict | None = None) -> str:
+        """
+        Start a timer that rings on the Lena display. One call per timer: for several requests in one sentence
+        (a pasta timer and a reminder), make each call.
+        :param seconds: How long, in seconds (5 minutes is 300).
+        :param label: Optional. What it's for, in a word or two, e.g. pasta.
+        :param room: Optional. The room, when they name one; leave empty for the display you're talking through.
+        """
+        return await self._do("set_timer", {"seconds": seconds, "label": label, "room": room}, __metadata__)
+
+    async def set_alarm(self, time: str, label: str = "", room: str = "", __metadata__: dict | None = None) -> str:
+        """
+        Set an alarm that rings on the Lena display at the next time the clock shows that time.
+        :param time: 24-hour HH:MM, e.g. 06:45 or 19:00.
+        :param label: Optional. What it's for.
+        :param room: Optional. The room, when they name one; leave empty for the display you're talking through.
+        """
+        return await self._do("set_alarm", {"time": time, "label": label, "room": room}, __metadata__)
+
+    async def set_reminder(self, message: str, at: str = "", in_seconds: int = 0, room: str = "", __metadata__: dict | None = None) -> str:
+        """
+        Remind them of something, said out loud on the Lena display: at a time ("at 7") or after a while ("in 20
+        seconds"). Give either at or in_seconds. For a later day than next week, add a calendar event instead.
+        :param message: What to remind them of, said to them, e.g. Time to flip the chicken.
+        :param at: When: 24-hour HH:MM for the next time the clock shows it (19:00), or a date and time (2026-11-08T07:30).
+        :param in_seconds: Or: how many seconds from now.
+        :param room: Optional. The room, when they name one; leave empty for the display you're talking through.
+        """
+        return await self._do("set_reminder", {"message": message, "at": at, "in_seconds": in_seconds or None, "room": room}, __metadata__)
+
+    async def cancel_timer(self, kind: Literal["timer", "alarm", "reminder", ""] = "", label: str = "", all: bool = False,
+                           room: str = "", __metadata__: dict | None = None) -> str:
+        """
+        Cancel a timer, an alarm or a reminder on the Lena display: the one named, or all of a kind.
+        :param kind: timer, alarm or reminder.
+        :param label: Optional. Its name or what it's for, e.g. pasta.
+        :param all: True to cancel all of them (of that kind).
+        :param room: Optional. The room, when they name one.
+        """
+        return await self._do("cancel_timer", {"kind": kind, "label": label, "all": all, "room": room}, __metadata__)
+
+    async def list_timers(self, everywhere: bool = False, room: str = "", __metadata__: dict | None = None) -> str:
+        """
+        What timers, alarms and reminders are set and how long is left, on this display or everywhere.
+        :param everywhere: True for every Lena display in the house.
+        :param room: Optional. The room, when they name one.
+        """
+        return await self._do("list_timers", {"everywhere": everywhere, "room": room}, __metadata__)
+
+    async def set_volume(self, level: int = -1, change: Literal["quieter", "louder", ""] = "", room: str = "",
+                         __metadata__: dict | None = None) -> str:
+        """
+        Change how loudly you speak on the Lena display: a level, or quieter or louder.
+        :param level: 0 to 100 (leave as -1 to use change instead).
+        :param change: quieter or louder.
+        :param room: Optional. The room, when they name one.
+        """
+        return await self._do("set_volume", {"level": level if level >= 0 else None, "change": change, "room": room}, __metadata__)
+
+    async def announce(self, message: str, room: str, listen: bool = False) -> str:
+        """
+        Say something out loud on the Lena display in another room, like an intercom ("tell the kitchen dinner's
+        ready"). With listen, she listens there for an answer and answers it herself.
+        :param message: What to say there, as you'd say it to them.
+        :param room: The room to say it in.
+        :param listen: True to listen for an answer after saying it.
+        """
+        result = await self._do("announce", {"message": message, "room": room, "listen": listen}, response=False)
+        return f"Said in the {room}." if result == "Done." else result
+
+    async def house_history(self, question: Literal["last_change", "how_long", "what_happened"], name: str = "",
+                            state: str = "", hours: float = 0) -> str:
+        """
+        Look back at the house's history: when something last happened ("when did the garage door last open?"),
+        how long something lasted ("how long was the back door open?"), or what happened today ("what did I
+        miss?": people coming and going, doors, locks, alarms).
+        :param question: last_change, how_long or what_happened.
+        :param name: What to look up, by its name in the home (not for what_happened).
+        :param state: Optional. The state asked about: open, on, home, locked.
+        :param hours: Optional. How far back, in hours; today by default.
+        """
+        return await self._do("history", {"question": question, "name": name, "state": state, "hours": hours or None})

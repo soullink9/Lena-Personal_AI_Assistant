@@ -32,7 +32,8 @@
           "alert_agent": "Write alerts in her words with",
           "alert_all_clear": "Also tell them when it's sorted",
           "memory_tidy_days": "She tidies her memory every",
-          "memory_tidy_task": "Tidy it with"
+          "memory_tidy_task": "Tidy it with",
+          "local_weather": "Your weather station"
         },
         "data_description": {
           "people": "Coming home after a while makes her delighted; an empty house makes her restless.",
@@ -45,7 +46,8 @@
           "alert_agent": "Your Lena conversation agent. She writes each alert herself; leave empty to send the plain reason instead.",
           "alert_all_clear": "A second alert when the sensor clears, replacing the first.",
           "memory_tidy_days": "She combines lines about the same thing, makes vague ones clear and ticks off outdated ones, at bedtime, then tells you what changed (Lena: Undo memory tidy puts it back). 0 never.",
-          "memory_tidy_task": "An AI Task entity, such as your Ollama's. Empty: Home Assistant's default (Settings > System > General > AI suggestions)."
+          "memory_tidy_task": "An AI Task entity, such as your Ollama's. Empty: Home Assistant's default (Settings > System > General > AI suggestions).",
+          "local_weather": "Your own weather sensors (an Ecowitt in the backyard: temperature, humidity, wind, rain). She uses them for what it's like outside right now, before any forecast service, in conversations and her morning briefing."
         }
       }
     }
@@ -140,6 +142,10 @@
         "listen": {
           "name": "Listen for an answer",
           "description": "After saying it, she listens, and answers what you say back."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name: says it on that room's displays."
         }
       }
     },
@@ -150,6 +156,178 @@
     "undo_memory_tidy": {
       "name": "Undo memory tidy",
       "description": "Puts her memory back as it was before her last tidy."
+    },
+    "set_timer": {
+      "name": "Set timer",
+      "description": "A timer that rings on a Lena display.",
+      "fields": {
+        "seconds": {
+          "name": "Seconds",
+          "description": "How long."
+        },
+        "label": {
+          "name": "Name",
+          "description": "What it is for, e.g. pasta."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "set_alarm": {
+      "name": "Set alarm",
+      "description": "An alarm on a Lena display at the next time the clock shows that time.",
+      "fields": {
+        "time": {
+          "name": "Time",
+          "description": "24-hour HH:MM, e.g. 06:45."
+        },
+        "label": {
+          "name": "Name",
+          "description": "What it is for."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "set_reminder": {
+      "name": "Set reminder",
+      "description": "Lena says a reminder on a display at a time or after a while.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "What to remind them of."
+        },
+        "at": {
+          "name": "At",
+          "description": "HH:MM, or a date and time."
+        },
+        "in_seconds": {
+          "name": "In seconds",
+          "description": "Or how many seconds from now."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "cancel_timer": {
+      "name": "Cancel timer",
+      "description": "Cancels timers, alarms or reminders on a display.",
+      "fields": {
+        "kind": {
+          "name": "Kind",
+          "description": "timer, alarm or reminder."
+        },
+        "label": {
+          "name": "Name",
+          "description": "The one to cancel."
+        },
+        "all": {
+          "name": "All",
+          "description": "Cancel all of them (of that kind)."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "list_timers": {
+      "name": "List timers",
+      "description": "What timers, alarms and reminders are set on the displays.",
+      "fields": {
+        "everywhere": {
+          "name": "Everywhere",
+          "description": "Every display, not just one."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "set_volume": {
+      "name": "Set volume",
+      "description": "How loudly Lena speaks on a display.",
+      "fields": {
+        "level": {
+          "name": "Level",
+          "description": "0 to 100."
+        },
+        "change": {
+          "name": "Change",
+          "description": "quieter or louder."
+        },
+        "device_id": {
+          "name": "Displays",
+          "description": "The Lena display (the one asked through)."
+        },
+        "room": {
+          "name": "Room",
+          "description": "A room's name; its display is used instead."
+        }
+      }
+    },
+    "update_fact": {
+      "name": "Update memory",
+      "description": "Corrects one of her memories in place.",
+      "fields": {
+        "old": {
+          "name": "Memory",
+          "description": "The memory to change, in a few words."
+        },
+        "new": {
+          "name": "Now",
+          "description": "What it should say now."
+        }
+      }
+    },
+    "history": {
+      "name": "House history",
+      "description": "When something last happened, how long it lasted, or what happened today, from Home Assistant's history.",
+      "fields": {
+        "question": {
+          "name": "Question",
+          "description": "last_change, how_long or what_happened."
+        },
+        "name": {
+          "name": "Name",
+          "description": "What to look up."
+        },
+        "state": {
+          "name": "State",
+          "description": "The state asked about, e.g. open."
+        },
+        "hours": {
+          "name": "Hours",
+          "description": "How far back."
+        }
+      }
     }
   }
 }

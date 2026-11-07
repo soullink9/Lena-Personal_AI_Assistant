@@ -54,11 +54,13 @@ Settings → Devices & services → Lena → **Configure**:
 
 - **People she misses:** coming home after a while makes her delighted; an empty house makes her restless.
 - **Weather:** a weather entity, such as your forecast. Rain, storms, snow and sunshine colour her mood.
+- **Your weather station:** your own weather sensors (an Ecowitt in the backyard: temperature, humidity, wind, rain). She uses them for what it's like outside right now, before any forecast, in conversations and her morning briefing.
 - **Special days calendars:** birthdays, anniversaries or holidays. Anything on them today puts her in a good mood, and she knows why.
 - **Things that worry her:** problem sensors like leaks, smoke or a garage door left open. She's worried until they clear, then relieved.
 - **Her day:** when she wakes up and winds down.
 - **Alerts:** the phones she tells when something worries her (they need the Home Assistant companion app), and your Lena agent, so she writes each alert herself. Tapping an alert opens the Lena app, listening. See [House alerts](../app/How-It-Works.md#house-alerts).
 - **How quickly her feelings move:** the defaults are a good start. See [Her feelings](../personality/Moods.md).
+- **Her memory:** how often she tidies it (every 7 days by default; 0 never) and with which AI Task. See [Memory](Memory.md).
 
 All optional; she still has a day of her own without them.
 
@@ -66,7 +68,7 @@ All optional; she still has a day of her own without them.
 
 1. Settings → Devices & services → Add integration → **Ollama**, with your Ollama address (`http://<server>:11434`).
 2. Add a conversation agent with the model `lena`, and set:
-   - **Control Home Assistant:** tick **Assist** *and* **Lena**. Assist lets her control your devices; Lena gives her feelings, memory and her tools (remember, forget, and recording how something made her feel).
+   - **Control Home Assistant:** tick **Assist** *and* **Lena**. Assist lets her control your devices; Lena gives her feelings, memory and her tools (remember, correct and forget, recording how something made her feel, calendar events, timers, alarms and reminders on her displays, the volume, the intercom, and the house's history).
    - **Instructions:** leave empty. Her character is in the model, and the Lena choice adds the time, who's home, how she feels and what she remembers to every request.
    - **Context window size:** 32768, the same as `num_ctx` in the Modelfile.
    - **Keep alive:** -1, so the model stays loaded.

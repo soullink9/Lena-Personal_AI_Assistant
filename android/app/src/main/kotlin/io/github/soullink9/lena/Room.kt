@@ -33,7 +33,7 @@ data class RoomInfo(
  * - Assist is told which device it's hearing from, so "turn on the lights" means this room's.
  * - Open WebUI is told the room, and where music goes when no room is named ([note]); for another room
  *   or the whole home she finds that room's speakers with her Home Assistant tools.
- * - Announcements (lena.announce) for this display are spoken here ([Announcements]).
+ * - Announcements (lena.announce) for this display are spoken here ([DisplaySync]).
  *
  * The registration is checked again every [REFRESH_MS], so moving the display to another room in Home
  * Assistant reaches the app within minutes.
@@ -99,6 +99,31 @@ object Room {
     /** Chooses where music goes when no room is named; "" leaves it to the room. */
     fun chooseSpeaker(c: Context, entityId: String) {
         p(c).edit().putString("music", entityId).apply()
+    }
+
+    /** The Home Assistant speaker she speaks through (Speak through), or "" for this device. */
+    fun voiceSpeaker(c: Context): String = p(c).getString("voice_speaker", "") ?: ""
+
+    /** Home Assistant's text-to-speech voice (a tts entity) used on that speaker. */
+    fun voiceEngine(c: Context): String = p(c).getString("voice_engine", "") ?: ""
+
+    /** Chooses the speaker and voice; empty speaker means she speaks on this device again. */
+    fun chooseVoiceSpeaker(c: Context, speaker: String, engine: String) {
+        p(c).edit().putString("voice_speaker", speaker).putString("voice_engine", engine).apply()
+    }
+
+    /** Whether everything she says goes to a Home Assistant speaker instead of this device. */
+    fun speaksThroughSpeaker(c: Context): Boolean =
+        voiceSpeaker(c).isNotBlank() && voiceEngine(c).isNotBlank() && HomeAssistant.from(c) != null
+
+    /**
+     * The motion sensor that makes her speak first (Settings → Wall display → Speaking first), or "".
+     * Separate from the screensaver's, so a photo frame can stay a photo frame and still get a briefing.
+     */
+    fun briefingSensor(c: Context): String = p(c).getString("briefing_sensor", "") ?: ""
+
+    fun chooseBriefingSensor(c: Context, entityId: String) {
+        p(c).edit().putString("briefing_sensor", entityId.trim()).apply()
     }
 
     /** Where music goes when no room is named: the chosen speaker, or the room's (Music Assistant's first). */

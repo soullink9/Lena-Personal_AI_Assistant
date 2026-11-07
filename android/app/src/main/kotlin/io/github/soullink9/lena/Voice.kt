@@ -24,6 +24,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -109,10 +110,24 @@ class PhoneEar(private val context: Context) : Ear {
     /** Counts sessions, so a late cancel only ever touches its own session (main thread only). */
     private var session = 0
 
-    /** Free-form speech with partial results, so your words appear as you speak. */
-    private fun request() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+    /** Whether the last session listened through the wake word's microphone ([MicRelay]). */
+    private var lastRelayed = false
+
+    /**
+     * Free-form speech with partial results, so your words appear as you speak. With [relay], the sound
+     * comes from the wake word's microphone, which never closed, instead of the recognizer opening its own.
+     */
+    private fun request(relay: MicRelay.Relay? = null) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
         .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        .apply {
+            if (relay != null) {
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, relay.pipe)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, android.media.AudioFormat.ENCODING_PCM_16BIT)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, MicRelay.RATE)
+            }
+        }
 
     /**
      * Listens once. If the service was still busy (error 10, or "busy"), waits and tries again, up to
@@ -121,11 +136,18 @@ class PhoneEar(private val context: Context) : Ear {
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String {
         var reconnected = false
         var busyTries = 0
+        var relayFailed = false
         while (true) {
             try {
-                return once(onPartial, onLevel)
+                return once(onPartial, onLevel, relay = if (relayFailed) null.also { MicRelay.drop() } else MicRelay.take())
             } catch (e: EarError) {
                 when {
+                    // The recognizer couldn't use the wake word's microphone: let it open its own.
+                    lastRelayed && !relayFailed -> {
+                        Logs.i("Voice", "The recognizer couldn't take the wake word's microphone (${e.describe()}); it opens its own")
+                        relayFailed = true
+                        delay(SETTLE_MS)
+                    }
                     e.code in BUSY && busyTries < BUSY_RETRY_MS.size -> {
                         Logs.i("Voice", "The phone's recognizer was busy (${e.describe()}); trying again")
                         delay(BUSY_RETRY_MS[busyTries++])
@@ -146,8 +168,9 @@ class PhoneEar(private val context: Context) : Ear {
      * One recognition, turned from the recognizer's callbacks into a suspending call that returns the text.
      * Recognizers must be driven from the main thread.
      */
-    private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String =
+    private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit, relay: MicRelay.Relay? = null): String =
         withContext(Dispatchers.Main) {
+            lastRelayed = relay != null
             val r = recognizer ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { recognizer = it }
             if (sessionOpen) {
                 // Close the last session and let the service catch up, or this one is refused.
@@ -161,9 +184,10 @@ class PhoneEar(private val context: Context) : Ear {
                 var latest = ""
                 var ready = false
                 lateinit var watchdog: Runnable
-                /** Ends this session's bookkeeping, if it's still the current one. */
+                /** Ends this session's bookkeeping, if it's still the current one, and lets go of the relay. */
                 fun close() {
                     main.removeCallbacks(watchdog)
+                    relay?.close()
                     if (session == mine) sessionOpen = false
                 }
                 /** Finishes with the text, once: the recognizer can call back more than once. */
@@ -236,13 +260,14 @@ class PhoneEar(private val context: Context) : Ear {
                     }
                 })
                 sessionOpen = true
-                r.startListening(request())
+                r.startListening(request(relay))
                 main.postDelayed(watchdog, READY_TIMEOUT_MS)
                 cont.invokeOnCancellation {
                     // Can come from any thread; the recognizer only takes calls on the main one. Only this
                     // session is cancelled, never a newer one that started meanwhile.
                     main.post {
                         main.removeCallbacks(watchdog)
+                        relay?.close()
                         if (session == mine && sessionOpen) {
                             runCatching { r.cancel() }
                             sessionOpen = false
@@ -294,11 +319,15 @@ class ServerEar(private val api: Api) : Ear {
      */
     private suspend fun record(onLevel: (Float) -> Unit): ByteArray {
         val frame = RATE / 50 // 20 ms
-        val min = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        val rec = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION, RATE,
-            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, frame * 2 * 10),
-        )
+        // Opened by her name: the wake word's microphone, which never closed ([MicRelay]); otherwise its own.
+        val relayed = MicRelay.take()?.let { MicRelay.Reader(it) }
+        val rec = if (relayed != null) null else {
+            val min = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION, RATE,
+                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, frame * 2 * 10),
+            )
+        }
         val out = ByteArrayOutputStream()
         val buf = ShortArray(frame)
         var noise = 0.0
@@ -306,10 +335,10 @@ class ServerEar(private val api: Api) : Ear {
         var speaking = false
         var silentMs = 0
         var totalMs = 0
-        rec.startRecording()
+        rec?.startRecording()
         try {
             while (currentCoroutineContext().isActive && !finishNow) {
-                val n = rec.read(buf, 0, frame)
+                val n = rec?.read(buf, 0, frame) ?: relayed!!.read(buf, 0, frame)
                 if (n <= 0) break
                 var sum = 0.0
                 for (i in 0 until n) {
@@ -338,8 +367,9 @@ class ServerEar(private val api: Api) : Ear {
                 if (totalMs >= 30_000) break
             }
         } finally {
-            rec.stop()
-            rec.release()
+            rec?.stop()
+            rec?.release()
+            relayed?.close()
         }
         return if (speaking || finishNow) out.toByteArray() else ByteArray(0)
     }
@@ -554,16 +584,49 @@ class PhoneMouth(context: Context) : Mouth {
     }
 }
 
-/** Ducks music and other audio while Lena talks. */
+/**
+ * Ducks music and other audio while Lena talks, at the volume that suits the moment ([Loudness]). On a
+ * Home Assistant speaker ([HaSpeakerMouth]) neither applies: the tablet stays as it is.
+ */
 suspend fun <T> withSpeechFocus(context: Context, block: suspend () -> T): T {
+    if (Room.speaksThroughSpeaker(context)) return block()
     val audio = context.getSystemService(AudioManager::class.java)
     val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(speechAttributes)
         .build()
     audio.requestAudioFocus(request)
     try {
-        return block()
+        return Loudness.whileSpeaking(context) { block() }
     } finally {
         audio.abandonAudioFocusRequest(request)
     }
+}
+
+/**
+ * Lena's voice on a speaker in Home Assistant (Settings → Connections → Home Assistant → Speak through):
+ * everything she says is sent to Home Assistant's text-to-speech (tts.speak, with the voice chosen there)
+ * on that media player. It returns once the speaker has finished, so listening afterwards still works.
+ */
+class HaSpeakerMouth(private val ha: HomeAssistant, private val speaker: String, private val voice: String) : Mouth {
+    override var tone: VoiceTone = VoiceTone()
+
+    override suspend fun say(text: String) {
+        if (text.isBlank()) return
+        ha.speak(voice, speaker, text)
+        // Wait for it to start (the voice is made first), then to finish.
+        var started = false
+        val begin = System.currentTimeMillis()
+        while (System.currentTimeMillis() - begin < 10 * 60_000L) {
+            delay(500)
+            val state = runCatching { ha.state(speaker) }.getOrNull() ?: break
+            if (state == "playing" || state == "buffering") started = true
+            else if (started || System.currentTimeMillis() - begin > 12_000) break
+        }
+    }
+
+    override fun stop() {
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch { runCatching { ha.stopPlaying(speaker) } }
+    }
+
+    override fun release() {}
 }

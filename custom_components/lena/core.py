@@ -34,6 +34,7 @@ from . import brain, tidy
 from .const import (
     CONF_ALERT_AGENT,
     CONF_ALERT_ALL_CLEAR,
+    CONF_LOCAL_WEATHER,
     CONF_TIDY_DAYS,
     CONF_TIDY_TASK,
     CONF_ALERT_PHONES,
@@ -107,6 +108,8 @@ class LenaCore:
         self.catalog = catalog
         self.feelings = brain.Feelings()
         self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed", "added"}
+        self.hub = None  # the displays' commands and reports (hub.Hub), set up with the entry
+        self.briefings = None  # what she's said first on each display (briefing.Briefings)
         self.tidied: datetime | None = None  # when she last tidied her memory
         self.memory_backup: dict[str, Any] | None = None  # {"at", "items"}: the list before her last tidy
         self._rng = random.Random()
@@ -422,15 +425,31 @@ class LenaCore:
             lines.append(f"(Only the first {limit} are listed; ask by kind and room for the rest.)")
         return "\n".join(lines)
 
+    def local_weather(self) -> list[str]:
+        """Your own weather sensors (Configure: Your weather station), as "Backyard temperature 41.2 °F"."""
+        out = []
+        for entity_id in self.opt(CONF_LOCAL_WEATHER) or []:
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                continue
+            unit = state.attributes.get("unit_of_measurement")
+            out.append(f"{state.name} {state.state}{' ' + unit if unit else ''}")
+        return out
+
     def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False) -> str:
-        """The time, who's home, how she feels and what she remembers (and, if asked, the home's devices)."""
+        """The time, who's home, the weather outside from your own sensors, how she feels and what she
+        remembers (and, if asked, the home's devices).
+        """
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
-        parts = [
+        right_now = (
             "## Right now\n"
             f"{self.time_of_day()}\n"
-            f"At home: {', '.join(home) if home else 'nobody'}.",
-            brain.describe(self.feelings, self.catalog, with_reasons),
-        ]
+            f"At home: {', '.join(home) if home else 'nobody'}."
+        )
+        if local := self.local_weather():
+            right_now += ("\nOutside, from the house's own weather station (more accurate here than any forecast "
+                          "service, so use these for what it's like now): " + "; ".join(local) + ".")
+        parts = [right_now, brain.describe(self.feelings, self.catalog, with_reasons)]
         if memory:
             parts.append(brain.remembered(self.memories()))
         if devices and (index := self.devices()):

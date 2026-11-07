@@ -263,7 +263,7 @@ object Commands {
                 1 -> "${Timers.spoken(items[0].at - now)} left on your ${items[0].name(c)}."
                 else -> "You have ${items.size} timers: " + items.joinToString("; ") { "${it.name(c)}, ${Timers.spoken(it.at - now)} left" } + "."
             }
-            CountdownKind.ALARM -> when (items.size) {
+            CountdownKind.REMINDER, CountdownKind.ALARM -> when (items.size) {
                 0 -> "You don't have any alarms."
                 1 -> "Your alarm is set for ${Timers.clock(c, items[0].at)} ${Timers.day(items[0].at)}."
                 else -> "You have ${items.size} alarms: " + items.joinToString("; ") { "${Timers.clock(c, it.at)} ${Timers.day(it.at)}" } + "."

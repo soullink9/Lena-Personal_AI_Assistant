@@ -675,6 +675,12 @@ class Api(server: String, private val context: Context? = null) {
             .put("session_id", "lena-${UUID.randomUUID()}")
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
+            // Which Lena display this is (its Home Assistant device), so her tools set timers, reminders and the
+            // volume here (Open WebUI hands it to the tools as the variable {{LENA_DISPLAY}}).
+            .apply {
+                val display = context?.let { Room.info(it).value?.deviceId }
+                if (display != null) put("variables", JSONObject().put("{{LENA_DISPLAY}}", display))
+            }
             // Title generation is only mentioned when it's wanted: Open WebUI treats "title_generation: false"
             // on a chat's first answer as "title it after the first message", which renamed chats Lena
             // had named herself ("Assistant Lena", a scheduled prompt's chat) so they couldn't be found again.

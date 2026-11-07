@@ -344,6 +344,11 @@ class WakeListener(
     private val model: String? = null,
     /** What it listens for, for the log. */
     private val label: String? = null,
+    /**
+     * When it hears her name, keep the microphone and pass it on to the sheet ([MicRelay]) instead of
+     * closing it, so there's no gap before she listens. Her name's listeners do; "stop" doesn't.
+     */
+    private val relay: Boolean = model == null,
 ) {
     companion object {
         /**
@@ -366,6 +371,12 @@ class WakeListener(
     @Volatile private var running = false
     private var thread: Thread? = null
 
+    /**
+     * Counts starts, so a thread still handing its microphone to the sheet after stop() never carries on
+     * listening beside a newer one.
+     */
+    @Volatile private var generation = 0
+
     val isRunning: Boolean get() = running
 
     /**
@@ -377,11 +388,15 @@ class WakeListener(
         if (if (model != null) !WakeWord.has(context, model) else !WakeWord.available(context)) return false
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return false
         running = true
-        thread = Thread({ loop() }, "lena-wake").also { it.start() }
+        val mine = ++generation
+        thread = Thread({ loop(mine) }, "lena-wake").also { it.start() }
         return true
     }
 
-    /** Stops at the next chunk; the thread closes the microphone and the model itself. */
+    /**
+     * Stops at the next chunk; the thread closes the microphone and the model itself. A microphone already
+     * handed to the sheet keeps going until the sheet is done with it.
+     */
     fun stop() {
         running = false
         thread = null
@@ -392,7 +407,9 @@ class WakeListener(
      * her, and notices when Android only hands it silence.
      */
     @SuppressLint("MissingPermission") // checked in start()
-    private fun loop() {
+    private fun loop(mine: Int) {
+        /** Still this listener's current run, and not stopped. */
+        fun listening() = running && generation == mine
         val phrase = label ?: Prefs.wakePhrase(context).label
         val model = runCatching {
             if (this.model != null) MicroWakeWord(context, this.model, WakeSensitivity.BALANCED) else WakeWord.open(context)
@@ -419,14 +436,20 @@ class WakeListener(
             val chunk = ShortArray(WakeWord.CHUNK)
             var silent = 0
             var lastIgnored = 0L
-            while (running) {
+            var handOff: HandOff? = null
+            while (listening() || handOff?.open == true) {
                 var read = 0
-                while (read < chunk.size && running) {
+                while (read < chunk.size && (listening() || handOff?.open == true)) {
                     val n = mic.read(chunk, read, chunk.size - read)
                     if (n <= 0) break
                     read += n
                 }
                 if (read < chunk.size) break
+                // Handing the microphone to the sheet: pass the sound on, don't listen for her name.
+                if (handOff != null) {
+                    handOff.send(chunk)
+                    continue
+                }
                 // A blocked microphone delivers exact zeros; real rooms never do.
                 if (chunk.all { it.toInt() == 0 }) {
                     if (++silent == 40) { // about 3 seconds
@@ -436,6 +459,7 @@ class WakeListener(
                         break
                     }
                 } else silent = 0
+                RoomNoise.hear(chunk)
                 val r = model.listen(chunk)
                 main.post { onScore(r.score) }
                 if (r.notSpeech && System.currentTimeMillis() - lastIgnored > 60_000) {
@@ -445,15 +469,77 @@ class WakeListener(
                 if (r.heard) {
                     Logs.i("Wake word", "Heard \u201C$phrase\u201D (%.2f, needs %.2f)".format(r.score, model.threshold))
                     running = false
+                    if (relay) handOff = runCatching { HandOff() }.onFailure {
+                        Logs.w("Wake word", "Couldn't pass the microphone on; the sheet opens it itself", it)
+                    }.getOrNull()
                     main.post(onHeard)
                 }
             }
+            handOff?.finish()
         } finally {
             runCatching { mic.stop() }
             mic.release()
             closed()
             model.close()
         }
+    }
+}
+
+/**
+ * The wake word's microphone passed on to the sheet ([MicRelay]): a pipe, with its own thread writing to
+ * it, so a slow reader never holds up the microphone (up to [BUFFER_CHUNKS] of sound wait in between).
+ * It ends when the sheet closes its side, or after [MAX_MS] at the most.
+ */
+private class HandOff {
+    companion object {
+        private const val BUFFER_CHUNKS = 150 // 12 seconds
+        private const val MAX_MS = 45_000L
+    }
+
+    private val queue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(BUFFER_CHUNKS)
+    private val until = android.os.SystemClock.elapsedRealtime() + MAX_MS
+    @Volatile private var ended = false
+
+    /** True while the sheet still wants the sound. */
+    val open: Boolean get() = !ended && android.os.SystemClock.elapsedRealtime() < until
+
+    init {
+        val (read, write) = android.os.ParcelFileDescriptor.createPipe()
+        val out = android.os.ParcelFileDescriptor.AutoCloseOutputStream(write)
+        Thread({
+            try {
+                while (true) {
+                    val bytes = queue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (bytes == null) {
+                        if (!open) break
+                        continue
+                    }
+                    out.write(bytes)
+                }
+            } catch (_: java.io.IOException) {
+                // The sheet closed its side: it has what it needs.
+            } finally {
+                ended = true
+                runCatching { out.close() }
+            }
+        }, "lena-mic-relay").start()
+        MicRelay.offer(MicRelay.Relay(read) { ended = true })
+    }
+
+    /** Passes 80 ms of sound on (dropped if the sheet is more than 12 seconds behind). */
+    fun send(chunk: ShortArray) {
+        val bytes = ByteArray(chunk.size * 2)
+        for (i in chunk.indices) {
+            val v = chunk[i].toInt()
+            bytes[2 * i] = (v and 0xff).toByte()
+            bytes[2 * i + 1] = ((v shr 8) and 0xff).toByte()
+        }
+        queue.offer(bytes)
+    }
+
+    /** No more sound: the writer finishes what's queued and closes the pipe. */
+    fun finish() {
+        ended = true
     }
 }
 

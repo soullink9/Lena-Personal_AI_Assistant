@@ -27,6 +27,12 @@ import javax.crypto.spec.GCMParameterSpec
 /** Home Assistant turned the token down: it was revoked, or it's wrong. */
 class HaAuthException : IOException("Home Assistant token rejected")
 
+/**
+ * Home Assistant answered with an error. The message stays "HTTP <code>" (what callers check); [detail] is
+ * Home Assistant's own explanation, when it gave one ("There's no tidy to undo").
+ */
+class HaHttpException(val code: Int, val detail: String?) : IOException("HTTP $code")
+
 /** How Lena feels right now, from her helpers in Home Assistant. */
 data class Feelings(val mood: String, val moodWhy: String, val energy: String, val moment: String?, val momentWhy: String)
 
@@ -117,7 +123,7 @@ class HomeAssistant(server: String, private val token: String) {
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.use { String(it.readBytes()) } ?: ""
             if (code !in 200..299) {
                 Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: HTTP $code ${text.take(200)}")
-                throw IOException("HTTP $code")
+                throw HaHttpException(code, runCatching { JSONObject(text).optString("message") }.getOrNull()?.ifBlank { null })
             }
             text
         } finally {
@@ -211,6 +217,75 @@ class HomeAssistant(server: String, private val token: String) {
      */
     suspend fun registerDisplay(id: String, name: String): JSONObject =
         JSONObject(call("POST", "/api/lena/display", JSONObject().put("id", id).put("name", name)))
+
+    /**
+     * Asks Lena to tidy her memory now (lena.tidy_memory): returns whether anything changed and what. Her
+     * model takes a while, hence the long wait. Throws [HaHttpException] with her reason when she can't
+     * (no AI Task set up, an answer she couldn't use).
+     */
+    suspend fun tidyMemory(): Pair<Boolean, String> {
+        val r = JSONObject(call("POST", "/api/services/lena/tidy_memory?return_response", JSONObject(), readTimeoutMs = 300_000))
+        val answer = r.optJSONObject("service_response") ?: JSONObject()
+        return answer.optBoolean("changed") to answer.optString("summary")
+    }
+
+    /** Puts her memory back as it was before her last tidy (lena.undo_memory_tidy). */
+    suspend fun undoMemoryTidy() {
+        call("POST", "/api/services/lena/undo_memory_tidy", JSONObject())
+    }
+
+    /**
+     * Says [text] on a media player with Home Assistant's text-to-speech (tts.speak with the [voice], a TTS
+     * entity). Returns once Home Assistant has started it; the speaker plays it from there.
+     */
+    suspend fun speak(voice: String, speaker: String, text: String) {
+        call("POST", "/api/services/tts/speak", JSONObject()
+            .put("entity_id", voice).put("media_player_entity_id", speaker).put("message", text).put("cache", true),
+            readTimeoutMs = 60_000)
+    }
+
+    /** Stops a media player (her voice on a speaker, when you stop her). */
+    suspend fun stopPlaying(speaker: String) {
+        call("POST", "/api/services/media_player/media_stop", JSONObject().put("entity_id", speaker))
+    }
+
+    /** Sets a media player's volume (0 to 100). */
+    suspend fun setSpeakerVolume(speaker: String, percent: Int) {
+        call("POST", "/api/services/media_player/volume_set", JSONObject()
+            .put("entity_id", speaker).put("volume_level", percent.coerceIn(0, 100) / 100.0))
+    }
+
+    /** A media player's volume (0 to 100), or null if it doesn't say. */
+    suspend fun speakerVolume(speaker: String): Int? =
+        stateWithAttributes(speaker)?.optJSONObject("attributes")?.takeIf { it.has("volume_level") }
+            ?.let { (it.optDouble("volume_level") * 100).toInt() }
+
+    /** Home Assistant's text-to-speech voices (tts entities), by name, for Speak through. */
+    suspend fun voices(): List<Speaker> {
+        val states = JSONArray(call("GET", "/api/states"))
+        return List(states.length()) { states.getJSONObject(it) }
+            .filter { it.optString("entity_id").startsWith("tts.") }
+            .map { o ->
+                val id = o.optString("entity_id")
+                Speaker(id, o.optJSONObject("attributes")?.optString("friendly_name")?.ifBlank { null } ?: id, false)
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
+    /**
+     * Reports this display's timers, alarms, reminders and volume to the Lena integration and collects what
+     * she's asked it to do (POST /api/lena/display/sync; see [DisplaySync]).
+     */
+    suspend fun syncDisplay(body: JSONObject): JSONObject =
+        JSONObject(call("POST", "/api/lena/display/sync", body, readTimeoutMs = 15_000))
+
+    /**
+     * Someone came into the room: asks the integration whether there's something to say first (the
+     * morning's briefing, or a worry not yet mentioned here), and returns it, or "" when there's nothing.
+     */
+    suspend fun briefing(displayId: String): String =
+        JSONObject(call("POST", "/api/lena/display/briefing", JSONObject().put("id", displayId), readTimeoutMs = 120_000))
+            .optString("text")
 
     /** Every media player in Home Assistant, by name, for choosing where music plays. */
     suspend fun speakers(): List<Speaker> {

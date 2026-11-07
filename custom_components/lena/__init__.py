@@ -2,9 +2,11 @@
 
 Sets up one Lena (there's only ever one), her Mood, Energy and Moment dropdowns, her memory
 to-do list, the "Lena" choice under Control Home Assistant in a conversation agent, the
-lena.feel, lena.add_event, lena.announce, lena.tidy_memory and lena.undo_memory_tidy actions, /api/lena/context for Open WebUI and the Lena
-app, /api/lena/media for the app's photo slideshow, and /api/lena/display, where each Lena app
-registers as a display you can put in a room (see displays.py).
+lena.feel, lena.add_event, lena.announce, lena.tidy_memory and lena.undo_memory_tidy actions and
+the actions behind her newer tools (actions.py: timers, alarms, reminders, volume, correcting a memory,
+the house's history), /api/lena/context for Open WebUI and the Lena app, /api/lena/media for the app's
+photo slideshow, /api/lena/display, where each Lena app registers as a display you can put in a room
+(see displays.py), and /api/lena/display/sync, where displays collect what they're asked to do (hub.py).
 """
 
 from __future__ import annotations
@@ -14,14 +16,14 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr, llm
-from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from . import events, tidy
+from . import actions, events, tidy
 from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
 from .displays import LenaDisplayView, display_id_of, displays
-from .event import SIGNAL_ANNOUNCE
+from .briefing import Briefings, LenaBriefingView
+from .hub import Hub, LenaSyncView, TargetError
 from .llm_api import LenaAPI
 from .view import LenaContextView, LenaMediaView
 
@@ -37,6 +39,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     """
     catalog = await hass.async_add_executor_job(load_catalog)
     core = LenaCore(hass, entry, catalog)
+    core.hub = Hub(hass, entry.entry_id)
+    core.briefings = Briefings(hass)
+    await core.briefings.async_load()
     await core.async_start()
     entry.runtime_data = core
     hass.data[DOMAIN] = core
@@ -48,6 +53,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
         hass.http.register_view(LenaContextView())
         hass.http.register_view(LenaMediaView())
         hass.http.register_view(LenaDisplayView())
+        hass.http.register_view(LenaSyncView())
+        hass.http.register_view(LenaBriefingView())
         hass.data[f"{DOMAIN}_view"] = True
 
     async def feel(call: ServiceCall) -> None:
@@ -95,31 +102,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "add_event"))
 
     async def announce(call: ServiceCall) -> None:
-        """The lena.announce action: says a message on the chosen displays (all of them if none is
-        chosen), like Home Assistant Voice's announcements. With listen, she then listens for an answer.
+        """The lena.announce action: says a message on the chosen displays, or the room's, or all of them
+        when neither is chosen, like Home Assistant Voice's announcements. With listen, she then listens
+        for an answer.
         """
-        everyone = displays(hass, entry.entry_id)
-        chosen = call.data.get("device_id") or [d.id for d in everyone]
-        known = {d.id for d in everyone}
-        unknown = [d for d in chosen if d not in known]
-        if unknown or not chosen:
-            raise ServiceValidationError(
-                "Choose Lena displays (devices under the Lena integration)" if unknown else
-                "No Lena displays yet: open the Lena app with Home Assistant set up, and it registers itself"
-            )
-        for device_id in chosen:
-            async_dispatcher_send(hass, SIGNAL_ANNOUNCE.format(device_id), call.data["message"], call.data["listen"])
+        try:
+            if call.data.get("device_id") or call.data.get("room"):
+                devices = core.hub.targets(device_ids=call.data.get("device_id"), room=call.data.get("room"))
+            else:
+                devices = core.hub.targets(device_ids=[d.id for d in displays(hass, entry.entry_id)] or None)
+        except TargetError as error:
+            raise ServiceValidationError(str(error)) from error
+        core.hub.send(devices, "announce", {"message": call.data["message"], "listen": call.data["listen"]})
 
     hass.services.async_register(
         DOMAIN, "announce", announce,
         schema=vol.Schema({
             vol.Optional("device_id"): vol.All(cv.ensure_list, [cv.string]),
+            vol.Optional("room"): cv.string,
             vol.Required("message"): cv.string,
             vol.Optional("listen", default=False): cv.boolean,
         }),
         supports_response=SupportsResponse.NONE,
     )
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "announce"))
+    actions.register(hass, entry)
 
     async def tidy_memory(call: ServiceCall) -> dict:
         """The lena.tidy_memory action: she tidies her memory now (combining, clarifying, retiring) and

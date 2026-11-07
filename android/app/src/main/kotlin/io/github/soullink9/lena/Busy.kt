@@ -1,15 +1,27 @@
 package io.github.soullink9.lena
 
+import java.util.concurrent.ConcurrentHashMap
+
 /**
- * Whether Lena is in the middle of a conversation in the sheet: listening, thinking or speaking. The
- * timers that act on "no one's touched it for a while" (the wall display's screensaver, and going back
- * from your chats to the dashboards) wait while she is, and start counting again only once she's done,
- * so a long think never ends in the screensaver.
+ * Whether Lena is in the middle of something: a conversation in the sheet (listening, thinking or
+ * speaking), or her own chat waiting for Assist. The timers that act on "no one's touched it for a while"
+ * (the wall display's screensaver, and going back from your chats to the dashboards) wait while she is,
+ * and start counting again only once she's done, so a long think never ends in the screensaver.
+ *
+ * Each screen marks itself ([set]) rather than sharing one flag: a sheet closing just as a new one opens
+ * (the wake word right after a conversation) used to clear the flag for the new one, which then thought
+ * for minutes with the screensaver counting down.
  */
 object Busy {
-    /** Set by the sheet (AskActivity) whenever its phase changes; false once it's idle or closed. */
-    @Volatile
-    var talking: Boolean = false
+    private val owners = ConcurrentHashMap.newKeySet<Any>()
+
+    /** True while any screen says it's busy. */
+    val talking: Boolean get() = owners.isNotEmpty()
+
+    /** [owner] (a screen) is busy, or done. */
+    fun set(owner: Any, busy: Boolean) {
+        if (busy) owners.add(owner) else owners.remove(owner)
+    }
 }
 
 /**

@@ -76,7 +76,28 @@ Then:
 
 - **Room-aware commands:** with **Who answers** set to Assist, every question is sent with the display's device, so Home Assistant knows the room: "turn on the lights" means that room's lights. With Open WebUI, she's told the room with each question.
 - **Music:** the app learns the room's media players (Music Assistant's first). Music, radio or podcasts asked for without naming a room play there (or on the speaker chosen in the app, Settings → Connections → Home Assistant → **Music plays on**). Name another room, or the whole home, and she finds the speakers there: Assist's own Music Assistant commands do this by area, and with Open WebUI she uses her Home Assistant tools.
-- **Announcements:** `lena.announce` says a message on the chosen displays (or all of them). A wall display says it within a few seconds while Lena is on screen; during a conversation, once the conversation ends. With **Listen for an answer**, she listens afterwards and answers.
+- **Announcements:** `lena.announce` says a message on the chosen displays, a room's (**room**), or all of them. A wall display says it within a few seconds while Lena is on screen; during a conversation, once the conversation ends. With **Listen for an answer**, she listens afterwards and answers.
+
+## Her tools on the displays
+
+Her tools in Assist (and the same ones in the Open WebUI tool) act on a display: the room named, else the one she was asked through, else the only one there is; with several and no room, she asks which.
+
+| Tool | Action | What it does |
+|---|---|---|
+| `set_timer` | `lena.set_timer` | A timer (seconds, an optional name). |
+| `set_alarm` | `lena.set_alarm` | An alarm at the next time the clock shows `HH:MM`. |
+| `set_reminder` | `lena.set_reminder` | She says the message at a time (`19:00`, or a date and time up to a week away) or after `in_seconds`. |
+| `cancel_timer`, `list_timers` | `lena.cancel_timer`, `lena.list_timers` | From what each display reports it has: the one named, all of a kind, or everywhere. |
+| `set_volume` | `lena.set_volume` | Her speaking volume: a level (0 to 100) or quieter / louder. On a display that speaks through a Home Assistant speaker, that speaker's volume. |
+| `announce` | `lena.announce` | The intercom: says something in another room, optionally listening for an answer there. |
+| `update_fact` | `lena.update_fact` | Corrects a memory in place. |
+| `house_history` | `lena.history` | `last_change` (when the garage door last opened, and for how long), `how_long` (the latest time, and the total today), `what_happened` (people, doors, windows, locks, covers, alarms and leaks since midnight). From the recorder; only what's exposed to Assist. |
+
+Displays collect what's asked of them from `POST /api/lena/display/sync` (a wall display every few seconds, any display right after an answer), and report their timers, alarms, reminders and volume there. Anything not collected within 15 minutes is dropped.
+
+## Speaking first
+
+A display with a **Speaking first** sensor (chosen in the app) asks `POST /api/lena/display/briefing` when someone comes in. The answer is usually nothing; it's the morning briefing once a day per display (from her morning time until noon), or a worry she hasn't mentioned there yet, and never within half an hour of the last time. The briefing is written in her words by the conversation agent chosen for alerts (Configure), or Home Assistant's AI Task, from the facts: today, your weather station, the forecast, today's calendar events, sensors named for trash or recycling, and anything that needs attention. What's been said is kept across restarts.
 
 ```yaml
 action: lena.announce

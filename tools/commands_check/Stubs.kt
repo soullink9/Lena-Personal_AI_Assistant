@@ -3,12 +3,13 @@ import java.util.Calendar
 
 class Context
 
-enum class CountdownKind { TIMER, ALARM }
+enum class CountdownKind { TIMER, ALARM, REMINDER }
 
 data class Countdown(val id: String, val kind: CountdownKind, val at: Long, val label: String = "", val durationMs: Long = 0) {
     fun name(c: Context) = when (kind) {
         CountdownKind.TIMER -> if (label.isNotBlank()) "$label timer" else "${Timers.spoken(durationMs)} timer"
         CountdownKind.ALARM -> "${Timers.clock(c, at)} alarm"
+        CountdownKind.REMINDER -> "Reminder: $label"
     }
 }
 

@@ -178,6 +178,8 @@ data class Settings(
     val contextTokens: Int = Defaults.CONTEXT_TOKENS,
     val haServer: String = "",
     val moodVoice: Boolean = Defaults.MOOD_VOICE,
+    /** Quieter early in the morning and late at night, louder when the room is noisy ([Loudness]). */
+    val autoVolume: Boolean = Defaults.AUTO_VOLUME,
     val widgetMood: Boolean = Defaults.WIDGET_MOOD,
     val lockScreen: Boolean = Defaults.LOCK_SCREEN,
     val openWebUiMenus: Boolean = Defaults.OPEN_WEBUI_MENUS,
@@ -247,6 +249,7 @@ object Prefs {
 
     /** Her voice gets a little slower, faster, lower or brighter with her mood (needs Home Assistant). */
     fun moodVoice(c: Context): Boolean = p(c).getBoolean("mood_voice", Defaults.MOOD_VOICE)
+    fun autoVolume(c: Context): Boolean = p(c).getBoolean("auto_volume", Defaults.AUTO_VOLUME)
 
     /** The widget shows how she feels (needs Home Assistant). */
     fun widgetMood(c: Context): Boolean = p(c).getBoolean("widget_mood", Defaults.WIDGET_MOOD)
@@ -363,6 +366,7 @@ object Prefs {
         contextTokens = contextTokens(c),
         haServer = haServer(c) ?: "",
         moodVoice = moodVoice(c),
+        autoVolume = autoVolume(c),
         widgetMood = widgetMood(c),
         lockScreen = lockScreen(c),
         openWebUiMenus = showOpenWebUiMenus(c),
@@ -407,6 +411,7 @@ object Prefs {
             .putInt("context_tokens", s.contextTokens.coerceIn(2048, 1_048_576))
             .putString("ha_server", s.haServer)
             .putBoolean("mood_voice", s.moodVoice)
+            .putBoolean("auto_volume", s.autoVolume)
             .putBoolean("widget_mood", s.widgetMood)
             .putBoolean("lock_screen", s.lockScreen)
             .putBoolean("show_owui_menus", s.openWebUiMenus)

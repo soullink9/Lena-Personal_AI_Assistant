@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +39,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.UUID
 
-/** A timer (rings after a while) or an alarm (rings at a time of day). */
-enum class CountdownKind { TIMER, ALARM }
+/**
+ * A timer (rings after a while), an alarm (rings at a time of day), or a reminder (says something at a
+ * time, set by her set_reminder tool).
+ */
+enum class CountdownKind { TIMER, ALARM, REMINDER }
 
 /**
  * One of Lena's timers or alarms: when it rings ([at], wall-clock milliseconds), what it's for, and for a
@@ -56,6 +60,7 @@ data class Countdown(
     fun name(c: Context): String = when (kind) {
         CountdownKind.TIMER -> if (label.isNotBlank()) "$label timer" else "${Timers.spoken(durationMs)} timer"
         CountdownKind.ALARM -> "${Timers.clock(c, at)} alarm" + if (label.isNotBlank()) " ($label)" else ""
+        CountdownKind.REMINDER -> "Reminder: $label"
     }
 }
 
@@ -91,6 +96,10 @@ object Timers {
     /** Sets an alarm for the next [hour]:[minute] (today if it's still to come, otherwise tomorrow). */
     fun addAlarm(c: Context, hour: Int, minute: Int, label: String = ""): Countdown =
         add(c, Countdown(UUID.randomUUID().toString(), CountdownKind.ALARM, nextAt(hour, minute), label.trim()))
+
+    /** Sets a reminder: [message] said at [at] (wall-clock milliseconds). */
+    fun addReminder(c: Context, at: Long, message: String): Countdown =
+        add(c, Countdown(UUID.randomUUID().toString(), CountdownKind.REMINDER, at, message.trim()))
 
     /** Cancels one. */
     fun cancel(c: Context, id: String) {
@@ -171,7 +180,7 @@ object Timers {
             val o = array.getJSONObject(i)
             Countdown(
                 id = o.optString("id"),
-                kind = if (o.optString("kind") == "ALARM") CountdownKind.ALARM else CountdownKind.TIMER,
+                kind = runCatching { CountdownKind.valueOf(o.optString("kind")) }.getOrDefault(CountdownKind.TIMER),
                 at = o.optLong("at"),
                 label = o.optString("label"),
                 durationMs = o.optLong("duration"),
@@ -261,12 +270,20 @@ fun NextCountdown(
         }
     }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
-        Icon(if (next.kind == CountdownKind.TIMER) Icons.Outlined.Timer else Icons.Outlined.Alarm, null, tint = color, modifier = Modifier.size(18.dp))
+        Icon(countdownIcon(next.kind), null, tint = color, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         val text = when (next.kind) {
             CountdownKind.TIMER -> Timers.countdown(next.at - now) + if (next.label.isNotBlank()) " · ${next.label}" else ""
             CountdownKind.ALARM -> Timers.clock(context, next.at)
+            CountdownKind.REMINDER -> Timers.clock(context, next.at) + " · " + next.label
         }
         Text(text, color = color, style = style, maxLines = 1)
     }
+}
+
+/** The icon for a timer, an alarm or a reminder. */
+fun countdownIcon(kind: CountdownKind) = when (kind) {
+    CountdownKind.TIMER -> Icons.Outlined.Timer
+    CountdownKind.ALARM -> Icons.Outlined.Alarm
+    CountdownKind.REMINDER -> Icons.Outlined.NotificationsActive
 }

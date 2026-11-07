@@ -2,6 +2,31 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Fixed: the microphone going off after the wake word.** Hearing her name used to close the microphone, then the sheet opened it again a second or two later, so what you said straight after her name was lost and sometimes the microphone was still busy. Now the wake word keeps recording and hands the sound straight to the listening sheet (to the phone's recognizer, or your server's speech-to-text), so she hears you from the moment she wakes. If the recognizer can't take it, it opens the microphone itself as before.
+- **Fixed: the screensaver coming on while she's still thinking.** "Busy" was one flag shared by every sheet, so a sheet closing just as a new one opened (the wake word right after a conversation) cleared it for the new one, which then thought for minutes with the screensaver counting down. Each screen now marks itself busy, and Lena's own chat in Assist mode counts as busy while it waits for an answer.
+- **Fixed: the wall display stuck on the sheet.** A touch on the sheet stopped it closing by itself for good, and an answer or a voice that never finished kept it up forever. On the wall display the sheet now always goes back once no one has touched any Lena screen for a minute and she's done, and it gives up on itself if she's been listening, thinking or speaking far longer than she ever should.
+- **Optimize memory** in Settings → Software version → Development: runs her memory tidy now instead of waiting for her weekly one, shows exactly what changed, with **Undo**.
+- **Reminders**, set by her tools: said on the display at the time (after a chime), or shown with one chime when Lena isn't on screen. Timers, alarms and reminders her tools set ring on the display you asked (or the room you named).
+- **Her volume:** she can change it when you ask ("speak more quietly"). With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM, and louder when the room is noisy (measured by the wake word, which is already listening), then the volume goes back to where it was.
+- **Speak through a Home Assistant speaker:** Settings → Connections → Home Assistant → **Speak through** sends everything she says to a speaker in Home Assistant, with the text-to-speech voice you choose there (Piper, say). If it fails, the tablet speaks instead.
+- **Speaking first:** pick a motion sensor under Settings → Wall display → Screensaver → **Speaking first** (it can differ from the one that wakes the screen, so a photo frame can stay a photo frame). When it sees someone come in, she gives a short morning briefing once a day (the weather from your own station, today's calendar, trash day, anything that needs attention), and mentions a worry at home once, never more than once every half hour.
+
+### Home Assistant integration
+
+- **New tools for her, in Assist and Open WebUI alike:** `set_timer`, `set_alarm`, `set_reminder` (at a time or after a while), `cancel_timer` and `list_timers` (from what each display reports), `set_volume`, `announce` (the intercom: "tell the kitchen dinner's ready", optionally listening there for an answer), `update_fact` (corrects a memory in place instead of adding a second one), and `house_history` (when something last happened, how long it lasted, what happened today, from Home Assistant's history, only for what's exposed to Assist). Several in one sentence work: each is its own call. The same are actions (`lena.set_timer` and the rest) for automations and Open WebUI.
+- **Displays sync** with `POST /api/lena/display/sync`: they collect what her tools asked of them and report what's set and their volume. Commands not collected within 15 minutes are dropped.
+- **Speaking first** (`POST /api/lena/display/briefing`): decides whether a display should say something as someone comes in: the morning briefing once a day per display (from her morning time until noon), a worry once, nothing within half an hour of the last time. Written in her words by her alert agent or Home Assistant's AI Task, or plainly from the facts. What's been said survives restarts.
+- **Your weather station:** Configure → **Your weather station** takes your own sensors (an Ecowitt in the backyard). She uses them for what it's like outside right now, before any forecast service, in conversations and her briefing.
+- `lena.announce` also takes a **room**.
+
+### Open WebUI
+
+- **The tool** has the new abilities too (timers, alarms, reminders, volume, the intercom, correcting a memory, the house's history). The Lena app tells it which display is asking (`{{LENA_DISPLAY}}`), so timers and reminders ring where you asked. Paste the new version over the old one.
+
 ## [0.6.8] - 2026-11-04
 
 ### Android app

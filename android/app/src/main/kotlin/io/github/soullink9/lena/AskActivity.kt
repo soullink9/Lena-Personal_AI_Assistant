@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.RoundedCorner
 import android.view.WindowManager
@@ -168,7 +169,7 @@ class AskActivity : ComponentActivity() {
                 }
 
         /**
-         * Opens the sheet to say an announcement from Home Assistant ([Announcements]); with [listen], she
+         * Opens the sheet to say an announcement from Home Assistant ([DisplaySync]); with [listen], she
          * then listens for an answer. Only Lena's own key lets it speak, as with a prompt.
          */
         fun announce(c: Context, message: String, listen: Boolean, from: From? = null): Intent =
@@ -203,6 +204,14 @@ class AskActivity : ComponentActivity() {
             return words.isNotEmpty() && words.joinToString(" ") in GOODBYES
         }
     }
+
+    /** On the wall display, how long the sheet stays up with no one around once she's done. */
+    private val IDLE_CLOSE_MS = 60_000L
+
+    /** Far longer than each should ever take: past this, the sheet is stuck and goes back. */
+    private val STUCK_LISTENING_MS = 90_000L
+    private val STUCK_SPEAKING_MS = 5 * 60_000L
+    private val STUCK_THINKING_MS = 15 * 60_000L
 
     /** The wall screen that called her: she goes back to it when the conversation's over. */
     enum class From { DASHBOARD, DISPLAY, SCREENSAVER }
@@ -332,8 +341,16 @@ class AskActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         fromOf(intent)?.let { from = it }
+        // An announcement or a reminder while the sheet is open: said once she's free (see Sheet).
+        intent.getStringExtra(EXTRA_ANNOUNCE)?.takeIf { intent.getStringExtra(EXTRA_KEY) == Prefs.launchKey(this) }?.let {
+            incoming.value = it to intent.getBooleanExtra(EXTRA_LISTEN, false)
+            return
+        }
         if (wantsTalk(intent)) restart.intValue++
     }
+
+    /** An announcement that arrived while the sheet was already open, waiting for her to be free. */
+    private val incoming = mutableStateOf<Pair<String, Boolean>?>(null)
 
     /** Unlocked while the sheet was open: the private lock-screen mode ends. */
     override fun onResume() {
@@ -383,10 +400,16 @@ class AskActivity : ComponentActivity() {
 
     /**
      * The voice chosen in Settings, or none when replies aren't read aloud. "Your server's voice" is Open
-     * WebUI's, so without it (Assist answering) the phone's voice reads instead.
+     * WebUI's, so without it (Assist answering) the phone's voice reads instead. With a Home Assistant
+     * speaker chosen (Speak through), she speaks there.
      */
     private fun newMouth(): Mouth? {
         val server = openWebUi
+        // Speaking through a Home Assistant speaker: everything she says goes there.
+        val ha = HomeAssistant.from(this)
+        if (Prefs.speaking(this) != Speaking.OFF && ha != null && Room.speaksThroughSpeaker(this)) {
+            return HaSpeakerMouth(ha, Room.voiceSpeaker(this), Room.voiceEngine(this))
+        }
         return when (Prefs.speaking(this)) {
             Speaking.SERVER -> if (server != null) ServerMouth(this, server) else PhoneMouth(this)
             Speaking.PHONE -> PhoneMouth(this)
@@ -411,7 +434,8 @@ class AskActivity : ComponentActivity() {
      * a touch, so the wall display's screensaver doesn't come on the moment she's done.
      */
     override fun onDestroy() {
-        Busy.talking = false
+        MicRelay.drop()
+        Busy.set(this, false)
         WallDisplay.touched()
         ear?.release()
         mouth?.release()
@@ -434,7 +458,7 @@ class AskActivity : ComponentActivity() {
         // the wall display's timers she's busy, so they don't count that time as no one being around.
         SideEffect {
             view.keepScreenOn = phase != Phase.IDLE
-            Busy.talking = phase != Phase.IDLE
+            Busy.set(this@AskActivity, phase != Phase.IDLE)
         }
         var heard by remember { mutableStateOf("") }
         var level by remember { mutableStateOf(0f) }
@@ -475,6 +499,42 @@ class AskActivity : ComponentActivity() {
             }
         }
         LaunchedEffect(phase) { if (phase != Phase.IDLE) closer?.cancel() }
+
+        // On the wall display the sheet never stays up by itself: once no one has touched any Lena screen
+        // for a minute and she's not listening, thinking or speaking, it goes back (a touch used to stop it
+        // closing for good). And if she's been stuck listening, thinking or speaking far longer than she
+        // ever should (a voice or a reply that never ends), it gives up and goes back too.
+        val wall = remember { handsFree || DashboardActivity.isHomeScreen(this@AskActivity) }
+        LaunchedEffect(Unit) {
+            if (!wall) return@LaunchedEffect
+            var seen = phase
+            var since = SystemClock.elapsedRealtime()
+            while (true) {
+                delay(2_000)
+                val now = SystemClock.elapsedRealtime()
+                if (phase != seen) {
+                    seen = phase
+                    since = now
+                }
+                val stuckAfter = when (phase) {
+                    Phase.LISTENING -> STUCK_LISTENING_MS
+                    Phase.SPEAKING -> STUCK_SPEAKING_MS
+                    Phase.THINKING -> STUCK_THINKING_MS
+                    Phase.IDLE -> null
+                }
+                if (stuckAfter != null && now - since > stuckAfter) {
+                    Logs.w("Ask", "Stuck ${phase.name.lowercase()} for ${(now - since) / 1000} s; closing the sheet")
+                    job?.cancel()
+                    goBack()
+                    break
+                }
+                if (phase == Phase.IDLE && WallDisplay.idleMillis() > IDLE_CLOSE_MS && !WallDisplay.typing(this@AskActivity)) {
+                    Logs.i("Ask", "Left alone; closing the sheet")
+                    goBack()
+                    break
+                }
+            }
+        }
         DisposableEffect(Unit) {
             onTouch = { closer?.cancel() }
             onDispose { onTouch = null }
@@ -527,9 +587,11 @@ class AskActivity : ComponentActivity() {
                     stopWord?.stop()
                     throw c
                 } catch (e: Exception) {
-                    // Your server's voice failed (for example, no text-to-speech engine set): use the phone's.
-                    Logs.w("Voice", "Couldn't speak with ${if (voice is ServerMouth) "your server's voice; trying the phone's" else "the phone's voice"}", e)
-                    if (voice is ServerMouth) runCatching {
+                    // Your server's voice or the Home Assistant speaker failed (no text-to-speech engine set,
+                    // the speaker off): use the phone's.
+                    val fallback = voice is ServerMouth || voice is HaSpeakerMouth
+                    Logs.w("Voice", "Couldn't speak with ${if (fallback) "${if (voice is ServerMouth) "your server's voice" else "the Home Assistant speaker"}; trying the phone's" else "the phone's voice"}", e)
+                    if (fallback) runCatching {
                         val phone = PhoneMouth(this@AskActivity).also { mouth = it; it.tone = tone }
                         withSpeechFocus(this@AskActivity) { phone.say(plain) }
                     }
@@ -619,6 +681,8 @@ class AskActivity : ComponentActivity() {
                     }
                     turn.done = true
                     working = false
+                    // Her tools may have just set a timer or a reminder for this display: collect it now.
+                    if (own == null) launch { DisplaySync.now(this@AskActivity) }
                     // She may have reacted to what you said; show how she feels now.
                     if (house != null) launch {
                         feelings = runCatching { house.feelings() }.getOrNull() ?: feelings
@@ -689,8 +753,9 @@ class AskActivity : ComponentActivity() {
         suspend fun hear(): String {
             val onPartial = { t: String -> heard = t }
             val onLevel = { l: Float -> level = l }
-            // Opened by her name: the wake word lets go of the microphone a moment after it heard her.
-            withTimeoutOrNull(1_000) {
+            // Opened by her name: the wake word passes its microphone on ([MicRelay]), so she listens at
+            // once. Otherwise wait for any wake word to let go of the microphone first.
+            if (!MicRelay.waiting()) withTimeoutOrNull(1_000) {
                 while (WakeListener.micsOpen > 0) delay(50)
             }
             val e = ear ?: newEar().also { ear = it }
@@ -843,6 +908,15 @@ class AskActivity : ComponentActivity() {
                 restart.intValue > 0 || !typing -> listen(false)
                 else -> runCatching { focus.requestFocus() }
             }
+        }
+        // An announcement or a reminder that came while the sheet was open: said once she's not listening,
+        // thinking or speaking, so it never cuts across the conversation.
+        LaunchedEffect(incoming.value, phase) {
+            val (message, listenAfter) = incoming.value ?: return@LaunchedEffect
+            if (phase != Phase.IDLE) return@LaunchedEffect
+            incoming.value = null
+            turns += Turn("Announcement").also { it.answer = message; it.done = true }
+            speakThenMaybeListen(message, listenAfter)
         }
 
         val f = feelings

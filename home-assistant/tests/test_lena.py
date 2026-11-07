@@ -90,7 +90,8 @@ async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
     assert "Mood: Cheerful." not in api.api_prompt  # only her current feelings
     assert "At home: " in api.api_prompt
     names = {t.name for t in api.tools}
-    assert names == {"remember_fact", "forget_fact", "record_feeling"}
+    assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_timer", "set_alarm",
+                     "set_reminder", "cancel_timer", "list_timers", "set_volume", "announce"}
 
     result = await api.async_call_tool(llm.ToolInput(tool_name="remember_fact", tool_args={"fact": "Alex likes the office at seventy degrees."}))
     assert data(result)["saved"].startswith("Alex")
@@ -608,3 +609,187 @@ async def test_memory_tidy_and_undo(hass: HomeAssistant, freezer) -> None:
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert len(again) == 1 and core.memories()[0] == "Alex likes coffee, black."
+
+
+async def _display(hass, client, display_id: str, name: str, room: str | None = None) -> str:
+    """Registers a display (put in [room], made if needed) and returns its device id."""
+    from homeassistant.helpers import area_registry as ar, device_registry as dr
+
+    info = await (await client.post("/api/lena/display", json={"id": display_id, "name": name})).json()
+    if room:
+        area = ar.async_get(hass).async_get_area_by_name(room) or ar.async_get(hass).async_create(room)
+        dr.async_get(hass).async_update_device(info["device_id"], area_id=area.id)
+    return info["device_id"]
+
+
+async def _sync(client, display_id: str, countdowns=None, after: int = 0, boot: str = "") -> dict:
+    response = await client.post("/api/lena/display/sync", json={
+        "id": display_id, "after": after, "boot": boot, "countdowns": countdowns or [], "volume": 40,
+    })
+    assert response.status == 200
+    return await response.json()
+
+
+async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass_client) -> None:
+    """Her tools queue timers, alarms, reminders, volume and announcements for the display she was asked
+    through (or the room named); the display collects them once, reports what it has, and she can list and
+    cancel from that. Several displays and no room: she asks which.
+    """
+    from homeassistant.exceptions import ServiceValidationError
+
+    await setup(hass)
+    client = await hass_client()
+    kitchen = await _display(hass, client, "kitchen-tab", "Kitchen tablet", "Kitchen")
+    await _display(hass, client, "bed-tab", "Bedroom tablet", "Bedroom")
+
+    # Asked through the kitchen: a 5 minute pasta timer and a reminder in 20 seconds.
+    t = await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 300, "label": "pasta", "device_id": kitchen},
+                                       blocking=True, return_response=True)
+    assert t["set"] == "pasta timer for 5 minutes" and t["on"] == "Kitchen tablet"
+    r = await hass.services.async_call(DOMAIN, "set_reminder", {"message": "Flip the chicken", "in_seconds": 20, "device_id": kitchen},
+                                       blocking=True, return_response=True)
+    assert r["set"] == "Reminder in 20 seconds: Flip the chicken"
+    await hass.services.async_call(DOMAIN, "set_alarm", {"time": "7:30 am", "room": "bedroom"}, blocking=True, return_response=True)
+    await hass.services.async_call(DOMAIN, "announce", {"message": "Dinner's ready!", "room": "the kitchen", "listen": True}, blocking=True)
+
+    first = await _sync(client, "kitchen-tab")
+    types = [c["type"] for c in first["commands"]]
+    assert types == ["timer", "reminder", "announce"]
+    assert first["commands"][0]["duration"] == 300 and first["commands"][0]["label"] == "pasta"
+    assert first["commands"][2] == {"seq": first["commands"][2]["seq"], "type": "announce", "message": "Dinner's ready!", "listen": True}
+    # Collected once: nothing new next time. After a restart (a new boot) it starts again from the beginning.
+    again = await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"])
+    assert again["commands"] == []
+    bedroom = await _sync(client, "bed-tab")
+    assert [(c["type"], c["hour"], c["minute"]) for c in bedroom["commands"]] == [("alarm", 7, 30)]
+
+    # What the kitchen reports, she can list and cancel.
+    soon = int((dt_util.utcnow() + timedelta(minutes=4)).timestamp() * 1000)
+    await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"], countdowns=[
+        {"kind": "timer", "label": "pasta", "at": soon, "duration": 300},
+        {"kind": "timer", "label": "eggs", "at": soon, "duration": 300},
+    ])
+    listed = await hass.services.async_call(DOMAIN, "list_timers", {"device_id": kitchen}, blocking=True, return_response=True)
+    assert any("pasta timer" in line for line in listed["set"])
+    with pytest.raises(ServiceValidationError, match="Several are set"):
+        await hass.services.async_call(DOMAIN, "cancel_timer", {"kind": "timer", "device_id": kitchen}, blocking=True, return_response=True)
+    cancelled = await hass.services.async_call(DOMAIN, "cancel_timer", {"label": "pasta", "device_id": kitchen},
+                                               blocking=True, return_response=True)
+    assert cancelled["cancelled"] == ["pasta timer, 4 minutes left"] or cancelled["cancelled"][0].startswith("pasta timer")
+
+    # No room and no display named, with two displays: she has to ask which.
+    with pytest.raises(ServiceValidationError, match="Say which room"):
+        await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 60}, blocking=True, return_response=True)
+    with pytest.raises(ServiceValidationError, match="no room called Garage"):
+        await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 60, "room": "Garage"}, blocking=True, return_response=True)
+    with pytest.raises(ServiceValidationError, match="from one second to 24 hours"):
+        await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 90000, "device_id": kitchen}, blocking=True, return_response=True)
+
+    # Her Assist tool uses the device the question came from.
+    names = {f.name for f in dataclasses.fields(llm.LLMContext)}
+    values = {"platform": "test", "context": None, "language": "en", "assistant": "conversation", "device_id": kitchen}
+    api = await llm.async_get_api(hass, "lena", llm.LLMContext(**{k: v for k, v in values.items() if k in names}))
+    result = data(await api.async_call_tool(llm.ToolInput(tool_name="set_volume", tool_args={"change": "quieter"})))
+    assert result == {"volume": "quieter", "on": "Kitchen tablet"}
+    result = data(await api.async_call_tool(llm.ToolInput(tool_name="set_alarm", tool_args={"time": "25:00"})))
+    assert result["done"] is False and "isn't a time" in result["error"]
+    latest = await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"])
+    assert [c["type"] for c in latest["commands"]] == ["cancel", "volume"]
+
+
+async def test_update_fact(hass: HomeAssistant) -> None:
+    """A correction replaces the memory it's about, in place, instead of adding a second one."""
+    from homeassistant.exceptions import ServiceValidationError
+
+    await setup(hass)
+    core = hass.data[DOMAIN]
+    core.remember("Alex works the day shift.")
+    core.remember("Sam likes tea.")
+    reply = await hass.services.async_call(DOMAIN, "update_fact", {"old": "Alex shift", "new": "Alex works the night shift."},
+                                           blocking=True, return_response=True)
+    assert reply == {"was": "Alex works the day shift.", "now": "Alex works the night shift."}
+    assert core.memories() == ["Alex works the night shift.", "Sam likes tea."]
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "update_fact", {"old": "the boat", "new": "x"}, blocking=True, return_response=True)
+
+
+async def test_house_history(hass: HomeAssistant, freezer) -> None:
+    """From the house's history: when the garage door last opened and for how long, and what happened
+    today. The recorder's answer is stood in for, so this checks her reading of it.
+    """
+    from unittest.mock import patch
+
+    from homeassistant.core import State
+    from homeassistant.exceptions import ServiceValidationError
+
+    freezer.move_to("2026-11-07 12:00:00")
+    await setup(hass)
+    door = {"friendly_name": "Garage Door", "device_class": "garage_door"}
+    hass.states.async_set("binary_sensor.garage_door", "off", door)
+    today = dt_util.start_of_local_day()
+
+    def at(hours: float):
+        return today + timedelta(hours=hours)
+
+    recorded = {
+        "binary_sensor.garage_door": [
+            State("binary_sensor.garage_door", "off", door, last_changed=at(-30), last_updated=at(-30)),
+            State("binary_sensor.garage_door", "on", door, last_changed=at(9), last_updated=at(9)),
+            State("binary_sensor.garage_door", "off", door, last_changed=at(9 + 4 / 60), last_updated=at(9 + 4 / 60)),
+        ],
+        "person.sam": [
+            State("person.sam", "home", {"friendly_name": "Sam"}, last_changed=at(-30), last_updated=at(-30)),
+            State("person.sam", "not_home", {"friendly_name": "Sam"}, last_changed=at(10), last_updated=at(10)),
+        ],
+    }
+
+    async def changes(hass_, entity_ids, start):
+        return {e: recorded[e] for e in (entity_ids or recorded) if e in recorded}
+
+    with patch("custom_components.lena.history._changes", changes):
+        last = await hass.services.async_call(DOMAIN, "history", {"question": "last_change", "name": "garage door"},
+                                              blocking=True, return_response=True)
+        assert "Garage Door was last on at" in last["answer"] and "for 4 minutes" in last["answer"]
+        long = await hass.services.async_call(DOMAIN, "history", {"question": "how_long", "name": "the garage door"},
+                                              blocking=True, return_response=True)
+        assert "1 time, 4 minutes in all" in long["answer"]
+        missed = await hass.services.async_call(DOMAIN, "history", {"question": "what_happened"}, blocking=True, return_response=True)
+        text = " ".join(missed["happened"])
+        assert "Garage Door on" in text and "Garage Door off" in text and "Sam not_home" in text
+        with pytest.raises(ServiceValidationError, match="Nothing called boat"):
+            await hass.services.async_call(DOMAIN, "history", {"question": "last_change", "name": "boat"}, blocking=True, return_response=True)
+
+
+async def test_speaking_first(hass: HomeAssistant, hass_client, freezer) -> None:
+    """Someone comes in: in the morning she gives the briefing once (with her own weather station), then
+    stays quiet; a new worry is mentioned once, but not within half an hour of the last thing she said.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    hass.states.async_set("sensor.backyard_temperature", "41.2", {"friendly_name": "Backyard temperature", "unit_of_measurement": "°F"})
+    hass.states.async_set("sensor.trash_pickup", "Today", {"friendly_name": "Trash pickup"})
+    await setup(hass, options=dict(OPTIONS, local_weather=["sensor.backyard_temperature"]))
+    client = await hass_client()
+    device = dr.async_get(hass).async_get(await _display(hass, client, "kitchen-tab", "Kitchen tablet", "Kitchen"))
+    core = hass.data[DOMAIN]
+    assert "Backyard temperature 41.2 °F" in core.context()
+    # The app's request (POST /api/lena/display/briefing) answers with this; its time is moved below.
+    reply = await (await client.post("/api/lena/display/briefing", json={"id": "kitchen-tab"})).json()
+    assert "text" in reply
+
+    async def briefing() -> str:
+        return await core.briefings.something_to_say(core, device)
+
+    core.briefings._said.clear()
+    # The house's own clock (tests run in Home Assistant's test time zone, not UTC).
+    day = dt_util.start_of_local_day() + timedelta(days=1)
+    freezer.move_to(day + timedelta(hours=7, minutes=15))
+    first = await briefing()
+    assert first.startswith("Good morning.") and "Backyard temperature 41.2 °F" in first and "Trash pickup: Today" in first
+    assert await briefing() == ""  # once a morning, and not twice in half an hour
+    freezer.move_to(day + timedelta(hours=9))
+    assert await briefing() == ""  # the morning's briefing was given
+    core.feelings.moment, core.feelings.moment_reason, core.feelings.moment_since = "Worried", "The leak sensor is wet.", dt_util.now()
+    assert "leak sensor is wet" in (await briefing()).lower()
+    freezer.move_to(day + timedelta(hours=10))
+    assert await briefing() == ""  # that worry was mentioned here already

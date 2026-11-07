@@ -27,9 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Snooze
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,11 +64,36 @@ object Ringing {
     /** What's ringing now, or null. */
     val now: StateFlow<Countdown?> = ringing
 
-    /** How long it may ring before it stops by itself. */
-    val maxRingMs: Long get() = MAX_RING_MS
+    /** How long it may ring before it stops by itself (a reminder's notice: a minute). */
+    fun maxRingMs(item: Countdown?): Long = if (item?.kind == CountdownKind.REMINDER) REMINDER_MS else MAX_RING_MS
 
-    /** Starts ringing for [item] (a newer one takes over from one already ringing). */
+    /** One short chime, before a reminder is said. */
+    fun chime(c: Context) {
+        runCatching {
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            RingtoneManager.getRingtone(c, uri)?.apply {
+                audioAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+                play()
+            }
+        }
+    }
+
+    /** How long a reminder's notification stays up, ringing once, before it goes. */
+    private const val REMINDER_MS = 60_000L
+
+    /**
+     * Starts ringing for [item] (a newer one takes over from one already ringing). A reminder is said
+     * instead: with Lena on screen (the wall display) she says it in the sheet after a chime; otherwise it
+     * shows like a timer, with one chime rather than a ringing sound.
+     */
     fun start(c: Context, item: Countdown) {
+        if (item.kind == CountdownKind.REMINDER && AppVisible.now) {
+            Logs.i("Timers", "Reminder: ${item.label}")
+            chime(c)
+            c.startActivity(AskActivity.announce(c, "Reminder: ${item.label}", listen = false))
+            return
+        }
         ringing.value = item
         Logs.i("Timers", "Ringing: ${item.name(c)}")
         c.startForegroundService(Intent(c, RingService::class.java))
@@ -141,9 +164,9 @@ class RingService : Service() {
         running = this
         Ringing.channel(this)
         startForeground(NOTIFICATION, notification(item), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        play()
+        if (item.kind == CountdownKind.REMINDER) Ringing.chime(this) else play()
         handler.removeCallbacks(giveUp)
-        handler.postDelayed(giveUp, Ringing.maxRingMs)
+        handler.postDelayed(giveUp, Ringing.maxRingMs(item))
         // On screen already (the wall display): the ringing screen comes up at once. Otherwise the
         // notification's full-screen intent brings it.
         if (AppVisible.now) startActivity(Intent(this, RingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -180,7 +203,7 @@ class RingService : Service() {
         )
         return NotificationCompat.Builder(this, Ringing.CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_lena)
-            .setContentTitle(if (item.kind == CountdownKind.TIMER) "Time's up" else "Alarm")
+            .setContentTitle(title(item.kind))
             .setContentText(item.name(this))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -232,14 +255,15 @@ class RingActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize().padding(32.dp),
                     ) {
                         Icon(
-                            if (ringing.kind == CountdownKind.TIMER) Icons.Outlined.Timer else Icons.Outlined.Alarm, null,
+                            countdownIcon(ringing.kind), null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(96.dp),
                         )
-                        Text(if (ringing.kind == CountdownKind.TIMER) "Time's up" else "Alarm", style = MaterialTheme.typography.displaySmall)
-                        Text(ringing.name(this@RingActivity), style = MaterialTheme.typography.titleLarge,
+                        Text(title(ringing.kind), style = MaterialTheme.typography.displaySmall)
+                        Text(if (ringing.kind == CountdownKind.REMINDER) ringing.label else ringing.name(this@RingActivity),
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Button(onClick = { Ringing.stop(this@RingActivity) }, modifier = Modifier.widthIn(min = 240.dp).height(64.dp)) {
-                            Text("Stop", style = MaterialTheme.typography.titleLarge)
+                            Text(if (ringing.kind == CountdownKind.REMINDER) "Done" else "Stop", style = MaterialTheme.typography.titleLarge)
                         }
                         if (ringing.kind == CountdownKind.ALARM) {
                             OutlinedButton(onClick = { Ringing.snooze(this@RingActivity) }, modifier = Modifier.widthIn(min = 240.dp)) {
@@ -274,4 +298,11 @@ class RingActivity : ComponentActivity() {
         stopWord = null
         super.onPause()
     }
+}
+
+/** What the ringing screen and notification say at the top. */
+private fun title(kind: CountdownKind) = when (kind) {
+    CountdownKind.TIMER -> "Time's up"
+    CountdownKind.ALARM -> "Alarm"
+    CountdownKind.REMINDER -> "Reminder"
 }

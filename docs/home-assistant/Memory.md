@@ -30,7 +30,7 @@ Every 7 days by default, at bedtime, Lena tidies her own memory with Home Assist
 - **Clarifies** a vague line into one clear sentence, using only what it says.
 - **Retires** lines that are outdated (a date that has passed, a fact a newer line replaces) or were only for a moment, by **ticking them off**: they stay on the list, out of her prompt, as when you tick one off yourself.
 
-She never touches lines you've ticked off, never retires more than half of what she remembers at once, and changes nothing if the model's answer doesn't add up. Afterwards a notification says exactly what changed; the action **Lena: Undo memory tidy** (`lena.undo_memory_tidy`) puts it all back. **Lena: Tidy memory** (`lena.tidy_memory`) runs it now. Set Configure → **She tidies her memory every** to 0 to turn it off.
+She never touches lines you've ticked off, never retires more than half of what she remembers at once, and changes nothing if the model's answer doesn't add up. Afterwards a notification says exactly what changed; the action **Lena: Undo memory tidy** (`lena.undo_memory_tidy`) puts it all back. **Lena: Tidy memory** (`lena.tidy_memory`) runs it now, and so does **Optimize memory** in the Lena app (Settings → tap Software version → Development), which shows what changed with Undo. Set Configure → **She tidies her memory every** to 0 to turn it off.
 
 ## Privacy
 

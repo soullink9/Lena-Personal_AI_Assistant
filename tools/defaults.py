@@ -155,6 +155,7 @@ SETTINGS = [
         "Your server's voice": "Speaking.SERVER", "The phone's voice": "Speaking.PHONE",
         "Don't read replies aloud": "Speaking.OFF"}),
     Setting("Talking to Lena › How she looks and sounds › Her voice follows her mood", "MOOD_VOICE", "Boolean", ON_OFF),
+    Setting("Talking to Lena › How she looks and sounds › Adjust her volume", "AUTO_VOLUME", "Boolean", ON_OFF),
     Setting("Talking to Lena › How she looks and sounds › Keep listening", "FOLLOW_UP", "FollowUp", {
         "After every reply": "FollowUp.ALWAYS", "When she asks a question": "FollowUp.QUESTIONS", "Off": "FollowUp.OFF"}),
     Setting("Talking to Lena › Interacting with Lena › The assistant gesture opens", "ASSIST", "AssistAction", {

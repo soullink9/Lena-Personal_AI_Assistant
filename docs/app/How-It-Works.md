@@ -156,7 +156,26 @@ With the Lena integration, the app registers itself in Home Assistant as a displ
 
 - **Room-aware commands:** in Assist mode every question says which display it came from, so "turn on the lights" means that room's. With Open WebUI, she's told the room.
 - **Music:** asked for without naming a room, it plays on the room's speaker (Music Assistant's first), or on the one picked in **Music plays on**. Name another room, or the whole home, and she finds the speakers there.
-- **Announcements:** Home Assistant's `lena.announce` action is said on the wall display within a few seconds, in the sheet like one of her answers, and she listens for an answer if it asks. During a conversation it waits until the conversation ends.
+- **Announcements and the intercom:** Home Assistant's `lena.announce` action, or asking her "tell the kitchen dinner's ready", is said on that room's wall display within a few seconds, in the sheet like one of her answers, and she listens for an answer there if asked. During a conversation it waits until the conversation ends.
+- **Speak through a Home Assistant speaker:** **Speak through** (in the same place) sends everything she says to a speaker in Home Assistant with the text-to-speech voice you pick (Piper, say), instead of the tablet. If that fails, the tablet speaks.
+
+### Her tools on the display
+
+With the Lena integration, she can do more than answer, in Assist and Open WebUI alike:
+
+- **Timers, alarms and reminders:** "put a 5 minute timer on for the pasta and remind me to flip the chicken in 20 seconds", "remind me at 7 to take the trash out", "how long is left on the pasta?", "cancel the pasta timer". They ring on the display you asked, or the room you name. A reminder is said out loud after a chime (or shown with one chime when Lena isn't on screen).
+- **Her volume:** "speak more quietly", "louder". With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM, and louder when the room is noisy (the wake word hears how noisy it is), then puts the volume back.
+- **Correcting what she remembers:** "Alex works nights now" changes the old memory instead of adding a second one.
+- **The house's history:** "when did the garage door last open?", "how long was the back door open?", "what did I miss today?" (people coming and going, doors, windows, locks, the garage, alarms and leaks; not lights or motion). Only what's exposed to Assist.
+
+### Speaking first
+
+Pick a motion sensor under Settings → Wall display → Screensaver → **Speaking first**. It can be a different one from the sensor that wakes the screen, so the display can stay a photo frame and still greet you. When it sees someone come in:
+
+- **In the morning** (from her morning time in the integration's Configure until noon), once a day: a short greeting and briefing, the weather from your own weather station, today's calendar, trash or recycling if it's today, anything that needs attention.
+- **When something at home needs attention** that she hasn't mentioned on that display yet: once.
+
+Never more than once every half hour on the same display.
 
 ## House alerts
 

@@ -25,6 +25,12 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── core.py                    runs the brain in Home Assistant, saves feelings and memory
 │   ├── llm_api.py                 the "Lena" choice for conversation agents, and her tools
 │   ├── events.py                  adding calendar events (her tool and lena.add_event)
+│   ├── abilities.py, actions.py   her timers, alarms, reminders, volume, intercom, memory corrections (and their lena.* actions)
+│   ├── history.py                 the house's history from the recorder (house_history, lena.history)
+│   ├── displays.py, hub.py        displays registering and syncing: what's asked of each, what each reports
+│   ├── event.py                   each display's Announcement event
+│   ├── briefing.py                speaking first: the morning briefing and worries, once each
+│   ├── tidy.py                    her memory tidy: the request, checking the answer, the changes
 │   ├── view.py                    GET /api/lena/context for Open WebUI and the app
 │   ├── select.py, todo.py         her dropdowns and her memory list
 │   ├── config_flow.py             adding and configuring her in the UI
@@ -37,7 +43,7 @@ How the repository is organised and how to change it without breaking things. Th
 ├── hacs.json                      for HACS and Home Assistant's Marketplace
 ├── open-webui/
 │   ├── lena_filter.py             feelings and memory into chats
-│   └── lena_tools.py              remember, forget, feel, add calendar events
+│   └── lena_tools.py              memory, feelings, calendar events, timers, intercom, volume, history
 ├── android/                       the Lena app (Gradle project)
 │   └── app/src/main/kotlin/io/github/soullink9/lena/
 ├── voice/

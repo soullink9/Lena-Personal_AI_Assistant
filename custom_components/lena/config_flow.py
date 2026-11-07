@@ -35,6 +35,7 @@ from .const import (
     CONF_MOOD_HOLD_HOURS,
     CONF_MORNING,
     CONF_PEOPLE,
+    CONF_LOCAL_WEATHER,
     CONF_TIDY_DAYS,
     CONF_TIDY_TASK,
     CONF_WEATHER,
@@ -98,6 +99,9 @@ class LenaOptionsFlow(OptionsFlowWithReload):
                 EntitySelector(EntitySelectorConfig(domain="person", multiple=True)),
             vol.Optional(CONF_WEATHER, description=default(CONF_WEATHER)):
                 EntitySelector(EntitySelectorConfig(domain="weather")),
+            # Your own weather station (an Ecowitt in the backyard): what it's like outside right now.
+            vol.Optional(CONF_LOCAL_WEATHER, description=default(CONF_LOCAL_WEATHER)):
+                EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
             vol.Optional(CONF_CALENDARS, description=default(CONF_CALENDARS)):
                 EntitySelector(EntitySelectorConfig(domain="calendar", multiple=True)),
             vol.Optional(CONF_WORRIES, description=default(CONF_WORRIES)):

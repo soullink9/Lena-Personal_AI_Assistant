@@ -220,7 +220,7 @@ class DashboardActivity : ComponentActivity() {
         if (dashboardMode && intent?.getBooleanExtra(EXTRA_IDLE, false) == true) dim()
         // On the wall all day: keep Open WebUI and Home Assistant ready for whenever someone talks to her.
         Connections.keepAlive(this)
-        Announcements.watch(this, AskActivity.From.DASHBOARD)
+        DisplaySync.watch(this, AskActivity.From.DASHBOARD)
     }
 
     /**

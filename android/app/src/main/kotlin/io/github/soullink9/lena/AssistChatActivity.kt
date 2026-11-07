@@ -52,6 +52,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -117,6 +118,12 @@ class AssistChatActivity : ComponentActivity() {
     }
 
     /** Back on screen: the switch, the wall display's Apps and her name follow the settings. */
+    /** Gone: no longer busy. */
+    override fun onDestroy() {
+        Busy.set(this, false)
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
         // Switched back to Open WebUI in Settings meanwhile: its chat screen takes over.
@@ -159,6 +166,8 @@ class AssistChatActivity : ComponentActivity() {
         var turns by remember { mutableStateOf<List<AssistTurn>>(emptyList()) }
         var text by remember { mutableStateOf("") }
         var waiting by remember { mutableStateOf<String?>(null) } // a typed question still being answered
+        // Waiting for Assist counts as her being busy, so the screensaver doesn't come on mid-answer.
+        SideEffect { Busy.set(this@AssistChatActivity, waiting != null) }
         val list = rememberLazyListState()
 
         LaunchedEffect(changed) { turns = AssistLog.all(this@AssistChatActivity) }
@@ -181,7 +190,11 @@ class AssistChatActivity : ComponentActivity() {
                 try {
                     val own = Commands.handle(this@AssistChatActivity, question)
                     if (own != null) AssistLog.add(this@AssistChatActivity, question, own)
-                    else AssistChat.ask(this@AssistChatActivity, question)
+                    else {
+                        AssistChat.ask(this@AssistChatActivity, question)
+                        // Her tools may have just set a timer or a reminder here: collect it now.
+                        DisplaySync.now(this@AssistChatActivity)
+                    }
                 } catch (e: HaAuthException) {
                     toast("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.")
                 } catch (e: IllegalStateException) {

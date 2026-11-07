@@ -6,7 +6,10 @@
     "calendar",
     "conversation",
     "http",
-    "media_source"
+    "media_player",
+    "media_source",
+    "recorder",
+    "tts"
   ],
   "codeowners": [
     "@soullink9"

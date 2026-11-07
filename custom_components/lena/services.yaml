@@ -44,6 +44,9 @@ announce:
         device:
           integration: lena
           multiple: true
+    room:
+      selector:
+        text:
     message:
       required: true
       example: Dinner's ready!
@@ -57,3 +60,152 @@ announce:
 tidy_memory:
 
 undo_memory_tidy:
+
+set_timer:
+  fields:
+    seconds:
+      required: true
+      example: 300
+      selector:
+        number:
+          min: 1
+          max: 86400
+          unit_of_measurement: s
+    label:
+      example: pasta
+      selector:
+        text:
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+set_alarm:
+  fields:
+    time:
+      required: true
+      example: "06:45"
+      selector:
+        text:
+    label:
+      selector:
+        text:
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+set_reminder:
+  fields:
+    message:
+      required: true
+      example: Take the trash out
+      selector:
+        text:
+    at:
+      example: "19:00"
+      selector:
+        text:
+    in_seconds:
+      selector:
+        number:
+          min: 1
+          max: 604800
+          unit_of_measurement: s
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+cancel_timer:
+  fields:
+    kind:
+      selector:
+        select:
+          options: [timer, alarm, reminder]
+    label:
+      selector:
+        text:
+    all:
+      default: false
+      selector:
+        boolean:
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+list_timers:
+  fields:
+    everywhere:
+      default: false
+      selector:
+        boolean:
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+set_volume:
+  fields:
+    level:
+      selector:
+        number:
+          min: 0
+          max: 100
+    change:
+      selector:
+        select:
+          options: [quieter, louder]
+    device_id:
+      selector:
+        device:
+          integration: lena
+    room:
+      selector:
+        text:
+
+update_fact:
+  fields:
+    old:
+      required: true
+      selector:
+        text:
+    new:
+      required: true
+      selector:
+        text:
+
+history:
+  fields:
+    question:
+      required: true
+      selector:
+        select:
+          options: [last_change, how_long, what_happened]
+    name:
+      selector:
+        text:
+    state:
+      selector:
+        text:
+    hours:
+      selector:
+        number:
+          min: 0.1
+          max: 720

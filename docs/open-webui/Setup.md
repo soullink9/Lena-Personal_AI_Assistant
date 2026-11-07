@@ -58,9 +58,9 @@ Any user's token works; no admin rights are needed. A Home Assistant user just f
 1. Workspace → **Tools** → **+** (new tool).
 2. Paste the whole of `open-webui/lena_tools.py` and save.
 3. Open its settings: the same `ha_url` and `ha_token`, and `memory_list` = `todo.lena_memory` (the default).
-4. Workspace → Models → `lena` → **Tools**: tick **Lena (remember, forget, feel, calendar)**.
+4. Workspace → Models → `lena` → **Tools**: tick **Lena (memory, feelings, calendar, timers, intercom, history)**.
 
-Its `add_calendar_event` runs the `lena.add_event` action in Home Assistant, so it can add to the same calendars as her voice: those exposed to Assist that take new events (see [Calendars](../home-assistant/Integration.md#calendars)). Updating from an earlier version: paste the new file over the old tool; its settings are kept.
+Its `add_calendar_event` runs the `lena.add_event` action in Home Assistant, so it can add to the same calendars as her voice: those exposed to Assist that take new events (see [Calendars](../home-assistant/Integration.md#calendars)). Its timers, alarms, reminders, volume, intercom, memory correction and house history run the same `lena.*` actions as her tools in Assist (see [Her tools on the displays](../home-assistant/Integration.md#her-tools-on-the-displays)); the Lena app tells it which display is asking, so they ring where you asked. Updating from an earlier version: paste the new file over the old tool; its settings are kept.
 
 The Lena app uses the model's tools and filters automatically, so there's nothing to set in the app.
 

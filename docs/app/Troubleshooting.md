@@ -96,13 +96,24 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 - The warning says what went wrong, for example that the microphone is in use by another app.
 - **"Couldn't hear you (error 10)"** (or "still busy with the last time") means Android's speech service hadn't finished with the previous turn. Lena now waits for the service and tries again by herself, so this should be rare; if it still shows, check that no other app is listening (a voice assistant's wake word, for example).
 - If the mic doesn't open again after Lena replies, check **Keep listening** in Lena's settings.
+- **After the wake word**, she listens through the same microphone that heard her name, so you can go straight on ("Hey Lena, turn off the lights"). If your phone's speech recognizer can't take the sound that way, the log says "couldn't take the wake word's microphone" and it opens its own instead, which takes a second: wait for the bubble before speaking.
 
 ## Lena doesn't speak her replies
 
 - Check **Lena's voice** in Lena's settings isn't **Off**.
 - She only reads replies aloud when you spoke. Typed questions get text replies.
 - With **Your server's voice**, Open WebUI's text-to-speech must be set up; if it isn't, Lena uses the phone's voice.
-- Replies play at media volume.
+- Replies play at media volume. With **Adjust her volume** on, she's quieter before 8 AM and after 10 PM; turn it off if that's too quiet.
+- With **Speak through** set to a Home Assistant speaker, she speaks there instead of on the tablet. Check the speaker is on and the chosen voice works in Home Assistant (Developer tools → Actions → `tts.speak`).
+
+## Speaking first doesn't say anything
+
+- It needs the Lena integration, the display put in a room, and a sensor under Settings → Wall display → Screensaver → **Speaking first**. It only works while Lena is on screen as the home screen.
+- The morning briefing comes once a day, from her morning time (the integration's Configure) until noon. After that she only speaks first about something that needs attention, once, and never twice within half an hour.
+
+## Her timers or reminders from Open WebUI don't ring
+
+- Update the Lena tool in Open WebUI (paste the new `lena_tools.py`). The app tells it which display is asking; from Open WebUI's own web page there's no display, so name the room ("remind the kitchen…").
 
 ## No "Lena finished" or scheduled prompt notifications
 

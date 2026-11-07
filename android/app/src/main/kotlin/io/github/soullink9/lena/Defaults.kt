@@ -44,6 +44,8 @@ object Defaults {
     val SPEAKING: Speaking = Speaking.SERVER
     /** Talking to Lena › How she looks and sounds › Her voice follows her mood: On */
     const val MOOD_VOICE: Boolean = true
+    /** Talking to Lena › How she looks and sounds › Adjust her volume: On */
+    const val AUTO_VOLUME: Boolean = true
     /** Talking to Lena › How she looks and sounds › Keep listening: After every reply */
     val FOLLOW_UP: FollowUp = FollowUp.ALWAYS
     /** Talking to Lena › Interacting with Lena › The assistant gesture opens: Talk to Lena */
