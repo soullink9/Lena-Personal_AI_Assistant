@@ -13,6 +13,7 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 - **Reminders**, set by her tools: said on the display at the time (after a chime), or shown with one chime when Lena isn't on screen. Timers, alarms and reminders her tools set ring on the display you asked (or the room you named).
 - **Her volume:** she can change it when you ask ("speak more quietly"). With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM, and louder when the room is noisy (measured by the wake word, which is already listening), then the volume goes back to where it was.
 - **Speak through a Home Assistant speaker:** Settings → Connections → Home Assistant → **Speak through** sends everything she says to a speaker in Home Assistant, with the text-to-speech voice you choose there (Piper, say). If it fails, the tablet speaks instead.
+- **"Her voice follows her mood" is off by default** for new installs and Return to defaults.
 - **Speaking first:** pick a motion sensor under Settings → Wall display → Screensaver → **Speaking first** (it can differ from the one that wakes the screen, so a photo frame can stay a photo frame). When it sees someone come in, she gives a short morning briefing once a day (the weather from your own station, today's calendar, trash day, anything that needs attention), and mentions a worry at home once, never more than once every half hour.
 
 ### Home Assistant integration

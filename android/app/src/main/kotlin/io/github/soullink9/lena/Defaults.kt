@@ -42,8 +42,8 @@ object Defaults {
     val HEARING: Hearing = Hearing.PHONE
     /** Talking to Lena › How she looks and sounds › Her voice: Your server's voice */
     val SPEAKING: Speaking = Speaking.SERVER
-    /** Talking to Lena › How she looks and sounds › Her voice follows her mood: On */
-    const val MOOD_VOICE: Boolean = true
+    /** Talking to Lena › How she looks and sounds › Her voice follows her mood: Off */
+    const val MOOD_VOICE: Boolean = false
     /** Talking to Lena › How she looks and sounds › Adjust her volume: On */
     const val AUTO_VOLUME: Boolean = true
     /** Talking to Lena › How she looks and sounds › Keep listening: After every reply */
