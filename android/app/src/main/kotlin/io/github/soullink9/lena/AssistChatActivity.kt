@@ -188,7 +188,7 @@ class AssistChatActivity : ComponentActivity() {
             waiting = question
             scope.launch {
                 try {
-                    val own = Commands.handle(this@AssistChatActivity, question)
+                    val own = Commands.handle(this@AssistChatActivity, question, timersHere = Room.info(this@AssistChatActivity).value?.satellite == null)
                     if (own != null) AssistLog.add(this@AssistChatActivity, question, own)
                     else {
                         AssistChat.ask(this@AssistChatActivity, question)

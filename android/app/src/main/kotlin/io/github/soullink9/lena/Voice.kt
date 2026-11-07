@@ -86,14 +86,27 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
 class PhoneEar(private val context: Context) : Ear {
 
     companion object {
-        /** Whether this phone has an on-device recognizer at all (some don't, and then the server is used). */
-        fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c)
+        /** After the recognizer never gets ready, how long it's passed over for another way of hearing. */
+        private const val UNRELIABLE_MS = 24 * 60 * 60_000L
+
+        /**
+         * Whether this phone has an on-device recognizer that works: one that never got ready lately (some
+         * tablets have one that never answers) counts as not having one, for a day.
+         */
+        fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c) &&
+            System.currentTimeMillis() - c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).getLong("phone_unreliable", 0) > UNRELIABLE_MS
+
+        /** The recognizer never got ready: use another way of hearing for a day (see [available]). */
+        fun markUnreliable(c: Context) {
+            Logs.w("Voice", "The phone's recognizer never got ready; using another way of hearing for a day")
+            c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).edit().putLong("phone_unreliable", System.currentTimeMillis()).apply()
+        }
 
         /** How long the speech service needs to close a cancelled session before the next can start. */
         private const val SETTLE_MS = 300L
 
         /** How long a session may take to get ready before it's given up. */
-        private const val READY_TIMEOUT_MS = 5_000L
+        private const val READY_TIMEOUT_MS = 3_000L
 
         /** Waits before each retry when the service was busy: it's usually free again within a second. */
         private val BUSY_RETRY_MS = listOf(500L, 1_200L)
@@ -291,24 +304,24 @@ class PhoneEar(private val context: Context) : Ear {
 }
 
 /**
- * Records until you stop talking, then sends the audio to Open WebUI's speech-to-text
- * (the same engine call mode uses).
+ * An ear that records until you stop talking and then has the recording turned into text somewhere else:
+ * your Open WebUI ([ServerEar]) or Home Assistant ([HaEar]). The text appears all at once, after you stop,
+ * unlike on the phone.
  */
-class ServerEar(private val api: Api) : Ear {
+abstract class RecordingEar : Ear {
 
     @Volatile
     private var finishNow = false
 
-    /**
-     * Records until you stop, then sends it to Open WebUI's speech-to-text. The text appears all at once,
-     * after you stop, unlike on the phone.
-     */
+    /** Turns 16 kHz, 16-bit mono PCM into text. */
+    protected abstract suspend fun transcribe(pcm: ByteArray): String
+
     override suspend fun listen(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String {
         finishNow = false
         val pcm = withContext(Dispatchers.IO) { record(onLevel) }
         if (pcm.isEmpty()) return ""
         onLevel(0f)
-        return api.transcribe(wav(pcm, RATE)).trim()
+        return transcribe(pcm).trim()
     }
 
     /**
@@ -383,7 +396,7 @@ class ServerEar(private val api: Api) : Ear {
     override fun release() {}
 
     companion object {
-        private const val RATE = 16_000
+        const val RATE = 16_000
 
         /** Raw 16-bit mono PCM with a WAV header, which every speech-to-text engine accepts. */
         fun wav(pcm: ByteArray, rate: Int): ByteArray {
@@ -395,6 +408,25 @@ class ServerEar(private val api: Api) : Ear {
             }
             return header.array() + pcm
         }
+    }
+}
+
+/** Open WebUI's speech-to-text (the same engine call mode uses). */
+class ServerEar(private val api: Api) : RecordingEar() {
+    override suspend fun transcribe(pcm: ByteArray): String = api.transcribe(wav(pcm, RATE))
+}
+
+/**
+ * Home Assistant's speech-to-text (Settings → Talking to Lena → Hearing you → Home Assistant), the engine
+ * its voice assistants use: Whisper, Speech-to-Phrase, Home Assistant Cloud. Like a Home Assistant Voice
+ * satellite, the display only records; Home Assistant does the hearing.
+ */
+class HaEar(private val ha: HomeAssistant, private val engine: String) : RecordingEar() {
+    /** The chosen engine, or Home Assistant's first when none is chosen. */
+    override suspend fun transcribe(pcm: ByteArray): String {
+        val use = engine.ifBlank { ha.sttEngines().firstOrNull()?.entityId }
+            ?: throw IllegalStateException("Home Assistant has no speech-to-text set up (Settings → Voice assistants).")
+        return ha.transcribe(use, pcm)
     }
 }
 

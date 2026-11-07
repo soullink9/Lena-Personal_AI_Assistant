@@ -13,6 +13,7 @@ what's set lives on the displays.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 import uuid
@@ -23,7 +24,6 @@ from aiohttp import web
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr
-from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
 from .const import DOMAIN
@@ -46,6 +46,7 @@ class Command:
     type: str  # timer, alarm, reminder, cancel, volume, announce
     data: dict[str, Any]
     at: float = field(default_factory=time.time)
+    collected: asyncio.Event = field(default_factory=asyncio.Event)
 
     def as_dict(self) -> dict[str, Any]:
         """What the app gets."""
@@ -59,6 +60,7 @@ class Reported:
     countdowns: list[dict[str, Any]] = field(default_factory=list)
     volume: int | None = None
     seen: float = 0.0
+    wake_word: str | None = None  # the phrase it listens for (WakePhrase name), or None when it doesn't listen
 
 
 class Hub:
@@ -113,18 +115,25 @@ class Hub:
     # ---- Commands ----------------------------------------------------------------------------
 
     @callback
-    def send(self, devices: list[dr.DeviceEntry], kind: str, data: dict[str, Any]) -> None:
-        """Queues a command for each display. An announcement also fires the display's Announcement
-        event, for automations and the logbook.
-        """
+    def send(self, devices: list[dr.DeviceEntry], kind: str, data: dict[str, Any]) -> list[Command]:
+        """Queues a command for each display, and returns them (to wait for with [collected])."""
         self._drop_old()
+        sent = []
         for device in devices:
             self._seq += 1
-            self._queue.append(Command(self._seq, device.id, kind, data))
-            if kind == "announce":
-                from .event import SIGNAL_ANNOUNCE  # here, as event.py imports displays
+            command = Command(self._seq, device.id, kind, data)
+            self._queue.append(command)
+            sent.append(command)
+        return sent
 
-                async_dispatcher_send(self.hass, SIGNAL_ANNOUNCE.format(device.id), data["message"], data.get("listen", False))
+    async def collected(self, command: Command, timeout: float) -> bool:
+        """Waits until the display has collected [command]; False if it didn't within [timeout] seconds."""
+        try:
+            async with asyncio.timeout(timeout):
+                await command.collected.wait()
+            return True
+        except TimeoutError:
+            return False
 
     @callback
     def collect(self, device_id: str, after: int, boot: str | None) -> tuple[list[dict[str, Any]], int]:
@@ -134,8 +143,10 @@ class Hub:
         self._drop_old()
         if boot != self.boot:
             after = 0
-        mine = [c.as_dict() for c in self._queue if c.device_id == device_id and c.seq > after]
-        return mine, self._seq
+        mine = [c for c in self._queue if c.device_id == device_id and c.seq > after]
+        for command in mine:
+            command.collected.set()
+        return [c.as_dict() for c in mine], self._seq
 
     def _drop_old(self) -> None:
         """Forgets commands nobody collected in time."""
@@ -145,9 +156,9 @@ class Hub:
     # ---- What displays have ------------------------------------------------------------------
 
     @callback
-    def report(self, device_id: str, countdowns: list[dict[str, Any]], volume: int | None) -> None:
-        """A display's own list and volume, as it just reported them."""
-        self.reported[device_id] = Reported(countdowns, volume, time.time())
+    def report(self, device_id: str, countdowns: list[dict[str, Any]], volume: int | None, wake_word: str | None = None) -> None:
+        """A display's own list, volume and wake word, as it just reported them."""
+        self.reported[device_id] = Reported(countdowns, volume, time.time(), wake_word)
 
     @callback
     def countdowns(self, devices: list[dr.DeviceEntry]) -> list[dict[str, Any]]:
@@ -212,12 +223,15 @@ class LenaSyncView(HomeAssistantView):
                 "label": str(c.get("label") or "")[:200],
                 "at": int(c.get("at") or 0),
                 "duration": int(c.get("duration") or 0),
+                "ha_id": str(c.get("ha_id") or ""),
             }
             for c in (body.get("countdowns") or [])[:50]
             if isinstance(c, dict)
         ]
         volume = body.get("volume")
-        core.hub.report(device.id, countdowns, int(volume) if isinstance(volume, (int, float)) else None)
+        wake = body.get("wake_word")
+        core.hub.report(device.id, countdowns, int(volume) if isinstance(volume, (int, float)) else None,
+                        str(wake) if isinstance(wake, str) and wake else None)
         try:
             after = int(body.get("after") or 0)
         except (TypeError, ValueError):

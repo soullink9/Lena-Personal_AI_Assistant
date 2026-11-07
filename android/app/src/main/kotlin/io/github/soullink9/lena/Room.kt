@@ -23,7 +23,8 @@ data class RoomInfo(
     val name: String,
     val area: String?,
     val speakers: List<Speaker>,
-    val announceEntity: String?,
+    /** Its Assist satellite in Home Assistant (assist_satellite.…), once it's there. */
+    val satellite: String?,
 )
 
 /**
@@ -101,6 +102,13 @@ object Room {
         p(c).edit().putString("music", entityId).apply()
     }
 
+    /** Home Assistant's speech-to-text engine for Hearing you → Home Assistant, or "" for its first one. */
+    fun sttEngine(c: Context): String = p(c).getString("stt_engine", "") ?: ""
+
+    fun chooseSttEngine(c: Context, entityId: String) {
+        p(c).edit().putString("stt_engine", entityId).apply()
+    }
+
     /** The Home Assistant speaker she speaks through (Speak through), or "" for this device. */
     fun voiceSpeaker(c: Context): String = p(c).getString("voice_speaker", "") ?: ""
 
@@ -172,7 +180,7 @@ object Room {
                 val s = speakers.getJSONObject(i)
                 Speaker(s.optString("entity_id"), s.optString("name"), s.optBoolean("music_assistant"))
             },
-            announceEntity = o.optString("announce_entity").takeIf { it.isNotBlank() && !o.isNull("announce_entity") },
+            satellite = o.optString("satellite").takeIf { it.isNotBlank() && !o.isNull("satellite") },
         )
     }
 
@@ -183,7 +191,7 @@ object Room {
         .put("speakers", JSONArray().apply {
             info.speakers.forEach { put(JSONObject().put("entity_id", it.entityId).put("name", it.name).put("music_assistant", it.musicAssistant)) }
         })
-        .put("announce_entity", info.announceEntity ?: JSONObject.NULL)
+        .put("satellite", info.satellite ?: JSONObject.NULL)
 
     private fun p(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

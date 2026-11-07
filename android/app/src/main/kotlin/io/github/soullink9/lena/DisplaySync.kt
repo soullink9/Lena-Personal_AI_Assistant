@@ -64,7 +64,7 @@ object DisplaySync {
         val countdowns = JSONArray()
         Timers.all(c).forEach {
             countdowns.put(JSONObject().put("kind", it.kind.name.lowercase()).put("label", it.label)
-                .put("at", it.at).put("duration", it.durationMs / 1000))
+                .put("at", it.at).put("duration", it.durationMs / 1000).put("ha_id", it.haId))
         }
         val body = JSONObject()
             .put("id", Room.id(c))
@@ -72,6 +72,8 @@ object DisplaySync {
             .put("boot", p.getString("sync_boot", "") ?: "")
             .put("countdowns", countdowns)
             .put("volume", runCatching { Loudness.level(c) }.getOrNull() ?: JSONObject.NULL)
+            // For its Assist satellite's wake word choice in Home Assistant.
+            .put("wake_word", if (Prefs.wakeWord(c)) Prefs.wakePhrase(c).name else JSONObject.NULL)
         val reply = try {
             ha.syncDisplay(body)
         } catch (e: HaHttpException) {
@@ -89,17 +91,56 @@ object DisplaySync {
     /** Does one thing she asked this display to do. */
     private suspend fun act(c: Context, command: JSONObject, from: AskActivity.From?) {
         when (command.optString("type")) {
-            "timer" -> Timers.addTimer(c, command.optLong("duration") * 1000, command.optString("label"))
+            // A Home Assistant timer asked through this display: a copy here that rings on time.
+            "timer" -> {
+                val haId = command.optString("ha_id")
+                if (haId.isBlank() || Timers.all(c).none { it.haId == haId }) {
+                    Timers.addTimer(c, command.optLong("duration") * 1000, command.optString("label"), haId)
+                }
+            }
+            "timer_update" -> Timers.updateFromHa(c, command.optString("ha_id"), command.optLong("seconds"), command.optBoolean("active", true))
             "alarm" -> Timers.addAlarm(c, command.optInt("hour"), command.optInt("minute"), command.optString("label"))
             "reminder" -> Timers.addReminder(c, command.optLong("at"), command.optString("message"))
             "cancel" -> cancel(c, command)
             "volume" -> volume(c, command)
-            "announce" -> say(c, command.optString("message"), command.optBoolean("listen"), from)
+            "announce" -> announce(c, command, from)
+            "wake_word" -> wakeWord(c, command.optString("phrase"))
         }
     }
 
-    /** Cancels what she meant: the ones with that name, or all of a kind, or the only one. */
+    /**
+     * An announcement from Home Assistant (its satellite's announce or start_conversation): a chime first
+     * if asked, then her voice saying the message, or the sound it sent. To start a conversation she then
+     * listens, and the answer carries on Home Assistant's conversation.
+     */
+    private fun announce(c: Context, command: JSONObject, from: AskActivity.From?) {
+        val message = command.optString("message")
+        val media = command.optString("media")
+        val listen = command.optBoolean("listen")
+        command.optString("conversation_id").takeIf { it.isNotBlank() }?.let { Prefs.setAssistConversation(c, it) }
+        if (command.optBoolean("chime")) Ringing.chime(c)
+        if (media.isNotBlank()) {
+            HomeAssistant.from(c)?.let { ha -> Sounds.play(c, ha.absolute(media)) }
+            if (message.isBlank() && !listen) return
+        }
+        say(c, message.ifBlank { "Yes?" }, listen, from)
+    }
+
+    /** The wake word chosen on its Assist satellite's page in Home Assistant (none: not listening). */
+    private fun wakeWord(c: Context, phrase: String) {
+        val chosen = runCatching { WakePhrase.valueOf(phrase) }.getOrNull()
+        val s = Prefs.load(c)
+        Prefs.save(c, if (chosen == null) s.copy(wakeWord = false) else s.copy(wakeWord = true, wakePhrase = chosen))
+        Logs.i("Display", "Wake word set in Home Assistant: ${chosen?.label ?: "off"}")
+    }
+
+    /** Cancels what she meant: one of Home Assistant's timers, the ones with that name, all of a kind, or the only one. */
     private fun cancel(c: Context, command: JSONObject) {
+        command.optString("ha_id").takeIf { it.isNotBlank() }?.let { haId ->
+            Timers.all(c).filter { it.haId == haId }.forEach { Timers.cancel(c, it.id) }
+            Ringing.now.value?.let { if (it.haId == haId) Ringing.stop(c) }
+            return
+        }
         val kind = command.optString("kind").takeIf { it.isNotBlank() }?.uppercase()
         val label = command.optString("label").lowercase()
         val all = command.optBoolean("all")
@@ -173,5 +214,22 @@ object DisplaySync {
             if (text.isNotBlank()) say(c, text, listen = false, AskActivity.From.DASHBOARD.takeIf { c is DashboardActivity })
         }
         return on
+    }
+}
+
+/** A sound Home Assistant sent to play (an announcement that's a sound, not words): played once, as speech. */
+object Sounds {
+    fun play(c: Context, url: String) {
+        runCatching {
+            android.media.MediaPlayer().apply {
+                setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                setDataSource(url)
+                setOnPreparedListener { it.start() }
+                setOnCompletionListener { it.release() }
+                setOnErrorListener { player, _, _ -> player.release(); true }
+                prepareAsync()
+            }
+        }.onFailure { Logs.w("Display", "Couldn't play the announcement's sound", it) }
     }
 }

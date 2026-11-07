@@ -1,6 +1,7 @@
 """The lena.* actions behind her newer tools, for Open WebUI (her tools there call these over Home
-Assistant's REST API) and for automations: timers, alarms, reminders, volume, the intercom, correcting a
-memory, and the house's history. Her tools in Assist call the same code directly (llm_api.py).
+Assistant's REST API) and for automations: timers (Home Assistant's own, through its timer intents),
+alarms, reminders, volume, the intercom, correcting a memory, and the house's history. Her tools in Assist
+call the same code directly (llm_api.py), except timers, which Assist has as its own tools.
 
 device_id is the display she was asked through (the Lena app sends it to Open WebUI with each question);
 room, when given, picks the room's display instead.
@@ -54,8 +55,8 @@ def register(hass: HomeAssistant, entry) -> None:
                          vol.Optional("in_seconds"): vol.All(vol.Coerce(int), vol.Range(min=1)), **TARGET},
         lambda d: abilities.set_reminder(core, d["message"], d.get("at"), d.get("in_seconds"), **where(d)), optional)
     add("cancel_timer", {vol.Optional("kind"): cv.string, vol.Optional("label"): cv.string,
-                         vol.Optional("all", default=False): cv.boolean, **TARGET},
-        lambda d: abilities.cancel(core, d.get("kind"), d.get("label"), d["all"], **where(d)), optional)
+                         vol.Optional("all", default=False): cv.boolean, vol.Optional("timer_id"): cv.string, **TARGET},
+        lambda d: abilities.cancel(core, d.get("kind"), d.get("label"), d["all"], timer_id=d.get("timer_id"), **where(d)), optional)
     add("list_timers", {vol.Optional("everywhere", default=False): cv.boolean, **TARGET},
         lambda d: abilities.list_countdowns(core, everywhere=d["everywhere"], **where(d)), SupportsResponse.ONLY)
     add("set_volume", {vol.Optional("level"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),

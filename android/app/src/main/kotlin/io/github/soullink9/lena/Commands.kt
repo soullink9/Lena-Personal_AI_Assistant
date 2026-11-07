@@ -41,9 +41,11 @@ object Commands {
 
     /**
      * Handles [question] if it's one of hers, and returns what she says back; null when it isn't, so it
-     * goes to whoever answers.
+     * goes to whoever answers. With [timersHere] false (the display is an Assist satellite, so Home
+     * Assistant keeps its timers), timers go on to Assist or her tools, which use Home Assistant's own; the
+     * copy that rings here comes back from Home Assistant.
      */
-    fun handle(c: Context, question: String): String? {
+    fun handle(c: Context, question: String, timersHere: Boolean = true): String? {
         val words = words(question)
         if (words.isEmpty() || words.size > MAX_WORDS) return null
         val text = words.joinToString(" ")
@@ -65,8 +67,9 @@ object Commands {
         // "How long is left?" names no timer, but means one when one is running.
         if (!timer && !alarm) {
             val howLong = words.first() == "how" && words.any { it == "left" || it == "remaining" || it == "longer" }
-            return if (howLong && Timers.all(c).any { it.kind == CountdownKind.TIMER }) status(c, CountdownKind.TIMER, words) else null
+            return if (timersHere && howLong && Timers.all(c).any { it.kind == CountdownKind.TIMER }) status(c, CountdownKind.TIMER, words) else null
         }
+        if (timer && !timersHere) return null
         // "Remind me…", "turn on the alarm system", "the alarm panel": things for Home Assistant or her, not a clock.
         if (words.any { it in setOf("remind", "reminder", "system", "panel", "security", "arm", "disarm", "armed", "siren", "sensor") }) return null
 

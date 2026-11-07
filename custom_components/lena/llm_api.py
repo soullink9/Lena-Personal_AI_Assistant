@@ -2,9 +2,10 @@
 
 Tick it next to Assist in your Ollama agent's settings. Every request then carries the time,
 who's home, how she feels and what she remembers, and she gets her tools: remember_fact,
-forget_fact, update_fact, record_feeling, house_history, set_timer, set_alarm, set_reminder,
-cancel_timer, list_timers, set_volume, announce and, when there's a calendar she may write to,
-add_calendar_event.
+forget_fact, update_fact, record_feeling, house_history, set_alarm, set_reminder,
+cancel_alarm_or_reminder, list_alarms_and_reminders, set_volume, announce and, when there's a calendar she
+may write to, add_calendar_event. Timers are Home Assistant's own tools, there for every Lena display (an
+Assist satellite with timers).
 Her character itself comes from the model's Modelfile.
 """
 
@@ -157,21 +158,6 @@ class _DisplayTool(llm.Tool):
             return tool_result({"done": False, "error": str(error)})
 
 
-class SetTimerTool(_DisplayTool):
-    """set_timer: a timer that rings on the display."""
-    name = "set_timer"
-    description = ("Start a timer that rings on the display. Use one call per timer; for several requests in one "
-                   "sentence (a pasta timer and a reminder) make each call.")
-    parameters = vol.Schema({
-        vol.Required("seconds", description="How long, in seconds (5 minutes is 300)"): vol.Coerce(int),
-        vol.Optional("label", description="Optional. What it's for, in a word or two, e.g. pasta"): cv.string,
-        vol.Optional("room", description=ROOM): cv.string,
-    })
-
-    def run(self, core, args, device_id):
-        return abilities.set_timer(core, args["seconds"], args.get("label"), device_id, args.get("room"))
-
-
 class SetAlarmTool(_DisplayTool):
     """set_alarm: an alarm at a time of day."""
     name = "set_alarm"
@@ -203,32 +189,32 @@ class SetReminderTool(_DisplayTool):
         return abilities.set_reminder(core, args["message"], args.get("at"), args.get("in_seconds"), device_id, args.get("room"))
 
 
-class CancelTimerTool(_DisplayTool):
-    """cancel_timer: cancels timers, alarms or reminders."""
-    name = "cancel_timer"
-    description = "Cancel a timer, an alarm or a reminder: the one named, or all of a kind."
+class CancelReminderTool(_DisplayTool):
+    """cancel_alarm_or_reminder: cancels her alarms or reminders (timers are Home Assistant's own tools)."""
+    name = "cancel_alarm_or_reminder"
+    description = "Cancel an alarm or a reminder: the one named, or all of a kind. (For timers, use the timer tools.)"
     parameters = vol.Schema({
-        vol.Optional("kind", description="timer, alarm or reminder"): vol.In(["timer", "alarm", "reminder"]),
-        vol.Optional("label", description="Optional. Its name or what it's for, e.g. pasta"): cv.string,
-        vol.Optional("all", description="True to cancel all of them (of that kind)"): cv.boolean,
+        vol.Required("kind", description="alarm or reminder"): vol.In(["alarm", "reminder"]),
+        vol.Optional("label", description="Optional. What it's for"): cv.string,
+        vol.Optional("all", description="True to cancel all of that kind"): cv.boolean,
         vol.Optional("room", description=ROOM): cv.string,
     })
 
     def run(self, core, args, device_id):
-        return abilities.cancel(core, args.get("kind"), args.get("label"), bool(args.get("all")), device_id, args.get("room"))
+        return abilities.cancel(core, args["kind"], args.get("label"), bool(args.get("all")), device_id, args.get("room"))
 
 
-class ListTimersTool(_DisplayTool):
-    """list_timers: what's set, and how long is left."""
-    name = "list_timers"
-    description = "What timers, alarms and reminders are set and how long is left, on this display or everywhere."
+class ListRemindersTool(_DisplayTool):
+    """list_alarms_and_reminders: what's set (timers are Home Assistant's own tools)."""
+    name = "list_alarms_and_reminders"
+    description = "What alarms and reminders are set, on this display or everywhere. (For timers, use the timer tools.)"
     parameters = vol.Schema({
         vol.Optional("everywhere", description="True for every display in the house"): cv.boolean,
         vol.Optional("room", description=ROOM): cv.string,
     })
 
     def run(self, core, args, device_id):
-        return abilities.list_countdowns(core, device_id, args.get("room"), bool(args.get("everywhere")))
+        return abilities.list_countdowns(core, device_id, args.get("room"), bool(args.get("everywhere")), timers=False)
 
 
 class SetVolumeTool(_DisplayTool):
@@ -302,7 +288,7 @@ class LenaAPI(llm.API):
         moments = [m for m in core.catalog.moments if m not in HOUSE_MOMENTS]
         tools: list[llm.Tool] = [
             RememberTool(), ForgetTool(), UpdateFactTool(), HistoryTool(),
-            SetTimerTool(), SetAlarmTool(), SetReminderTool(), CancelTimerTool(), ListTimersTool(),
+            SetAlarmTool(), SetReminderTool(), CancelReminderTool(), ListRemindersTool(),
             SetVolumeTool(), AnnounceTool(),
         ]
         if moments:

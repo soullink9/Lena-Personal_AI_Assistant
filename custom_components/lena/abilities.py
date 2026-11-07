@@ -1,6 +1,9 @@
 """Her abilities on the displays: timers, alarms, reminders, volume, saying something in another room, and
 correcting what she remembers.
 
+Timers are Home Assistant's own (its timer intents, for the display as an Assist satellite); alarms,
+reminders and the volume are Lena's, since Home Assistant has none of its own.
+
 Shared by her tools in Assist (llm_api.py) and the lena.* actions that her Open WebUI tools call, so she
 behaves the same whichever answers. Each returns a small dict for her to read back, or raises
 AbilityError with a sentence she can act on (ask which room, say it differently).
@@ -12,14 +15,18 @@ she was asked through. They're queued in the hub for that display to collect (se
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import logging
 import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import intent
 from homeassistant.util import dt as dt_util
 
 from . import brain
 from .hub import KINDS, TargetError
+
+_LOGGER = logging.getLogger(__name__)
 
 MAX_SECONDS = 24 * 60 * 60
 MAX_TEXT = 200
@@ -58,13 +65,40 @@ def _label(text: str | None) -> str:
     return (text or "").strip()[:MAX_TEXT]
 
 
-def set_timer(core, seconds: int, label: str | None = None, device_id=None, room: str | None = None) -> dict[str, Any]:
-    """A timer for [seconds] on the display, with an optional name ("pasta")."""
+async def _timer_intent(core, device, intent_type: str, slots: dict[str, Any]) -> str:
+    """Runs one of Home Assistant's timer intents for a display, and returns what Home Assistant says."""
+    try:
+        response = await intent.async_handle(
+            core.hass, "lena", intent_type, {k: {"value": v} for k, v in slots.items() if v not in (None, "")},
+            language=core.hass.config.language, device_id=device.id,
+        )
+    except intent.IntentHandleError as error:
+        raise AbilityError(str(error) or "Home Assistant couldn't do that with its timers") from error
+    # Outside a conversation Home Assistant gives the facts (its "speech slots") rather than a sentence;
+    # the timers' status is put into words here.
+    timers = (response.speech_slots or {}).get("timers")
+    if intent_type == "HassTimerStatus" and timers is not None:
+        if not timers:
+            return "no timers"
+        return "; ".join(
+            f"{t.get('name') + ' timer' if t.get('name') else 'timer'}, {_spoken(int(t.get('total_seconds_left', 0)))} left"
+            + ("" if t.get("is_active", True) else " (paused)")
+            for t in timers
+        )
+    return response.speech.get("plain", {}).get("speech", "") or "Done."
+
+
+async def set_timer(core, seconds: int, label: str | None = None, device_id=None, room: str | None = None) -> dict[str, Any]:
+    """A Home Assistant timer for [seconds] on the display, with an optional name ("pasta")."""
     seconds = int(seconds)
     if not 1 <= seconds <= MAX_SECONDS:
         raise AbilityError("A timer can be from one second to 24 hours")
     devices = _targets(core, device_id, room)
-    core.hub.send(devices, "timer", {"duration": seconds, "label": _label(label)})
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    for device in devices:
+        await _timer_intent(core, device, "HassStartTimer", {"hours": hours or None, "minutes": minutes or None,
+                                                              "seconds": secs or None, "name": _label(label)})
     return {"set": f"{_label(label) + ' timer' if label else 'Timer'} for {_spoken(seconds)}", "on": _names(devices)}
 
 
@@ -137,16 +171,36 @@ def set_reminder(core, message: str, at: str | None = None, in_seconds: int | No
     return {"set": f"Reminder {said}: {message}", "on": _names(devices)}
 
 
-def cancel(core, kind: str | None = None, label: str | None = None, everything: bool = False,
-           device_id=None, room: str | None = None) -> dict[str, Any]:
+async def cancel(core, kind: str | None = None, label: str | None = None, everything: bool = False,
+                 device_id=None, room: str | None = None, timer_id: str | None = None) -> dict[str, Any]:
     """Cancels timers, alarms or reminders on the display: the one named ([label]), all of a [kind], or the
-    only one there is. Says which, from what the display reported.
+    only one there is. Timers are Home Assistant's (one can be named by its [timer_id]); alarms and
+    reminders are the display's own, cancelled from what it reported.
     """
     kind = (kind or "").lower().rstrip("s") or None
     if kind not in (None, *KINDS):
         raise AbilityError("Cancel a timer, an alarm or a reminder")
+    if timer_id:
+        from homeassistant.components.intent.timers import TIMER_DATA
+
+        try:
+            core.hass.data[TIMER_DATA].cancel_timer(timer_id)
+        except Exception as error:  # noqa: BLE001 - an unknown or finished timer
+            raise AbilityError("That timer isn't running") from error
+        return {"cancelled": ["timer"]}
     devices = _targets(core, device_id, room)
-    have = [c for c in core.hub.countdowns(devices) if kind is None or c["kind"] == kind]
+    own = [c for c in core.hub.countdowns(devices) if c["kind"] in ("alarm", "reminder") and (kind is None or c["kind"] == kind)]
+    label_l = _label(label).lower()
+    named_own = [c for c in own if label_l and (label_l in c.get("label", "").lower() or c.get("label", "").lower() in label_l)]
+    if kind == "timer" or (kind is None and not named_own):
+        said = []
+        for device in devices:
+            if everything:
+                said.append(await _timer_intent(core, device, "HassCancelAllTimers", {}))
+            else:
+                said.append(await _timer_intent(core, device, "HassCancelTimer", {"name": _label(label)}))
+        return {"cancelled": said}
+    have = own
     label = _label(label).lower()
     if label:
         meant = [c for c in have if label in c.get("label", "").lower() or c.get("label", "").lower() in label]
@@ -156,7 +210,7 @@ def cancel(core, kind: str | None = None, label: str | None = None, everything: 
         return {"cancelled": [], "note": "Nothing like that is set" + (f" (set: {', '.join(_describe(c) for c in have)})" if have else "")}
     if len(meant) > 1 and not everything:
         raise AbilityError("Several are set: " + "; ".join(_describe(c) for c in meant) + ". Say which, or cancel all of them")
-    core.hub.send(devices, "cancel", {"kind": kind or "", "label": label, "all": bool(everything)})
+    core.hub.send(devices, "cancel", {"kind": kind or meant[0]["kind"], "label": label, "all": bool(everything)})
     return {"cancelled": [_describe(c) for c in meant]}
 
 
@@ -173,13 +227,24 @@ def _describe(item: dict[str, Any]) -> str:
     return f"reminder at {clock} {_day(at)}: {label}"
 
 
-def list_countdowns(core, device_id=None, room: str | None = None, everywhere: bool = False) -> dict[str, Any]:
-    """What's set: on the display (or the room's), or on every display."""
+async def list_countdowns(core, device_id=None, room: str | None = None, everywhere: bool = False,
+                          timers: bool = True) -> dict[str, Any]:
+    """What's set: Home Assistant's timers (as it says them) and the display's alarms and reminders, on
+    the display (or the room's), or on every display.
+    """
     from .displays import displays
 
     devices = displays(core.hass, core.entry.entry_id) if everywhere else _targets(core, device_id, room)
-    items = core.hub.countdowns(devices)
-    return {"set": [f"{_describe(c)} (on {c['display']})" for c in items] or ["Nothing is set."]}
+    lines = []
+    for device in devices if timers else []:
+        try:
+            said = await _timer_intent(core, device, "HassTimerStatus", {})
+            lines.append(f"Timers on {device.name_by_user or device.name}: {said}")
+        except AbilityError:
+            pass
+    items = [c for c in core.hub.countdowns(devices) if c["kind"] in ("alarm", "reminder")]
+    lines += [f"{_describe(c)} (on {c['display']})" for c in items]
+    return {"set": lines or ["Nothing is set."]}
 
 
 def set_volume(core, level: int | None = None, change: str | None = None, device_id=None, room: str | None = None) -> dict[str, Any]:
@@ -192,15 +257,17 @@ def set_volume(core, level: int | None = None, change: str | None = None, device
     return {"volume": data.get("level", change), "on": _names(devices)}
 
 
-def announce(core, message: str, listen: bool = False, device_id=None, room: str | None = None) -> dict[str, Any]:
-    """Says [message] on the display(s) in [room] (the intercom), and with [listen] listens for an answer
-    there.
+async def announce(core, message: str, listen: bool = False, device_id=None, room: str | None = None) -> dict[str, Any]:
+    """Says [message] on the display(s) in [room] (the intercom), after the announcement chime, and with
+    [listen] listens there for an answer. Sent straight to the displays, so unlike Home Assistant's
+    assist_satellite.announce (which also works on them) it needs no text-to-speech engine: she says it in
+    her own voice.
     """
     message = (message or "").strip()
     if not message:
         raise AbilityError("Say what to announce")
     devices = _targets(core, device_id, room)
-    core.hub.send(devices, "announce", {"message": message[:1000], "listen": bool(listen)})
+    core.hub.send(devices, "announce", {"message": message[:1000], "listen": bool(listen), "chime": True})
     return {"announced": message, "on": _names(devices), "listening": bool(listen)}
 
 

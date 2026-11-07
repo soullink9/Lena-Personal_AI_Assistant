@@ -84,28 +84,63 @@ def instructions(items: list[dict[str, Any]], now: datetime) -> str:
         "or that were only ever for a moment. Keep everything else, even if it's old.\n"
         "- Keep each line short, third person, one fact or a few closely related ones.\n"
         "- Keep lines that are fine as they are word for word.\n\n"
-        "Answer with JSON only, no other text: {\"memories\": [{\"text\": \"the line\", \"from\": [the numbers "
-        "of the lines it comes from]}]}. Every line you keep or write lists where it came from; a number may "
-        "be used only once; lines you leave out are simply not listed."
+        "Give back the new memory as a list of lines. Start each line with the numbers of the lines it comes "
+        "from, in brackets, then the line: \"[1, 2] Alex likes coffee, black.\" for two combined, \"[3] Sam has a "
+        "dentist appointment on Friday.\" for one clarified, \"[5] Pat bikes to work.\" for one kept as it is. "
+        "Each number may be used only once; lines you leave out are simply not listed."
     )
 
 
+# What the AI Task is asked to give back: a list of lines (Home Assistant checks the answer has this shape,
+# so the model can't answer in prose).
+STRUCTURE = {
+    "memories": {
+        "description": "The new memory: one entry per line, each starting with its source numbers in brackets, like [1, 2] Alex likes coffee, black.",
+        "required": True,
+        "selector": {"text": {"multiple": True}},
+    }
+}
+
+_LINE = re.compile(r"^\s*[\[(]\s*(\d+(?:\s*[,;&]\s*\d+|\s+and\s+\d+)*)\s*[\])]\s*[:.-]?\s*(.+?)\s*$", re.DOTALL)
+
+
+def _entry(item: Any) -> Any:
+    """One line of the answer as {"text", "from"}: "[1, 2] the line" (what's asked for), or already an
+    object. Anything else is passed on for plan() to refuse.
+    """
+    if isinstance(item, str):
+        match = _LINE.match(item)
+        if not match:
+            raise TidyError(f"\"{item[:80]}\" didn't start with the numbers of the lines it came from")
+        numbers = [int(n) for n in re.findall(r"\d+", match.group(1))]
+        return {"text": match.group(2), "from": numbers}
+    return item
+
+
 def _parse(answer: Any) -> list[dict[str, Any]]:
-    """The model's answer as a list of {"text", "from"}: a dict already, or JSON text (a code block or
-    words around it are allowed).
+    """The model's answer as a list of {"text", "from"}: the structured answer Home Assistant checked, or,
+    from a model that answered in text anyway, JSON or bracketed lines found in it (a code block, a
+    thinking section or words around them are allowed).
     """
     if isinstance(answer, str):
-        match = re.search(r"\{.*\}", answer, re.DOTALL)
-        if not match:
-            raise TidyError("The answer had no JSON")
-        try:
-            answer = json.loads(match.group(0))
-        except ValueError as err:
-            raise TidyError(f"The answer wasn't valid JSON: {err}") from err
-    memories = answer.get("memories") if isinstance(answer, dict) else None
+        text = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL)
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        parsed = None
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+            except ValueError:
+                parsed = None
+        if parsed is None:
+            lines = [line.strip(" -*•\t") for line in text.splitlines() if _LINE.match(line.strip(" -*•\t"))]
+            if not lines:
+                raise TidyError(f"The answer wasn't a list of memory lines: \"{text.strip()[:120]}\"")
+            parsed = {"memories": lines}
+        answer = parsed
+    memories = answer.get("memories") if isinstance(answer, dict) else answer if isinstance(answer, list) else None
     if not isinstance(memories, list):
         raise TidyError("The answer had no list of memories")
-    return memories
+    return [_entry(m) for m in memories]
 
 
 def plan(memory: list[dict[str, Any]], answer: Any, now: datetime) -> Plan:

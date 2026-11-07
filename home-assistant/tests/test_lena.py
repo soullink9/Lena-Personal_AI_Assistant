@@ -90,8 +90,8 @@ async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
     assert "Mood: Cheerful." not in api.api_prompt  # only her current feelings
     assert "At home: " in api.api_prompt
     names = {t.name for t in api.tools}
-    assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_timer", "set_alarm",
-                     "set_reminder", "cancel_timer", "list_timers", "set_volume", "announce"}
+    assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_alarm",
+                     "set_reminder", "cancel_alarm_or_reminder", "list_alarms_and_reminders", "set_volume", "announce"}
 
     result = await api.async_call_tool(llm.ToolInput(tool_name="remember_fact", tool_args={"fact": "Alex likes the office at seventy degrees."}))
     assert data(result)["saved"].startswith("Alex")
@@ -499,8 +499,8 @@ async def test_add_event_action(hass: HomeAssistant) -> None:
 
 
 async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client) -> None:
-    """The app registers as a display, put in a room it learns that room and its speakers (Music
-    Assistant's first), lena.announce reaches it through its Announcement, and it can be deleted.
+    """The app registers as a display (with its Assist satellite), put in a room it learns that room and
+    its speakers (Music Assistant's first), lena.announce reaches it, and it can be deleted.
     """
     from homeassistant.exceptions import ServiceValidationError
     from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
@@ -514,7 +514,7 @@ async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client
     assert response.status == 200
     first = await response.json()
     assert first["name"] == "Kitchen tablet" and first["area"] is None and first["speakers"] == []
-    assert first["announce_entity"] and first["announce_entity"].startswith("event.")
+    assert first["satellite"] and first["satellite"].startswith("assist_satellite.")
     device = dr.async_get(hass).async_get(first["device_id"])
     assert device is not None and device in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
 
@@ -528,25 +528,22 @@ async def test_displays_rooms_and_announcements(hass: HomeAssistant, hass_client
         reg.async_update_entity(e.entity_id, area_id=area)
         hass.states.async_set(e.entity_id, "idle", {"friendly_name": object_id.replace("_", " ").title()})
     again = await (await client.post("/api/lena/display", json={"id": "abc-123", "name": "Kitchen tablet"})).json()
-    assert again["device_id"] == first["device_id"] and again["announce_entity"] == first["announce_entity"]
+    assert again["device_id"] == first["device_id"] and again["satellite"] == first["satellite"]
     assert again["area"] == {"id": kitchen.id, "name": "Kitchen"}
     assert [s["entity_id"] for s in again["speakers"]] == ["media_player.kitchen_ma", "media_player.kitchen_cast"]
     assert again["speakers"][0]["music_assistant"] is True
 
-    # An announcement fires the display's event with the message.
-    entity = first["announce_entity"]
+    # An announcement is queued for the display, with the chime, to collect.
     await hass.services.async_call(DOMAIN, "announce", {"message": "Dinner's ready!", "listen": True}, blocking=True)
-    await hass.async_block_till_done()
-    state = hass.states.get(entity)
-    assert state.attributes["event_type"] == "announce"
-    assert state.attributes["message"] == "Dinner's ready!" and state.attributes["listen"] is True
+    synced = await (await client.post("/api/lena/display/sync", json={"id": "abc-123"})).json()
+    assert [(c["type"], c["message"], c["listen"], c["chime"]) for c in synced["commands"]] == [("announce", "Dinner's ready!", True, True)]
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(DOMAIN, "announce", {"message": "x", "device_id": ["nope"]}, blocking=True)
 
     # It survives a restart of the integration, and only displays can be deleted.
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    assert hass.states.get(entity) is not None
+    assert hass.states.get(first["satellite"]) is not None
     from custom_components.lena import async_remove_config_entry_device
     assert await async_remove_config_entry_device(hass, entry, device)
     lena = next(d for d in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id) if (DOMAIN, "lena") in d.identifiers)
@@ -568,14 +565,13 @@ async def test_memory_tidy_and_undo(hass: HomeAssistant, freezer) -> None:
     core.memory[-1]["status"] = "completed"  # one she was told to retire: never touched
     before = [dict(m) for m in core.memory]
 
-    answer = {"memories": [
-        {"text": "Alex likes coffee, black.", "from": [1, 2]},
-        {"text": "Sam has a dentist appointment to remember.", "from": [3]},
-    ]}
+    # The structured answer Home Assistant checks: lines starting with where they came from.
+    answer = {"memories": ["[1, 2] Alex likes coffee, black.", "[3] Sam has a dentist appointment to remember."]}
     asked = async_mock_service(hass, "ai_task", "generate_data", response={"conversation_id": "x", "data": answer},
                                supports_response=SupportsResponse.ONLY)
     reply = await hass.services.async_call(DOMAIN, "tidy_memory", {}, blocking=True, return_response=True)
     assert asked[0].data["entity_id"] == "ai_task.ollama"
+    assert asked[0].data["structure"]["memories"]["selector"] == {"text": {"multiple": True}}
     assert "1. Alex likes coffee. (saved today)" in asked[0].data["instructions"]
     assert "Yuki" not in asked[0].data["instructions"]  # ticked off: not hers to tidy
     assert reply["changed"] and "Combined 2 into: Alex likes coffee, black." in reply["summary"]
@@ -631,18 +627,23 @@ async def _sync(client, display_id: str, countdowns=None, after: int = 0, boot: 
 
 
 async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass_client) -> None:
-    """Her tools queue timers, alarms, reminders, volume and announcements for the display she was asked
-    through (or the room named); the display collects them once, reports what it has, and she can list and
-    cancel from that. Several displays and no room: she asks which.
+    """Each display is an Assist satellite with Home Assistant's timers: lena.set_timer starts one of
+    Home Assistant's own, and the display gets a copy (with its id) that rings on time. Alarms, reminders,
+    the volume and the intercom are queued for the display she was asked through (or the room named); the
+    display collects them once and reports what it has, so she can list and cancel. Several displays and no
+    room: she asks which.
     """
+    from homeassistant.components.intent import async_device_supports_timers
     from homeassistant.exceptions import ServiceValidationError
 
     await setup(hass)
     client = await hass_client()
     kitchen = await _display(hass, client, "kitchen-tab", "Kitchen tablet", "Kitchen")
     await _display(hass, client, "bed-tab", "Bedroom tablet", "Bedroom")
+    await hass.async_block_till_done()
+    assert async_device_supports_timers(hass, kitchen)  # Home Assistant's own timer tools work for it
 
-    # Asked through the kitchen: a 5 minute pasta timer and a reminder in 20 seconds.
+    # Asked through the kitchen: a 5 minute pasta timer (Home Assistant's) and a reminder in 20 seconds.
     t = await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 300, "label": "pasta", "device_id": kitchen},
                                        blocking=True, return_response=True)
     assert t["set"] == "pasta timer for 5 minutes" and t["on"] == "Kitchen tablet"
@@ -653,29 +654,31 @@ async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass
     await hass.services.async_call(DOMAIN, "announce", {"message": "Dinner's ready!", "room": "the kitchen", "listen": True}, blocking=True)
 
     first = await _sync(client, "kitchen-tab")
-    types = [c["type"] for c in first["commands"]]
-    assert types == ["timer", "reminder", "announce"]
-    assert first["commands"][0]["duration"] == 300 and first["commands"][0]["label"] == "pasta"
-    assert first["commands"][2] == {"seq": first["commands"][2]["seq"], "type": "announce", "message": "Dinner's ready!", "listen": True}
+    assert [c["type"] for c in first["commands"]] == ["timer", "reminder", "announce"]
+    timer = first["commands"][0]
+    assert timer["duration"] == 300 and timer["label"] == "pasta" and timer["ha_id"]
+    assert first["commands"][2]["message"] == "Dinner's ready!" and first["commands"][2]["listen"] is True
     # Collected once: nothing new next time. After a restart (a new boot) it starts again from the beginning.
     again = await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"])
     assert again["commands"] == []
     bedroom = await _sync(client, "bed-tab")
     assert [(c["type"], c["hour"], c["minute"]) for c in bedroom["commands"]] == [("alarm", 7, 30)]
 
-    # What the kitchen reports, she can list and cancel.
+    # What the kitchen reports (two reminders), she can list and cancel; its timer is Home Assistant's.
     soon = int((dt_util.utcnow() + timedelta(minutes=4)).timestamp() * 1000)
     await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"], countdowns=[
-        {"kind": "timer", "label": "pasta", "at": soon, "duration": 300},
-        {"kind": "timer", "label": "eggs", "at": soon, "duration": 300},
+        {"kind": "timer", "label": "pasta", "at": soon, "duration": 300, "ha_id": timer["ha_id"]},
+        {"kind": "reminder", "label": "Flip the chicken", "at": soon},
+        {"kind": "reminder", "label": "Stir the sauce", "at": soon},
     ])
     listed = await hass.services.async_call(DOMAIN, "list_timers", {"device_id": kitchen}, blocking=True, return_response=True)
-    assert any("pasta timer" in line for line in listed["set"])
+    text = " ".join(listed["set"])
+    assert "pasta" in text and "Flip the chicken" in text
     with pytest.raises(ServiceValidationError, match="Several are set"):
-        await hass.services.async_call(DOMAIN, "cancel_timer", {"kind": "timer", "device_id": kitchen}, blocking=True, return_response=True)
-    cancelled = await hass.services.async_call(DOMAIN, "cancel_timer", {"label": "pasta", "device_id": kitchen},
+        await hass.services.async_call(DOMAIN, "cancel_timer", {"kind": "reminder", "device_id": kitchen}, blocking=True, return_response=True)
+    cancelled = await hass.services.async_call(DOMAIN, "cancel_timer", {"kind": "timer", "label": "pasta", "device_id": kitchen},
                                                blocking=True, return_response=True)
-    assert cancelled["cancelled"] == ["pasta timer, 4 minutes left"] or cancelled["cancelled"][0].startswith("pasta timer")
+    assert cancelled["cancelled"]
 
     # No room and no display named, with two displays: she has to ask which.
     with pytest.raises(ServiceValidationError, match="Say which room"):
@@ -685,7 +688,7 @@ async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass
     with pytest.raises(ServiceValidationError, match="from one second to 24 hours"):
         await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 90000, "device_id": kitchen}, blocking=True, return_response=True)
 
-    # Her Assist tool uses the device the question came from.
+    # Her Assist tools use the device the question came from.
     names = {f.name for f in dataclasses.fields(llm.LLMContext)}
     values = {"platform": "test", "context": None, "language": "en", "assistant": "conversation", "device_id": kitchen}
     api = await llm.async_get_api(hass, "lena", llm.LLMContext(**{k: v for k, v in values.items() if k in names}))
@@ -695,6 +698,19 @@ async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass
     assert result["done"] is False and "isn't a time" in result["error"]
     latest = await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"])
     assert [c["type"] for c in latest["commands"]] == ["cancel", "volume"]
+    assert latest["commands"][0]["ha_id"] == timer["ha_id"]
+
+    # The satellite's wake word choice reaches the display, and shows what it reported.
+    from homeassistant.helpers import entity_registry as er
+
+    satellite = next(e.entity_id for e in er.async_entries_for_device(er.async_get(hass), kitchen) if e.domain == "assist_satellite")
+    await client.post("/api/lena/display/sync", json={"id": "kitchen-tab", "after": latest["seq"], "boot": latest["boot"], "wake_word": "HEY_LENA"})
+    entity = hass.data["entity_components"]["assist_satellite"].get_entity(satellite)
+    assert entity.async_get_configuration().active_wake_words == ["HEY_LENA"]
+    from homeassistant.components.assist_satellite import AssistSatelliteConfiguration
+    await entity.async_set_configuration(AssistSatelliteConfiguration(available_wake_words=[], active_wake_words=["OKAY_NABU"], max_active_wake_words=1))
+    chosen = await _sync(client, "kitchen-tab", after=latest["seq"], boot=latest["boot"])
+    assert [(c["type"], c["phrase"]) for c in chosen["commands"]] == [("wake_word", "OKAY_NABU")]
 
 
 async def test_update_fact(hass: HomeAssistant) -> None:
@@ -724,6 +740,10 @@ async def test_house_history(hass: HomeAssistant, freezer) -> None:
 
     freezer.move_to("2026-11-07 12:00:00")
     await setup(hass)
+    # She only looks back at what's exposed to Assist (a garage door is by default; a person isn't).
+    from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
+
+    async_expose_entity(hass, "conversation", "person.sam", True)
     door = {"friendly_name": "Garage Door", "device_class": "garage_door"}
     hass.states.async_set("binary_sensor.garage_door", "off", door)
     today = dt_util.start_of_local_day()

@@ -91,7 +91,8 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 ## Talking to Lena doesn't hear me
 
 - Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.
-- With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server meanwhile. You can also switch to **Your server** in Lena's settings.
+- With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server or Home Assistant meanwhile. You can also switch to **Your server** or **Home Assistant** in Lena's settings.
+- **"Couldn't hear you (error 11)"**, after a few seconds with the microphone off: the phone's recognizer never got ready (some tablets', like the Galaxy Tab A9+, never answer). Lena now hears you another way straight away (your server's speech-to-text, or else Home Assistant's) and keeps doing so for a day. For a wall display, set **Hearing you** to **Home Assistant**: Home Assistant's own speech-to-text (Whisper, Speech-to-Phrase or Cloud, under Settings → Voice assistants there), the way a Home Assistant Voice satellite hears.
 - With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)). Lena also uses it whenever the phone's recognizer can't listen, so it's worth setting up either way.
 - The warning says what went wrong, for example that the microphone is in use by another app.
 - **"Couldn't hear you (error 10)"** (or "still busy with the last time") means Android's speech service hadn't finished with the previous turn. Lena now waits for the service and tries again by herself, so this should be rare; if it still shows, check that no other app is listening (a voice assistant's wake word, for example).

@@ -139,6 +139,9 @@ cancel_timer:
       default: false
       selector:
         boolean:
+    timer_id:
+      selector:
+        text:
     device_id:
       selector:
         device:

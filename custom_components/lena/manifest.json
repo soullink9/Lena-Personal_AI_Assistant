@@ -16,7 +16,9 @@
   ],
   "config_flow": true,
   "dependencies": [
-    "http"
+    "assist_satellite",
+    "http",
+    "intent"
   ],
   "documentation": "https://github.com/soullink9/Lena-Personal_AI_Assistant/blob/main/docs/home-assistant/Installation.md",
   "integration_type": "service",

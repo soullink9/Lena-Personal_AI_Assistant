@@ -452,7 +452,7 @@ class SettingsActivity : ComponentActivity() {
                     countdownIcon(item.kind),
                     item.name(this@SettingsActivity), summary,
                     trailing = {
-                        IconButton(onClick = { Timers.cancel(this@SettingsActivity, item.id) }) { Icon(Icons.Outlined.Close, "Cancel") }
+                        IconButton(onClick = { Timers.cancelEverywhere(this@SettingsActivity, item.id) }) { Icon(Icons.Outlined.Close, "Cancel") }
                     },
                 ) {}
             }
@@ -1337,14 +1337,32 @@ class SettingsActivity : ComponentActivity() {
         // "Your server" is Open WebUI's speech, which isn't used while Assist answers: the phone hears and speaks.
         val assist = s.answers == Answerer.ASSIST
         Section("How she sounds") {
-            if (!assist) PickItem(Icons.Outlined.Hearing, "Hearing you",
-                listOf(Hearing.PHONE to "On this phone", Hearing.SERVER to "Your server"), s.hearing,
+            val hasHa = s.haServer.isNotBlank()
+            PickItem(Icons.Outlined.Hearing, "Hearing you",
+                listOfNotNull(
+                    Hearing.PHONE to "On this phone",
+                    if (assist) null else Hearing.SERVER to "Your server",
+                    if (hasHa) Hearing.HOME_ASSISTANT to "Home Assistant" else null,
+                ), s.hearing,
                 detail = {
                     when (it) {
-                        Hearing.PHONE -> if (phoneEar) "Your words appear as you speak. The audio never leaves the phone." else "Not available on this phone; your server is used."
+                        Hearing.PHONE -> if (phoneEar) "Your words appear as you speak. The audio never leaves the phone." else "Not working on this device lately; another way is used."
                         Hearing.SERVER -> "Open WebUI's speech-to-text, the same as its voice input"
+                        Hearing.HOME_ASSISTANT -> "Home Assistant's speech-to-text, the one its voice assistants use (Whisper, Speech-to-Phrase, Cloud)"
                     }
                 }) { set(s.copy(hearing = it)) }
+            if (hasHa && s.hearing == Hearing.HOME_ASSISTANT) {
+                var engines by remember { mutableStateOf<List<Speaker>>(emptyList()) }
+                var engine by remember { mutableStateOf(Room.sttEngine(this@SettingsActivity)) }
+                LaunchedEffect(Unit) {
+                    engines = runCatching { HomeAssistant.from(this@SettingsActivity)?.sttEngines() }.getOrNull().orEmpty()
+                }
+                PickItem(Icons.Outlined.GraphicEq, "Speech-to-text in Home Assistant",
+                    listOf("" to "Its first one") + engines.map { it.entityId to it.name }, engine, detail = { null }) {
+                    engine = it
+                    Room.chooseSttEngine(this@SettingsActivity, it)
+                }
+            }
             PickItem(Icons.Outlined.RecordVoiceOver, "Her voice",
                 listOfNotNull(
                     if (assist) null else Speaking.SERVER to "Your server's voice",
@@ -1880,7 +1898,11 @@ class SettingsActivity : ComponentActivity() {
 
     /** The Voice part of a summary: who listens, who speaks, and whether it follows her mood. */
     private fun voiceLabel(s: Settings): String {
-        val ear = if (s.hearing == Hearing.PHONE) "Phone listens" else "Server listens"
+        val ear = when (s.hearing) {
+            Hearing.PHONE -> "Phone listens"
+            Hearing.SERVER -> "Server listens"
+            Hearing.HOME_ASSISTANT -> "Home Assistant listens"
+        }
         val mouth = when (s.speaking) {
             Speaking.SERVER -> "server voice"
             Speaking.PHONE -> "phone voice"

@@ -48,9 +48,10 @@ jobs:
             echo "Test harness $harness"
             pip install "pytest-homeassistant-custom-component==$harness"
           fi
-          # Her tools are called through the conversation integration; install what it needs, at the
-          # versions this Home Assistant pins.
-          reqs=$(python -c "import json, pathlib, homeassistant; m = pathlib.Path(homeassistant.__file__).parent / 'components' / 'conversation' / 'manifest.json'; print(' '.join(json.loads(m.read_text())['requirements']))")
+          # Her tools are called through the conversation integration, and each display is an Assist
+          # satellite with Home Assistant's timers: install what those load, at the versions this Home
+          # Assistant pins.
+          reqs=$(python home-assistant/requirements.py conversation assist_satellite intent)
           echo "Installing: $reqs"
           pip install $reqs
           python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
@@ -90,8 +91,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install homeassistant
           # Without its frontend Home Assistant starts in recovery mode, which leaves custom integrations
-          # out; her tools need the conversation integration. Both at the versions it pins.
-          reqs=$(python -c "import json, pathlib, homeassistant; base = pathlib.Path(homeassistant.__file__).parent / 'components'; print(' '.join(r for name in ('frontend', 'conversation') for r in json.loads((base / name / 'manifest.json').read_text())['requirements']))")
+          # out; her tools need the conversation integration, and each display is an Assist satellite. All
+          # at the versions it pins.
+          reqs=$(python home-assistant/requirements.py frontend conversation assist_satellite intent)
           echo "Installing: $reqs"
           pip install $reqs
       - name: Start it with Lena

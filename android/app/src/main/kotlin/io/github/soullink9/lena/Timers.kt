@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
@@ -55,6 +56,8 @@ data class Countdown(
     val at: Long,
     val label: String = "",
     val durationMs: Long = 0,
+    /** For a copy of one of Home Assistant's timers: its id there, so cancelling here cancels it there too. */
+    val haId: String = "",
 ) {
     /** "10 minute timer", "pasta timer", "7:30 AM alarm": how she speaks of it. */
     fun name(c: Context): String = when (kind) {
@@ -90,8 +93,37 @@ object Timers {
     fun all(c: Context): List<Countdown> = items(c).value.orEmpty()
 
     /** Sets a timer that rings after [durationMs]. */
-    fun addTimer(c: Context, durationMs: Long, label: String = ""): Countdown =
-        add(c, Countdown(UUID.randomUUID().toString(), CountdownKind.TIMER, System.currentTimeMillis() + durationMs, label.trim(), durationMs))
+    fun addTimer(c: Context, durationMs: Long, label: String = "", haId: String = ""): Countdown =
+        add(c, Countdown(UUID.randomUUID().toString(), CountdownKind.TIMER, System.currentTimeMillis() + durationMs, label.trim(), durationMs, haId))
+
+    /** A copy of a Home Assistant timer that changed (more time, paused): replaced, or gone while paused. */
+    fun updateFromHa(c: Context, haId: String, secondsLeft: Long, active: Boolean) {
+        val old = all(c).firstOrNull { it.haId == haId } ?: return
+        disarm(c, old.id)
+        val rest = all(c).filterNot { it.id == old.id }
+        if (!active) {
+            save(c, rest)
+            return
+        }
+        val updated = old.copy(at = System.currentTimeMillis() + secondsLeft * 1000)
+        save(c, rest + updated)
+        arm(c, updated)
+    }
+
+    /**
+     * Cancels one, here and, for a copy of a Home Assistant timer, there too (in the background: if Home
+     * Assistant can't be reached, it simply never rings here).
+     */
+    fun cancelEverywhere(c: Context, id: String) {
+        val item = all(c).firstOrNull { it.id == id }
+        cancel(c, id)
+        val ha = HomeAssistant.from(c)
+        if (item != null && item.haId.isNotBlank() && ha != null) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                runCatching { ha.cancelHaTimer(item.haId) }.onFailure { Logs.w("Timers", "Couldn't cancel it in Home Assistant too", it) }
+            }
+        }
+    }
 
     /** Sets an alarm for the next [hour]:[minute] (today if it's still to come, otherwise tomorrow). */
     fun addAlarm(c: Context, hour: Int, minute: Int, label: String = ""): Countdown =
@@ -184,6 +216,7 @@ object Timers {
                 at = o.optLong("at"),
                 label = o.optString("label"),
                 durationMs = o.optLong("duration"),
+                haId = o.optString("ha_id"),
             )
         }.sortedBy { it.at }
     }
@@ -192,7 +225,8 @@ object Timers {
         val sorted = items.sortedBy { it.at }
         val array = JSONArray()
         sorted.forEach {
-            array.put(JSONObject().put("id", it.id).put("kind", it.kind.name).put("at", it.at).put("label", it.label).put("duration", it.durationMs))
+            array.put(JSONObject().put("id", it.id).put("kind", it.kind.name).put("at", it.at).put("label", it.label)
+                .put("duration", it.durationMs).put("ha_id", it.haId))
         }
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, array.toString()).apply()
         list.value = sorted

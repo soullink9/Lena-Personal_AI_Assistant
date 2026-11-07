@@ -26,7 +26,7 @@ enum class Answerer(val label: String, val detail: String) {
 }
 
 /** Who turns your voice into text in the Ask sheet. */
-enum class Hearing { PHONE, SERVER }
+enum class Hearing { PHONE, SERVER, HOME_ASSISTANT }
 
 /** Who reads Lena's spoken replies aloud. */
 enum class Speaking { SERVER, PHONE, OFF }

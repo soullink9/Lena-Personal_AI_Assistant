@@ -17,11 +17,11 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Action | `lena.announce` | Says a message on Lena's displays, like Home Assistant Voice's announcements: choose displays (all of them if none), the message, and **Listen for an answer** to have her listen afterwards. |
 | Action | `lena.tidy_memory`, `lena.undo_memory_tidy` | She tidies her memory now (combining, clarifying, retiring outdated lines; see [Memory](Memory.md)) and says what changed; undo puts it back as it was. She also tidies on her own, every 7 days by default. |
 | Device | Each Lena display | Every Lena app with Home Assistant set up registers itself as a device under Lena, named after the tablet or phone. Put it in a room (its **Area**) and it's room-aware. Delete one you no longer use. |
-| Event | `event.<display>_announcement` | Each display's announcements (`message`, `listen`), which its app watches and says. Usable as an automation trigger. |
+| Assist satellite | `assist_satellite.<display>` | Each display as Home Assistant's own voice-assistant device, like a Voice Preview Edition: `assist_satellite.announce` and `start_conversation`, Home Assistant's broadcast, its timers, and the wake word choice all reach the tablet. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |
 | Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
 | Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
-| Address | `POST /api/lena/display` | Where each Lena app registers as a display and learns its room, the room's speakers and its Announcement entity. |
+| Address | `POST /api/lena/display` | Where each Lena app registers as a display and learns its room, the room's speakers and its Assist satellite. |
 
 Her feelings and memory are saved, so they survive restarts.
 
@@ -76,7 +76,9 @@ Then:
 
 - **Room-aware commands:** with **Who answers** set to Assist, every question is sent with the display's device, so Home Assistant knows the room: "turn on the lights" means that room's lights. With Open WebUI, she's told the room with each question.
 - **Music:** the app learns the room's media players (Music Assistant's first). Music, radio or podcasts asked for without naming a room play there (or on the speaker chosen in the app, Settings → Connections → Home Assistant → **Music plays on**). Name another room, or the whole home, and she finds the speakers there: Assist's own Music Assistant commands do this by area, and with Open WebUI she uses her Home Assistant tools.
-- **Announcements:** `lena.announce` says a message on the chosen displays, a room's (**room**), or all of them. A wall display says it within a few seconds while Lena is on screen; during a conversation, once the conversation ends. With **Listen for an answer**, she listens afterwards and answers.
+- **Announcements:** each display is an Assist satellite, so Home Assistant's own `assist_satellite.announce` and `assist_satellite.start_conversation` (and its "broadcast" in Assist) work on it: the chime, then Lena says the message in her own voice, or plays the sound you sent; starting a conversation then listens, and the answer carries on that conversation. `lena.announce` does the same by room name (**room**), and needs no text-to-speech engine in Home Assistant. A wall display says it within a few seconds while Lena is on screen; during a conversation, once the conversation ends.
+- **Timers:** Home Assistant's own. Each display is a satellite with timers, so "set a 10 minute timer" in Assist uses Home Assistant's timer for that display, and "how long is left?" and "cancel the timer" are Home Assistant's too. The display keeps a copy that rings on time even if it loses its connection, shows the countdown, and cancelling it there cancels it in Home Assistant.
+- **Wake word:** the satellite's page in Home Assistant lists the app's wake words; choosing one there sets it on the display.
 
 ## Her tools on the displays
 
@@ -84,10 +86,10 @@ Her tools in Assist (and the same ones in the Open WebUI tool) act on a display:
 
 | Tool | Action | What it does |
 |---|---|---|
-| `set_timer` | `lena.set_timer` | A timer (seconds, an optional name). |
+| (Assist's own timer tools) | `lena.set_timer` | Home Assistant's own timer for the display (seconds, an optional name), through its timer intents. In Assist she uses Home Assistant's timer tools directly; the action is for Open WebUI and automations. |
 | `set_alarm` | `lena.set_alarm` | An alarm at the next time the clock shows `HH:MM`. |
 | `set_reminder` | `lena.set_reminder` | She says the message at a time (`19:00`, or a date and time up to a week away) or after `in_seconds`. |
-| `cancel_timer`, `list_timers` | `lena.cancel_timer`, `lena.list_timers` | From what each display reports it has: the one named, all of a kind, or everywhere. |
+| `cancel_alarm_or_reminder`, `list_alarms_and_reminders` | `lena.cancel_timer`, `lena.list_timers` | Alarms and reminders from what each display reports it has (the one named, all of a kind, or everywhere). The actions also cover Home Assistant's timers on the display, through its timer intents. |
 | `set_volume` | `lena.set_volume` | Her speaking volume: a level (0 to 100) or quieter / louder. On a display that speaks through a Home Assistant speaker, that speaker's volume. |
 | `announce` | `lena.announce` | The intercom: says something in another room, optionally listening for an answer there. |
 | `update_fact` | `lena.update_fact` | Corrects a memory in place. |
@@ -132,7 +134,7 @@ Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out 
 POST /api/lena/display   {"id": "<the app's own id>", "name": "Kitchen tablet"}
 ```
 
-Registers the app as a display the first time (and adds its Announcement), then just reads it. Returns its `device_id`, `name`, `area` (`{"id", "name"}`, or null), the room's `speakers` (`entity_id`, `name`, `music_assistant`; Music Assistant's first) and its `announce_entity`. Any user's token works.
+Registers the app as a display the first time (and adds its Assist satellite), then just reads it. Returns its `device_id`, `name`, `area` (`{"id", "name"}`, or null), the room's `speakers` (`entity_id`, `name`, `music_assistant`; Music Assistant's first) and its `satellite`. Any user's token works.
 
 ## /api/lena/media
 

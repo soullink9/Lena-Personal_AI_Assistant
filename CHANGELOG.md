@@ -2,6 +2,21 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Fixed: "Couldn't hear you (error 11)" on some tablets** (the Galaxy Tab A9+). Its speech recognizer never gets ready: the microphone sat off for several seconds while Lena tried again, then gave up. She now waits less, and when the recognizer never gets ready she hears you another way at once (your server's speech-to-text, or else Home Assistant's) and keeps using that for a day.
+- **Hearing you: Home Assistant**, a third choice under Settings → Talking to Lena → How she looks and sounds: Home Assistant's own speech-to-text (Whisper, Speech-to-Phrase, Cloud; pick one or it uses the first), the way a Voice satellite hears. It also works in Assist mode, where there's no Open WebUI.
+- **A display is an Assist satellite** (see below): Home Assistant's timers asked through it show and ring on it (a copy that rings even if the connection drops; cancelling it here cancels it there), Home Assistant's announcements play on it (the chime, then her voice saying the message, or the sound sent), a conversation Home Assistant starts listens for your answer and carries it on, and the wake word chosen on the satellite's page is the one it listens for. On a satellite display, simple timer requests now go to Home Assistant instead of being kept on the tablet; alarms are still hers.
+
+### Home Assistant integration
+
+- **Each Lena display is an Assist satellite** (`assist_satellite.<display>`), Home Assistant's own voice-assistant device: `assist_satellite.announce`, `assist_satellite.start_conversation` and Assist's broadcast reach it, Home Assistant's timers work for it, and its page lists the app's wake words. It replaces the Announcement event entity from 0.6.8, which is removed.
+- **Timers are Home Assistant's own.** In Assist, she uses Home Assistant's timer tools for the display; `lena.set_timer`, `lena.cancel_timer` and `lena.list_timers` (for Open WebUI and automations) use its timer intents too. Her own tools now cover alarms and reminders (`cancel_alarm_or_reminder`, `list_alarms_and_reminders`), which Home Assistant doesn't have.
+- **Fixed: Optimize memory saying "The answer had no JSON".** The AI Task is now asked for a structured answer (a list of lines, which Home Assistant checks), and an answer in text anyway is still read if it lists the lines.
+- `lena.announce` still works by room name and needs no text-to-speech engine; it now plays the announcement chime first.
+
 ## [0.6.9] - 2026-11-07
 
 ### Android app

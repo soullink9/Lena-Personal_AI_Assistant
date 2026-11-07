@@ -389,14 +389,23 @@ class AskActivity : ComponentActivity() {
     }
 
     /**
-     * The phone's recognizer when chosen and available, otherwise your server's speech-to-text. Without
-     * Open WebUI (Assist answering) it's always the phone's.
+     * Whoever Hearing you names: the phone's recognizer, your server's speech-to-text, or Home Assistant's.
+     * When that one isn't there (no Open WebUI in Assist mode, a phone recognizer that never gets ready),
+     * the next one that is.
      */
     private fun newEar(): Ear {
         val server = openWebUi
-        return if (server == null || (Prefs.hearing(this) == Hearing.PHONE && PhoneEar.available(this))) PhoneEar(this)
-        else ServerEar(server)
+        val ha = HomeAssistant.from(this)
+        return when (Prefs.hearing(this)) {
+            Hearing.HOME_ASSISTANT -> if (ha != null) HaEar(ha, Room.sttEngine(this)) else otherEar() ?: PhoneEar(this)
+            Hearing.SERVER -> if (server != null) ServerEar(server) else if (PhoneEar.available(this)) PhoneEar(this) else otherEar() ?: PhoneEar(this)
+            Hearing.PHONE -> if (PhoneEar.available(this)) PhoneEar(this) else otherEar() ?: PhoneEar(this)
+        }
     }
+
+    /** Another way of hearing when the phone can't: your server's speech-to-text, else Home Assistant's. */
+    private fun otherEar(): Ear? =
+        openWebUi?.let { ServerEar(it) } ?: HomeAssistant.from(this)?.let { HaEar(it, Room.sttEngine(this)) }
 
     /**
      * The voice chosen in Settings, or none when replies aren't read aloud. "Your server's voice" is Open
@@ -665,7 +674,7 @@ class AskActivity : ComponentActivity() {
                     ready.await()
                     // Her own timers and alarms ("set a 10 minute timer") are answered here, at once and
                     // without a connection; everything else goes to whoever answers.
-                    val own = if (image == null) Commands.handle(this@AskActivity, turn.question) else null
+                    val own = if (image == null) Commands.handle(this@AskActivity, turn.question, timersHere = Room.info(this@AskActivity).value?.satellite == null) else null
                     if (own != null) {
                         turn.answer = own
                         if (viaAssist) AssistLog.add(this@AskActivity, turn.question, own)
@@ -730,20 +739,23 @@ class AskActivity : ComponentActivity() {
             }
         }
 
-        // Your server's speech-to-text, for when the phone's recognizer can't listen this time. Without
-        // Open WebUI (Assist answering) there's no server to fall back on.
-        suspend fun hearViaServer(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String = try {
-            val server = openWebUi
-            if (server == null) "" else ServerEar(server).also { fallbackEar = it }.listen(onPartial, onLevel)
-        } catch (c: CancellationException) {
-            throw c
-        } catch (_: AuthException) {
-            note = "Open Lena and sign in first."
-            ""
-        } catch (e: Exception) {
-            Logs.w("Voice", "Your server's speech-to-text failed", e)
-            note = "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
-            ""
+        // Your server's speech-to-text, or else Home Assistant's, for when the phone's recognizer can't
+        // listen this time.
+        suspend fun hearViaServer(onPartial: (String) -> Unit, onLevel: (Float) -> Unit): String {
+            val other = otherEar() ?: return ""
+            return try {
+                other.also { fallbackEar = it }.listen(onPartial, onLevel)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (_: AuthException) {
+                note = "Open Lena and sign in first."
+                ""
+            } catch (e: Exception) {
+                Logs.w("Voice", "Hearing through ${if (other is HaEar) "Home Assistant" else "your server"} failed", e)
+                note = if (other is HaEar) "Couldn't hear you: Home Assistant's speech-to-text didn't answer. Check Settings → Voice assistants there."
+                else "Couldn't hear you: your server's speech-to-text didn't answer. Check Open WebUI → Admin → Audio."
+                ""
+            }
         }
 
         /**
@@ -764,16 +776,16 @@ class AskActivity : ComponentActivity() {
             } catch (c: CancellationException) {
                 throw c
             } catch (_: EarUnavailable) {
-                // The phone's speech model is still downloading: use your server meanwhile, if there is one.
+                // The phone's speech model is still downloading: use your server or Home Assistant meanwhile.
                 e.release()
-                val server = openWebUi
-                if (server == null) {
+                val other = otherEar()
+                if (other == null) {
                     ear = null
                     note = "The phone's speech model is downloading. Try again in a minute."
                     ""
                 } else {
-                    ear = ServerEar(server)
-                    note = "The phone's speech model is downloading; using your server for now."
+                    ear = other
+                    note = "The phone's speech model is downloading; using ${if (other is HaEar) "Home Assistant" else "your server"} for now."
                     hearViaServer(onPartial, onLevel)
                 }
             } catch (err: EarError) {
@@ -782,6 +794,12 @@ class AskActivity : ComponentActivity() {
                     note = "Lena needs the microphone to hear you."
                     ""
                 } else {
+                    // Never got ready, even after starting afresh: some tablets' recognizers never answer.
+                    // Hear another way from now on (for a day), starting with this time.
+                    if (err.code == android.speech.SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
+                        PhoneEar.markUnreliable(this@AskActivity)
+                        otherEar()?.let { e.release(); ear = it }
+                    }
                     // The phone couldn't listen this time; your server can.
                     hearViaServer(onPartial, onLevel).also {
                         if (it.isBlank() && note == null) note = "Couldn't hear you (${err.describe()})."

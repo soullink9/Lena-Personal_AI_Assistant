@@ -15,7 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import config_validation as cv, device_registry as dr, llm
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er, llm
 
 from . import actions, events, tidy
 from .compat import vol
@@ -27,7 +27,7 @@ from .hub import Hub, LenaSyncView, TargetError
 from .llm_api import LenaAPI
 from .view import LenaContextView, LenaMediaView
 
-PLATFORMS = [Platform.EVENT, Platform.SELECT, Platform.TODO]
+PLATFORMS = [Platform.ASSIST_SATELLITE, Platform.SELECT, Platform.TODO]
 
 type LenaConfigEntry = ConfigEntry[LenaCore]
 
@@ -43,6 +43,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     core.briefings = Briefings(hass)
     await core.briefings.async_load()
     await core.async_start()
+    # Up to 0.6.9 each display had an Announcement event entity; its Assist satellite does that now.
+    entities = er.async_get(hass)
+    for old in er.async_entries_for_config_entry(entities, entry.entry_id):
+        if old.domain == "event":
+            entities.async_remove(old.entity_id)
     entry.runtime_data = core
     hass.data[DOMAIN] = core
 
@@ -103,8 +108,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
 
     async def announce(call: ServiceCall) -> None:
         """The lena.announce action: says a message on the chosen displays, or the room's, or all of them
-        when neither is chosen, like Home Assistant Voice's announcements. With listen, she then listens
-        for an answer.
+        when neither is chosen, after the announcement chime, optionally listening for an answer. Like
+        assist_satellite.announce (which works on the displays too), but by room name and with no
+        text-to-speech engine needed: she says it in her own voice.
         """
         try:
             if call.data.get("device_id") or call.data.get("room"):
@@ -113,7 +119,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
                 devices = core.hub.targets(device_ids=[d.id for d in displays(hass, entry.entry_id)] or None)
         except TargetError as error:
             raise ServiceValidationError(str(error)) from error
-        core.hub.send(devices, "announce", {"message": call.data["message"], "listen": call.data["listen"]})
+        core.hub.send(devices, "announce", {"message": call.data["message"], "listen": call.data["listen"], "chime": True})
 
     hass.services.async_register(
         DOMAIN, "announce", announce,

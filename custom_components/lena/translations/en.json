@@ -68,18 +68,6 @@
       "memory": {
         "name": "Memory"
       }
-    },
-    "event": {
-      "announcement": {
-        "name": "Announcement",
-        "state_attributes": {
-          "event_type": {
-            "state": {
-              "announce": "Announce"
-            }
-          }
-        }
-      }
     }
   },
   "services": {
@@ -129,7 +117,7 @@
     },
     "announce": {
       "name": "Announce",
-      "description": "Says a message on Lena's displays (the Lena app on a tablet or phone), like Home Assistant Voice's announcements.",
+      "description": "Says a message on Lena's displays with Home Assistant's own announcement (assist_satellite.announce), by room name; with Listen for an answer, starts a conversation there.",
       "fields": {
         "device_id": {
           "name": "Displays",
@@ -159,7 +147,7 @@
     },
     "set_timer": {
       "name": "Set timer",
-      "description": "A timer that rings on a Lena display.",
+      "description": "Starts one of Home Assistant's own timers on a Lena display (its Assist satellite).",
       "fields": {
         "seconds": {
           "name": "Seconds",
@@ -229,7 +217,7 @@
     },
     "cancel_timer": {
       "name": "Cancel timer",
-      "description": "Cancels timers, alarms or reminders on a display.",
+      "description": "Cancels timers (Home Assistant's own, on that display), alarms or reminders.",
       "fields": {
         "kind": {
           "name": "Kind",
@@ -250,6 +238,10 @@
         "room": {
           "name": "Room",
           "description": "A room's name; its display is used instead."
+        },
+        "timer_id": {
+          "name": "Timer ID",
+          "description": "One of Home Assistant's timers, by its id (what the Lena app sends when you cancel one there)."
         }
       }
     },

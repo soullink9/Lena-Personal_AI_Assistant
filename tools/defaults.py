@@ -150,7 +150,7 @@ SETTINGS = [
         "Orb": "AskStyle.ORB", "Sheet": "AskStyle.SHEET", "Glow": "AskStyle.GLOW", "Bar": "AskStyle.BAR",
         "Island": "AskStyle.ISLAND", "Subtitles": "AskStyle.SUBTITLES"}),
     Setting("Talking to Lena › How she looks and sounds › Hearing you", "HEARING", "Hearing", {
-        "On this phone": "Hearing.PHONE", "Your server": "Hearing.SERVER"}),
+        "On this phone": "Hearing.PHONE", "Your server": "Hearing.SERVER", "Home Assistant": "Hearing.HOME_ASSISTANT"}),
     Setting("Talking to Lena › How she looks and sounds › Her voice", "SPEAKING", "Speaking", {
         "Your server's voice": "Speaking.SERVER", "The phone's voice": "Speaking.PHONE",
         "Don't read replies aloud": "Speaking.OFF"}),

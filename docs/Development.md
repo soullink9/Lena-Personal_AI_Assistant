@@ -28,7 +28,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── abilities.py, actions.py   her timers, alarms, reminders, volume, intercom, memory corrections (and their lena.* actions)
 │   ├── history.py                 the house's history from the recorder (house_history, lena.history)
 │   ├── displays.py, hub.py        displays registering and syncing: what's asked of each, what each reports
-│   ├── event.py                   each display's Announcement event
+│   ├── assist_satellite.py        each display as an Assist satellite: announcements, conversations, timers, wake word
 │   ├── briefing.py                speaking first: the morning briefing and worries, once each
 │   ├── tidy.py                    her memory tidy: the request, checking the answer, the changes
 │   ├── view.py                    GET /api/lena/context for Open WebUI and the app
@@ -39,6 +39,7 @@ How the repository is organised and how to change it without breaking things. Th
 ├── home-assistant/
 │   ├── tests/                     runs the integration in a real Home Assistant
 │   ├── startup_check.py           starts the newest Home Assistant with Lena, before its test harness is out
+│   ├── requirements.py            the packages Home Assistant pins for what Lena loads, for CI
 │   └── pytest.ini
 ├── hacs.json                      for HACS and Home Assistant's Marketplace
 ├── open-webui/

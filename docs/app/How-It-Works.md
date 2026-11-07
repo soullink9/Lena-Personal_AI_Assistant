@@ -142,7 +142,10 @@ The app computes exactly the sound features Home Assistant's voice devices do: i
 
 ### Timers and alarms
 
-Lena keeps her own timers and alarms on the device. Ask her: "set a 10 minute pasta timer", "timer for an hour and a half", "wake me up at 6:45" (the morning, unless you say otherwise), "set an alarm for 7 pm", "how long is left?", "when is my alarm?", "cancel the pasta timer", "cancel all alarms". She understands these herself, in English, before anything is sent anywhere: they don't go to Open WebUI or Assist (in Assist mode they're still kept in her chat), they answer at once, and they work without a connection. A longer or less clear sentence goes on to her as usual.
+Ask her: "set a 10 minute pasta timer", "timer for an hour and a half", "wake me up at 6:45" (the morning, unless you say otherwise), "set an alarm for 7 pm", "how long is left?", "when is my alarm?", "cancel the pasta timer", "cancel all alarms".
+
+- **On a display registered with the Lena integration** (an Assist satellite), **timers are Home Assistant's own**: Assist sets them with its own timer support for this display, and with Open WebUI her tool does. The display keeps a copy that rings here on time even if the connection drops, and cancelling it here cancels it in Home Assistant.
+- **Alarms**, and timers on a phone or tablet without the integration, are hers: she understands these herself, in English, before anything is sent anywhere, answers at once, and they work without a connection. A longer or less clear sentence goes on to her as usual.
 
 They're set on Android's alarm clock, like a clock app's, so they ring on time while the tablet sleeps, and they're set again after a restart (one missed by less than five minutes while it was off rings when it's back). When one rings, the alarm sound plays at the alarm volume and a full-screen **Stop** appears (over the lock screen too), with **Snooze** for 10 minutes on an alarm; saying "stop" works on that screen. It stops by itself after 10 minutes. The next one counts down on the dashboards' bar and on the screensaver; tap it, or open Settings → Device customization → **Alarms & timers**, to see them all, cancel one, or set a quick timer or an alarm by hand.
 
@@ -163,7 +166,8 @@ With the Lena integration, the app registers itself in Home Assistant as a displ
 
 With the Lena integration, she can do more than answer, in Assist and Open WebUI alike:
 
-- **Timers, alarms and reminders:** "put a 5 minute timer on for the pasta and remind me to flip the chicken in 20 seconds", "remind me at 7 to take the trash out", "how long is left on the pasta?", "cancel the pasta timer". They ring on the display you asked, or the room you name. A reminder is said out loud after a chime (or shown with one chime when Lena isn't on screen).
+- **Timers, alarms and reminders:** "put a 5 minute timer on for the pasta and remind me to flip the chicken in 20 seconds", "remind me at 7 to take the trash out", "how long is left on the pasta?", "cancel the pasta timer". Timers are Home Assistant's own; alarms and reminders are hers (Home Assistant has none). They ring on the display you asked, or the room you name. A reminder is said out loud after a chime (or shown with one chime when Lena isn't on screen).
+- **Home Assistant's own voice features:** each display is an Assist satellite, so `assist_satellite.announce`, `start_conversation` and Assist's broadcast reach it, and its wake word can be chosen on the satellite's page in Home Assistant.
 - **Her volume:** "speak more quietly", "louder". With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM, and louder when the room is noisy (the wake word hears how noisy it is), then puts the volume back.
 - **Correcting what she remembers:** "Alex works nights now" changes the old memory instead of adding a second one.
 - **The house's history:** "when did the garage door last open?", "how long was the back door open?", "what did I miss today?" (people coming and going, doors, windows, locks, the garage, alarms and leaks; not lights or motion). Only what's exposed to Assist.

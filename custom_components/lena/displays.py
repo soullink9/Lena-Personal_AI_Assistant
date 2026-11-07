@@ -7,8 +7,8 @@ room the usual way (Settings > Devices & services > Lena > the display > Area). 
   lights" means that room's, as on a Home Assistant Voice satellite.
 - The app learns its room and the speakers in it, so music asked for without a room plays there, and
   Lena is told which room she's in when Open WebUI answers.
-- The lena.announce action speaks a message on one display, several, or all of them, through each
-  display's Announcement event (event.<display>_announcement), which the app watches.
+- Each display is an Assist satellite (assist_satellite.py): Home Assistant's announcements, conversations
+  it starts, its timers and the wake word choice reach the tablet.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
 from .const import DOMAIN
 
-# Sent with a display's device id when a new display registers, so its Announcement entity is added.
+# Sent with a display's device id when a new display registers, so its satellite is added.
 SIGNAL_NEW_DISPLAY = "lena_new_display"
 
 # A display's identifier in the device registry: (lena, "display:<the app's own id>").
@@ -89,11 +89,11 @@ def speakers(hass: HomeAssistant, area_id: str | None) -> list[dict[str, Any]]:
 @callback
 def describe(hass: HomeAssistant, device: dr.DeviceEntry) -> dict[str, Any]:
     """What the app needs to know about its display: its device, its room and that room's speakers, and
-    its Announcement entity.
+    its Assist satellite.
     """
     area = ar.async_get(hass).async_get_area(device.area_id) if device.area_id else None
     announce = next(
-        (e.entity_id for e in er.async_entries_for_device(er.async_get(hass), device.id) if e.domain == "event"),
+        (e.entity_id for e in er.async_entries_for_device(er.async_get(hass), device.id) if e.domain == "assist_satellite"),
         None,
     )
     return {
@@ -101,7 +101,7 @@ def describe(hass: HomeAssistant, device: dr.DeviceEntry) -> dict[str, Any]:
         "name": device.name_by_user or device.name,
         "area": {"id": area.id, "name": area.name} if area else None,
         "speakers": speakers(hass, device.area_id),
-        "announce_entity": announce,
+        "satellite": announce,
     }
 
 
@@ -137,9 +137,9 @@ class LenaDisplayView(HomeAssistantView):
         device = registry.async_get_or_create(config_entry_id=core.entry.entry_id, **display_info(display_id, name))
         if existing is None:
             async_dispatcher_send(hass, SIGNAL_NEW_DISPLAY, device.id)
-            # Its Announcement entity is added a moment later; wait briefly so the answer can name it.
+            # Its satellite is added a moment later; wait briefly so the answer can name it.
             for _ in range(40):
-                if any(e.domain == "event" for e in er.async_entries_for_device(er.async_get(hass), device.id)):
+                if any(e.domain == "assist_satellite" for e in er.async_entries_for_device(er.async_get(hass), device.id)):
                     break
                 await asyncio.sleep(0.05)
         return self.json(describe(hass, registry.async_get(device.id) or device))

@@ -131,6 +131,9 @@ class HomeAssistant(server: String, private val token: String) {
         }
     }
 
+    /** A full address for a path Home Assistant gave (its own sounds and voices start with /api/). */
+    fun absolute(url: String): String = if (url.startsWith("http://") || url.startsWith("https://")) url else base + url
+
     /** Encodes part of a path. */
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
@@ -153,6 +156,70 @@ class HomeAssistant(server: String, private val token: String) {
         } finally {
             conn.disconnect()
         }
+    }
+
+    /** The language each speech-to-text engine was found to take, so it's asked only once. */
+    private val sttLanguages = mutableMapOf<String, String>()
+
+    /**
+     * Turns speech into text with one of Home Assistant's speech-to-text engines (an stt entity, the same
+     * its voice assistants use): 16 kHz, 16-bit mono PCM, as a Home Assistant Voice satellite sends it.
+     * Returns "" when it heard nothing.
+     */
+    suspend fun transcribe(engine: String, pcm: ByteArray): String = withContext(Dispatchers.IO) {
+        val language = sttLanguages[engine] ?: sttLanguage(engine).also { sttLanguages[engine] = it }
+        val conn = URL("$base/api/stt/${enc(engine)}").openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "POST"
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 60_000
+            conn.doOutput = true
+            conn.setFixedLengthStreamingMode(pcm.size)
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            conn.setRequestProperty("Content-Type", "application/octet-stream")
+            conn.setRequestProperty("X-Speech-Content",
+                "format=wav; codec=pcm; sample_rate=16000; bit_rate=16; channel=1; language=$language")
+            conn.outputStream.use { it.write(pcm) }
+            val code = conn.responseCode
+            if (code == 401 || code == 403) throw HaAuthException()
+            val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.use { String(it.readBytes()) } ?: ""
+            if (code !in 200..299) {
+                Logs.w("Home Assistant", "Speech-to-text ($engine): HTTP $code ${text.take(200)}")
+                throw HaHttpException(code, null)
+            }
+            val reply = JSONObject(text)
+            if (reply.optString("result") != "success") "" else reply.optString("text")
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /**
+     * The language to ask an engine for: Home Assistant's own (its general settings), in the engine's own
+     * spelling ("en" or "en-US"), or the engine's first.
+     */
+    private suspend fun sttLanguage(engine: String): String {
+        val house = runCatching { JSONObject(call("GET", "/api/config")).optString("language") }.getOrNull()?.ifBlank { null } ?: "en"
+        val offered = runCatching { JSONObject(call("GET", "/api/stt/${enc(engine)}")).optJSONArray("languages") }.getOrNull()
+        val languages = List(offered?.length() ?: 0) { offered!!.optString(it) }.filter { it.isNotBlank() }
+        return languages.firstOrNull { it.equals(house, ignoreCase = true) }
+            ?: languages.firstOrNull { it.lowercase().replace('_', '-').startsWith(house.lowercase() + "-") }
+            ?: languages.firstOrNull { house.lowercase().startsWith(it.lowercase()) }
+            ?: languages.firstOrNull()
+            ?: house
+    }
+
+    /** Home Assistant's speech-to-text engines (stt entities), by name, for Hearing you. */
+    suspend fun sttEngines(): List<Speaker> {
+        val states = JSONArray(call("GET", "/api/states"))
+        return List(states.length()) { states.getJSONObject(it) }
+            .filter { it.optString("entity_id").startsWith("stt.") }
+            .map { o ->
+                val id = o.optString("entity_id")
+                Speaker(id, o.optJSONObject("attributes")?.optString("friendly_name")?.ifBlank { null } ?: id, false)
+            }
+            .sortedBy { it.name.lowercase() }
     }
 
     /** A folder of Home Assistant's media, through the Lena integration (null id: the top level). */
@@ -242,6 +309,11 @@ class HomeAssistant(server: String, private val token: String) {
         call("POST", "/api/services/tts/speak", JSONObject()
             .put("entity_id", voice).put("media_player_entity_id", speaker).put("message", text).put("cache", true),
             readTimeoutMs = 60_000)
+    }
+
+    /** Cancels one of Home Assistant's timers by its id (lena.cancel_timer). */
+    suspend fun cancelHaTimer(timerId: String) {
+        call("POST", "/api/services/lena/cancel_timer", JSONObject().put("timer_id", timerId))
     }
 
     /** Stops a media player (her voice on a speaker, when you stop her). */

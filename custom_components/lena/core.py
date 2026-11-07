@@ -18,6 +18,7 @@ import yaml
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
@@ -311,7 +312,14 @@ class LenaCore:
         if task := self.opt(CONF_TIDY_TASK):
             request["entity_id"] = task
         try:
-            reply = await self.hass.services.async_call("ai_task", "generate_data", request, blocking=True, return_response=True)
+            # Structured, so the model has to give back a list of lines (Home Assistant checks it); a model
+            # that can't do structured answers is asked again for plain text.
+            try:
+                reply = await self.hass.services.async_call(
+                    "ai_task", "generate_data", {**request, "structure": tidy.STRUCTURE}, blocking=True, return_response=True)
+            except HomeAssistantError as err:
+                _LOGGER.debug("The AI Task couldn't give a structured answer (%s); asking for text", err)
+                reply = await self.hass.services.async_call("ai_task", "generate_data", request, blocking=True, return_response=True)
         except Exception as err:  # noqa: BLE001 - any failure of the model just means no tidy this time
             raise tidy.TidyError(f"The AI Task didn't answer: {err}") from err
         before = [dict(m) for m in self.memory]

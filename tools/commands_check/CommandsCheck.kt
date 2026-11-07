@@ -40,6 +40,19 @@ fun main() {
     val timers = Timers.all(c).filter { it.kind == CountdownKind.TIMER }.joinToString(", ") { "cancel ${it.id}" }
     expect("cancel all timers", timers)
 
+    // On a satellite display Home Assistant keeps timers: they go on to Assist; alarms are still hers.
+    did.clear()
+    if (Commands.handle(c, "Set a 10 minute timer", timersHere = false) != null || did.isNotEmpty()) {
+        failed++
+        println("FAIL  a timer on a satellite display should go on to Home Assistant")
+    } else println("ok    \"Set a 10 minute timer\" on a satellite -> -")
+    did.clear()
+    if (Commands.handle(c, "Wake me up at 6:45", timersHere = false) == null) {
+        failed++
+        println("FAIL  an alarm on a satellite display is still hers")
+    } else println("ok    \"Wake me up at 6:45\" on a satellite -> ${did.joinToString()}")
+    Timers.list.removeIf { it.kind == CountdownKind.ALARM }
+
     // Alarms
     expect("Wake me up at 6:45", "alarm 06:45")
     expect("Set an alarm for 7 pm", "alarm 19:00")
@@ -53,7 +66,7 @@ fun main() {
     expect("Set an alarm for 7 o'clock in the evening", "alarm 19:00")
     expect("set an alarm for 18:30", "alarm 18:30")
     expect("when is my alarm", "?")
-    expect("cancel my 6:05 alarm", "cancel 19")
+    expect("cancel my 6:05 alarm", "cancel 20")
     expect("cancel my alarm", "?") // several: she asks which
     expect("set an alarm", "?")
 
