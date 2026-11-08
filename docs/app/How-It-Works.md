@@ -248,7 +248,7 @@ Open WebUI's attach button opens Android's file picker. Lena has no camera permi
 
 ## Updates
 
-**Settings → Software version → Updates** checks your GitHub repository's latest release, downloads it, checks it, and installs it, with a token for a private repository. **Re-download and install** gets the latest release again even if you already have it, to repair an install or after the version number was reset. See [Installation → Updating](Installation.md#updating).
+**Settings → Software version → Updates** checks the latest release on GitHub (or on your own Gitea, if you've typed its address there), downloads it, checks it, and installs it. No token or sign-in is used. **Re-download and install** gets the latest release again even if you already have it, to repair an install or after the version number was reset. See [Installation → Updating](Installation.md#updating).
 
 ## Signing in by herself
 

@@ -21,27 +21,45 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Updating Lena from her releases on GitHub (the public repository [REPO], so no token or setup is
- * needed). The APK is checked three ways before it's offered: against the release's SHA256SUMS,
- * that it's Lena and newer, and that it's signed with the same key as the Lena you have (Android
- * checks that last one again itself). It's kept until it's installed, so you can leave to change
- * a security setting and come back without downloading again, and deleted once the update is in.
+ * Updating Lena from her releases: on GitHub (the public repository [REPO], so no token or setup is
+ * needed), or on your own Gitea if you've given its address ([UpdateSource]). The APK is checked three
+ * ways before it's offered: against the release's SHA256SUMS, that it's Lena and newer, and that it's
+ * signed with the same key as the Lena you have (Android checks that last one again itself), so an
+ * update can only ever be one you built, wherever it came from. It's kept until it's installed, so you
+ * can leave to change a security setting and come back without downloading again, and deleted once the
+ * update is in.
  */
 object Updates {
-    const val REPO = "soullink9/Lena-Personal_AI_Assistant"
+    const val REPO = UpdateSource.GitHub.REPO
 
     /** Where a token for a private repository used to be kept, removed by [cleanUp]. */
     private const val OLD_TOKEN = "github_token"
     private const val TAG = "Updates"
 
     /**
-     * The latest release: its version (the tag without the v), notes, the APK asset and the SHA256SUMS
-     * asset if there is one.
+     * The latest release: its version (the tag without the v), notes, where to download the APK and the
+     * SHA256SUMS file (if there is one), and where it came from, for messages.
      */
-    data class Release(val version: String, val notes: String, val apkId: Long, val apkName: String, val size: Long, val sumsId: Long?)
+    data class Release(
+        val version: String, val notes: String, val apkUrl: String, val apkName: String, val size: Long,
+        val sumsUrl: String?, val from: String,
+    )
 
-    /** Where the updater keeps its own state (what's waiting to install). */
+    /** Where the updater keeps its own state (what's waiting to install, your Gitea's address). */
     private fun p(c: Context) = c.getSharedPreferences("lena-updates", Context.MODE_PRIVATE)
+
+    /** Your Gitea's address as you typed it (empty: updates come from GitHub). */
+    fun giteaAddress(c: Context): String = p(c).getString("gitea", "") ?: ""
+
+    /** Saves your Gitea's address as typed; it's only used once it's one Lena can use ([UpdateSource.gitea]). */
+    fun setGiteaAddress(c: Context, typed: String) = p(c).edit().putString("gitea", typed.trim()).apply()
+
+    /** Where updates come from now: GitHub, your Gitea, or null when the typed address can't be used. */
+    fun source(c: Context): UpdateSource? = UpdateSource.from(giteaAddress(c))
+
+    /** "GitHub" or "Gitea", for messages ("From Lena's releases on Gitea"). */
+    fun sourceName(c: Context): String = source(c)?.name ?: "Gitea"
+
     /** The folder downloaded APKs wait in: private, and deleted once installed. */
     private fun dir(c: Context) = File(c.filesDir, "updates")
 
@@ -64,11 +82,11 @@ object Updates {
         return false
     }
 
-    // ---- GitHub ---------------------------------------------------------------------------
+    // ---- GitHub or Gitea --------------------------------------------------------------------
 
     /**
-     * A GitHub connection, without any sign-in (the repository is public). Redirects aren't followed
-     * automatically, so the hand-off to GitHub's file storage is checked to be https first.
+     * A connection to GitHub or your Gitea, without any sign-in (the repository is public). Redirects
+     * aren't followed automatically, so a hand-off to file storage is checked to be https first.
      */
     private fun open(url: String, accept: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
@@ -76,24 +94,38 @@ object Updates {
             connectTimeout = 10_000
             readTimeout = 60_000
             setRequestProperty("Accept", accept)
-            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            if (url.startsWith("https://api.github.com/")) setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
         }
 
-    /** GitHub's refusals in words that say what to do. */
-    private fun problem(code: Int): IOException = IOException(
-        when (code) {
-            403, 429 -> "GitHub is limiting checks from this network for now (an hour at most). Try again later."
-            404 -> "No release found on GitHub."
-            else -> "GitHub answered HTTP $code."
+    /** A refusal in words that say what to do. */
+    private fun problem(code: Int, source: UpdateSource): IOException = IOException(
+        when {
+            source is UpdateSource.GitHub && (code == 403 || code == 429) ->
+                "GitHub is limiting checks from this network for now (an hour at most). Try again later."
+            source is UpdateSource.Gitea && (code == 401 || code == 403 || code == 404) ->
+                "No release found at ${source.page}. Check the address, and that the repository can be seen without signing in to Gitea."
+            code == 404 -> "No release found on ${source.name}."
+            else -> "${source.name} answered HTTP $code."
         }
     )
 
-    /** The newest release with an APK in it. */
+    /**
+     * The newest release with an APK in it, from GitHub or your Gitea. Both describe a release the same
+     * way (Gitea copies GitHub's API); a file is downloaded from GitHub through its API, and from Gitea
+     * from its download address.
+     */
     suspend fun latest(c: Context): Release = withContext(Dispatchers.IO) {
-        val conn = open("https://api.github.com/repos/$REPO/releases/latest", "application/vnd.github+json")
+        val source = source(c) ?: throw IOException(
+            "Lena can't use the Gitea address \"${giteaAddress(c)}\". Use its https:// address and your account, like https://gitea.example.com/you."
+        )
+        val conn = open(source.latestUrl, if (source is UpdateSource.GitHub) "application/vnd.github+json" else "application/json")
         try {
-            val code = conn.responseCode
-            if (code != 200) throw problem(code)
+            val code = try {
+                conn.responseCode
+            } catch (e: IOException) {
+                throw IOException("Couldn't reach ${source.name}: ${e.message}", e)
+            }
+            if (code != 200) throw problem(code, source)
             val r = JSONObject(conn.inputStream.use { String(it.readBytes()) })
             val assets = r.optJSONArray("assets")
             var apk: JSONObject? = null
@@ -104,33 +136,42 @@ object Updates {
                 if (name.endsWith(".apk")) apk = a
                 if (name == "SHA256SUMS") sums = a
             }
-            if (apk == null) throw IOException("The latest release has no APK.")
+            if (apk == null) throw IOException("The latest release on ${source.name} has no APK.")
+            fun address(asset: JSONObject): String = when (source) {
+                is UpdateSource.GitHub -> "https://api.github.com/repos/$REPO/releases/assets/${asset.getLong("id")}"
+                is UpdateSource.Gitea -> asset.getString("browser_download_url")
+            }
             Release(
-                version = r.optString("tag_name").removePrefix("v"),
+                version = r.optString("tag_name").removePrefix("v").removePrefix("V"),
                 notes = r.optString("body"),
-                apkId = apk.getLong("id"),
+                apkUrl = address(apk),
                 apkName = apk.getString("name"),
                 size = apk.optLong("size"),
-                sumsId = sums?.getLong("id"),
+                sumsUrl = sums?.let { address(it) },
+                from = source.name,
             )
         } finally {
             conn.disconnect()
         }
     }
 
-    /** Streams a release file into [to], following GitHub's hand-off to its storage. */
-    private fun fetch(c: Context, assetId: Long, to: File, progress: (Long) -> Unit) {
-        var conn = open("https://api.github.com/repos/$REPO/releases/assets/$assetId", "application/octet-stream")
+    /**
+     * Streams a release file into [to], following a hand-off to file storage (GitHub always does; Gitea
+     * does when its files are kept elsewhere). The download address must be https, like the source.
+     */
+    private fun fetch(r: Release, url: String, to: File, progress: (Long) -> Unit) {
+        if (!url.startsWith("https://")) throw IOException("${r.from} gave an insecure download address.")
+        var conn = open(url, "application/octet-stream")
         try {
             var code = conn.responseCode
             if (code in 301..308) {
-                val next = conn.getHeaderField("Location") ?: throw IOException("GitHub sent no download address.")
-                if (!next.startsWith("https://")) throw IOException("GitHub sent an insecure download address.")
+                val next = conn.getHeaderField("Location") ?: throw IOException("${r.from} sent no download address.")
+                if (!next.startsWith("https://")) throw IOException("${r.from} sent an insecure download address.")
                 conn.disconnect()
                 conn = open(next, "application/octet-stream")
                 code = conn.responseCode
             }
-            if (code != 200) throw problem(code)
+            if (code != 200) throw IOException("${r.from} answered HTTP $code for ${to.name}.")
             conn.inputStream.use { input ->
                 to.outputStream().use { out ->
                     val buffer = ByteArray(64 * 1024)
@@ -158,12 +199,12 @@ object Updates {
         val d = dir(c).apply { deleteRecursively(); mkdirs() }
         val apk = File(d, "lena-${r.version}.apk")
         try {
-            fetch(c, r.apkId, apk) { done -> if (r.size > 0) progress(done.toFloat() / r.size) }
+            fetch(r, r.apkUrl, apk) { done -> if (r.size > 0) progress(done.toFloat() / r.size) }
 
             // 1. The checksum published with the release.
-            val sumsId = r.sumsId ?: throw IOException("The release has no SHA256SUMS file to check the APK against.")
+            val sumsUrl = r.sumsUrl ?: throw IOException("The release has no SHA256SUMS file to check the APK against.")
             val sumsFile = File(d, "SHA256SUMS")
-            fetch(c, sumsId, sumsFile) { }
+            fetch(r, sumsUrl, sumsFile) { }
             val expected = sumsFile.readLines().map { it.trim().split(Regex("\\s+")) }
                 .firstOrNull { it.size >= 2 && it.last().removePrefix("*") == r.apkName }?.first()?.lowercase()
                 ?: throw IOException("SHA256SUMS doesn't list ${r.apkName}.")
@@ -193,7 +234,7 @@ object Updates {
 
             p(c).edit().putString("pending_version", archive.versionName ?: r.version).putString("pending_file", apk.name)
                 .putLong("pending_code", archive.longVersionCode).putBoolean("pending_reinstall", reinstall).apply()
-            Logs.i(TAG, "Downloaded and checked ${r.version}" + if (reinstall) " (to install again)" else "")
+            Logs.i(TAG, "Downloaded and checked ${r.version} from ${r.from}" + if (reinstall) " (to install again)" else "")
         } catch (e: Exception) {
             d.deleteRecursively()
             Logs.w(TAG, "Download of ${r.version} failed", e)
@@ -219,7 +260,8 @@ object Updates {
 
     /** Deletes a downloaded update that's no longer needed (installed, or no longer newer). */
     fun cleanUp(c: Context) {
-        // From when releases could come from another or a private repository: neither is needed now.
+        // From when releases could come from another or a private GitHub repository: neither is needed now.
+        // (Your Gitea's address, "gitea", is kept: it needs no token.)
         if (Secrets.has(c, OLD_TOKEN) || p(c).contains("repo")) {
             Secrets.put(c, OLD_TOKEN, null)
             p(c).edit().remove("repo").apply()

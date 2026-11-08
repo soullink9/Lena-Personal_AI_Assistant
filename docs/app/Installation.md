@@ -78,11 +78,13 @@ How you trigger the assistant depends on your phone and navigation style: usuall
 
 ## Updating
 
-**From the app:** Settings → tap **Software version** → **Updates**. Releases come from this repository's public releases, so there's nothing to set up (building your own fork? Point `Updates.REPO` in `Updates.kt` at your repository). Then:
+**From the app:** Settings → tap **Software version** → **Updates**. Releases come from this repository's public releases, so there's nothing to set up (building your own fork? Point `UpdateSource.GitHub.REPO` in `UpdateSource.kt` at your repository). Then:
 
 1. **Check for updates**, then **Download**. The APK is checked against the release's `SHA256SUMS`, and that it's Lena, newer, and signed with your key; anything else is thrown away.
 2. **Let Lena install apps** (Android's "Install unknown apps" for Lena) and, if **Auto Blocker** stops the install (Samsung: Settings → Security and privacy → Auto Blocker), turn it off; the button opens Security and privacy, where it's listed. You can leave for those settings and come back: the download waits.
 3. **Install**. Android asks you to confirm. Once the update is in, the downloaded APK is deleted, and if you turned Auto Blocker off, Lena reminds you to turn it back on.
+
+**From your own Gitea instead:** if Lena's repository lives on your Gitea (pushed or mirrored there, with its release workflow), type its address under **Where updates come from**: your Gitea and account, like `https://gitea.example.com/you`, or the repository's own address. Lena then checks and downloads the latest release there, the same way and with the same checks, so it still only installs a build signed with your key. The repository must be visible without signing in, and the address must be https. Empty the box to go back to GitHub.
 
 **Re-download and install** gets the latest release again even when it's the version you have, checked the same way: to repair an install, or after a version number was reset. Android compares the **build number** (`versionCode` in `android/app/build.gradle.kts`), not the version name, so if the version name starts again, `versionCode` must keep going up; Android refuses to install a lower build number over a higher one, and Lena says so instead of downloading for nothing.
 

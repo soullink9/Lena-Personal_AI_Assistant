@@ -502,7 +502,7 @@ class SettingsActivity : ComponentActivity() {
         Group {
             val waiting = remember { Updates.pending(this@SettingsActivity) }
             Item(Icons.Outlined.SystemUpdate, "Updates",
-                waiting?.let { "${it.first} downloaded, ready to install" } ?: upd.available ?: "From your GitHub releases") { open(Page.UPDATES) }
+                waiting?.let { "${it.first} downloaded, ready to install" } ?: upd.available ?: "From your ${Updates.sourceName(this@SettingsActivity)} releases") { open(Page.UPDATES) }
             val problems by produceState<Int?>(null) {
                 value = withContext(Dispatchers.IO) {
                     val day = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
@@ -793,7 +793,7 @@ class SettingsActivity : ComponentActivity() {
     private val upd = UpdateState()
 
     /**
-     * Asks GitHub for the latest release and says whether it's newer. A different, lower version is pointed
+     * Asks GitHub (or your Gitea) for the latest release and says whether it's newer. A different, lower version is pointed
      * at Re-download and install, since that's what a reset version number looks like.
      */
     private fun checkForUpdate() {
@@ -813,7 +813,7 @@ class SettingsActivity : ComponentActivity() {
                 }
             } catch (e: Exception) {
                 Logs.w("Updates", "Couldn't check for updates", e)
-                upd.status = e.message ?: "Couldn't reach GitHub."
+                upd.status = e.message ?: "Couldn't reach ${Updates.sourceName(this@SettingsActivity)}."
             }
         }
     }
@@ -840,7 +840,8 @@ class SettingsActivity : ComponentActivity() {
 
     /**
      * Updates: what's waiting to install and the steps for it, checking, downloading, and Re-download and
-     * install. Releases come from Lena's public repository, so there's nothing to set up.
+     * install. Releases come from Lena's public repository, so there's nothing to set up; your own Gitea
+     * can be given instead, at the bottom.
      */
     @Composable
     private fun UpdatesPage() {
@@ -867,7 +868,9 @@ class SettingsActivity : ComponentActivity() {
             }
         }
 
-        Footnote("This is Lena $installed. Updates come from Lena's releases on GitHub.")
+        var gitea by remember { mutableStateOf(Updates.giteaAddress(this)) }
+        val from = UpdateSource.from(gitea)?.name ?: "Gitea"
+        Footnote("This is Lena $installed. Updates come from Lena's releases on $from.")
 
         pending?.let { (version, file) ->
             Section("Ready to install $version") {
@@ -907,7 +910,7 @@ class SettingsActivity : ComponentActivity() {
         }
 
         Group {
-            Item(Icons.Outlined.Refresh, "Check for updates", upd.status ?: "From Lena's releases on GitHub") { checkForUpdate() }
+            Item(Icons.Outlined.Refresh, "Check for updates", upd.status ?: "From Lena's releases on $from") { checkForUpdate() }
             val r = upd.release
             if (r != null && Updates.newer(r.version, installed) && pending?.first != r.version) {
                 val p = upd.progress
@@ -944,12 +947,42 @@ class SettingsActivity : ComponentActivity() {
                         upd.status = "The latest release is ${latest.version}"
                         again(latest)
                     } catch (e: Exception) {
-                        upd.status = e.message ?: "Couldn't reach GitHub."
+                        upd.status = e.message ?: "Couldn't reach ${Updates.sourceName(this@SettingsActivity)}."
                     }
                 }
             }
         }
 
+        // Your own Gitea instead of GitHub: for when the project lives there and GitHub is its mirror, or
+        // can't be reached. The same checks apply to what comes from it, so it can only be your own build.
+        Section("Where updates come from") {
+            FieldItem {
+                val bad = gitea.isNotBlank() && UpdateSource.gitea(gitea) == null
+                OutlinedTextField(
+                    value = gitea,
+                    onValueChange = {
+                        gitea = it
+                        Updates.setGiteaAddress(this@SettingsActivity, it)
+                        // What was found on the other source no longer applies.
+                        upd.release = null
+                        upd.available = null
+                        upd.status = null
+                    },
+                    label = { Text("Your Gitea (optional)") }, placeholder = { Text("https://gitea.example.com/you") },
+                    isError = bad,
+                    supportingText = {
+                        Text(
+                            when {
+                                bad -> "Use your Gitea's https:// address and your account, or the repository's address"
+                                gitea.isBlank() -> "Empty: Lena's releases on GitHub. Or your Gitea's address and account, if Lena's repository is there; it must be visible without signing in."
+                                else -> "Releases from ${UpdateSource.gitea(gitea)?.page}. Empty it to go back to GitHub."
+                            }
+                        )
+                    },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 
     /**

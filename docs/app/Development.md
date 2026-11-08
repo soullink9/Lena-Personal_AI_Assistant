@@ -44,7 +44,8 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers (scheduled prompts go to Assist when it answers), schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
-| `Updates.kt` | Updating from GitHub releases: checking, downloading, verifying and installing. |
+| `Updates.kt` | Updating from GitHub releases (or your Gitea's): checking, downloading, verifying and installing. |
+| `UpdateSource.kt` | Where updates come from: GitHub, or the Gitea address typed on the Updates page. |
 | `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Software version → Logs. |
 | `Widgets.kt` | The Quick Settings tile (Talk to Lena) and the home screen widget. |
 | `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |

@@ -4,12 +4,16 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [Unreleased]
 
+### Android app
+
+- **Updates from your own Gitea.** Settings → Software version → Updates → **Where updates come from**: type your Gitea's address and account (`https://gitea.example.com/you`), or the repository's address, and Lena checks and downloads her releases there instead of GitHub, with the same checks (`SHA256SUMS`, that it's Lena and newer, and signed with your key). The repository must be visible without signing in; empty the box to go back to GitHub.
+
 ### Development
 
 - **Tested and released on Gitea first, without GitHub.** The project lives on Gitea, which push-mirrors to GitHub. `.gitea/workflows/test.yml` runs every test on each push and pull request, and `.gitea/workflows/release.yml` (Run workflow with a version, or a pushed `v*.*.*` tag) runs them again, then builds, signs, checks and publishes the APK as the Gitea release. They use no GitHub actions and download nothing from GitHub: jobs run in Docker Hub images (Python, and the official Gradle image with Google's Android SDK), and get the code from Gitea with git.
 - **GitHub's release follows from the mirrored tag.** `.github/workflows/release.yml` publishes the same release on GitHub when Gitea's mirror pushes the tag (or from its own Run workflow, which now takes the version); `build.yml` only makes test builds.
 - **Shared release scripts** in `scripts/`: `release_notes.py` checks the tag against every part's version (now including the voice bridge's) and the changelog, and writes the notes (install steps, then the changelog section, linking to GitHub); `check_apk.py` refuses an APK that's debug-signed, of another version or missing from `SHA256SUMS`; `publish_gitea_release.py` publishes on Gitea. The build and Home Assistant test steps are scripts too, so every runner does the same. `tests/test_release.py` tests the release scripts, including against a fake Gitea, and `tools/check.py` runs it.
-- How to release is in [CONTRIBUTING](CONTRIBUTING.md#releasing). Nothing changes for people using Lena.
+- How to release is in [CONTRIBUTING](CONTRIBUTING.md#releasing).
 
 ## [0.6.11] - 2026-11-07
 
