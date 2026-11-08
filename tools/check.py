@@ -325,6 +325,11 @@ check(integrations == ["lena"], f"custom_components/ holds only lena (found {int
 for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
     check(bool(manifest.get(key)), f"the integration's manifest.json has {key}")
 check((LENA / "brand" / "icon.png").exists(), "custom_components/lena/brand/icon.png exists")
+# Gitea's runner runs steps with sh unless told otherwise; the steps are written for bash, as on GitHub.
+for workflow in sorted((ROOT / ".gitea" / "workflows").glob("*.yml")):
+    shell = (yaml.safe_load(workflow.read_text()).get("defaults") or {}).get("run", {}).get("shell")
+    check(shell == "bash", f"{workflow.relative_to(ROOT)} runs its steps in bash (defaults: run: shell: bash)")
+
 # The tests run on GitHub and on Gitea, before every release too, each with the same list of Home Assistant releases.
 for workflow in (".github/workflows/home-assistant.yml", ".github/workflows/release.yml",
                  ".gitea/workflows/test.yml", ".gitea/workflows/release.yml"):

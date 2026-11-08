@@ -32,6 +32,12 @@ env:
   # next to Gitea, e.g. http://gitea-server:3000. Set it once as an Actions variable on your user or organisation.
   GITEA_INTERNAL_URL: ${{ vars.GITEA_INTERNAL_URL }}
 
+# Every step runs in bash, as on GitHub. Gitea's runner otherwise uses sh, which lacks what the steps use
+# (${GITHUB_SHA::7}, pipefail); every image here has bash.
+defaults:
+  run:
+    shell: bash
+
 # The same tests as test.yml, then the release job, which only starts when they've all passed.
 
 jobs:
