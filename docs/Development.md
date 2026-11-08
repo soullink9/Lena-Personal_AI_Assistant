@@ -51,24 +51,38 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── piper/docker-compose.example.yml text-to-speech example
 │   └── bridge/                    Wyoming bridge for Open WebUI
 ├── tools/
-│   ├── check.py                   offline checks
+│   ├── check.py                   offline checks (also runs tests/test_release.py)
 │   ├── defaults.py                applies adjustments/defaults.env to the app's Defaults.kt
 │   ├── wall-display-debloat.sh    strips a tablet down to the wall display (run from a computer with adb)
 │   ├── debloat_lists.py           updates that script's package lists from the UAD project's list
-│   └── make_images.py             app icon, notification icon and avatars from the logo
+│   ├── make_images.py             app icon, notification icon and avatars from the logo
+│   ├── frontend_check/            the wake word front end against the original C
+│   └── commands_check/            what she understands on her own, on example sentences
+├── scripts/                       what the workflows run, on Gitea and GitHub alike
+│   ├── release_notes.py           checks the tag against every part's version; writes the release notes
+│   ├── check_apk.py               checks the APK before it's published (signed, Lena's version, SHA256SUMS)
+│   ├── publish_gitea_release.py   publishes the release on Gitea through its API
+│   ├── build_apk.sh               builds and names the APK, writes SHA256SUMS
+│   ├── android_sdk.sh             the Android SDK from Google, for the Gitea runner
+│   └── test_home_assistant.sh, start_home_assistant.sh   the integration's tests, from PyPI
+├── tests/                         tests of the release scripts (see tests/README.md)
 ├── docs/                          everything in detail
 │   ├── assets/                    the logo, avatar and GitHub social preview
 │   ├── Getting-Started.md, Overview.md, Development.md
 │   ├── personality/, open-webui/, home-assistant/, app/, voice/
-└── .github/
-    ├── workflows/build.yml        builds, signs and releases the app
-    ├── workflows/home-assistant.yml tests the integration on Home Assistant 2026.9 and the latest
+├── .gitea/workflows/              the project's own CI, on the Gitea runner (no GitHub needed)
+│   ├── test.yml                   every test, on every push and pull request
+│   └── release.yml                every test, then the signed APK published as a Gitea release
+└── .github/                       GitHub, the public mirror
+    ├── workflows/release.yml      the same release on GitHub, from the tag Gitea's mirror pushes
+    ├── workflows/build.yml        a test build of the app for each change to it
+    ├── workflows/home-assistant.yml tests the integration on Home Assistant 2026.9 and the latest, plus hassfest and HACS
     └── ISSUE_TEMPLATE/
 ```
 
 `custom_components/lena` is laid out the way Home Assistant expects, so it can be copied into a Home Assistant configuration as it is. `feelings.yaml` holds nothing but names and descriptions, so anyone can change how she sounds without reading code.
 
-The app build only runs when something in `android/` or its workflow changes, and the integration tests only when something in `home-assistant/` or theirs does. Editing docs runs neither.
+On Gitea every push runs every test (`.gitea/workflows/test.yml`). On GitHub, the app build only runs when something in `android/` or its checks change, and the integration tests only when something in `home-assistant/` or theirs does; editing docs runs neither there.
 
 ## Things that must stay in step
 
@@ -83,7 +97,7 @@ The app build only runs when something in `android/` or its workflow changes, an
 | Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](app/How-It-Works.md). It relies on Open WebUI's Tailwind colour variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `adjustments/defaults.env` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
-| The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, and a section in `CHANGELOG.md`. `tools/check.py` checks they match. |
+| The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, the voice bridge's `LenaVoiceBridge/` version in `voice/bridge/bridge.py`, and a section in `CHANGELOG.md`. `tools/check.py` checks they match (the list is `project_versions` in `scripts/release_notes.py`), and the release workflows check the tag against them. |
 | A setting in the app | `Settings` and `Prefs` in `Prefs.kt` (its default comes from `Defaults.kt`, written from `adjustments/defaults.env` by `tools/defaults.py`; add an entry to its `SETTINGS` for a new one), its page in `SettingsActivity.kt`, a line in that file's `findable` list (so **Search settings** finds it), and the [app guide](app/How-It-Works.md#settings) |
 | An Open WebUI endpoint the app uses | `Api.kt`, and the endpoint list in [App development](app/Development.md) |
 | A new screen (activity) in the app | `WallDisplay.watch(this)` in its `onCreate` and `WallDisplay.touched()` in `onUserInteraction`, so the wall display keeps the screen on and its screen saver comes on there too |
@@ -103,9 +117,10 @@ The script checks that:
 - her description includes only her current feelings, and forgetting picks the right memory;
 - the Open WebUI tool offers exactly the moments she can set herself;
 - the Modelfile carries her character in `MESSAGE system`, and its context size matches the app's;
-- the Python files compile, the compose watchdog escapes its dollar signs, and no obvious private data (home IP addresses, tokens, passwords) has crept in.
+- the Python files compile, the compose watchdog escapes its dollar signs, and no obvious private data (home IP addresses, tokens, passwords) has crept in;
+- the release scripts work: `tests/test_release.py` (see [tests/README.md](../tests/README.md)).
 
-It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's own tests do run Home Assistant: they start it with the integration on GitHub for every change to `home-assistant/`, on 2026.9 and the newest release. To run them yourself: `pip install pytest-homeassistant-custom-component`, then `python -m pytest` in `home-assistant/`.
+It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's own tests do run Home Assistant: they start it with the integration on the Gitea runner for every push (and on GitHub for every change to `home-assistant/`), on 2026.9 and the newest release. To run them yourself, in a virtualenv: `scripts/test_home_assistant.sh latest` (or `2026.9`).
 
 ## Testing a change for real
 
@@ -113,14 +128,14 @@ It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's ow
 - **Feelings descriptions:** edit `feelings.yaml` in Home Assistant and reload the integration, then set her dropdowns by hand and talk to her. The voice assistant's debug view shows exactly what she was told.
 - **The integration:** add a test to `home-assistant/tests`, push, and read the **Home Assistant integration** run. Then copy the folder into a test Home Assistant and restart.
 - **Open WebUI filter and tool:** paste the new version over the old one in Open WebUI, then try the test in [Lena in Open WebUI](open-webui/Setup.md#7-test-it).
-- **App:** push to `main` (or run **Build APK** by hand) and install the APK from the run. See [App development](app/Development.md).
+- **App:** push, and Gitea's **Test** run builds it; on GitHub, **Build APK** keeps the APK as the run's artifact to install. See [App development](app/Development.md).
 - **Voice bridge:** rebuild the container, then try call mode in Open WebUI and check the bridge's log.
 
 ## Releasing
 
 Everything shares one version and one changelog.
 
-- **Releasing:** set the new version everywhere (see the table above; `tools/check.py` catches a mismatch), add its section to `CHANGELOG.md`, then **Actions → Build APK → Run workflow** with **Publish a release** ticked. That builds the app and publishes the release and its tag. Details in [App development](app/Development.md#making-a-release).
+- **Releasing:** set the new version everywhere (see the table above; `tools/check.py` catches a mismatch), turn `## [Unreleased]` in `CHANGELOG.md` into the version's section, then on Gitea **Actions → Release → Run workflow** with the version (`0.6.12`). That runs every test, builds and signs the app, and publishes the release and its tag on Gitea; the push mirror takes the tag to GitHub, where the same release is published. Details in [CONTRIBUTING](../CONTRIBUTING.md#releasing).
 - **The parts without a build** (Modelfile, Home Assistant integration, Open WebUI files) ship in the same release. People update them by rebuilding the model, copying the new integration folder in and restarting, and pasting the Open WebUI files over the old ones; the changelog says which of these a release needs.
 
 ## The logo

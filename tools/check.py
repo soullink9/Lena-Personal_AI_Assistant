@@ -5,9 +5,9 @@
     python3 tools/check.py
 
 It does NOT need Home Assistant, Ollama, Open WebUI or the Android SDK (the Home Assistant
-integration's full tests run on GitHub against a real Home Assistant; see
-.github/workflows/home-assistant.yml). It catches the mistakes that are easy to make when
-editing:
+integration's full tests run against a real Home Assistant on the Gitea runner and on GitHub; see
+.gitea/workflows/test.yml and .github/workflows/home-assistant.yml). It catches the mistakes that
+are easy to make when editing:
 
   - broken YAML or JSON;
   - feelings.yaml missing a feeling her mood engine uses, or a description that isn't text;
@@ -17,7 +17,8 @@ editing:
   - Python that doesn't compile, and private data slipping into the repository;
   - the integration's brand images missing or the wrong size;
   - the parts' versions disagreeing, or reaching 1.0 before that's approved;
-  - a library or Python package that hasn't been approved.
+  - a library or Python package that hasn't been approved;
+  - the release scripts in scripts/ going wrong (tests/test_release.py).
 
 Exit code 0 means every check passed.
 """
@@ -42,7 +43,8 @@ COMPOSE_FILES = [
     ROOT / "voice" / "piper" / "docker-compose.example.yml",
     ROOT / "voice" / "bridge" / "compose.yaml",
 ]
-WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+# GitHub's workflows and Gitea's (.gitea/workflows, run on the owner's own runner; see CONTRIBUTING.md).
+WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.yml")) + sorted((ROOT / ".gitea" / "workflows").glob("*.yml"))
 MODELFILE = ROOT / "ollama" / "Modelfile"
 APP_PREFS = ROOT / "android" / "app" / "src" / "main" / "kotlin" / "io" / "github" / "soullink9" / "lena" / "Prefs.kt"
 BRIDGE = ROOT / "voice" / "bridge" / "bridge.py"
@@ -248,15 +250,14 @@ for name, k in (("logo.png", 1), ("logo@2x.png", 2), ("dark_logo.png", 1), ("dar
 # The whole project shares one version: the app's versionName, the integration's manifest, the
 # Open WebUI files' front matter and the newest CHANGELOG section. A mismatch means a release
 # would ship parts that say different things about what they are.
+# The places it's written are listed once, in scripts/release_notes.py, which checks them again before
+# a release; the voice bridge's User-Agent is one of them.
+sys.path.insert(0, str(ROOT / "scripts"))
+import release_notes  # noqa: E402 - the scripts folder, added just above
+
 gradle = (ROOT / "android/app/build.gradle.kts").read_text()
-app_version = re.search(r'versionName = "([^"]+)"', gradle).group(1)
-versions = {
-    "android/app/build.gradle.kts (versionName)": app_version,
-    "manifest.json": json.loads((ROOT / "custom_components/lena/manifest.json").read_text())["version"],
-}
-for name in ("lena_filter.py", "lena_tools.py"):
-    found = re.search(r"^version: *(\S+)", (ROOT / "open-webui" / name).read_text(), re.M)
-    versions[f"open-webui/{name}"] = found.group(1) if found else None
+versions = release_notes.project_versions()
+app_version = versions["android/app/build.gradle.kts (versionName)"]
 newest = re.search(r"^## \[?v?([0-9][^\] ]*)", (ROOT / "CHANGELOG.md").read_text(), re.M)
 versions["CHANGELOG.md (newest section)"] = newest.group(1) if newest else None
 for where, v in versions.items():
@@ -324,9 +325,12 @@ check(integrations == ["lena"], f"custom_components/ holds only lena (found {int
 for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
     check(bool(manifest.get(key)), f"the integration's manifest.json has {key}")
 check((LENA / "brand" / "icon.png").exists(), "custom_components/lena/brand/icon.png exists")
-oldest = re.search(r'home-assistant: \[.*"(\d{4}\.\d+)"\]', (ROOT / ".github/workflows/home-assistant.yml").read_text())
-check(oldest is not None and hacs.get("homeassistant", "").startswith(oldest.group(1) + "."),
-      "hacs.json's minimum Home Assistant is the oldest one the tests run on")
+# The tests run on GitHub and on Gitea, before every release too, each with the same list of Home Assistant releases.
+for workflow in (".github/workflows/home-assistant.yml", ".github/workflows/release.yml",
+                 ".gitea/workflows/test.yml", ".gitea/workflows/release.yml"):
+    oldest = re.search(r'home-assistant: \[.*"(\d{4}\.\d+)"\]', (ROOT / workflow).read_text())
+    check(oldest is not None and hacs.get("homeassistant", "").startswith(oldest.group(1) + "."),
+          f"hacs.json's minimum Home Assistant is the oldest one {workflow} tests on")
 
 # ---- 14. The wall display debloat script ------------------------------------------------------------
 # tools/wall-display-debloat.sh must parse, and its lists (written by tools/debloat_lists.py) must never
@@ -346,6 +350,17 @@ removing = set(re.findall(r"^([A-Za-z][\w.]*)\|", debloat_text, re.M))
 check(len(removing) > 100, "tools/wall-display-debloat.sh has its package lists")
 overlap = sorted(removing & debloat_lists.protected())
 check(not overlap, f"the debloat script never removes a protected package ({', '.join(overlap) or 'none'})")
+
+# ---- 15. The release scripts ---------------------------------------------------------------------
+# scripts/ checks the version, writes the notes, checks the APK and publishes on Gitea, in both release
+# workflows; tests/test_release.py tries each of them (against a fake Gitea), so a mistake shows up here
+# rather than halfway through a release.
+
+released = subprocess.run([sys.executable, str(ROOT / "tests/test_release.py")], capture_output=True, text=True)
+for line in released.stdout.splitlines():
+    if line.startswith("FAIL"):
+        check(False, f"tests/test_release.py: {line[5:]}")
+check(released.returncode == 0, f"tests/test_release.py passes ({released.stdout.strip().splitlines()[-1] if released.stdout.strip() else released.stderr.strip()[-200:]})")
 
 print()
 if failures:

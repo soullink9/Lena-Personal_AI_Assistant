@@ -57,7 +57,8 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `res/xml/data_extraction_rules.xml` | Keeps all app data out of backups and transfers. |
 | `res/xml/shortcuts.xml` | The app icon's long-press shortcuts. |
 | `res/xml/lena_widget_info.xml` | The widget's size and description. |
-| `.github/workflows/build.yml` | Builds, signs and publishes the APK. |
+| `scripts/build_apk.sh`, `scripts/check_apk.py` | Build and name the APK with its `SHA256SUMS`; check it before a release. |
+| `.gitea/workflows/`, `.github/workflows/` | Build on every change and publish releases, on Gitea and on GitHub. See [How the build works](#how-the-build-works). |
 
 ## Versions
 
@@ -141,21 +142,19 @@ export LENA_KEYSTORE_PASSWORD='your password'
 
 ## How the build works
 
-`build.yml` runs on GitHub's Ubuntu runner, using the JDK and Android SDK already installed there.
+The same scripts build the app everywhere: `scripts/build_apk.sh` builds and signs the release APK, names it `lena-v<version>.apk` (or `lena-<commit>.apk` for test builds) and writes `SHA256SUMS`; for a release, `scripts/check_apk.py` then checks it the way the app's updater and Android will.
 
-1. Downloads Gradle straight from gradle.org and checks it against the published SHA-256. No third-party setup actions.
-2. Loads your signing key from the secrets, if they're set.
-3. Builds and signs the release APK, names it `lena-<version>.apk` (or `lena-<commit>.apk` for test builds), and writes `SHA256SUMS`.
-4. Uploads both as the run's artifact.
-5. For version tags only, a separate step with permission to write releases publishes them as a GitHub Release. The build step itself only has read access.
+- **On Gitea** (where the project lives), `.gitea/workflows/test.yml` builds on every push, in the official `gradle:8.14.3-jdk21` image from Docker Hub. It has Gradle and a JDK but no Android SDK, so `scripts/android_sdk.sh` fetches Google's command-line tools from dl.google.com, checks them against the SHA-256 Google publishes, and installs Android 16's platform. Nothing comes from GitHub, so it builds when GitHub is down. `tools/commands_check/run.sh` uses the Kotlin compiler inside Gradle there, as the image has no `kotlinc`.
+- **On GitHub** (the public mirror), `build.yml` builds each change to the app on GitHub's Ubuntu runner, with the JDK and Android SDK already installed there and Gradle downloaded from gradle.org (checked against its published SHA-256), and keeps the APK and `SHA256SUMS` as the run's artifact.
+- **Releases** (`.gitea/workflows/release.yml` and `.github/workflows/release.yml`) load your signing key from the secrets, refuse to go on without it, and publish only after every test has passed. The release step is the only one allowed to write.
 
 ## Making a release
 
-1. In `android/app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example, `0.5.1`). `versionCode` must always go up, whatever the name says: Android compares it, not the name.
-2. Add a section to `CHANGELOG.md`, and set the same version in `home-assistant/custom_components/lena/manifest.json` and the `version:` line of the two Open WebUI files if they changed.
-3. Commit and push to `main`.
-4. **Actions → Build APK → Run workflow**, tick **Publish a release**, and run it.
+1. In `android/app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example, `0.6.12`). `versionCode` must always go up, whatever the name says: Android compares it, not the name.
+2. Set the same version in `custom_components/lena/manifest.json`, the `version:` line of the two Open WebUI files and the voice bridge's User-Agent, and turn `## [Unreleased]` in `CHANGELOG.md` into `## [0.6.12] - <date>`. `tools/check.py` catches anything missed.
+3. Commit and push.
+4. On Gitea: **Actions → Release → Run workflow**, and enter the version without the v (`0.6.12`).
 
-The build reads the version from `versionName`, creates the tag (for example, `v0.5.1`) and publishes the release with the APK attached. It appears under **Releases** a couple of minutes later. Running it twice for the same version fails rather than overwriting the first release.
+It checks the version against every part and the changelog, runs every test, builds, signs and checks the APK, creates the tag (`v0.6.12`) and publishes the release on Gitea. Gitea's push mirror then takes the tag to GitHub, whose release workflow publishes the same release there; that's the one the app updates from. Running it again for the same version updates that release rather than adding a second.
 
-Pushing a tag yourself (`git tag v0.5.1 && git push origin v0.5.1`) does the same thing. The tag must match `versionName`, or the build stops.
+Pushing a tag yourself (`git tag v0.6.12 && git push origin v0.6.12`) does the same. The tag must match the version, or nothing is published. GitHub's **Actions → Release → Run workflow** releases from GitHub alone, with the same version box. More in [CONTRIBUTING](../../CONTRIBUTING.md#releasing).

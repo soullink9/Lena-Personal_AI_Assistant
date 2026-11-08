@@ -1,0 +1,160 @@
+# Publishes a GitHub release: Lena's signed APK and its SHA256SUMS, with notes from that version's section of
+# CHANGELOG.md. The app updates itself from these releases. (.gitea/workflows/release.yml does the same on Gitea;
+# both use the scripts in scripts/.)
+#
+# Two ways to start it:
+#   - Actions tab → Release → Run workflow, and enter the version (0.6.12). This also creates the tag (v0.6.12) on
+#     the branch you run it from.
+#   - Push a version tag:  git tag v0.6.12 && git push origin v0.6.12. A tag pushed here by Gitea's push mirror
+#     (after a release on Gitea) starts it too, so each release appears on both.
+# It refuses to publish unless every part of the project and CHANGELOG.md are at that version, no default setting
+# is waiting to be applied, the APK is signed with your key, and every test passes, so a release always matches
+# the code in it. Lena's versions are plain numbers, so there are no pre-releases.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*", "V*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the v (for example 0.6.12)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Offline checks and the release scripts
+        run: |
+          pip install -q pyyaml
+          python3 tools/check.py
+
+  home-assistant:
+    # The same Home Assistant releases as home-assistant.yml and the Gitea runner.
+    strategy:
+      fail-fast: false
+      matrix:
+        home-assistant: ["latest", "2026.9"]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Test on Home Assistant ${{ matrix.home-assistant }}
+        run: scripts/test_home_assistant.sh "${{ matrix.home-assistant }}"
+
+  startup:
+    # The newest Home Assistant on PyPI, even before its test harness is out.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Start the newest Home Assistant with Lena
+        run: scripts/start_home_assistant.sh
+
+  release:
+    needs: [checks, home-assistant, startup]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # to create the tag and the release
+    env:
+      GRADLE_VERSION: "8.14.3"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Work out the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v${INPUT_VERSION#[vV]}"  # (a "v" typed by mistake is fine)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check the version and take the release notes from CHANGELOG.md
+        id: notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: python3 scripts/release_notes.py "$TAG" "$GITHUB_REPOSITORY" notes.md >> "$GITHUB_OUTPUT"
+
+      # Every requested default change must be applied (and reviewed) before a release.
+      - name: No default changes waiting
+        run: |
+          if ! python3 tools/defaults.py waiting; then
+            echo "::error file=adjustments/defaults.env::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
+            exit 1
+          fi
+
+      # Plain Gradle download, checked against Gradle's published SHA-256. No third-party setup actions.
+      - name: Install Gradle
+        run: |
+          cd "$RUNNER_TEMP"
+          zip="gradle-${GRADLE_VERSION}-bin.zip"
+          curl -fsSLO "https://services.gradle.org/distributions/${zip}"
+          echo "$(curl -fsSL "https://services.gradle.org/distributions/${zip}.sha256")  ${zip}" | sha256sum -c -
+          unzip -q "$zip"
+          echo "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Check the wake word front end against the original C
+        run: tools/frontend_check/run.sh
+
+      - name: Check timers and alarms by voice
+        run: tools/commands_check/run.sh
+
+      # A release must install over the last one, so it's signed with your key or not published at all.
+      - name: Load the signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::No KEYSTORE_B64 secret: add it and KEYSTORE_PASSWORD to the repository's Actions secrets (docs/app/Installation.md)"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/lena.jks"
+          echo "LENA_KEYSTORE=$RUNNER_TEMP/lena.jks" >> "$GITHUB_ENV"
+
+      # Uses the JDK and Android SDK already on GitHub's Ubuntu runner.
+      - name: Build the app
+        env:
+          LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
+          scripts/build_apk.sh "v${TAG#[vV]}"
+
+      # The checks Lena's updater and Android make, before anyone else has to.
+      - name: Check the APK
+        env:
+          APK: ${{ steps.notes.outputs.apk }}
+        run: python3 scripts/check_apk.py "android/app/build/outputs/apk/release/$APK" android/app/build/outputs/apk/release/SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TITLE: ${{ steps.notes.outputs.title }}
+          APK: ${{ steps.notes.outputs.apk }}
+        run: |
+          out=android/app/build/outputs/apk/release
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # A release made by hand on GitHub: add the files and notes to it.
+            gh release upload "$TAG" "$out/$APK" "$out/SHA256SUMS" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md --prerelease=false --draft=false
+          else
+            gh release create "$TAG" "$out/$APK" "$out/SHA256SUMS" --title "$TITLE" --notes-file notes.md \
+              --target "$GITHUB_SHA"
+          fi

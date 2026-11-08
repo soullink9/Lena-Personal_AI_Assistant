@@ -1,17 +1,14 @@
+# Builds the app on GitHub for every change to it, and keeps the APK as the run's artifact (a test build).
+# Releases are published by release.yml, on GitHub, and by .gitea/workflows/release.yml on Gitea, which is where
+# the project lives; this repository is its public mirror.
 name: Build APK
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
     # Only the app needs building; docs and Home Assistant files don't.
-    paths: ["android/**", ".github/workflows/build.yml"]
+    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
   workflow_dispatch:
-    inputs:
-      release:
-        description: "Publish a release for the versionName in android/app/build.gradle.kts"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -19,15 +16,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    outputs:
-      version: ${{ steps.build.outputs.version }}
     env:
       GRADLE_VERSION: "8.14.3"
     steps:
       - uses: actions/checkout@v5
 
       # Requested default changes (adjustments/defaults.env, a value after a setting's =) are applied before every build;
-      # list any still waiting in the run's summary. The release job below won't publish while one is.
+      # list any still waiting in the run's summary. The release workflows won't publish while one is.
       - name: Default settings waiting
         run: |
           waiting=$(python3 tools/defaults.py waiting || true)
@@ -72,38 +67,13 @@ jobs:
       - name: Check timers and alarms by voice
         run: tools/commands_check/run.sh
 
-      # Uses the JDK and Android SDK already on GitHub's Ubuntu runner.
+      # Uses the JDK and Android SDK already on GitHub's Ubuntu runner. A test build is named after its commit.
       - name: Build
-        id: build
         env:
           LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          RELEASE: ${{ inputs.release }}
         run: |
-          app_version="v$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' android/app/build.gradle.kts)"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version="$GITHUB_REF_NAME"
-            [ "$version" = "$app_version" ] || {
-              echo "::error::Tag $version doesn't match versionName ($app_version) in android/app/build.gradle.kts"; exit 1; }
-          elif [ "$RELEASE" = "true" ]; then
-            version="$app_version"
-          else
-            version="${GITHUB_SHA::7}"
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
           export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME_17_X64}"
-          cd android
-          set -o pipefail
-          if ! gradle --no-daemon assembleRelease 2>&1 | tee "$RUNNER_TEMP/build.log"; then
-            # Put the errors in the run summary, so they can be read without opening the full log.
-            msg=$(grep -E '^e: |What went wrong|^> |^  > |error:|Error:' "$RUNNER_TEMP/build.log" \
-              | sed "s#file://$GITHUB_WORKSPACE/##; s#$GITHUB_WORKSPACE/##" | head -60 \
-              | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
-            echo "::error title=Build failed::${msg:-see the build log}"
-            exit 1
-          fi
-          cd app/build/outputs/apk/release   # inside android/
-          mv app-release.apk "lena-${version}.apk"
-          sha256sum lena-*.apk | tee SHA256SUMS
+          scripts/build_apk.sh "${GITHUB_SHA::7}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -112,45 +82,3 @@ jobs:
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/release/SHA256SUMS
           if-no-files-found: error
-
-  # Version tags, or Run workflow with "Publish a release" ticked.
-  # Kept apart from the build so only this step can write to the repo.
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.release
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          sparse-checkout: |
-            CHANGELOG.md
-            adjustments/defaults.env
-            tools/defaults.py
-          sparse-checkout-cone-mode: false
-      # Every requested default change must be applied (and reviewed) before a release.
-      - name: No default changes waiting
-        run: |
-          if ! python3 tools/defaults.py waiting; then
-            echo "::error file=adjustments/defaults.env::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
-            exit 1
-          fi
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          gh run download "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" -n lena-apk -D apk
-          # The release notes are this version's section of CHANGELOG.md (everything between its
-          # heading and the next one), so the release says what the changelog says.
-          awk -v v="${VERSION#v}" '
-            /^## / { if (found) exit; if (index($0, "[" v "]") || index($0, " " v)) { found = 1; next } }
-            found { print }
-          ' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
-          # The title is the plain version number ("v0.6.3"; an older "v0.5.2-beta" was titled "v0.5.2").
-          title="${VERSION%%-*}"
-          gh release create "$VERSION" apk/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "$title" --notes-file notes.md

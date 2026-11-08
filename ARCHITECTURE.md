@@ -168,7 +168,26 @@ sequenceDiagram
 
 | What | How |
 |---|---|
-| The rules, configuration consistency, versions, private data | `python3 tools/check.py` (offline, seconds) |
-| The integration in a real Home Assistant | `.github/workflows/home-assistant.yml` (pytest-homeassistant-custom-component, oldest supported and latest) |
-| The app compiles and the wake word front end matches the C | `.github/workflows/build.yml` |
+| The rules, configuration consistency, versions, private data, the release scripts | `python3 tools/check.py` (offline, seconds; runs `tests/test_release.py`) |
+| The integration in a real Home Assistant | `scripts/test_home_assistant.sh` (pytest-homeassistant-custom-component, oldest supported and latest) and `scripts/start_home_assistant.sh` (the newest release) |
+| The app compiles, the wake word front end matches the C, she understands timers and alarms | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh` |
 | Everything with real voices, models and devices | By hand; see the test steps in each setup guide |
+
+## Building and releasing
+
+The project lives on Gitea, which push-mirrors to GitHub, the public copy people install and update from. Gitea's runner runs every check and publishes releases without needing GitHub: its workflows use no actions (they come from GitHub) and run in Docker Hub images that already have the tools. GitHub runs the same scripts on the mirror, so both publish the same release from the same tag. How to release is in [CONTRIBUTING](CONTRIBUTING.md#releasing).
+
+| File | What it does |
+|---|---|
+| `.gitea/workflows/test.yml` | Every push and pull request on Gitea: `tools/check.py`, the Open WebUI files on Python 3.11, the integration on Home Assistant 2026.9 and the latest, the newest Home Assistant starting, and the app's checks and build |
+| `.gitea/workflows/release.yml` | Run workflow (a version) or a pushed `v*.*.*` tag on Gitea: the same tests, then the signed APK checked and published as the Gitea release |
+| `.github/workflows/release.yml` | The same release on GitHub, started by the tag Gitea's mirror pushes (or its own Run workflow) |
+| `.github/workflows/build.yml` | A test build of the app on GitHub for each change to it, kept as the run's artifact |
+| `.github/workflows/home-assistant.yml` | The integration's tests on GitHub, plus Home Assistant's hassfest and HACS's checks, which only exist as GitHub actions |
+| `scripts/release_notes.py` | Checks the tag against every part's version and the changelog; writes the notes (install steps, then the changelog section, linking to GitHub) |
+| `scripts/check_apk.py` | Checks the APK as Lena's updater and Android will: signed with the release key, Lena's package and version, listed in `SHA256SUMS` |
+| `scripts/publish_gitea_release.py` | Creates or updates the Gitea release and replaces its files, through Gitea's API |
+| `scripts/build_apk.sh` | Builds and names the APK and writes `SHA256SUMS` |
+| `scripts/android_sdk.sh` | The Android SDK from Google, for the Gitea runner's Gradle image |
+| `scripts/test_home_assistant.sh`, `scripts/start_home_assistant.sh` | The Home Assistant tests, from PyPI |
+| `tests/test_release.py` | Tests for the release scripts, including publishing to a fake Gitea |

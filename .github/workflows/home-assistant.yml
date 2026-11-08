@@ -1,11 +1,13 @@
 name: Home Assistant integration
 
 # Tests custom_components/lena against a real Home Assistant, and checks it the way Home Assistant
-# (hassfest) and HACS / Home Assistant's Marketplace do.
+# (hassfest) and HACS / Home Assistant's Marketplace do. The tests also run on the Gitea runner
+# (.gitea/workflows/test.yml, with the same scripts); hassfest and HACS's checks are GitHub actions, so they
+# run here only.
 on:
   push:
     branches: [main]
-    paths: ["custom_components/**", "home-assistant/**", "hacs.json", ".github/workflows/home-assistant.yml"]
+    paths: ["custom_components/**", "home-assistant/**", "hacs.json", "scripts/*home_assistant.sh", ".github/workflows/home-assistant.yml"]
   workflow_dispatch:
 
 permissions:
@@ -27,54 +29,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-      - name: Install Home Assistant's test harness
-        run: |
-          python -m pip install --upgrade pip
-          if [ "${{ matrix.home-assistant }}" = "latest" ]; then
-            pip install pytest-homeassistant-custom-component
-          else
-            # The test harness is released once per Home Assistant version; find the newest one for this release.
-            harness=$(python - "${{ matrix.home-assistant }}" <<'PY'
-          import json, sys, urllib.request
-          want = sys.argv[1] + "."
-          info = json.load(urllib.request.urlopen("https://pypi.org/pypi/pytest-homeassistant-custom-component/json"))
-          for version in sorted(info["releases"], key=lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")], reverse=True):
-              meta = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/pytest-homeassistant-custom-component/{version}/json"))
-              if any(r.replace(" ", "").startswith("homeassistant==" + want) for r in meta["info"].get("requires_dist") or []):
-                  print(version)
-                  break
-          PY
-            )
-            echo "Test harness $harness"
-            pip install "pytest-homeassistant-custom-component==$harness"
-          fi
-          # Her tools are called through the conversation integration, and each display is an Assist
-          # satellite with Home Assistant's timers: install what those load, at the versions this Home
-          # Assistant pins.
-          reqs=$(python home-assistant/requirements.py conversation assist_satellite intent)
-          echo "Installing: $reqs"
-          pip install $reqs
-          python -c "import homeassistant.const as c; print('Home Assistant', c.__version__)"
+      # The same script the Gitea runner uses: the harness for this release, what Lena loads, then the tests.
       - name: Test
-        working-directory: home-assistant
-        run: |
-          set -o pipefail
-          # Warnings are logged as they happen, so Home Assistant's notes about Lena using something
-          # deprecated (they name "custom integration 'lena'") can be picked out below.
-          if ! python -m pytest -q -p no:cacheprovider -W default -o log_cli=true --log-cli-level=WARNING 2>&1 | tee "$RUNNER_TEMP/pytest.log"; then
-            # Put the failures in the run summary, so they can be read without opening the full log.
-            msg=$(grep -E "^(FAILED|ERROR)|Error|assert |^E  " "$RUNNER_TEMP/pytest.log" | head -80 \
-              | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
-            echo "::error title=Tests failed::${msg:-see the log}"
-            exit 1
-          fi
-          ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
-          echo "::notice title=Home Assistant $ha::$(tail -1 "$RUNNER_TEMP/pytest.log")"
-          # Anything this Home Assistant says Lena should change before a later release, as a warning on
-          # the run (once each).
-          { grep -iE "custom integration 'lena'|custom_components/lena.*(deprecat|will stop working|no longer)" "$RUNNER_TEMP/pytest.log" || true; } \
-            | sed 's/^.*\(Detected\|custom_components\)/\1/' | sort -u | head -20 \
-            | while read -r line; do echo "::warning title=Home Assistant $ha says::$line"; done
+        run: scripts/test_home_assistant.sh "${{ matrix.home-assistant }}"
 
   startup:
     # The newest Home Assistant on PyPI, even before its test harness is out: Lena must load, her context
@@ -86,27 +43,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-      - name: Install Home Assistant
-        run: |
-          python -m pip install --upgrade pip
-          pip install homeassistant
-          # Without its frontend Home Assistant starts in recovery mode, which leaves custom integrations
-          # out; her tools need the conversation integration, and each display is an Assist satellite. All
-          # at the versions it pins.
-          reqs=$(python home-assistant/requirements.py frontend conversation assist_satellite intent)
-          echo "Installing: $reqs"
-          pip install $reqs
       - name: Start it with Lena
-        run: |
-          set -o pipefail
-          ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
-          if ! python home-assistant/startup_check.py "$RUNNER_TEMP/config" 2>&1 | tee "$RUNNER_TEMP/startup.log"; then
-            echo "::error title=Home Assistant $ha::$(grep -E "^(ERROR|CRITICAL|Home Assistant|Her context)" "$RUNNER_TEMP/startup.log" | head -20 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
-            exit 1
-          fi
-          echo "::notice title=Home Assistant $ha::$(grep -E "^(Home Assistant|Her context)" "$RUNNER_TEMP/startup.log" | sed ':a;N;$!ba;s/\n/ · /g')"
-          { grep -E "^WARNING:" "$RUNNER_TEMP/startup.log" || true; } | head -20 \
-            | while read -r line; do echo "::warning title=Home Assistant $ha says::$line"; done
+        run: scripts/start_home_assistant.sh
 
   hassfest:
     # Home Assistant's own checks for an integration: manifest, translations, services.

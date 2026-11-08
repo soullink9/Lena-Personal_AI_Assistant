@@ -150,7 +150,7 @@ Photos are paths on this Home Assistant (fetch them with the same token). Immich
 
 ## Tests
 
-`home-assistant/tests` runs the integration in a real Home Assistant on every change (`.github/workflows/home-assistant.yml`), against the newest release its test harness supports and 2026.9. To run them yourself:
+`home-assistant/tests` runs the integration in a real Home Assistant on every change (`scripts/test_home_assistant.sh`, run by `.gitea/workflows/test.yml` and `.github/workflows/home-assistant.yml`), against the newest release its test harness supports and 2026.9. To run them yourself:
 
 ```
 pip install pytest-homeassistant-custom-component

@@ -1,0 +1,229 @@
+# Publishes a release on Gitea: Lena's signed APK and its SHA256SUMS, with notes from that version's section of
+# CHANGELOG.md.
+#
+# Two ways to start it:
+#   - Actions tab → Release → Run workflow, and enter the version (0.6.12). This also creates the tag (v0.6.12) on
+#     the commit it releases.
+#   - Push a version tag:  git tag v0.6.12 && git push origin v0.6.12
+# It refuses to publish unless every part of the project (the app, the integration, the Open WebUI files, the
+# voice bridge) and CHANGELOG.md are at that version, no default setting is waiting to be applied, the APK is
+# signed with your key, and every test passes, so a release always matches the code in it. Lena's versions are
+# plain numbers, so there are no pre-releases.
+#
+# With Gitea push-mirroring to GitHub, the new tag reaches GitHub too, and GitHub's own release workflow
+# (.github/workflows/release.yml) publishes the same release there, which is where the app updates from.
+#
+# Like test.yml it uses no actions, so it works when GitHub can't be reached. The release notes still point at
+# the public copy on GitHub (PUBLIC_REPOSITORY), which is where people install from.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*", "V*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the v (for example 0.6.12)"
+        required: true
+
+env:
+  PUBLIC_REPOSITORY: soullink9/Lena-Personal_AI_Assistant
+  # Gitea's address as the job containers can reach it, if that isn't its public address (ROOT_URL): for a runner
+  # next to Gitea, e.g. http://gitea-server:3000. Set it once as an Actions variable on your user or organisation.
+  GITEA_INTERNAL_URL: ${{ vars.GITEA_INTERNAL_URL }}
+
+# The same tests as test.yml, then the release job, which only starts when they've all passed.
+
+jobs:
+  checks:
+    # tools/check.py and the release scripts' tests, on Python 3.13: the voice bridge's Python
+    # (voice/bridge/Dockerfile), and new enough for the integration's code, which only ever runs on Home
+    # Assistant's own Python (the jobs below test it there).
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.13-bookworm
+    steps:
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          # the exact commit that started the run; its branch or pull request as a fallback
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+          git log -1 --format='Testing %h %s'
+
+      - name: Install the checks' one package (PyYAML, from PyPI)
+        run: pip install -q --root-user-action=ignore --disable-pip-version-check pyyaml
+
+      # Versions, defaults, private data, approved dependencies... and tests/test_release.py.
+      - name: Offline checks and the release scripts
+        run: python3 tools/check.py
+
+  open-webui:
+    # Open WebUI runs her filter and tool on its own Python 3.11, the oldest any of Lena's code meets, so they must
+    # compile there.
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.11-bookworm
+    steps:
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+
+      - name: The Open WebUI filter and tool compile on Python 3.11
+        run: python3 -m py_compile open-webui/lena_filter.py open-webui/lena_tools.py
+
+  home-assistant:
+    # The integration in a real Home Assistant: the newest release its test harness supports, and the oldest Lena
+    # supports (keep that one last: tools/check.py compares it with hacs.json). Python 3.14, which both run on.
+    strategy:
+      fail-fast: false
+      matrix:
+        home-assistant: ["latest", "2026.9"]
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14-bookworm
+    steps:
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+
+      - name: Test on Home Assistant ${{ matrix.home-assistant }}
+        run: scripts/test_home_assistant.sh "${{ matrix.home-assistant }}"
+
+  startup:
+    # The newest Home Assistant on PyPI, even before its test harness is out.
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14-bookworm
+    steps:
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+
+      - name: Start the newest Home Assistant with Lena
+        run: scripts/start_home_assistant.sh
+
+  release:
+    needs: [checks, open-webui, home-assistant, startup]
+    runs-on: ubuntu-latest
+    container:
+      image: gradle:8.14.3-jdk21
+    env:
+      ANDROID_HOME: /opt/android-sdk
+    steps:
+      # The wake word check compiles the original C (g++); the release scripts are Python.
+      - name: Install the build tools (from Ubuntu)
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends git curl unzip g++ python3 > /dev/null
+
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+
+      - name: Work out the version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v${INPUT_VERSION#[vV]}"  # (a "v" typed by mistake is fine)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the version and take the release notes from CHANGELOG.md
+        id: notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: python3 scripts/release_notes.py "$TAG" "$PUBLIC_REPOSITORY" notes.md >> "$GITHUB_OUTPUT"
+
+      # Every requested default change must be applied (and reviewed) before a release.
+      - name: No default changes waiting
+        run: |
+          if ! python3 tools/defaults.py waiting; then
+            echo "::error file=adjustments/defaults.env::Apply the requested default changes before releasing (python3 tools/defaults.py apply)"
+            exit 1
+          fi
+
+      - name: Check the wake word front end against the original C
+        run: tools/frontend_check/run.sh
+
+      - name: Check timers and alarms by voice
+        run: tools/commands_check/run.sh
+
+      - name: Install the Android SDK (from Google)
+        run: scripts/android_sdk.sh
+
+      # A release must install over the last one, so it's signed with your key or not published at all.
+      - name: Load the signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::No KEYSTORE_B64 secret: add it and KEYSTORE_PASSWORD to the repository's Actions secrets (docs/app/Installation.md)"
+            exit 1
+          fi
+          keys="$(mktemp -d)"
+          echo "$KEYSTORE_B64" | base64 -d > "$keys/lena.jks"
+          echo "LENA_KEYSTORE=$keys/lena.jks" >> "$GITHUB_ENV"
+
+      - name: Build the app
+        env:
+          LENA_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: scripts/build_apk.sh "v${TAG#[vV]}"
+
+      # The checks Lena's updater and Android make, before anyone else has to.
+      - name: Check the APK
+        env:
+          APK: ${{ steps.notes.outputs.apk }}
+        run: python3 scripts/check_apk.py "android/app/build/outputs/apk/release/$APK" android/app/build/outputs/apk/release/SHA256SUMS
+
+      - name: Publish on Gitea
+        env:
+          # the job's own token; set a RELEASE_TOKEN secret instead if your Gitea doesn't let it make releases
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITEA_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+          TITLE: ${{ steps.notes.outputs.title }}
+          PRERELEASE: ${{ steps.notes.outputs.prerelease }}
+          APK: ${{ steps.notes.outputs.apk }}
+        run: |
+          out=android/app/build/outputs/apk/release
+          python3 scripts/publish_gitea_release.py "$TAG" "$COMMIT" "$TITLE" notes.md "$PRERELEASE" "$out/$APK" "$out/SHA256SUMS"

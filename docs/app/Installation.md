@@ -47,7 +47,9 @@ Without these, builds still work but are debug-signed with a throwaway key, and 
 Every push to `main` builds the app. To build by hand: **Actions → Build APK → Run workflow**.
 
 - **Test builds** (pushes to `main`) appear under the run's **Artifacts** as `lena-apk`, a zip holding `lena-<commit>.apk` and `SHA256SUMS`.
-- **Releases** are built when you run the workflow with **Publish a release** ticked (or push a version tag). They appear under **Releases** with the APK attached directly. See [Development](Development.md#making-a-release).
+- **Releases** are built when you run **Actions → Release → Run workflow** with the version (or push a version tag). They appear under **Releases** with the APK attached directly. See [Development](Development.md#making-a-release).
+
+If you keep your copy on your own Gitea and push-mirror it to GitHub, add the same two secrets to the Gitea repository too (**Settings → Actions → Secrets**): its release workflow signs the APK as well. See [CONTRIBUTING](../../CONTRIBUTING.md#releasing).
 
 ## 4. Install
 
