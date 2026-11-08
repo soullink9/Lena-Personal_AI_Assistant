@@ -305,25 +305,18 @@ class LenaCore:
         open_items = [m for m in self.memory if m.get("status") != "completed"]
         if len(open_items) < tidy.MIN_ITEMS:
             return None
-        if not self.hass.services.has_service("ai_task", "generate_data"):
-            raise tidy.TidyError("Home Assistant has no AI Task set up (Settings > System > General > AI suggestions)")
         now = dt_util.now()
-        request: dict[str, Any] = {"task_name": "Tidy Lena's memory", "instructions": tidy.instructions(open_items, now)}
-        if task := self.opt(CONF_TIDY_TASK):
-            request["entity_id"] = task
-        try:
-            # Structured, so the model has to give back a list of lines (Home Assistant checks it); a model
-            # that can't do structured answers is asked again for plain text.
-            try:
-                reply = await self.hass.services.async_call(
-                    "ai_task", "generate_data", {**request, "structure": tidy.STRUCTURE}, blocking=True, return_response=True)
-            except HomeAssistantError as err:
-                _LOGGER.debug("The AI Task couldn't give a structured answer (%s); asking for text", err)
-                reply = await self.hass.services.async_call("ai_task", "generate_data", request, blocking=True, return_response=True)
-        except Exception as err:  # noqa: BLE001 - any failure of the model just means no tidy this time
-            raise tidy.TidyError(f"The AI Task didn't answer: {err}") from err
+        instructions = tidy.instructions(open_items, now)
+        answer = await self._tidy_answer(instructions)
+        if answer in (None, "", {}):
+            raise tidy.TidyError(
+                f"Her model gave back an empty answer for her {len(open_items)} memory lines. Usually the model's context "
+                "window is too small for them all, or it's a thinking model that spent its answer thinking. Try a "
+                "different model under Configure → Tidy it with (or in the AI Task's own settings), or a larger "
+                "context window; Home Assistant's log has the model's side."
+            )
         before = [dict(m) for m in self.memory]
-        result = tidy.plan(self.memory, (reply or {}).get("data"), now)
+        result = tidy.plan(self.memory, answer, now)
         self.tidied = now
         if result.changed:
             self.memory_backup = {"at": now.isoformat(), "items": before}
@@ -338,6 +331,43 @@ class LenaCore:
                          len(result.combined), len(result.clarified), len(result.retired))
         self.memory_changed()
         return result
+
+    async def _tidy_answer(self, instructions: str) -> Any:
+        """Asks her model to tidy: Home Assistant's AI Task with a structured answer (a list of lines it
+        checks); then, if that fails or comes back empty, the AI Task for plain text; then her conversation
+        agent for alerts (Configure), if one is chosen. Returns the first answer with anything in it, or
+        None. Raises TidyError when there's no model to ask at all.
+        """
+        hass = self.hass
+        attempts: list[tuple[str, Any]] = []
+        if hass.services.has_service("ai_task", "generate_data"):
+            request: dict[str, Any] = {"task_name": "Tidy Lena's memory", "instructions": instructions}
+            if task := self.opt(CONF_TIDY_TASK):
+                request["entity_id"] = task
+            attempts.append(("ai_task (structured)", ("ai_task", "generate_data", {**request, "structure": tidy.STRUCTURE})))
+            attempts.append(("ai_task (text)", ("ai_task", "generate_data", request)))
+        if agent := self.opt(CONF_ALERT_AGENT):
+            attempts.append(("conversation agent", ("conversation", "process", {"text": instructions, "agent_id": agent})))
+        if not attempts:
+            raise tidy.TidyError("Home Assistant has no AI Task set up (Settings > System > General > AI suggestions)")
+        problems = []
+        for name, (domain, service, data) in attempts:
+            try:
+                reply = await hass.services.async_call(domain, service, data, blocking=True, return_response=True) or {}
+            except Exception as err:  # noqa: BLE001 - try the next way of asking
+                _LOGGER.debug("Tidying with %s didn't work: %s", name, err)
+                problems.append(f"{name}: {err}")
+                continue
+            if domain == "conversation":
+                answer = reply.get("response", {}).get("speech", {}).get("plain", {}).get("speech", "")
+            else:
+                answer = reply.get("data")
+            if answer not in (None, "", {}):
+                return answer
+            _LOGGER.debug("Tidying with %s gave back an empty answer", name)
+        if problems and len(problems) == len(attempts):
+            raise tidy.TidyError("Her model didn't answer: " + "; ".join(problems))
+        return None
 
     @callback
     def undo_memory_tidy(self) -> bool:

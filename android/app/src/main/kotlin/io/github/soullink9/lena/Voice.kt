@@ -96,6 +96,11 @@ class PhoneEar(private val context: Context) : Ear {
         fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c) &&
             System.currentTimeMillis() - c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).getLong("phone_unreliable", 0) > UNRELIABLE_MS
 
+        /** Gives the phone's recognizer another chance (choosing On this phone again in Settings). */
+        fun trustAgain(c: Context) {
+            c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).edit().remove("phone_unreliable").apply()
+        }
+
         /** The recognizer never got ready: use another way of hearing for a day (see [available]). */
         fun markUnreliable(c: Context) {
             Logs.w("Voice", "The phone's recognizer never got ready; using another way of hearing for a day")
@@ -107,6 +112,18 @@ class PhoneEar(private val context: Context) : Ear {
 
         /** How long a session may take to get ready before it's given up. */
         private const val READY_TIMEOUT_MS = 3_000L
+
+        /** Through the wake word's microphone: your words unchanged this long means you've finished. */
+        private const val END_OF_SPEECH_MS = 1_400L
+
+        /** Through the wake word's microphone: nothing said in this long means nothing's coming. */
+        private const val NOTHING_SAID_MS = 7_000L
+
+        /** Through the wake word's microphone: the longest a question can be. */
+        private const val LONGEST_MS = 30_000L
+
+        /** After ending the sound, how long to wait for the recognizer's final result. */
+        private const val RESULT_WAIT_MS = 2_500L
 
         /** Waits before each retry when the service was busy: it's usually free again within a second. */
         private val BUSY_RETRY_MS = listOf(500L, 1_200L)
@@ -197,9 +214,11 @@ class PhoneEar(private val context: Context) : Ear {
                 var latest = ""
                 var ready = false
                 lateinit var watchdog: Runnable
+                lateinit var endpointer: Runnable
                 /** Ends this session's bookkeeping, if it's still the current one, and lets go of the relay. */
                 fun close() {
                     main.removeCallbacks(watchdog)
+                    main.removeCallbacks(endpointer)
                     relay?.close()
                     if (session == mine) sessionOpen = false
                 }
@@ -212,6 +231,27 @@ class PhoneEar(private val context: Context) : Ear {
                 fun fail(e: Exception) {
                     close()
                     if (cont.isActive) cont.resumeWithException(e)
+                }
+                // Listening through the wake word's microphone, the recognizer never decides by itself that
+                // you've finished (the sound keeps coming), so Lena does: once your words stop changing for a
+                // moment, or nothing is said at all, the sound ends and the recognizer gives its result.
+                val started = android.os.SystemClock.elapsedRealtime()
+                var changed = started
+                var stopping = false
+                endpointer = Runnable {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val quiet = now - changed
+                    val finished = (latest.isNotBlank() && quiet > END_OF_SPEECH_MS) ||
+                        (latest.isBlank() && now - started > NOTHING_SAID_MS) || now - started > LONGEST_MS
+                    if (!stopping && finished && session == mine) {
+                        stopping = true
+                        relay?.close() // the end of the sound
+                        runCatching { r.stopListening() }
+                        // If the result still doesn't come, use what was heard.
+                        main.postDelayed({ if (session == mine) { runCatching { r.cancel() }; done(latest) } }, RESULT_WAIT_MS)
+                    } else if (!stopping) {
+                        main.postDelayed(endpointer, 200)
+                    }
                 }
                 // Never got ready: the service isn't answering. Give up on it rather than wait forever.
                 watchdog = Runnable {
@@ -231,6 +271,7 @@ class PhoneEar(private val context: Context) : Ear {
                     override fun onReadyForSpeech(params: Bundle?) {
                         ready = true
                         main.removeCallbacks(watchdog)
+                        if (relay != null) main.postDelayed(endpointer, 200)
                     }
 
                     // Callbacks the recognizer requires but Lena doesn't need: she only uses readiness,
@@ -246,7 +287,11 @@ class PhoneEar(private val context: Context) : Ear {
                      */
                     override fun onPartialResults(partialResults: Bundle?) {
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                            ?.takeIf { it.isNotBlank() }?.let { latest = it; onPartial(it) }
+                            ?.takeIf { it.isNotBlank() }?.let {
+                                if (it != latest) changed = android.os.SystemClock.elapsedRealtime()
+                                latest = it
+                                onPartial(it)
+                            }
                     }
 
                     /** The final text, or the last partial one if the recognizer returned nothing better. */

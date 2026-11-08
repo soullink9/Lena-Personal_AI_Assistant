@@ -67,6 +67,9 @@ PROTECT=(
     com.google.android.webview
     com.android.webview
     com.google.android.tts                         # on-device speech recognition and text-to-speech
+    com.google.android.as                          # Android System Intelligence: the on-device speech recognizer on Samsung tablets
+    com.google.android.as.oss                      # Private Compute Services: what it needs to work (without it, it never gets ready)
+    com.google.android.overlay.gmsconfig.asi       # its settings from Google Play services
     com.samsung.android.honeyboard                 # Samsung Keyboard (works before unlock, unlike most)
 
     # Clock: alarm tones, the lock screen clock, time zone data
@@ -231,10 +234,11 @@ voice="$(on_device settings get secure tts_default_synth)"
 [ "$voice" = "null" ] || note_kept "$voice" "your text-to-speech engine"
 
 # Lena hears you on the tablet itself through Android's on-device speech recognizer: Google's speech
-# engine (kept above) or Android System Intelligence, whichever this tablet has. Without one she sends
-# your voice to your server instead. (The Google app's recognizer is the online one: not needed.)
+# engine and Android System Intelligence with Private Compute Services (all kept above). On a Galaxy Tab
+# A9+, removing the last two left a recognizer that never got ready ("Couldn't hear you, error 11").
+# (Samsung's own recognizers and the Google app's online one aren't needed and still go.)
 on_device cmd package query-services --brief -a android.speech.RecognitionService \
-    | sed -n 's#^\(com\.google\.android\.as\)/.*#\1#p' | sort -u > "$WORK/hearing.txt"
+    | sed -n 's#^\(com\.google\.android\.\(as\|tts\)\)/.*#\1#p' | sort -u > "$WORK/hearing.txt"
 while read -r pkg; do
     note_kept "$pkg" "speech recognition (Lena hears you on the tablet)"
 done < "$WORK/hearing.txt"
@@ -745,8 +749,6 @@ com.google.android.apps.youtube.kids|Recommended|YouTube Kids
 com.google.android.apps.youtube.mango|Recommended|YouTube Go  Lite version of the YouTube app.
 com.google.android.apps.youtube.music|Recommended|YouTube Music
 com.google.android.apps.youtube.vr|Recommended|YouTube VR
-com.google.android.as|Recommended|Android System Intelligence (previously Device Personalization Services)
-com.google.android.as.oss|Recommended|Private Compute Services.
 com.google.android.backup|Recommended|Allows Android apps to back up their data on Google servers.
 com.google.android.backuptransport|Advanced|Allows Android apps to back up their data on Google servers.
 com.google.android.calculator|Recommended|Google Calculator
@@ -786,7 +788,6 @@ com.google.android.nearby.halfsheet|Recommended|Useless frameworks to Wi-Fi conn
 com.google.android.ondevicepersonalization.services|Recommended|OnDevicePersonalization.
 com.google.android.onetimeinitializer|Recommended|Provides first time setup, safe to remove.
 com.google.android.overlay.gmsconfig|Advanced|Useless configurations about webview, wifi and bluetooth to scan for bet
-com.google.android.overlay.gmsconfig.asi|Advanced|it's another component of Android System Intelligence (previously Device
 com.google.android.overlay.gmsconfig.gsa|Advanced|configures default assistant?
 com.google.android.overlay.gmsconfig.ww|Advanced|useless unused overlay gmsconfig to family link.
 com.google.android.overlay.modules.captiveportallogin.forframework|Advanced|Configs default captiveportallogin.
@@ -2494,6 +2495,8 @@ com.google.android.apps.wearables.maestro.companion
 com.google.android.apps.work.clouddpc
 com.google.android.apps.youtube.music.setupwizard
 com.google.android.appsearch.apk
+com.google.android.as
+com.google.android.as.oss
 com.google.android.avatarpicker
 com.google.android.backdrop
 com.google.android.bluetooth
@@ -2553,6 +2556,7 @@ com.google.android.odad
 com.google.android.overlay.devicelockcontroller
 com.google.android.overlay.flipendo
 com.google.android.overlay.gmsagoconfig
+com.google.android.overlay.gmsconfig.asi
 com.google.android.overlay.gmsconfig.common
 com.google.android.overlay.gmsconfig.comms
 com.google.android.overlay.gmsconfig.geotz

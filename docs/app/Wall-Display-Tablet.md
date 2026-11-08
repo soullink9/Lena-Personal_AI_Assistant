@@ -12,7 +12,7 @@ The apps listed at the top of the script, in `PROTECT`. As shipped, that's Lena,
 |---|---|
 | Google Play services and sign-in, Android Setup, Play system updates | The Play Store, and Google account sync. |
 | Android System WebView | Lena's chats and dashboards are web pages inside the app. |
-| Google's speech engine (Speech Recognition and Synthesis), and Android System Intelligence where it does speech recognition | Lena hearing you on the tablet (**Hearing you: On this phone**). Without one she sends your voice to your server or Home Assistant instead; on a wall display, **Hearing you: Home Assistant** (its own speech-to-text, like a Voice satellite) is often the more reliable choice. |
+| Google's speech engine (Speech Recognition and Synthesis), Android System Intelligence and Private Compute Services (on a Galaxy Tab A9+, without the last two the recognizer never gets ready: "Couldn't hear you, error 11") | Lena hearing you on the tablet (**Hearing you: On this phone**). Without one she sends your voice to your server or Home Assistant instead; on a wall display, **Hearing you: Home Assistant** (its own speech-to-text, like a Voice satellite) is often the more reliable choice. |
 | Samsung Keyboard (or whichever keyboard you use) | Signing in. Samsung's works before the tablet is unlocked, unlike most. |
 | Your text-to-speech engine | Lena's voice when it's set to **The phone's voice**. |
 | Alarm sounds, the lock screen clock, time zone data | Clock. |

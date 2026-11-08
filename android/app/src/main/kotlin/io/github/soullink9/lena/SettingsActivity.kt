@@ -1333,7 +1333,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Footnote("Every look listens, answers and speaks the same way. The sheet is the only one that shows earlier turns; the others show what's happening now.")
-        val phoneEar = remember { PhoneEar.available(this) }
+        val phoneEar = PhoneEar.available(this) // read each time, so choosing On this phone again shows at once
         // "Your server" is Open WebUI's speech, which isn't used while Assist answers: the phone hears and speaks.
         val assist = s.answers == Answerer.ASSIST
         Section("How she sounds") {
@@ -1350,7 +1350,12 @@ class SettingsActivity : ComponentActivity() {
                         Hearing.SERVER -> "Open WebUI's speech-to-text, the same as its voice input"
                         Hearing.HOME_ASSISTANT -> "Home Assistant's speech-to-text, the one its voice assistants use (Whisper, Speech-to-Phrase, Cloud)"
                     }
-                }) { set(s.copy(hearing = it)) }
+                }) {
+                // Choosing On this phone (again) gives a recognizer that wasn't answering another chance,
+                // such as after putting back the speech packages a debloat removed.
+                if (it == Hearing.PHONE) PhoneEar.trustAgain(this@SettingsActivity)
+                set(s.copy(hearing = it))
+            }
             if (hasHa && s.hearing == Hearing.HOME_ASSISTANT) {
                 var engines by remember { mutableStateOf<List<Speaker>>(emptyList()) }
                 var engine by remember { mutableStateOf(Room.sttEngine(this@SettingsActivity)) }

@@ -2,6 +2,21 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Fixed: after the wake word she never stopped listening.** Through the wake word's microphone the recognizer never decides by itself that you've finished, so Lena does: once your words stop changing for a moment (or nothing's said for 7 seconds), the sound ends and the recognizer gives its result.
+- **Choosing Hearing you → On this phone again** gives a recognizer that wasn't answering another chance at once, instead of a day later (after putting back speech packages a debloat removed, say).
+
+### Home Assistant integration
+
+- **Fixed: Optimize memory saying "The answer wasn't a list of memory lines".** The AI Task came back empty (Home Assistant's Ollama returns nothing when the model's context window is too small for her memory, or a thinking model spends the answer thinking). She now asks again for plain text, then through her conversation agent for alerts if one is chosen, and if all come back empty, says so and what to try.
+
+### Wall display debloat
+
+- **Keeps Android System Intelligence, Private Compute Services and its settings overlay.** On a Galaxy Tab A9+, removing them left the on-device speech recognizer never getting ready ("Couldn't hear you, error 11"). If you ran an earlier version, put them back with `adb shell cmd package install-existing --user 0 com.google.android.as` (and `com.google.android.as.oss`, `com.google.android.overlay.gmsconfig.asi`) and restart the tablet.
+
 ## [0.6.10] - 2026-11-07
 
 ### Android app
