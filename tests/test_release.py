@@ -59,7 +59,8 @@ check(code == 0 and f"title=v{version}" in out and "prerelease=false" in out and
 apk_url = f"https://github.com/{REPO}/releases/download/{tag}/lena-v{version}.apk"
 check(notes.startswith("## Install") and apk_url in notes and "## What's in it" in notes,
       "notes give the install steps with the APK's GitHub download address, then the changelog")
-check(release_notes.changelog_section(version) in notes, "…and the whole of this version's changelog section")
+check(release_notes.absolute_links(release_notes.changelog_section(version), REPO, tag) in notes,
+      "…and the whole of this version's changelog section (with its links made absolute)")
 check(not re.search(r"\]\((?!https?:|#)", notes), "every link in the notes is absolute, so it works on the release page")
 check(f"https://github.com/{REPO}/blob/{tag}/docs/app/Installation.md" in notes, "…pointing at GitHub, at the tag")
 check(notes_script(f"V{version}", "notes-capital.md")[0] == 0, "a capital V typed by mistake is fine")
