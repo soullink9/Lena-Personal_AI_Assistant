@@ -17,8 +17,8 @@ android {
         // checks), and the lint block below fails the build on any call that isn't.
         minSdk = 30
         targetSdk = 36
-        versionCode = 49
-        versionName = "0.6.15"
+        versionCode = 50
+        versionName = "0.6.16"
         // Phones and tablets are 64-bit; many Android TV boxes run 32-bit Android on 64-bit chips, so the wake
         // word's native code (LiteRT) comes for 32-bit ARM too.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
