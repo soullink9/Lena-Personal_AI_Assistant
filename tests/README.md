@@ -10,6 +10,7 @@ repository root. Each suite prints `PASS` or `FAIL` per check and exits non-zero
 | `scripts/test_home_assistant.sh latest` (or `2026.9`) | The integration in a real Home Assistant (`home-assistant/tests`); it pip installs, so use a virtualenv |
 | `scripts/start_home_assistant.sh` | The newest Home Assistant on PyPI starting with Lena |
 | `tools/commands_check/run.sh` | What she understands on her own (timers, alarms, "stop") on example sentences |
+| `tools/pairing_check/run.sh` | Connect from your phone: Lena's QR codes against ones a QR reader read back, and the page the device serves, used as a phone would |
 | `tools/frontend_check/run.sh` | The app's wake word front end against the original C, bit for bit |
 
 `test_release.py` covers:

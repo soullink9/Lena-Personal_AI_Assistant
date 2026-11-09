@@ -14,9 +14,11 @@ Later updates come through Lena herself, as on a phone (**Settings → Software 
 
 ## Set her up
 
-Lena opens on her settings. Typing with the remote is slow, so type with your phone: the **Google TV** app's remote (on the same Wi-Fi as the TV) has a keyboard that types into the TV, and you can paste there too. That's the easy way to enter Home Assistant's long token.
+Lena opens on **Connect Home Assistant**. Choose **Connect from your phone**: the TV shows an address and its QR code.
 
-1. **Home Assistant**: its address and a long-lived token. The wall display needs it.
+1. **Home Assistant, from your phone**: scan the QR code with your phone's camera (or type the short address into its browser), on the same Wi-Fi as the TV. On the page that opens, check your Home Assistant's address and tap **Sign in with Home Assistant**; you sign in on your Home Assistant's own page (your password manager works there), and Lena on the TV makes herself a long-lived token, named after the TV, which you'll see in your Home Assistant profile under **Security**. The page also takes a token you've made yourself, pasted. The TV closes the screen once it's connected, and the wall display starts. It's also in **Settings → Home Assistant → Connect from your phone**.
+
+For anything else you'd type on the TV, the **Google TV** app's remote on your phone has a keyboard that types into the TV, and you can paste there too.
 2. **Who answers**: Home Assistant's Assist is the simplest on a TV. To use Open WebUI instead, enter its address and turn on **Sign in by herself** with your Open WebUI email and password: a TV can't open Open WebUI's sign-in page.
 3. **Hearing you**: **The TV's voice search** (the default). It's the TV's own speech recognition, the one that hears through the remote's microphone.
 

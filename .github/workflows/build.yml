@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     # Only the app needs building; docs and Home Assistant files don't.
-    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
+    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "tools/pairing_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -66,6 +66,10 @@ jobs:
       # What she understands on her own (timers, alarms, "stop"), on example sentences.
       - name: Check timers and alarms by voice
         run: tools/commands_check/run.sh
+
+      # Connect from your phone: the QR code and the page it serves, used as a phone would.
+      - name: Check connecting from a phone
+        run: tools/pairing_check/run.sh
 
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner. A test build is named after its commit.
       - name: Build

@@ -52,7 +52,7 @@ Full details: [App installation](app/Installation.md) and [Open WebUI setup for 
 2. Enter your `https://` Open WebUI address (and your sign-in page, if you use Authentik or similar) and sign in.
 3. In the app's settings, leave **Model** on **Lena, automatically** (or pick `lena`), and **Conversation → Her context size** at 32,768 to match the Modelfile.
 4. Make her your assistant: Android Settings → Apps → Default apps → **Digital assistant app** → Lena.
-5. After part 4, come back to **Settings → Home Assistant** in the app: your Home Assistant's `https://` address and a long-lived access token. Any user's token works. The sheet then shows how she feels, and **Memory & knowledge** gets a **Hers** tab with her shared memory.
+5. After part 4, come back to **Settings → Home Assistant** in the app: your Home Assistant's `https://` address and a long-lived access token (any user's works), or **Connect from your phone** to sign in on a phone instead of typing it (the way to do it on a TV). The sheet then shows how she feels, and **Memory & knowledge** gets a **Hers** tab with her shared memory.
 
 The app talks to Open WebUI, so the filter and tool from part 2 work there with nothing extra: same feelings, same memory, same tools.
 

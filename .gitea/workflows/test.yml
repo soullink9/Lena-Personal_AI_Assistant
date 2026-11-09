@@ -161,6 +161,10 @@ jobs:
       - name: Check timers and alarms by voice
         run: tools/commands_check/run.sh
 
+      # Connect from your phone: the QR code and the page it serves, used as a phone would.
+      - name: Check connecting from a phone
+        run: tools/pairing_check/run.sh
+
       - name: Install the Android SDK (from Google)
         run: scripts/android_sdk.sh
 

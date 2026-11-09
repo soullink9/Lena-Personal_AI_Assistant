@@ -6,6 +6,7 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ### Android app
 
+- **Connect Home Assistant from your phone.** No more typing a long-lived token with a TV remote: **Connect from your phone** (on the wall display before it's connected, and in Settings → Home Assistant) shows an address and its QR code. Your phone opens it on the same Wi-Fi, you sign in on your Home Assistant's own page, and Lena makes herself a long-lived token named after the device (and signs the first sign-in out). Pasting a token you've made works there too. The page is served only while the screen is open, behind a code shown on it. The QR code is drawn by Lena herself; there's no new library.
 - **Stuck in Settings on a new wall display.** With Lena as the home screen but Home Assistant not set up yet (a tablet set up in that order, or one whose token didn't save), leaving Settings opened the home screen, which opened Settings again, so Back seemed to do nothing. The wall display now says what's missing instead, with **Settings** and **Apps** buttons, and opens your dashboards as soon as you come back from Settings with Home Assistant set up.
 
 ## [0.6.13] - 2026-11-08

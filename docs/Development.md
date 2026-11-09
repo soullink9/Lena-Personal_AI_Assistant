@@ -58,7 +58,8 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── make_images.py             app icon, notification icon, avatars and the TV banner from the logo
 │   ├── android-tv-home.sh         makes Lena an Android TV's home screen (docs/app/Android-TV.md)
 │   ├── frontend_check/            the wake word front end against the original C
-│   └── commands_check/            what she understands on her own, on example sentences
+│   ├── commands_check/            what she understands on her own, on example sentences
+│   └── pairing_check/             Connect from your phone: QR codes and the page, used as a phone would
 ├── scripts/                       what the workflows run, on Gitea and GitHub alike
 │   ├── release_notes.py           checks the tag against every part's version; writes the release notes
 │   ├── check_apk.py               checks the APK before it's published (signed, Lena's version, SHA256SUMS)

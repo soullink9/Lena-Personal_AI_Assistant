@@ -4,6 +4,7 @@ package io.github.soullink9.lena
 
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.QrCode2
 import android.Manifest
 import android.app.StatusBarManager
 import android.app.TimePickerDialog
@@ -1102,8 +1103,21 @@ class SettingsActivity : ComponentActivity() {
         var token by remember { mutableStateOf("") }
         var tokenSaved by remember { mutableStateOf(Secrets.has(this, Secrets.HA_TOKEN)) }
         var check by remember { mutableStateOf<String?>(null) }
+        // Connected from a phone: show the address and token it saved.
+        val pairing = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                set(s.copy(haServer = Prefs.haServer(this@SettingsActivity) ?: s.haServer))
+                tokenSaved = Secrets.has(this@SettingsActivity, Secrets.HA_TOKEN)
+                token = ""
+                check = null
+            }
+        }
         Footnote("Optional. With the Lena integration in your Home Assistant, the app shows how she feels and lets you see and edit her memory.")
         Group {
+            // A TV remote can't type a long token: sign in from a phone instead ([HaPairActivity]).
+            Item(Icons.Outlined.QrCode2, "Connect from your phone", "Sign in to Home Assistant on your phone, on the same Wi-Fi; no typing here") {
+                pairing.launch(Intent(this@SettingsActivity, HaPairActivity::class.java))
+            }
             FieldItem {
                 val bad = s.haServer.isNotBlank() && Prefs.normalize(s.haServer) == null
                 OutlinedTextField(
