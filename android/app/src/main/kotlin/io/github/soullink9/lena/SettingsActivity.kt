@@ -265,7 +265,7 @@ class SettingsActivity : ComponentActivity() {
                 ),
             )
             val wantsNotifications = n.notifyReplies || n.schedules.any { it.enabled }
-            if (wantsNotifications && !Compat.notificationsAllowed(this)) {
+            if (wantsNotifications && !Compat.notificationsAllowed(this@SettingsActivity)) {
                 notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -1234,7 +1234,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on this phone",
                 "Checks every 15 minutes and tells you when she's worried about something at home. Needs Home Assistant.", s.alerts) {
                 set(s.copy(alerts = it))
-                if (it && !Compat.notificationsAllowed(this)) {
+                if (it && !Compat.notificationsAllowed(this@SettingsActivity)) {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
                 }
             }
