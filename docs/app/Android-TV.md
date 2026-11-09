@@ -30,24 +30,41 @@ Android TV has no setting to choose another home screen. Without one, Lena opens
 2. On the computer: `./tools/android-tv-home.sh --connect <the TV's IP address>` shows what it would change, and accept the "Allow network debugging?" prompt on the TV.
 3. `./tools/android-tv-home.sh --connect <the TV's IP address> --apply` makes the change.
 
-It turns off the TV's own launcher (nothing is uninstalled) and makes Lena the home app. `--restore` turns the TV's launcher back on. A system update may turn it back on too; run `--apply` again if the Home button stops opening Lena.
+It turns off the TV's own launcher and its setup app (nothing is uninstalled) and makes Lena the home app. The setup app is a home screen too: with only the launcher off, Android falls back to it whenever Lena is briefly gone, which is every time she updates, and it then sits on **Completing setup** for good. With it off as well, the TV just waits for Lena to come back. `--restore` turns both back on, as does a factory reset. A system update may turn the launcher back on; run `--apply` again if the Home button stops opening Lena.
+
+**Stuck on "Completing setup"** (from an earlier version of the script): run `./tools/android-tv-home.sh --connect <the TV's IP address> --apply` again. It turns the setup app off and goes to Lena's home screen.
 
 To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV and Lena need), [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) works over the network the same way: see [On an Nvidia Shield or Android TV](Wall-Display-Tablet.md#on-an-nvidia-shield-or-android-tv).
+
+## The TV home
+
+On a TV, Lena's home screen is rows you move through with the remote, over your photo slideshow (dimmed) if you've chosen an album:
+
+- At the top, the time, the date and weather, and how Lena feels.
+- **Lena**: **Talk to Lena**, chosen when the screen opens, so pressing OK talks straight away; and every timer, alarm and reminder that's running, with the time left.
+- **Home Assistant**: your wall display dashboards (Settings → Home Assistant → Wall display dashboards). One opens full screen with Lena's bar; Back from its first page, or Home, returns to the rows.
+- **Apps**: your TV apps, the ones you open most first, and **All apps** (where you can hide some from the row).
+- **Settings**: Lena's settings and the TV's.
 
 ## The remote
 
 | Button | What it does |
 |---|---|
-| **OK**, held down | She listens. Hold it again to send what you said, or to stop her talking. |
+| **OK**, held down | She listens, anywhere. Hold it again to send what you said, or to stop her talking. |
 | **OK**, pressed | Presses whatever is chosen on screen, as usual. |
 | **Search** button, on remotes that send one | She listens. |
 | **Menu** (☰) | Lena's settings. |
 | **Back** | Back, as usual; closes her when she's open. |
 | Any button, on the screensaver | Wakes the screen, and does nothing else. |
 
-The arrows move around the bar and the dashboard. On the dashboard (a web page), the TV moves between its cards and buttons.
+The arrows move along the rows, and around the bar and a dashboard. On a dashboard (a web page), the TV moves between its cards and buttons.
 
-**The remote's microphone button** opens Google Assistant on most TVs: Android keeps that button for its own assistant, so no app gets it. Some remotes send a "search" button instead, and Lena takes that one. To see what your remote's buttons send, press them and look in **Settings → Logs** for lines from **Remote**.
+**The remote's microphone button** opens Google Assistant: Android keeps that button for its own assistant, so no app can have it. Two ways round it:
+
+- **A button of its own.** Lena has a second entry in the TV's apps, **Talk to Lena**, which opens her listening. Put it on a button the remote lets you customise: on a Shield, **Settings → Remotes & Accessories**, then the remote's customisable button (the menu button's double press, or the Netflix button on remotes that have one), and choose **Talk to Lena**. It works from any app, not only Lena's home.
+- **Hold OK**, on Lena's screens.
+
+Either way she listens through **The TV's voice search**. Some remotes send their microphone button as "search", and then Lena takes it directly. To see what your remote's buttons send, press them and look in **Settings → Logs** for lines from **Remote**.
 
 ## What's different from a phone
 
@@ -61,6 +78,6 @@ The arrows move around the bar and the dashboard. On the dashboard (a web page),
 
 This was built without a Shield to try it on. If something here doesn't work on yours, the log (**Settings → Logs**) says what happened; send it along.
 
-- Whether the Shield's voice search hears through the remote when Lena asks (it does for other apps' voice search).
-- Which button the Shield remote's microphone sends (see above).
+- Whether the Shield's voice search hears through the remote when Lena asks, from a customised button or OK held (it does for other apps' voice search).
+- The Shield's settings for customising a remote button (they differ between remotes and Shield versions).
 - Moving around a Home Assistant dashboard with the arrows.

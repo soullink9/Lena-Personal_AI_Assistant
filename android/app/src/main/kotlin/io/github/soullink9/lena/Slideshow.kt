@@ -113,7 +113,7 @@ private class FocusAlignment(private val fx: Float, private val fy: Float) : Ali
  * by [LenaDisplay] instead of the clock when the slideshow is on. Tap to talk.
  */
 @Composable
-fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, listening: Listening, onTalk: () -> Unit) {
+fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, listening: Listening, onTalk: (() -> Unit)?) {
     val context = LocalContext.current
     var shown by remember { mutableStateOf<Shown?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -151,10 +151,11 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
         }
     }
 
-    Box(
-        Modifier.fillMaxSize().background(Color.Black)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Talk to Lena", onClick = onTalk),
-    ) {
+    // Tapping the photos talks to her; without onTalk (behind the TV home's rows) they're only a background,
+    // which the remote never lands on.
+    val tap = if (onTalk == null) Modifier else
+        Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Talk to Lena", onClick = onTalk)
+    Box(Modifier.fillMaxSize().background(Color.Black).then(tap)) {
         val current = shown
         when (slides.transition) {
             SlideTransition.SLIDE -> AnimatedContent(

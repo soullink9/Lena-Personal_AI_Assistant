@@ -172,6 +172,12 @@ class DashboardActivity : ComponentActivity() {
 
     private val tab = mutableIntStateOf(0)
     private val dimmed = mutableStateOf(false)
+
+    /**
+     * On a TV, the dashboard open full screen; null shows the TV home's rows instead ([TvHome]). Back from
+     * a dashboard's first page, or the Home button, returns to the rows.
+     */
+    private val tvDashboard = mutableStateOf<Dashboard?>(null)
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
 
@@ -605,9 +611,10 @@ class DashboardActivity : ComponentActivity() {
             dim()
             return
         }
-        // Pressing home while it's the home screen: back to the first dashboard.
+        // Pressing home while it's the home screen: back to the first dashboard (on a TV, to the rows).
         if (intent.hasCategory(Intent.CATEGORY_HOME) && ::web.isInitialized) {
             wakeUp()
+            tvDashboard.value = null
             tab.intValue = 0
             open(Prefs.dashboards(this).first())
         }
@@ -704,6 +711,9 @@ class DashboardActivity : ComponentActivity() {
         BackHandler(enabled = true) {
             when {
                 apps -> apps = false
+                // On a TV, a dashboard's first page goes back to the rows.
+                tv && tvDashboard.value != null && !header.value.subview && !web.canGoBack() -> tvDashboard.value = null
+                tv && tvDashboard.value == null -> Unit // the TV home: nowhere further back
                 header.value.subview || web.canGoBack() -> back()
                 // As the home screen, back has nowhere to go; otherwise it leaves (its page is kept, see
                 // DashboardWeb, so coming back is quick).
@@ -712,7 +722,19 @@ class DashboardActivity : ComponentActivity() {
         }
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+            if (tv && tvDashboard.value == null) {
+                // A TV's home: rows for the remote, rather than the tablet's bar over a dashboard.
+                TvHome(
+                    now = now, clock = clock, dashboards = dashboards,
+                    onTalk = ::talk,
+                    onDashboard = { d ->
+                        open(d)
+                        tvDashboard.value = d
+                    },
+                    onAllApps = { apps = true },
+                    onSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) },
+                )
+            } else Column(Modifier.fillMaxSize().navigationBarsPadding()) {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
                 else Strip(now, clock, dashboards, onTalk = ::talk, onApps = { apps = true })

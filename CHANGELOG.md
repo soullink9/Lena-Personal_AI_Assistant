@@ -2,6 +2,14 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **A TV home.** On Android TV, Lena's home screen is rows for the remote, over your photo slideshow: the time, weather and how she feels; **Talk to Lena** (chosen when the screen opens) with every running timer, alarm and reminder; your Home Assistant dashboards, each opening full screen (Back or Home returns to the rows); your TV apps, most used first, and All apps; and Lena's and the TV's settings. The tablet's bar over a dashboard was impractical with a remote.
+- **Talk to Lena from a remote button.** The remote's microphone button always opens Google Assistant, so Lena has a second entry in the TV's apps, **Talk to Lena**, that opens her listening; put it on a customisable remote button (on a Shield, in Settings → Remotes & Accessories).
+- **No more "Completing setup" after an update.** `tools/android-tv-home.sh --apply` also turns off Android TV's setup app, which otherwise took over the Home button whenever Lena was being updated and stayed on "Completing setup". Run it again to fix a TV stuck there; `--restore` turns it back on.
+
 ## [0.6.14] - 2026-11-08
 
 ### Android app

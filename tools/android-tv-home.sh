@@ -8,6 +8,11 @@
 # once (and again if a system update turns the TV's launcher back on). Lena works without it, opened from
 # the TV's apps; this only changes what the Home button opens. More in docs/app/Android-TV.md.
 #
+# Android TV's setup app is a home screen too, kept for setting up a new TV. With the launcher off it's the
+# one Android falls back to whenever Lena is briefly gone, which is every time she updates, and it then sits
+# on "Completing setup" for good. So it's turned off as well (setup is long done; a factory reset turns it
+# back on), and Android's own fallback simply waits for Lena to come back.
+#
 # Run it from a computer with adb (Android platform-tools). On the TV: Settings → Device Preferences →
 # About → click Build 7 times; then Settings → Device Preferences → Developer options → Network debugging
 # (Shield) or USB debugging. Then use --connect with the TV's IP address (or `adb connect` it yourself), and
@@ -32,6 +37,11 @@ LAUNCHERS=(
     com.google.android.apps.tv.launcherx  # Google TV's home screen
     com.google.android.leanbacklauncher   # The older Android TV home screen
     com.amazon.tv.launcher                # Fire TV (Fire OS often turns it back on by itself)
+)
+
+# Android TV's setup apps, which also answer the Home button (see above). Turned off with the launcher.
+SETUP=(
+    com.google.android.tungsten.setupwraith   # Android TV and Google TV setup ("Completing setup")
 )
 
 mode=preview
@@ -92,13 +102,13 @@ fi
 # The launchers installed here, and which of them are turned on.
 installed=()
 enabled=()
-for pkg in "${LAUNCHERS[@]}"; do
+for pkg in "${LAUNCHERS[@]}" "${SETUP[@]}"; do
     if on_tv pm list packages "$pkg" | grep -qx "package:$pkg"; then
         installed+=("$pkg")
         on_tv pm list packages -d "$pkg" | grep -qx "package:$pkg" || enabled+=("$pkg")
     fi
 done
-echo "The TV's launcher: ${installed[*]:-none found} (turned on: ${enabled[*]:-none})"
+echo "The TV's launcher and setup: ${installed[*]:-none found} (turned on: ${enabled[*]:-none})"
 echo "What the Home button opens now: $(on_tv cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN | tail -1)"
 
 case "$mode" in
@@ -114,7 +124,9 @@ case "$mode" in
         # Android 7 and later: the home app, as choosing it in a phone's settings would.
         on_tv cmd package set-home-activity "$LENA_HOME" >/dev/null
         echo "The Home button now opens: $(on_tv cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN | tail -1)"
-        echo "Press Home on the remote to try it. To undo: $0 --restore${connect:+ --connect $connect}"
+        # Go home now, which also leaves a TV stuck on "Completing setup".
+        on_tv am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null
+        echo "The TV is on Lena's home screen now. To undo: $0 --restore${connect:+ --connect $connect}"
         ;;
     restore)
         for pkg in "${installed[@]+"${installed[@]}"}"; do

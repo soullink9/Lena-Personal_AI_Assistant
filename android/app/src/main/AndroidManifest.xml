@@ -175,6 +175,22 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- "Talk to Lena" in a TV's apps, for a remote's customisable button (the microphone button is
+             Google Assistant's). Opens her listening; shows nothing itself. -->
+        <activity
+            android:name=".TalkActivity"
+            android:exported="true"
+            android:label="Talk to Lena"
+            android:banner="@drawable/tv_banner_talk"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Connect Home Assistant from your phone (a page this device serves on the home network while it shows). -->
         <activity
             android:name=".HaPairActivity"
