@@ -250,6 +250,13 @@ private fun talk(c: Context, from: AskActivity.From) = c.startActivity(AskActivi
  * Back (or a swipe from the edge) leaves it.
  */
 class DisplayActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
+
     companion object {
         private const val EXTRA_SCREENSAVER = "screensaver"
 

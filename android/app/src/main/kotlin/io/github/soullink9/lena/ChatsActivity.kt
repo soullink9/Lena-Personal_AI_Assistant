@@ -2,6 +2,7 @@
 
 package io.github.soullink9.lena
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -69,6 +70,12 @@ import kotlinx.coroutines.launch
  * the main screen with it.
  */
 class ChatsActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     companion object {
         /** Search for this straight away (See all results, from the menu's search). */

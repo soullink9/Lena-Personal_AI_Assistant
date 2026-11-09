@@ -2,6 +2,7 @@
 
 package io.github.soullink9.lena
 
+import android.content.Context
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -69,6 +70,12 @@ import java.util.Date
  * Copy or share what you see, for example to ask for help; nothing leaves the phone otherwise.
  */
 class LogsActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     /** Every touch or key: someone's using the wall display, so its screensaver waits (see [WallDisplay]). */
     override fun onUserInteraction() {

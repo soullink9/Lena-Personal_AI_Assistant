@@ -144,6 +144,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class AskActivity : ComponentActivity() {
 
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
+
     companion object {
         const val ACTION_ASK = "io.github.soullink9.lena.ASK"   // keyboard
         const val ACTION_TALK = "io.github.soullink9.lena.TALK" // listening

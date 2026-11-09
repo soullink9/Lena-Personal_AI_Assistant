@@ -1,5 +1,6 @@
 package io.github.soullink9.lena
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -52,6 +53,12 @@ import java.util.Locale
  * closes; the wall display (or Settings) carries on from there.
  */
 class HaPairActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     /** What the screen shows. */
     private sealed class State {

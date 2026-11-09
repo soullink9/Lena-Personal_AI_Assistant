@@ -40,13 +40,15 @@ To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV 
 
 ## The TV home
 
-On a TV, Lena's home screen is rows you move through with the remote, over your photo slideshow (dimmed) if you've chosen an album:
+On a TV, Lena's home screen is rows you move through with the remote, over your photo slideshow (dimmed) if you've chosen an album. It keeps inside the TV's safe area, as TVs crop the edges of the picture.
 
 - At the top, the time, the date and weather, and how Lena feels.
-- **Lena**: **Talk to Lena**, chosen when the screen opens, so pressing OK talks straight away; and every timer, alarm and reminder that's running, with the time left.
-- **Home Assistant**: your wall display dashboards (Settings → Home Assistant → Wall display dashboards). One opens full screen with Lena's bar; Back from its first page, or Home, returns to the rows.
-- **Apps**: your TV apps, the ones you open most first, and **All apps** (where you can hide some from the row).
-- **Settings**: Lena's settings and the TV's.
+- **Lena**: **Talk to Lena**, chosen when the screen opens, so pressing OK talks straight away; every timer, alarm and reminder that's running, with the time left; your wall display dashboards (Settings → Home Assistant → Wall display dashboards), each opening full screen with Lena's bar (Back from its first page, or Home, returns to the rows); and Lena's settings and the TV's.
+- **Apps**: your TV apps, the ones you open most first; **Choose apps**; and **All apps**.
+
+**Choose apps** lists every TV app; press OK on one to hide it from the Apps row, and again to show it. It stays installed, and Back is done. Hidden apps are still in **All apps**.
+
+Lena's screens are always dark on a TV (Android TV has no dark mode setting of its own). Home Assistant's dashboards follow when your Home Assistant profile's **Theme** is left on **Auto**; a theme you've chosen there wins.
 
 ## The remote
 
@@ -59,7 +61,7 @@ On a TV, Lena's home screen is rows you move through with the remote, over your 
 | **Back** | Back, as usual; closes her when she's open. |
 | Any button, on the screensaver | Wakes the screen, and does nothing else. |
 
-The arrows move along the rows, and around the bar and a dashboard. On a dashboard (a web page), the TV moves between its cards and buttons.
+The arrows move along the rows. On a Home Assistant dashboard, down and right go to the next card or button and up and left to the one before, in the page's order (Home Assistant outlines the chosen one), and OK presses it; up from the first card goes to Lena's bar, for the dashboard's views.
 
 **The remote's microphone button** opens Google Assistant: Android keeps that button for its own assistant, so no app can have it. Two ways round it:
 
@@ -82,4 +84,4 @@ This was built without a Shield to try it on. If something here doesn't work on 
 
 - Whether the Shield's voice search hears through the remote when Lena asks, from a customised button or OK held (it does for other apps' voice search).
 - The Shield's settings for customising a remote button (they differ between remotes and Shield versions).
-- Moving around a Home Assistant dashboard with the arrows.
+- Moving around a Home Assistant dashboard with the arrows, and up from its first card to Lena's bar.

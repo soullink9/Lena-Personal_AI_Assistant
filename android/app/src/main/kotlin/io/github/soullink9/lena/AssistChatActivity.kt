@@ -78,6 +78,12 @@ import kotlinx.coroutines.launch
  */
 class AssistChatActivity : ComponentActivity() {
 
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
+
     companion object {
         /** The chat screen to open: this one when Assist answers, otherwise Open WebUI's. */
         fun intent(c: Context): Intent = Intent(

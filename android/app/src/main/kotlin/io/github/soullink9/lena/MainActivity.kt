@@ -2,6 +2,7 @@
 
 package io.github.soullink9.lena
 
+import android.content.Context
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
@@ -147,6 +148,12 @@ import org.json.JSONObject
 
 /** Open WebUI inside a native shell: top bar, drawer with your chats, and the locks around the page. */
 class MainActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     companion object {
         const val ACTION_NEW_CHAT = "io.github.soullink9.lena.NEW_CHAT"

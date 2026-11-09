@@ -2,6 +2,7 @@
 
 package io.github.soullink9.lena
 
+import android.content.Context
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.widget.Toast
@@ -78,6 +79,12 @@ import kotlinx.coroutines.launch
  * by mistake.
  */
 class MemoryActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     /** Your Open WebUI, unless it isn't used (Assist answers, or it isn't set up): then only her memory shows. */
     private var openWebUiApi: Api? = null

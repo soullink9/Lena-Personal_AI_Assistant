@@ -2,6 +2,7 @@
 
 package io.github.soullink9.lena
 
+import android.content.Context
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.QrCode2
@@ -153,6 +154,12 @@ import kotlinx.coroutines.launch
  * make them; addresses are saved once they're valid https:// addresses.
  */
 class SettingsActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
 
     companion object {
         /** Opens Settings straight on Alarms & timers (from Android's alarm icon and the clock). */

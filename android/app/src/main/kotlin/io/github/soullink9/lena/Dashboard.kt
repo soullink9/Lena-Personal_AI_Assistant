@@ -108,6 +108,12 @@ import java.util.Date
  */
 class DashboardActivity : ComponentActivity() {
 
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
+
     companion object {
         /** Go straight to the screen saver (another Lena screen was left alone for a while, see [WallDisplay]). */
         const val EXTRA_IDLE = "idle"
@@ -511,7 +517,26 @@ class DashboardActivity : ComponentActivity() {
                 return true
             }
         }
-        return remote.dispatch(event) { super.dispatchKeyEvent(it) }
+        return remote.dispatch(event) { super.dispatchKeyEvent(forWebPage(it)) }
+    }
+
+    /**
+     * A Home Assistant dashboard is a web page, which a TV's web view doesn't move around with the arrows
+     * (they scroll it). So on a TV, while the page has the remote, the arrows become Tab (down and right:
+     * the next card or button) and Shift+Tab (up and left: the one before), and OK becomes Enter, which
+     * presses it, as with a keyboard. Home Assistant outlines the one that's chosen. Shift+Tab from the
+     * page's first card leaves the page for Lena's bar above it.
+     */
+    private fun forWebPage(e: android.view.KeyEvent): android.view.KeyEvent {
+        if (tvDashboard.value == null || !::web.isInitialized || !web.hasFocus()) return e
+        val (code, back) = when (e.keyCode) {
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN, android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> android.view.KeyEvent.KEYCODE_TAB to false
+            android.view.KeyEvent.KEYCODE_DPAD_UP, android.view.KeyEvent.KEYCODE_DPAD_LEFT -> android.view.KeyEvent.KEYCODE_TAB to true
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER -> android.view.KeyEvent.KEYCODE_ENTER to false
+            else -> return e
+        }
+        val meta = if (back) android.view.KeyEvent.META_SHIFT_ON or android.view.KeyEvent.META_SHIFT_LEFT_ON else 0
+        return android.view.KeyEvent(e.downTime, e.eventTime, e.action, code, e.repeatCount, meta, e.deviceId, e.scanCode, e.flags, e.source)
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
@@ -730,11 +755,18 @@ class DashboardActivity : ComponentActivity() {
                     onDashboard = { d ->
                         open(d)
                         tvDashboard.value = d
+                        // The remote starts on the page (the arrows then move between its cards, see
+                        // forWebPage), once the web view is back on screen.
+                        web.post { web.requestFocus() }
                     },
                     onAllApps = { apps = true },
                     onSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) },
                 )
-            } else Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+            } else Column(
+                Modifier.fillMaxSize().navigationBarsPadding()
+                    // A TV crops the picture's edges: keep the bar and the dashboard inside its safe area.
+                    .then(if (tv) Modifier.padding(horizontal = 48.dp, vertical = 27.dp) else Modifier)
+            ) {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
                 else Strip(now, clock, dashboards, onTalk = ::talk, onApps = { apps = true })

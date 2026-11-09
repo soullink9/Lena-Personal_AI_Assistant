@@ -2,6 +2,8 @@ package io.github.soullink9.lena
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.view.ContextThemeWrapper
 import android.view.KeyEvent
 
 /**
@@ -12,6 +14,19 @@ import android.view.KeyEvent
 object Tv {
     /** Whether this is an Android TV device ("leanback" is Android's name for the TV interface). */
     fun isTv(c: Context): Boolean = c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+    /**
+     * Lena's screens are always dark on a TV. A TV is in a living room, often in the evening, and Android
+     * TV leaves apps in light mode (it has no dark mode setting), so Settings and the Home Assistant
+     * dashboards came up white. Called from each screen's attachBaseContext: night mode for that screen
+     * alone, which picks the dark themes (res/values-night), Compose's dark colours (isSystemInDarkTheme)
+     * and, through the dark theme, a web page's prefers-color-scheme: dark, which Home Assistant follows
+     * when its theme is left on the default. Android keeps it through configuration changes.
+     */
+    fun darkOnTv(screen: ContextThemeWrapper, base: Context) {
+        if (!isTv(base)) return
+        screen.applyOverrideConfiguration(Configuration().apply { uiMode = Configuration.UI_MODE_NIGHT_YES })
+    }
 }
 
 /**

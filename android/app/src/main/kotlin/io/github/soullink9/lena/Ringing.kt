@@ -236,6 +236,13 @@ class RingService : Service() {
  * screen and turns the screen on; closes by itself once the ringing stops.
  */
 class RingActivity : ComponentActivity() {
+
+    // Dark on a TV (Tv.darkOnTv).
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase)
+        Tv.darkOnTv(this, newBase)
+    }
+
     private var stopWord: WakeListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
