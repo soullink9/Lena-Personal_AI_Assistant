@@ -25,10 +25,12 @@ Lena opens on her settings. Typing with the remote is slow, so type with your ph
 Android TV has no setting to choose another home screen. Without one, Lena opens from the TV's apps, and the Home button still goes to the TV's own home screen. To make the Home button open Lena, run [`tools/android-tv-home.sh`](../../tools/android-tv-home.sh) once from a computer with adb:
 
 1. On the TV: **Settings → Device Preferences → About**, click **Build** 7 times, then turn on **Network debugging** (Shield) or **USB debugging** in **Developer options**.
-2. On the computer: `adb connect <the TV's IP address>`, and accept the prompt on the TV.
-3. `./tools/android-tv-home.sh` shows what it would change. `./tools/android-tv-home.sh --apply` makes the change.
+2. On the computer: `./tools/android-tv-home.sh --connect <the TV's IP address>` shows what it would change, and accept the "Allow network debugging?" prompt on the TV.
+3. `./tools/android-tv-home.sh --connect <the TV's IP address> --apply` makes the change.
 
 It turns off the TV's own launcher (nothing is uninstalled) and makes Lena the home app. `--restore` turns the TV's launcher back on. A system update may turn it back on too; run `--apply` again if the Home button stops opening Lena.
+
+To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV and Lena need), [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) works over the network the same way: see [On an Nvidia Shield or Android TV](Wall-Display-Tablet.md#on-an-nvidia-shield-or-android-tv).
 
 ## The remote
 

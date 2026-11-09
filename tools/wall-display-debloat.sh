@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# wall-display-debloat.sh: strips a Samsung Android tablet down to a Lena wall display.
+# wall-display-debloat.sh: strips a Samsung Android tablet, or an Nvidia Shield or other Android TV box,
+# down to a Lena wall display.
 #
 # Keeps:   Lena, Google Play Store, Firefox, Calculator, Clock, My Files, Settings
-#          (and what those need to work; see PROTECT below).
+#          (and what those need to work; see PROTECT below). On a TV, also what the TV needs to work
+#          with its remote, its voice search (Lena hears you through it) and its updates (TV_PROTECT).
 # Removes: every other Samsung, Google, carrier and preinstalled app this script knows to be safe to
-#          remove, plus every app installed on top (Facebook, Netflix, Microsoft and so on).
+#          remove, plus every app installed on top (Facebook, Netflix, Microsoft and so on). On a TV, apps
+#          installed on top stay unless you add --apps: a Shield is often still the TV's media box.
 #
-# Run it from a computer with adb (Android platform-tools), with the tablet connected and USB debugging on
-# (Settings → About tablet → Software information → tap Build number 7 times; then Settings → Developer
-# options → USB debugging).
+# Run it from a computer with adb (Android platform-tools), with debugging on, by cable or over the network:
+#   Tablet, by cable: Settings → About tablet → Software information → tap Build number 7 times; then
+#     Settings → Developer options → USB debugging, and plug it in.
+#   Tablet, over Wi-Fi (Android 11 and later): Developer options → Wireless debugging → Pair device with
+#     pairing code; on the computer, `adb pair <IP>:<pairing port>` with that code, then use --connect with
+#     the IP address and port shown on the Wireless debugging screen (not the pairing port).
+#   Nvidia Shield or Android TV, over the network: Settings → Device Preferences → About → click Build 7
+#     times; then Device Preferences → Developer options → Network debugging. Use --connect with the IP
+#     address it shows (port 5555), and accept the "Allow network debugging?" prompt on the TV.
 #
 #   ./wall-display-debloat.sh              Preview: lists what would be removed. Changes nothing.
 #   ./wall-display-debloat.sh --apply      Removes it (asks you to type REMOVE first). Writes a log.
 #   ./wall-display-debloat.sh --restore debloat-<serial>-<date>.log
 #                                          Puts back everything that log removed.
-#   Add -s <serial> to pick a device when more than one is connected (see `adb devices`).
+#   Add --connect <IP>[:<port>] to reach the device over the network (adb connect; port 5555 if left out),
+#   or -s <serial> to pick a device when more than one is connected (see `adb devices`).
+#   Add --apps on a TV to uninstall the apps installed on top too, as on a tablet.
 #
 # How it removes: `pm uninstall -k --user 0` (or `pm disable-user` when Android refuses). System apps
 # stay in the firmware, so `--restore`, or a factory reset, brings them back. Apps that were installed
@@ -92,6 +103,36 @@ PROTECT=(
     com.google.android.captiveportallogin
 )
 
+# On an Android TV (an Nvidia Shield, a TV with Android TV or Google TV), never removed either. Names this TV
+# doesn't have are simply skipped.
+TV_PROTECT=(
+    # Lena hears you through the TV's own voice search, which is what listens to the remote's microphone
+    com.google.android.katniss                     # Google app for Android TV: voice search and its speech recognition
+    com.google.android.speech.pumpkin              # its offline speech parts
+    com.google.android.leanback.ime                # the TV's keyboard (Gboard for Android TV)
+    com.google.android.tv.remote.service           # Android TV Remote Service: the Google TV app's remote and keyboard on your phone
+    com.android.tv.settings                        # the TV's Settings
+    com.android.providers.tv                       # TV channels and the home screen's rows
+    com.google.android.tv.frameworkpackagestubs    # opens Android's settings pages on a TV
+    com.android.tv.frameworkpackagestubs
+    com.android.remoteprovisioner                  # device keys streaming apps' copy protection (DRM) may check
+
+    # The TV's own home screen and setup: tools/android-tv-home.sh turns the launcher off (and back on with
+    # --restore), so it stays installed
+    com.google.android.tvlauncher                  # Android TV's home screen (Shield)
+    com.google.android.tvrecommendations          # its rows
+    com.google.android.apps.tv.launcherx           # Google TV's home screen
+    com.google.android.tungsten.setupwraith        # Android TV setup
+
+    # Nvidia Shield: the remote, controllers and system updates
+    com.nvidia.shieldtech.accessoryserver          # SHIELD Accessories: pairing and firmware for the remote and controllers
+    com.nvidia.shieldtech.hooks                    # the remote's buttons (Netflix button, customisation)
+    com.nvidia.shield.remote.server                # the SHIELD TV phone app's remote
+    com.nvidia.blakepairing                        # pairing for the older remote and controller
+    com.nvidia.ota                                 # Shield system updates
+    com.nvidia.stats                               # needed by Shield updates
+)
+
 # Removed too, on top of the list below. Put packages here from the "Not in the list" part of the
 # preview once you've checked what they are.
 EXTRA_REMOVE=(
@@ -102,6 +143,8 @@ EXTRA_REMOVE=(
 LOG_PREFIX="debloat"
 MODE="preview"
 SERIAL=""
+CONNECT=""
+TV_APPS=""
 RESTORE_LOG=""
 
 usage() {
@@ -114,6 +157,8 @@ while [ $# -gt 0 ]; do
         --apply) MODE="apply" ;;
         --restore) MODE="restore"; RESTORE_LOG="${2:-}"; shift ;;
         -s) SERIAL="${2:-}"; shift ;;
+        --connect) CONNECT="${2:-}"; shift ;;
+        --apps) TV_APPS=1 ;;
         -h|--help) usage 0 ;;
         *) echo "Unknown option: $1"; usage 1 ;;
     esac
@@ -125,9 +170,38 @@ if ! command -v adb >/dev/null 2>&1; then
     exit 1
 fi
 
+# Over the network: connect first, then talk to that device only (its serial is the address).
+if [ -n "$CONNECT" ]; then
+    case "$CONNECT" in
+        *:*) ;;
+        *) CONNECT="$CONNECT:5555" ;;   # Network debugging's port on a Shield and most Android TVs
+    esac
+    out="$(adb connect "$CONNECT" 2>&1 | tr -d '\r')"
+    case "$out" in
+        *"connected to"*) echo "$out" ;;
+        *)
+            echo "Couldn't connect to $CONNECT: $out"
+            echo "Check that network (or wireless) debugging is on and the address is right. A tablet on Android 11"
+            echo "or later needs pairing first: adb pair <IP>:<pairing port>, with the code its screen shows."
+            exit 1
+            ;;
+    esac
+    SERIAL="$CONNECT"
+fi
+
 ADB=(adb)
 if [ -n "$SERIAL" ]; then
     ADB=(adb -s "$SERIAL")
+fi
+
+# How to reach this device again, for the commands this suggests (a network address needs connecting again
+# after adb restarts, which --connect does).
+if [ -n "$CONNECT" ]; then
+    AGAIN=" --connect $CONNECT"
+elif [ -n "$SERIAL" ]; then
+    AGAIN=" -s $SERIAL"
+else
+    AGAIN=""
 fi
 
 # Runs a command on the tablet; drops the carriage returns adb adds on some systems.
@@ -135,10 +209,21 @@ on_device() {
     "${ADB[@]}" shell "$@" </dev/null | tr -d '\r'
 }
 
+# A network connection can take a moment to be authorised: the TV or tablet asks on its screen first.
 STATE="$("${ADB[@]}" get-state 2>&1 | tr -d '\r')"
+if [ -n "$CONNECT" ] && [ "$STATE" != "device" ]; then
+    echo "Accept the \"Allow debugging?\" prompt on the device's screen..."
+    tries=0
+    while [ "$STATE" != "device" ] && [ "$tries" -lt 30 ]; do
+        sleep 2
+        tries=$((tries + 1))
+        STATE="$("${ADB[@]}" get-state 2>&1 | tr -d '\r')"
+    done
+fi
 if [ "$STATE" != "device" ]; then
-    echo "No tablet ready: $STATE"
-    echo "Connect it, turn on USB debugging, and accept the \"Allow USB debugging?\" prompt on its screen."
+    echo "No device ready: $STATE"
+    echo "Connect it (by cable, or with --connect <IP> over the network), turn on debugging, and accept the"
+    echo "\"Allow debugging?\" prompt on its screen."
     echo "With more than one device connected, pick one with -s <serial> (see: adb devices)."
     exit 1
 fi
@@ -147,14 +232,25 @@ DEVICE_SERIAL="$("${ADB[@]}" get-serialno | tr -d '\r')"
 MODEL="$(on_device getprop ro.product.model)"
 ANDROID="$(on_device getprop ro.build.version.release)"
 ONEUI="$(on_device getprop ro.build.version.oneui)"
-echo "Tablet: $MODEL ($DEVICE_SERIAL), Android $ANDROID${ONEUI:+, One UI $ONEUI}"
+# An Android TV (a Shield, a TV with Android TV or Google TV): "leanback" is Android's TV interface.
+IS_TV=""
+if on_device pm list features | grep -q '^feature:android.software.leanback$'; then
+    IS_TV=1
+fi
+if [ -n "$IS_TV" ]; then
+    KIND="TV"
+    echo "Android TV: $(on_device getprop ro.product.manufacturer) $MODEL ($DEVICE_SERIAL), Android $ANDROID"
+else
+    KIND="tablet"
+    echo "Tablet: $MODEL ($DEVICE_SERIAL), Android $ANDROID${ONEUI:+, One UI $ONEUI}"
+fi
 echo
 
 # ---- Restore ------------------------------------------------------------------------------------------
 
 if [ "$MODE" = "restore" ]; then
     if [ -z "$RESTORE_LOG" ] || [ ! -f "$RESTORE_LOG" ]; then
-        echo "Give the log the --apply run wrote, e.g.: --restore ${LOG_PREFIX}-${DEVICE_SERIAL}-2026-11-04.log"
+        echo "Give the log the --apply run wrote, e.g.: --restore ${LOG_PREFIX}-$(echo "$DEVICE_SERIAL" | tr ':' '-')-2026-11-04.log"
         exit 1
     fi
     restored=0
@@ -185,7 +281,7 @@ if [ "$MODE" = "restore" ]; then
         esac
     done < "$RESTORE_LOG"
     echo
-    echo "Restored $restored package(s); $failed need attention (above). Restart the tablet to finish."
+    echo "Restored $restored package(s); $failed need attention (above). Restart the $KIND to finish."
     exit 0
 fi
 
@@ -208,7 +304,7 @@ on_device pm list packages -3 | sed 's/^package://' | sort -u > "$WORK/apps.txt"
 comm -23 "$WORK/installed.txt" "$WORK/apps.txt" > "$WORK/system.txt"
 
 if [ ! -s "$WORK/installed.txt" ]; then
-    echo "Couldn't list the tablet's packages. Is the screen unlocked and USB debugging allowed?"
+    echo "Couldn't list the $KIND's packages. Is the screen unlocked and debugging allowed?"
     exit 1
 fi
 
@@ -217,6 +313,11 @@ fi
 for pkg in "${PROTECT[@]}"; do
     echo "$pkg" >> "$WORK/protect.txt"
 done
+if [ -n "$IS_TV" ]; then
+    for pkg in "${TV_PROTECT[@]}"; do
+        echo "$pkg" >> "$WORK/protect.txt"
+    done
+fi
 
 why_kept=""
 note_kept() {
@@ -237,10 +338,17 @@ voice="$(on_device settings get secure tts_default_synth)"
 # engine and Android System Intelligence with Private Compute Services (all kept above). On a Galaxy Tab
 # A9+, removing the last two left a recognizer that never got ready ("Couldn't hear you, error 11").
 # (Samsung's own recognizers and the Google app's online one aren't needed and still go.)
-on_device cmd package query-services --brief -a android.speech.RecognitionService \
-    | sed -n 's#^\(com\.google\.android\.\(as\|tts\)\)/.*#\1#p' | sort -u > "$WORK/hearing.txt"
+# On a TV she hears you through the TV's own speech service (its voice search, which listens to the remote),
+# so every recognizer there stays.
+if [ -n "$IS_TV" ]; then
+    on_device cmd package query-services --brief -a android.speech.RecognitionService \
+        | sed -n 's#^\([A-Za-z][A-Za-z0-9_.]*\)/.*#\1#p' | sort -u > "$WORK/hearing.txt"
+else
+    on_device cmd package query-services --brief -a android.speech.RecognitionService \
+        | sed -n 's#^\(com\.google\.android\.\(as\|tts\)\)/.*#\1#p' | sort -u > "$WORK/hearing.txt"
+fi
 while read -r pkg; do
-    note_kept "$pkg" "speech recognition (Lena hears you on the tablet)"
+    note_kept "$pkg" "speech recognition (Lena hears you on the $KIND)"
 done < "$WORK/hearing.txt"
 
 webview="$(on_device dumpsys webviewupdate | sed -n 's/.*Current WebView package (name, version): (\([^,]*\),.*/\1/p' | head -1)"
@@ -253,8 +361,13 @@ home="$(on_device cmd package resolve-activity --brief -a android.intent.action.
 home="${home%%/*}"
 note_kept "$home" "the home app"
 if [ "$home" != "io.github.soullink9.lena" ]; then
-    echo "Note: Lena isn't the home app yet (it's: ${home:-none chosen}). Make it the home app in Lena's"
-    echo "Settings → Wall display before you remove things, so there's always a home screen."
+    if [ -n "$IS_TV" ]; then
+        echo "Note: Lena isn't the TV's home screen yet (it's: ${home:-none chosen}). That's fine: the TV's launcher"
+        echo "stays. To make the Home button open Lena: tools/android-tv-home.sh --apply$AGAIN"
+    else
+        echo "Note: Lena isn't the home app yet (it's: ${home:-none chosen}). Make it the home app in Lena's"
+        echo "Settings → Wall display before you remove things, so there's always a home screen."
+    fi
     echo
 fi
 
@@ -268,8 +381,13 @@ done
 sort -u "$WORK/list-names.txt" "$WORK/extra.txt" > "$WORK/wanted.txt"
 comm -12 "$WORK/system.txt" "$WORK/wanted.txt" | comm -23 - "$WORK/protect.txt" > "$WORK/remove-system.txt"
 
-# Apps installed on top of the firmware, minus protected.
-comm -23 "$WORK/apps.txt" "$WORK/protect.txt" > "$WORK/remove-apps.txt"
+# Apps installed on top of the firmware, minus protected. On a TV only with --apps: a Shield is often still
+# the TV's media box, and its streaming apps are installed on top.
+if [ -n "$IS_TV" ] && [ -z "$TV_APPS" ]; then
+    : > "$WORK/remove-apps.txt"
+else
+    comm -23 "$WORK/apps.txt" "$WORK/protect.txt" > "$WORK/remove-apps.txt"
+fi
 
 # Firmware packages nobody has rated: shown for review, left alone.
 sort -u "$WORK/list-names.txt" "$WORK/known.txt" "$WORK/protect.txt" "$WORK/extra.txt" > "$WORK/rated.txt"
@@ -296,21 +414,25 @@ n_apps="$(count "$WORK/remove-apps.txt")"
 n_unknown="$(count "$WORK/unknown.txt")"
 
 if [ "$MODE" = "preview" ]; then
-    echo "== Would remove $n_system Samsung, Google and preinstalled packages"
+    echo "== Would remove $n_system ${IS_TV:+TV, }Samsung, Google and preinstalled packages"
     describe "$WORK/remove-system.txt"
     echo
     echo "== Would uninstall $n_apps app(s) installed on top (reinstall from the Play Store if wanted)"
     sed 's/^/  /' "$WORK/remove-apps.txt"
+    if [ -n "$IS_TV" ] && [ -z "$TV_APPS" ]; then
+        echo "  (On a TV, apps installed on top stay. Add --apps to uninstall them too.)"
+    fi
     echo
-    echo "== Kept for this tablet"
+    echo "== Kept for this $KIND"
     printf '%s' "$why_kept"
     echo
     echo "== Not in the list: $n_unknown firmware package(s) left alone"
-    echo "   Mostly Android's own parts. Newer Samsung extras (Galaxy AI and so on) can show up here too:"
-    echo "   look up any you don't recognise, and add the ones you want gone to EXTRA_REMOVE."
+    echo "   Mostly Android's own parts. Newer Samsung extras (Galaxy AI and so on) can show up here too, and on a"
+    echo "   Shield, Nvidia's own apps (NVIDIA Games and the like): look up any you don't recognise, and add the"
+    echo "   ones you want gone to EXTRA_REMOVE."
     sed 's/^/  /' "$WORK/unknown.txt"
     echo
-    echo "Nothing was changed. To remove the $((n_system + n_apps)) above: $0 --apply${SERIAL:+ -s $SERIAL}"
+    echo "Nothing was changed. To remove the $((n_system + n_apps)) above: $0 --apply$AGAIN${TV_APPS:+ --apps}"
     exit 0
 fi
 
@@ -331,10 +453,11 @@ if [ "$answer" != "REMOVE" ]; then
     exit 1
 fi
 
-LOG="${LOG_PREFIX}-${DEVICE_SERIAL}-$(date +%Y-%m-%d-%H%M).log"
+# A network device's serial is its address; the ":" before the port isn't allowed in Windows file names.
+LOG="${LOG_PREFIX}-$(echo "$DEVICE_SERIAL" | tr ':' '-')-$(date +%Y-%m-%d-%H%M).log"
 {
     echo "# wall-display-debloat.sh on $MODEL ($DEVICE_SERIAL), Android $ANDROID, $(date)"
-    echo "# Undo with: $0 --restore $LOG${SERIAL:+ -s $SERIAL}"
+    echo "# Undo with: $0 --restore $LOG$AGAIN"
 } > "$LOG"
 
 removed=0
@@ -382,9 +505,9 @@ done < "$WORK/remove-apps.txt"
 
 echo
 echo "Done: $removed removed, $disabled switched off, $failed refused by Android."
-echo "The log is $LOG; keep it. To undo: $0 --restore $LOG${SERIAL:+ -s $SERIAL}"
+echo "The log is $LOG; keep it. To undo: $0 --restore $LOG$AGAIN"
 echo
-printf 'Restart the tablet now? [y/N] '
+printf 'Restart the %s now? [y/N] ' "$KIND"
 read -r answer
 case "$answer" in
     y|Y|yes|YES) "${ADB[@]}" reboot && echo "Restarting." ;;

@@ -12,6 +12,11 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 - **The TV's home screen.** `tools/android-tv-home.sh` (from a computer with adb, once) turns the TV's own launcher off and makes Lena the home app, so the Home button opens her; `--restore` undoes it. Android TV has no setting for this.
 - The Apps button lists and opens the TV's apps too.
 
+### Wall display debloat
+
+- **Nvidia Shield and Android TV.** `tools/wall-display-debloat.sh` recognises an Android TV and keeps what it needs on top of the usual list: the TV's voice search (Lena hears you through it), keyboard, remote service, Settings and launcher, the device keys streaming apps may check, and on a Shield, Shield Accessories, its button hooks and its updates. Apps installed on top stay on a TV unless you add `--apps`.
+- **Over the network.** `--connect <IP>[:<port>]` (both scripts) connects with adb first and waits for the device's "Allow debugging?" prompt: a Shield's Network debugging, or a tablet's Wireless debugging. The suggested commands and the log carry the address, and log names no longer contain a ":" (not allowed in Windows file names).
+
 ### Development
 
 - `minSdk` is now 30 (Android 11); `targetSdk` and `compileSdk` stay 36. Newer calls are behind version checks (`Compat.kt`), and release builds fail on any that isn't (lint's NewApi is fatal). The APK also carries the wake word's 32-bit ARM code, for TV boxes that run 32-bit Android.

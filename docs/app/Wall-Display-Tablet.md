@@ -2,7 +2,7 @@
 
 A tablet that only runs Lena's wall display doesn't need most of what came on it. [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) strips a Samsung tablet down to Lena and a few apps you choose, so nothing else runs in the background, nags with notifications or updates itself overnight.
 
-It's optional and fully reversible. It's written for Samsung tablets (One UI), and works on other Android devices too, but there it removes only the Google, AOSP and preinstalled packages it knows.
+It's optional and fully reversible. It's written for Samsung tablets (One UI), and works on other Android devices too, but there it removes only the Google, AOSP and preinstalled packages it knows. It also knows the **Nvidia Shield** and other Android TV boxes: see [On an Nvidia Shield or Android TV](#on-an-nvidia-shield-or-android-tv).
 
 ## What it keeps
 
@@ -57,6 +57,27 @@ Make Lena the home screen first (**Settings → Wall display → Make it this de
    It asks you to type `REMOVE`, removes everything from the preview, writes a log named `debloat-<serial>-<date>.log` in the current folder, and offers to restart the tablet. Keep the log.
 
 With more than one device connected, add `-s <serial>` (see `adb devices`). It runs in the bash that comes with macOS and Linux, and in Git Bash or WSL on Windows.
+
+**Over Wi-Fi instead of a cable:** add `--connect <IP>:<port>`. On Android 11 and later, turn on **Developer options → Wireless debugging**, tap **Pair device with pairing code**, and run `adb pair <IP>:<pairing port>` with that code once; then use the IP address and port shown on the Wireless debugging screen (not the pairing port). The log name and every command it suggests carry the address, so `--restore` reaches the device the same way.
+
+## On an Nvidia Shield or Android TV
+
+The script recognises an Android TV (a Shield, a TV with Android TV or Google TV) and changes three things:
+
+- **More is kept** (`TV_PROTECT` in the script): the TV's voice search and its speech parts (Lena hears you through the remote with them), the TV's keyboard, the Android TV Remote Service (the Google TV app's remote and keyboard on your phone), TV Settings, the TV's own launcher (so [`tools/android-tv-home.sh`](../../tools/android-tv-home.sh) can turn it back on), the device keys streaming apps' copy protection may check, and on a Shield, Shield Accessories (the remote and controllers), its button hooks and its system updates.
+- **Apps installed on top stay** (Netflix, Plex and the like): a Shield is often still the TV's media box. Add `--apps` to uninstall them too, as on a tablet.
+- **The home screen isn't required:** the TV's launcher stays until you run `tools/android-tv-home.sh --apply` (see [Lena on Android TV](Android-TV.md)).
+
+Nvidia's own apps (NVIDIA Games and the like) aren't on the list the script uses, so they're shown under "Not in the list" and left alone; add the ones you want gone to `EXTRA_REMOVE`.
+
+Over the network: on the TV, **Settings → Device Preferences → About**, click **Build** seven times, then **Device Preferences → Developer options → Network debugging**. Then:
+
+```
+./tools/wall-display-debloat.sh --connect <the TV's IP address>
+./tools/wall-display-debloat.sh --connect <the TV's IP address> --apply
+```
+
+The port is 5555 unless you give another. Accept the "Allow network debugging?" prompt on the TV the first time; the script waits for it.
 
 ## Going further
 

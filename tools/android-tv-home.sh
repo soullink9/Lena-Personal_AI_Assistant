@@ -10,12 +10,14 @@
 #
 # Run it from a computer with adb (Android platform-tools). On the TV: Settings → Device Preferences →
 # About → click Build 7 times; then Settings → Device Preferences → Developer options → Network debugging
-# (Shield) or USB debugging. Then, on the computer:  adb connect <the TV's IP address>
+# (Shield) or USB debugging. Then use --connect with the TV's IP address (or `adb connect` it yourself), and
+# accept the "Allow network debugging?" prompt on the TV.
 #
 #   ./android-tv-home.sh             Preview: shows the TV, its launcher and what would change. Changes nothing.
 #   ./android-tv-home.sh --apply     Makes Lena the home screen.
 #   ./android-tv-home.sh --restore   Gives the TV its own home screen back.
-#   Add -s <serial> to pick a device when more than one is connected (see `adb devices`).
+#   Add --connect <IP>[:<port>] to reach the TV over the network (port 5555 if left out),
+#   or -s <serial> to pick a device when more than one is connected (see `adb devices`).
 #
 # Works with the bash that comes with macOS (3.2), Linux, and Git Bash or WSL on Windows.
 
@@ -34,11 +36,13 @@ LAUNCHERS=(
 
 mode=preview
 serial=()
+connect=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --apply) mode=apply ;;
         --restore) mode=restore ;;
         -s) serial=(-s "${2:?-s needs a device serial}"); shift ;;
+        --connect) connect="${2:?--connect needs the IP address of the TV}"; shift ;;
         -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
     esac
@@ -49,8 +53,26 @@ done
 on_tv() { adb "${serial[@]+"${serial[@]}"}" shell "$@" 2>&1 | tr -d '\r'; }
 
 command -v adb >/dev/null || { echo "adb isn't installed: get Android platform-tools first." >&2; exit 1; }
+
+# Over the network: connect, wait for the TV's "Allow network debugging?" to be accepted, then use only it.
+if [ -n "$connect" ]; then
+    case "$connect" in *:*) ;; *) connect="$connect:5555" ;; esac
+    result="$(adb connect "$connect" 2>&1 | tr -d '\r')"
+    case "$result" in
+        *"connected to"*) echo "$result" ;;
+        *) echo "Couldn't connect to $connect: $result (is Network debugging on, and the address right?)" >&2; exit 1 ;;
+    esac
+    serial=(-s "$connect")
+    tries=0
+    until [ "$(adb -s "$connect" get-state 2>/dev/null | tr -d '\r')" = device ] || [ "$tries" -ge 30 ]; do
+        [ "$tries" -eq 0 ] && echo "Accept the \"Allow network debugging?\" prompt on the TV..."
+        sleep 2
+        tries=$((tries + 1))
+    done
+fi
+
 if ! adb "${serial[@]+"${serial[@]}"}" get-state >/dev/null 2>&1; then
-    echo "No TV connected. Turn on network or USB debugging on the TV, then: adb connect <its IP address>" >&2
+    echo "No TV connected. Turn on network or USB debugging on the TV, then run this with --connect <its IP address>" >&2
     exit 1
 fi
 
@@ -92,7 +114,7 @@ case "$mode" in
         # Android 7 and later: the home app, as choosing it in a phone's settings would.
         on_tv cmd package set-home-activity "$LENA_HOME" >/dev/null
         echo "The Home button now opens: $(on_tv cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN | tail -1)"
-        echo "Press Home on the remote to try it. To undo: $0 --restore"
+        echo "Press Home on the remote to try it. To undo: $0 --restore${connect:+ --connect $connect}"
         ;;
     restore)
         for pkg in "${installed[@]+"${installed[@]}"}"; do
