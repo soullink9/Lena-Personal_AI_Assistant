@@ -35,7 +35,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -113,9 +112,8 @@ class HaPairActivity : ComponentActivity() {
             val base = Prefs.normalize(address) ?: throw IOException("Use your Home Assistant's https:// address.")
             val trimmed = token.trim()
             if (trimmed.isEmpty()) throw IOException("Paste the token first.")
-            if (!runBlocking { HomeAssistant(base, trimmed).check() }) {
-                throw IOException("Home Assistant didn't accept that token at $base. Check the address and the token.")
-            }
+            // Says exactly what went wrong (refused, or not reached, and why), on the phone and in the log.
+            HaSignIn.verify(base, trimmed)
             return save(base, trimmed)
         }
 
@@ -200,6 +198,54 @@ class HaPairActivity : ComponentActivity() {
  * Lena works exactly as with one made by hand ([HaPairActivity]).
  */
 object HaSignIn {
+    /**
+     * Checks a token against Home Assistant, the way every later request will use it. Throws with what
+     * went wrong, in words for the phone: Home Assistant refusing the token, or this device not reaching
+     * Home Assistant at all, which looks the same from the phone but has nothing to do with the token (a
+     * name this device can't look up, a certificate it doesn't trust, a network it isn't on).
+     */
+    fun verify(base: String, token: String) {
+        val conn = URL(base + "api/").openConnection() as HttpURLConnection
+        try {
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 15_000
+            conn.instanceFollowRedirects = false
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            val code = try {
+                conn.responseCode
+            } catch (e: IOException) {
+                Logs.w("Pairing", "Couldn't reach Home Assistant at $base", e)
+                throw IOException(unreachable(base, e))
+            }
+            when {
+                code == 401 || code == 403 -> throw IOException(
+                    "Home Assistant at $base refused that token (HTTP $code). Make a new one in your profile → Security, and paste all of it."
+                )
+                code in 300..399 -> throw IOException(
+                    "$base sends this device somewhere else (HTTP $code, to ${conn.getHeaderField("Location")}). Use the address it ends up at."
+                )
+                code !in 200..299 -> throw IOException("Home Assistant at $base answered HTTP $code. Check the address.")
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Why this device couldn't reach Home Assistant, in words, with what usually fixes it. */
+    private fun unreachable(base: String, e: IOException): String {
+        val host = runCatching { URL(base).host }.getOrDefault(base)
+        return when {
+            e is java.net.UnknownHostException && host.endsWith(".local") && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S ->
+                "This device can't look up $host: Android before 12 doesn't find .local names. Use the address you use away from home, or one your router's DNS knows."
+            e is java.net.UnknownHostException -> "This device can't look up $host. Check the address, and that this device uses the same network and DNS as your phone."
+            e is javax.net.ssl.SSLException || e.cause is java.security.cert.CertificateException ->
+                "This device doesn't trust $host's certificate (${e.message}). A certificate from your own authority has to be installed on this device too; one from Let's Encrypt or Nabu Casa just works."
+            e is java.net.SocketTimeoutException || e is java.net.ConnectException ->
+                "This device couldn't connect to $host (${e.message}). Check that it's reachable from this device's network."
+            else -> "This device couldn't reach Home Assistant at $base: ${e.message}"
+        }
+    }
+
     /**
      * Swaps Home Assistant's one-time [code] for a sign-in, asks for a long-lived token called [name] (only
      * its WebSocket API makes them), and signs that first sign-in out again, so only the token is left.
