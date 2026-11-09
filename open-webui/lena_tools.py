@@ -1,7 +1,7 @@
 """
 title: Lena (memory, feelings, calendar, timers, intercom, history)
 author: soullink9
-version: 0.6.12
+version: 0.6.13
 license: GPL-3.0
 description: Lets Lena save, correct and remove her Home Assistant memories, record how something made her feel, add calendar events, set timers, alarms and reminders on her displays, change her volume, speak in another room, and look back at the house's history, from Open WebUI and the Lena app.
 """
