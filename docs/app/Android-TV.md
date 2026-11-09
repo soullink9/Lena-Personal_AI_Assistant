@@ -18,6 +18,8 @@ Lena opens on **Connect Home Assistant**. Choose **Connect from your phone**: th
 
 1. **Home Assistant, from your phone**: scan the QR code with your phone's camera (or type the short address into its browser), on the same Wi-Fi as the TV. On the page that opens, check your Home Assistant's address and tap **Sign in with Home Assistant**; you sign in on your Home Assistant's own page (your password manager works there), and Lena on the TV makes herself a long-lived token, named after the TV, which you'll see in your Home Assistant profile under **Security**. The page also takes a token you've made yourself, pasted. The TV closes the screen once it's connected, and the wall display starts. It's also in **Settings → Home Assistant → Connect from your phone**.
 
+If the page says Home Assistant won't talk to the TV (HTTP 403), Home Assistant has most likely banned the TV's address after earlier failed sign-ins (a token mistyped with the remote counts). Its notifications name the address; remove that line from `ip_bans.yaml` in Home Assistant's config folder (with the File editor or Studio Code Server add-on) and restart Home Assistant. A proxy or firewall in front of Home Assistant can also refuse a device.
+
 For anything else you'd type on the TV, the **Google TV** app's remote on your phone has a keyboard that types into the TV, and you can paste there too.
 2. **Who answers**: Home Assistant's Assist is the simplest on a TV. To use Open WebUI instead, enter its address and turn on **Sign in by herself** with your Open WebUI email and password: a TV can't open Open WebUI's sign-in page.
 3. **Hearing you**: **The TV's voice search** (the default). It's the TV's own speech recognition, the one that hears through the remote's microphone.

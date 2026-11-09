@@ -218,8 +218,17 @@ object HaSignIn {
                 throw IOException(unreachable(base, e))
             }
             when {
-                code == 401 || code == 403 -> throw IOException(
-                    "Home Assistant at $base refused that token (HTTP $code). Make a new one in your profile → Security, and paste all of it."
+                code == 401 -> throw IOException(
+                    "Home Assistant at $base refused that token (HTTP 401). Make a new one in your profile → Security, and paste all of it."
+                )
+                // Home Assistant answers a wrong token with 401. A 403 means it (or something in front of it)
+                // won't talk to this device whatever the token: most often Home Assistant has banned the
+                // device's address after failed sign-ins, such as a token mistyped with a remote.
+                code == 403 -> throw IOException(
+                    "Home Assistant at $base won't talk to this device (HTTP 403), whatever the token. Most likely it banned " +
+                        "this device's address after earlier failed sign-ins: remove the address from ip_bans.yaml in Home " +
+                        "Assistant's config folder and restart Home Assistant (its notifications say which address was banned). " +
+                        "Otherwise a proxy or firewall in front of Home Assistant is blocking this device."
                 )
                 code in 300..399 -> throw IOException(
                     "$base sends this device somewhere else (HTTP $code, to ${conn.getHeaderField("Location")}). Use the address it ends up at."
