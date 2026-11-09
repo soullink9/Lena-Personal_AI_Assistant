@@ -195,9 +195,24 @@ class DashboardActivity : ComponentActivity() {
     /** The Refresh generation the dashboards were loaded at; a newer one reloads them (see [Refresh]). */
     private var refreshSeen = Refresh.generation
 
+    /** What Home Assistant still needs before there's anything to show, in words; null when it's all set. */
+    private fun missing(): String? {
+        val server = Prefs.haServer(this)
+        val token = Secrets.get(this, Secrets.HA_TOKEN)
+        return when {
+            server == null && token == null -> "Add your Home Assistant's address and a long-lived token"
+            server == null -> "Add your Home Assistant's address"
+            token == null -> "Add a long-lived token from your Home Assistant profile"
+            HomeAssistant.from(this) == null -> "Check your Home Assistant's address"
+            else -> null
+        }
+    }
+
     /**
-     * Needs Home Assistant's address and token; without them it opens Settings. Full screen and kept on in
-     * dashboard mode, and asks for the microphone if the wake word is on.
+     * Needs Home Assistant's address and token. Without them it opens Settings, except where it's the home
+     * screen (or a TV's wall display): there, leaving Settings opens the home screen again, which would open
+     * Settings again, with no way out. So there it says what's missing, with Settings and your apps.
+     * Full screen and kept on in dashboard mode, and asks for the microphone if the wake word is on.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -205,9 +220,14 @@ class DashboardActivity : ComponentActivity() {
         val server = Prefs.haServer(this)
         val saved = Secrets.get(this, Secrets.HA_TOKEN)
         if (ha == null || server == null || saved == null) {
-            // Nothing to show without Home Assistant: go and set it up.
-            startActivity(Intent(this, SettingsActivity::class.java))
-            finish()
+            if (isHomeScreen(this) || tv) {
+                enableEdgeToEdge()
+                setContent { LenaTheme { NotSetUp(missing() ?: "Check your Home Assistant connection") } }
+            } else {
+                // Nothing to show without Home Assistant: go and set it up.
+                startActivity(Intent(this, SettingsActivity::class.java))
+                finish()
+            }
             return
         }
         house = ha
@@ -541,7 +561,11 @@ class DashboardActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
-        if (!::web.isInitialized) return
+        if (!::web.isInitialized) {
+            // Back from Settings with Home Assistant now set up: start again, dashboards and all.
+            if (!isFinishing && missing() == null) recreate()
+            return
+        }
         applyWindowMode()
         if (refreshSeen != Refresh.generation) {
             refreshSeen = Refresh.generation
@@ -596,6 +620,35 @@ class DashboardActivity : ComponentActivity() {
     }
 
     // ---- The screen -----------------------------------------------------------------------
+
+    /**
+     * The home screen before Home Assistant is set up: what's missing, Settings, and your apps, so the
+     * device is never left without a way to open anything.
+     */
+    @Composable
+    private fun NotSetUp(what: String) {
+        var apps by remember { mutableStateOf(false) }
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(32.dp),
+            ) {
+                Text("Connect Home Assistant", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "The wall display shows your Home Assistant dashboards. $what in Settings → Home Assistant.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilledTonalButton(onClick = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }) { Text("Settings") }
+                    androidx.compose.material3.OutlinedButton(onClick = { apps = true }) { Text("Apps") }
+                }
+            }
+            if (apps) AppsDrawer(onClose = { apps = false })
+        }
+    }
 
     /**
      * The bar (or the worried banner), the page, the screen saver over it, and the apps list, plus the

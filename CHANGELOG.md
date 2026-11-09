@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Stuck in Settings on a new wall display.** With Lena as the home screen but Home Assistant not set up yet (a tablet set up in that order, or one whose token didn't save), leaving Settings opened the home screen, which opened Settings again, so Back seemed to do nothing. The wall display now says what's missing instead, with **Settings** and **Apps** buttons, and opens your dashboards as soon as you come back from Settings with Home Assistant set up.
+
 ## [0.6.13] - 2026-11-08
 
 ### Android app
