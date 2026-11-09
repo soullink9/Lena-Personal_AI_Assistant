@@ -76,6 +76,7 @@ Either way she listens through **The TV's voice search**. Some remotes send thei
 - **Hearing**: **The TV's voice search** uses the remote's microphone. **Your server** and **Home Assistant** record the sound themselves, which needs a microphone plugged into the TV box: Android doesn't give apps the remote's.
 - **Wake word**: needs a microphone plugged into the TV box (USB), as the remote's microphone is only on while you hold its button.
 - **Android 11** (Shield): her words don't appear as you speak on every TV (it depends on the TV's voice search), and after her name the microphone briefly changes hands, as on phones before Android 13.
+- **Her volume**: the TV box's volume is the volume of everything on the TV, so Lena keeps her own changes to it (quieter in the morning and at night, "speak more quietly") at 40% or more of it. Settings → Talking to Lena → **Her quietest** and **Her loudest** change that.
 - Settings that only make sense on a phone (the assistant gesture, widgets, the chat screen) aren't shown.
 
 ## Not yet checked on a real TV

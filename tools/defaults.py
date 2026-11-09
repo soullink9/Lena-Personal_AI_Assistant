@@ -109,6 +109,11 @@ def loosely(label: str) -> str:
     return " ".join(word.removesuffix("s") for word in label.lower().split())
 
 
+def percents(*options: int) -> dict[str, str]:
+    """Volumes as the app words them ("40%"), and their numbers."""
+    return {f"{value}%": str(value) for value in options}
+
+
 def seconds(*options: tuple[str, int]) -> dict[str, str]:
     """Durations as the app words them, and their seconds."""
     return {label: str(value) for label, value in options}
@@ -156,6 +161,16 @@ SETTINGS = [
         "Don't read replies aloud": "Speaking.OFF"}),
     Setting("Talking to Lena › How she looks and sounds › Her voice follows her mood", "MOOD_VOICE", "Boolean", ON_OFF),
     Setting("Talking to Lena › How she looks and sounds › Adjust her volume", "AUTO_VOLUME", "Boolean", ON_OFF),
+    # Her volume's limits ([Loudness]): what she keeps her own volume changes within. Each kind of device
+    # has its own, since a TV box's volume is the volume of everything on the TV (Prefs.quietestVolume).
+    Setting("Talking to Lena › How she looks and sounds › Her quietest (phones and tablets)", "QUIETEST_VOLUME", "Int",
+            percents(0, 10, 20, 30, 40, 50, 60)),
+    Setting("Talking to Lena › How she looks and sounds › Her loudest (phones and tablets)", "LOUDEST_VOLUME", "Int",
+            percents(50, 60, 70, 80, 90, 100)),
+    Setting("Talking to Lena › How she looks and sounds › Her quietest (TVs)", "TV_QUIETEST_VOLUME", "Int",
+            percents(0, 10, 20, 30, 40, 50, 60)),
+    Setting("Talking to Lena › How she looks and sounds › Her loudest (TVs)", "TV_LOUDEST_VOLUME", "Int",
+            percents(50, 60, 70, 80, 90, 100)),
     Setting("Talking to Lena › How she looks and sounds › Keep listening", "FOLLOW_UP", "FollowUp", {
         "After every reply": "FollowUp.ALWAYS", "When she asks a question": "FollowUp.QUESTIONS", "Off": "FollowUp.OFF"}),
     Setting("Talking to Lena › Interacting with Lena › The assistant gesture opens", "ASSIST", "AssistAction", {

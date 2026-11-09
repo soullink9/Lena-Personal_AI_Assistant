@@ -180,6 +180,12 @@ data class Settings(
     val moodVoice: Boolean = Defaults.MOOD_VOICE,
     /** Quieter early in the morning and late at night, louder when the room is noisy ([Loudness]). */
     val autoVolume: Boolean = Defaults.AUTO_VOLUME,
+    /**
+     * Her quietest and loudest (0 to 100), the limits of every change she makes to the volume ([Loudness]);
+     * null is this kind of device's own (see [quietestVolume]), which is also what Return to defaults gives.
+     */
+    val quietestVolume: Int? = null,
+    val loudestVolume: Int? = null,
     val widgetMood: Boolean = Defaults.WIDGET_MOOD,
     val lockScreen: Boolean = Defaults.LOCK_SCREEN,
     val openWebUiMenus: Boolean = Defaults.OPEN_WEBUI_MENUS,
@@ -250,6 +256,20 @@ object Prefs {
     /** Her voice gets a little slower, faster, lower or brighter with her mood (needs Home Assistant). */
     fun moodVoice(c: Context): Boolean = p(c).getBoolean("mood_voice", Defaults.MOOD_VOICE)
     fun autoVolume(c: Context): Boolean = p(c).getBoolean("auto_volume", Defaults.AUTO_VOLUME)
+
+    /**
+     * Her quietest and loudest on this device, 0 to 100: what she keeps her own volume changes within
+     * (Adjust her volume, and "speak louder"). Unless you've chosen one, each kind of device has its own: on
+     * a TV box the volume is the volume of everything on the TV, so she keeps it higher there than on a
+     * phone or tablet (Defaults.TV_QUIETEST_VOLUME).
+     */
+    fun quietestVolume(c: Context): Int = chosenVolume(c, "quietest_volume")
+        ?: if (Tv.isTv(c)) Defaults.TV_QUIETEST_VOLUME else Defaults.QUIETEST_VOLUME
+    fun loudestVolume(c: Context): Int = chosenVolume(c, "loudest_volume")
+        ?: if (Tv.isTv(c)) Defaults.TV_LOUDEST_VOLUME else Defaults.LOUDEST_VOLUME
+
+    /** A volume limit you've chosen, or null for the device's own. */
+    private fun chosenVolume(c: Context, key: String): Int? = p(c).getInt(key, -1).takeIf { it in 0..100 }
 
     /** The widget shows how she feels (needs Home Assistant). */
     fun widgetMood(c: Context): Boolean = p(c).getBoolean("widget_mood", Defaults.WIDGET_MOOD)
@@ -367,6 +387,8 @@ object Prefs {
         haServer = haServer(c) ?: "",
         moodVoice = moodVoice(c),
         autoVolume = autoVolume(c),
+        quietestVolume = chosenVolume(c, "quietest_volume"),
+        loudestVolume = chosenVolume(c, "loudest_volume"),
         widgetMood = widgetMood(c),
         lockScreen = lockScreen(c),
         openWebUiMenus = showOpenWebUiMenus(c),
@@ -412,6 +434,8 @@ object Prefs {
             .putString("ha_server", s.haServer)
             .putBoolean("mood_voice", s.moodVoice)
             .putBoolean("auto_volume", s.autoVolume)
+            .putInt("quietest_volume", s.quietestVolume ?: -1)
+            .putInt("loudest_volume", s.loudestVolume ?: -1)
             .putBoolean("widget_mood", s.widgetMood)
             .putBoolean("lock_screen", s.lockScreen)
             .putBoolean("show_owui_menus", s.openWebUiMenus)

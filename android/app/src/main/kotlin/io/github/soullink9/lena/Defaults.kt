@@ -46,6 +46,14 @@ object Defaults {
     const val MOOD_VOICE: Boolean = false
     /** Talking to Lena › How she looks and sounds › Adjust her volume: On */
     const val AUTO_VOLUME: Boolean = true
+    /** Talking to Lena › How she looks and sounds › Her quietest (phones and tablets): 20% */
+    const val QUIETEST_VOLUME: Int = 20
+    /** Talking to Lena › How she looks and sounds › Her loudest (phones and tablets): 100% */
+    const val LOUDEST_VOLUME: Int = 100
+    /** Talking to Lena › How she looks and sounds › Her quietest (TVs): 40% */
+    const val TV_QUIETEST_VOLUME: Int = 40
+    /** Talking to Lena › How she looks and sounds › Her loudest (TVs): 100% */
+    const val TV_LOUDEST_VOLUME: Int = 100
     /** Talking to Lena › How she looks and sounds › Keep listening: After every reply */
     val FOLLOW_UP: FollowUp = FollowUp.ALWAYS
     /** Talking to Lena › Interacting with Lena › The assistant gesture opens: Talk to Lena */

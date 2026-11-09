@@ -104,7 +104,8 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 - Check **Lena's voice** in Lena's settings isn't **Off**.
 - She only reads replies aloud when you spoke. Typed questions get text replies.
 - With **Your server's voice**, Open WebUI's text-to-speech must be set up; if it isn't, Lena uses the phone's voice.
-- Replies play at media volume. With **Adjust her volume** on, she's quieter before 8 AM and after 10 PM; turn it off if that's too quiet.
+- Replies play at media volume. With **Adjust her volume** on, she's quieter before 8 AM and after 10 PM, but never below **Her quietest** (just under it); raise that if it's too quiet, or turn Adjust her volume off.
+- **The volume ended up at 0 or very low** (before 0.6.17, mostly on a TV in the morning): a conversation in quiet hours could lower it again on every reply. That's fixed; turn the volume back up once with the remote or the volume buttons.
 - With **Speak through** set to a Home Assistant speaker, she speaks there instead of on the tablet. Check the speaker is on and the chosen voice works in Home Assistant (Developer tools → Actions → `tts.speak`).
 
 ## Speaking first doesn't say anything

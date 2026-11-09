@@ -1453,6 +1453,22 @@ class SettingsActivity : ComponentActivity() {
             SwitchItem(null, "Adjust her volume", "Quieter before 8 AM and after 10 PM, louder when the room is noisy (heard by the wake word)", s.autoVolume) {
                 set(s.copy(autoVolume = it))
             }
+            // The limits of every volume change she makes (Loudness); "this device's own" differs between a
+            // TV box, where the volume is the TV's whole sound, and a phone or tablet.
+            val ownQuietest = if (tv) Defaults.TV_QUIETEST_VOLUME else Defaults.QUIETEST_VOLUME
+            val ownLoudest = if (tv) Defaults.TV_LOUDEST_VOLUME else Defaults.LOUDEST_VOLUME
+            PickItem(null, "Her quietest",
+                listOf<Pair<Int?, String>>(null to "This device's own ($ownQuietest%)") + listOf(0, 10, 20, 30, 40, 50, 60).map { it to "$it%" },
+                s.quietestVolume,
+                detail = { if (it == null) "She never speaks quieter, even early in the morning" else null }) {
+                set(s.copy(quietestVolume = it))
+            }
+            PickItem(null, "Her loudest",
+                listOf<Pair<Int?, String>>(null to "This device's own ($ownLoudest%)") + listOf(50, 60, 70, 80, 90, 100).map { it to "$it%" },
+                s.loudestVolume,
+                detail = { if (it == null) "She never speaks louder, even in a noisy room" else null }) {
+                set(s.copy(loudestVolume = it))
+            }
             SwitchItem(null, "Her voice follows her mood", "Slower when she's groggy, brighter when she's cheerful. Needs Home Assistant.", s.moodVoice) {
                 set(s.copy(moodVoice = it))
             }

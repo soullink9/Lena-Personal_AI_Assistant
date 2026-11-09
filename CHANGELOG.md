@@ -2,6 +2,13 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Her volume stays within limits, and no longer drifts to 0.** In quiet hours (before 8 AM, from 10 PM), a reply that started while the last was still being spoken lowered the volume again from the already lowered one, and the first to finish put back the wrong one, so a morning conversation could end with the device (a TV's whole sound, on a TV box) at nothing. Overlapping replies now share one change, the volume from before goes back once the last is spoken (and next time if she was closed mid-sentence), and a volume you change while she speaks stays.
+- **Her quietest and her loudest.** Settings → Talking to Lena, under Adjust her volume: every volume change she makes (quiet hours, a noisy room, "speak more quietly" or "louder") stays between the two. Each kind of device has its own unless you choose: 20% to 100% on a phone or tablet, 40% to 100% on a TV. A device whose volume is fixed (left to the TV over HDMI) is left alone.
+
 ## [0.6.16] - 2026-11-08
 
 ### Android app
