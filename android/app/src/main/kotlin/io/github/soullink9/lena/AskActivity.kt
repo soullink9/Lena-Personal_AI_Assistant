@@ -221,6 +221,28 @@ class AskActivity : ComponentActivity() {
     /** A touch on the sheet: stops it closing by itself, since you're using it. */
     private var onTouch: (() -> Unit)? = null
 
+    /** What the TV remote's talk button does: the same as tapping the big button (set while the sheet shows). */
+    private var onRemoteTalk: (() -> Unit)? = null
+
+    /** Whether this is an Android TV: no typing, and the remote ([Tv]). */
+    private val tv by lazy { Tv.isTv(this) }
+
+    /** The TV remote: OK held, or its search button, talks (or stops her talking, or sends what you said). */
+    private val remote = Remote(onTalk = { onRemoteTalk?.invoke() })
+
+    /**
+     * On a TV, a button on the remote counts as using the sheet, like a touch, and the remote's talk button
+     * works the big button. Phones and tablets keep Android's usual keys.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (!tv) return super.dispatchKeyEvent(event)
+        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+            onTouch?.invoke()
+            WallDisplay.touched()
+        }
+        return remote.dispatch(event) { super.dispatchKeyEvent(it) }
+    }
+
     /**
      * Sees every touch before the views do, so any touch counts as using the sheet (and, on the wall
      * display, as someone being there).
@@ -431,7 +453,7 @@ class AskActivity : ComponentActivity() {
         super.onStop()
         val started = running
         if (working && started != null && Prefs.notifyReplies(this) &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            Compat.notificationsAllowed(this)
         ) {
             ReplyWorker.enqueue(applicationContext, started.chatId)
         }
@@ -868,6 +890,8 @@ class AskActivity : ComponentActivity() {
                 Phase.IDLE -> listen(false)
             }
         }
+        // The remote's talk button, kept up to date with this composition's tapOrb.
+        SideEffect { onRemoteTalk = { tapOrb() } }
 
         // Check the connections while you talk, signing in again if needed, so asking doesn't wait for it.
         LaunchedEffect(Unit) { Connections.ensure(this@AskActivity) }
@@ -940,7 +964,8 @@ class AskActivity : ComponentActivity() {
         val f = feelings
         val ui = AskUi(
             phase = phase,
-            typing = typing,
+            // A TV has no keyboard: talking is the only way to ask ([Tv]).
+            typing = typing && !tv,
             text = text,
             turns = turns,
             heard = heard,
@@ -1351,7 +1376,7 @@ class AskActivity : ComponentActivity() {
                     // Continue / copy once there's an answer
                     if (a.answered) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                            if (a.chatId != null) TextButton(onClick = a.open) { Text("Continue in Lena") }
+                            if (a.chatId != null && !tv) TextButton(onClick = a.open) { Text("Continue in Lena") }
                             TextButton(onClick = a.copy) {
                                 Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))

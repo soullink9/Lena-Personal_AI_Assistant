@@ -12,12 +12,16 @@ android {
 
     defaultConfig {
         applicationId = "io.github.soullink9.lena"
-        minSdk = 36
+        // Android 11, for Android TV boxes like the Nvidia Shield (docs/app/Android-TV.md); phones and
+        // tablets are Android 16. Anything newer than Android 11 is used only where it's there (Build.VERSION
+        // checks), and the lint block below fails the build on any call that isn't.
+        minSdk = 30
         targetSdk = 36
         versionCode = 46
         versionName = "0.6.12"
-        // Android 16 phones and tablets are 64-bit; leaving out 32-bit keeps the wake word's native code small.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        // Phones and tablets are 64-bit; many Android TV boxes run 32-bit Android on 64-bit chips, so the wake
+        // word's native code (LiteRT) comes for 32-bit ARM too.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     // The release key comes from CI secrets (see docs/app/Installation.md). Without it the APK is debug-signed.
@@ -47,6 +51,14 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // A call to anything newer than Android 11 (minSdk) without a Build.VERSION check would crash on an
+    // Android TV box, and no phone would ever show it: make it fail every release build instead. (Release
+    // builds run lint's "vital" checks; this adds NewApi to them.)
+    lint {
+        fatal += "NewApi"
+        checkReleaseBuilds = true
     }
 
     // Leave out the Google-encrypted dependency report blob.

@@ -69,7 +69,7 @@ object Alerts {
      * stay quiet. Tapping it opens Lena listening.
      */
     private fun show(c: Context, title: String, text: String, urgent: Boolean) {
-        if (c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        if (!Compat.notificationsAllowed(c)) return
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "House alerts", NotificationManager.IMPORTANCE_HIGH)

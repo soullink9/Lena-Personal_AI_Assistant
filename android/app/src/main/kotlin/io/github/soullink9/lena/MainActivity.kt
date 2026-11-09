@@ -264,6 +264,12 @@ class MainActivity : ComponentActivity() {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A TV has no chat (no keyboard to type with): a widget, shortcut or notification opens the wall display.
+        if (Tv.isTv(this) && intent?.action != ACTION_SETTINGS) {
+            startActivity(Intent(this, DashboardActivity::class.java))
+            finish()
+            return
+        }
         // With Assist answering (Settings → Who answers), Lena's own chat is the chat screen.
         if (Prefs.answers(this) == Answerer.ASSIST && intent?.action != ACTION_SETTINGS) {
             startActivity(Intent(this, AssistChatActivity::class.java))
@@ -379,7 +385,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("lena", MODE_PRIVATE)
         if (prefs.getBoolean("asked_notifications", false) || !Prefs.notifyReplies(this)) return
         prefs.edit().putBoolean("asked_notifications", true).apply()
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (!Compat.notificationsAllowed(this)) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -714,7 +720,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         if (!::web.isInitialized || !Prefs.notifyReplies(this)) return
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        if (!Compat.notificationsAllowed(this)) return
         val chatId = chatIdOf(currentUrl.value) ?: return
         val appContext = applicationContext
         lifecycleScope.launch {

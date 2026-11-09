@@ -45,7 +45,7 @@ flowchart LR
 | Her character | `ollama/Modelfile` | Who she is, how she talks, house rules. Put first in every conversation with a `MESSAGE system` line, which apps can't remove (a `SYSTEM` prompt would be replaced by any app's own). |
 | Lena integration | `custom_components/lena/` | Her feelings, her memory list, her context text, her tools for Home Assistant's agents (including adding calendar events, which Home Assistant's own tools can't), alerts, and two HTTP views for the other clients. |
 | Open WebUI filter and tool | `open-webui/` | Bringing her context into chats, and letting her remember, forget and react there. |
-| Android app | `android/` | The phone and tablet experience. Holds no server state of its own beyond settings. |
+| Android app | `android/` | The phone and tablet experience, and on Android TV the wall display only, driven by the remote (`Tv.kt`). Holds no server state of its own beyond settings. |
 | Voice bridge | `voice/bridge/` | Making Home Assistant's Piper and Whisper available to Open WebUI through an OpenAI-shaped API. |
 
 ## The Home Assistant integration

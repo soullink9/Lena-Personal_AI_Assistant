@@ -2,6 +2,20 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Android TV and the Nvidia Shield.** Lena installs on Android TV and Google TV boxes from Android 11 (she needed Android 16 before), and shows in the TV's apps with her own banner. There she's the wall display only: no chat or typing (a TV has no keyboard), and no settings that only make sense on a phone. See [Lena on Android TV](docs/app/Android-TV.md).
+- **The remote.** Hold **OK** to talk (again to send, or to stop her talking); a short press still presses what's chosen. The remote's search button, on remotes that send one, talks too; **Menu** opens Settings; any button wakes the screensaver. The row the remote is on is outlined. Each button is logged once (Settings → Logs, "Remote"), to see what a remote sends.
+- **Hearing through the remote's microphone.** On a TV, **Hearing you** offers **The TV's voice search**: the TV's own speech recognition, which hears through the remote. Phones keep the on-device recognizer.
+- **The TV's home screen.** `tools/android-tv-home.sh` (from a computer with adb, once) turns the TV's own launcher off and makes Lena the home app, so the Home button opens her; `--restore` undoes it. Android TV has no setting for this.
+- The Apps button lists and opens the TV's apps too.
+
+### Development
+
+- `minSdk` is now 30 (Android 11); `targetSdk` and `compileSdk` stay 36. Newer calls are behind version checks (`Compat.kt`), and release builds fail on any that isn't (lint's NewApi is fatal). The APK also carries the wake word's 32-bit ARM code, for TV boxes that run 32-bit Android.
+
 ## [0.6.12] - 2026-11-08
 
 ### Android app

@@ -265,7 +265,7 @@ class SettingsActivity : ComponentActivity() {
                 ),
             )
             val wantsNotifications = n.notifyReplies || n.schedules.any { it.enabled }
-            if (wantsNotifications && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (wantsNotifications && !Compat.notificationsAllowed(this)) {
                 notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -358,9 +358,15 @@ class SettingsActivity : ComponentActivity() {
             if (!assist) Item(Icons.Outlined.SmartToy, "Model", "$modelName · %,d tokens".format(s.contextTokens)) { open(Page.MODEL) }
             RefreshItem()
         }
+        // On a TV, Lena is the wall display and nothing else: no chat, no widgets, no assistant gesture ([Tv]).
+        val tv = remember { Tv.isTv(this@SettingsActivity) }
         Section(Area.WALL.title) {
             val home = remember { DashboardActivity.isHomeScreen(this@SettingsActivity) }
-            Item(Icons.Outlined.Home, "Make it this device's home screen",
+            if (tv) {
+                // Android TV has no setting for the home app: tools/android-tv-home.sh sets it once.
+                Item(Icons.Outlined.Home, "The TV's home screen",
+                    if (home) "It is: the Home button opens the wall display" else "Open it from the TV's apps, or make it the home screen once with tools/android-tv-home.sh") {}
+            } else Item(Icons.Outlined.Home, "Make it this device's home screen",
                 if (home) "It is: the wall display, full screen, with the screensaver" else "Makes the wall display full screen, with the screensaver",
                 trailing = { OpenInAndroid() }) { openHomeSettings() }
             val dream = remember { isScreenSaver() }
@@ -379,7 +385,8 @@ class SettingsActivity : ComponentActivity() {
         }
         Section(Area.TALKING.title) {
             val assistant = remember { isDigitalAssistant() }
-            Item(Icons.Outlined.Assistant, "Make Lena your digital assistant",
+            // A TV's voice button belongs to Google Assistant; on a TV, hold OK on the remote instead.
+            if (!tv) Item(Icons.Outlined.Assistant, "Make Lena your digital assistant",
                 if (assistant) "She is: the assistant gesture opens her" else "So the assistant gesture opens her",
                 trailing = { OpenInAndroid() }) { openAssistantSettings() }
             Item(Icons.Outlined.Hearing, "Wake word", wakeLabel(s)) { open(Page.WAKE) }
@@ -388,7 +395,7 @@ class SettingsActivity : ComponentActivity() {
                 open(Page.GESTURE)
             }
         }
-        Section(Area.CHAT_SCREEN.title) {
+        if (!tv) Section(Area.CHAT_SCREEN.title) {
             Item(Icons.Outlined.ViewSidebar, "Chat screen",
                 if (s.answers == Answerer.ASSIST) (if (s.homeSwitch) "Chat | Home switch on" else "Chat | Home switch off") else chatScreenLabel(s)) {
                 open(Page.CHAT_SCREEN)
@@ -396,7 +403,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Section(Area.DEVICE.title) {
             Item(Icons.Outlined.Notifications, "Notifications", notificationsLabel(s)) { open(Page.NOTIFICATIONS) }
-            Item(Icons.Outlined.Widgets, "Widgets & tile", if (s.widgetMood) "Widget shows her mood" else "Talk to Lena from the home screen or the shade") {
+            if (!tv) Item(Icons.Outlined.Widgets, "Widgets & tile", if (s.widgetMood) "Widget shows her mood" else "Talk to Lena from the home screen or the shade") {
                 open(Page.PHONE)
             }
             Item(Icons.Outlined.Bolt, "Quick prompts", count(s.quickPrompts.size, "prompt", "None yet")) { open(Page.QUICK) }
@@ -1227,7 +1234,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on this phone",
                 "Checks every 15 minutes and tells you when she's worried about something at home. Needs Home Assistant.", s.alerts) {
                 set(s.copy(alerts = it))
-                if (it && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                if (it && !Compat.notificationsAllowed(this)) {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
                 }
             }
@@ -1369,19 +1376,25 @@ class SettingsActivity : ComponentActivity() {
         val phoneEar = PhoneEar.available(this) // read each time, so choosing On this phone again shows at once
         // "Your server" is Open WebUI's speech, which isn't used while Assist answers: the phone hears and speaks.
         val assist = s.answers == Answerer.ASSIST
+        // On a TV, "this phone" is the TV's voice search: the one way to hear through the remote's microphone.
+        val tv = Tv.isTv(this)
         Section("How she sounds") {
             val hasHa = s.haServer.isNotBlank()
             PickItem(Icons.Outlined.Hearing, "Hearing you",
                 listOfNotNull(
-                    Hearing.PHONE to "On this phone",
+                    Hearing.PHONE to if (tv) "The TV's voice search" else "On this phone",
                     if (assist) null else Hearing.SERVER to "Your server",
                     if (hasHa) Hearing.HOME_ASSISTANT to "Home Assistant" else null,
                 ), s.hearing,
                 detail = {
                     when (it) {
-                        Hearing.PHONE -> if (phoneEar) "Your words appear as you speak. The audio never leaves the phone." else "Not working on this device lately; another way is used."
-                        Hearing.SERVER -> "Open WebUI's speech-to-text, the same as its voice input"
-                        Hearing.HOME_ASSISTANT -> "Home Assistant's speech-to-text, the one its voice assistants use (Whisper, Speech-to-Phrase, Cloud)"
+                        Hearing.PHONE -> when {
+                            !phoneEar -> "Not working on this device lately; another way is used."
+                            tv -> "The TV's own speech recognition, which hears through the remote's microphone. Hold OK, or press the remote's search button if it has one."
+                            else -> "Your words appear as you speak. The audio never leaves the phone."
+                        }
+                        Hearing.SERVER -> "Open WebUI's speech-to-text, the same as its voice input" + if (tv) ". Needs a microphone plugged into the TV box; the remote's can't be used." else ""
+                        Hearing.HOME_ASSISTANT -> "Home Assistant's speech-to-text, the one its voice assistants use (Whisper, Speech-to-Phrase, Cloud)" + if (tv) ". Needs a microphone plugged into the TV box; the remote's can't be used." else ""
                     }
                 }) {
                 // Choosing On this phone (again) gives a recognizer that wasn't answering another chance,

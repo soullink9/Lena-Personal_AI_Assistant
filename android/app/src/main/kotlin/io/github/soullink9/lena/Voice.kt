@@ -74,7 +74,8 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
 
 /**
  * Android's on-device speech recognizer: shows your words as you speak, and the audio never
- * leaves the phone.
+ * leaves the phone. On Android TV, and before Android 12, it's the device's own speech service instead
+ * ([onDevice]): on a TV, that's what hears through the remote's microphone.
  *
  * One recognizer per sheet, destroyed when the sheet closes: a recognizer kept longer can outlive the
  * speech service it's connected to (Android restarts it while the tablet sits idle) and then never
@@ -90,11 +91,23 @@ class PhoneEar(private val context: Context) : Ear {
         private const val UNRELIABLE_MS = 24 * 60 * 60_000L
 
         /**
-         * Whether this phone has an on-device recognizer that works: one that never got ready lately (some
-         * tablets have one that never answers) counts as not having one, for a day.
+         * Whether this phone has a recognizer that works: one that never got ready lately (some tablets have
+         * one that never answers) counts as not having one, for a day.
          */
-        fun available(c: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(c) &&
-            System.currentTimeMillis() - c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).getLong("phone_unreliable", 0) > UNRELIABLE_MS
+        fun available(c: Context): Boolean {
+            val exists = if (onDevice(c)) SpeechRecognizer.isOnDeviceRecognitionAvailable(c) else SpeechRecognizer.isRecognitionAvailable(c)
+            return exists &&
+                System.currentTimeMillis() - c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).getLong("phone_unreliable", 0) > UNRELIABLE_MS
+        }
+
+        /**
+         * Whether to use the on-device recognizer (Android 12 and later), which never sends your voice
+         * anywhere. On a TV it's the TV's own speech recognition instead: that's the one that can hear
+         * through the remote's microphone, as the TV's voice search does. Before Android 12 there's only
+         * the device's speech service (Google's, on most).
+         */
+        @androidx.annotation.ChecksSdkIntAtLeast(api = android.os.Build.VERSION_CODES.S)
+        fun onDevice(c: Context): Boolean = Compat.onDeviceRecognizer && !Tv.isTv(c)
 
         /** Gives the phone's recognizer another chance (choosing On this phone again in Settings). */
         fun trustAgain(c: Context) {
@@ -159,6 +172,10 @@ class PhoneEar(private val context: Context) : Ear {
             }
         }
 
+    /** The on-device recognizer, or the device's speech service (see [onDevice]). */
+    private fun newRecognizer(): SpeechRecognizer =
+        if (onDevice(context)) SpeechRecognizer.createOnDeviceSpeechRecognizer(context) else SpeechRecognizer.createSpeechRecognizer(context)
+
     /**
      * Listens once. If the service was still busy (error 10, or "busy"), waits and tries again, up to
      * twice. If the recognizer broke or never got ready, starts over with a new one once.
@@ -169,7 +186,9 @@ class PhoneEar(private val context: Context) : Ear {
         var relayFailed = false
         while (true) {
             try {
-                return once(onPartial, onLevel, relay = if (relayFailed) null.also { MicRelay.drop() } else MicRelay.take())
+                // Only Android 13 and later can listen through the wake word's microphone.
+                val relay = if (relayFailed || !Compat.recognizerTakesAudio) null.also { MicRelay.drop() } else MicRelay.take()
+                return once(onPartial, onLevel, relay = relay)
             } catch (e: EarError) {
                 when {
                     // The recognizer couldn't use the wake word's microphone: let it open its own.
@@ -201,7 +220,7 @@ class PhoneEar(private val context: Context) : Ear {
     private suspend fun once(onPartial: (String) -> Unit, onLevel: (Float) -> Unit, relay: MicRelay.Relay? = null): String =
         withContext(Dispatchers.Main) {
             lastRelayed = relay != null
-            val r = recognizer ?: SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { recognizer = it }
+            val r = recognizer ?: newRecognizer().also { recognizer = it }
             if (sessionOpen) {
                 // Close the last session and let the service catch up, or this one is refused.
                 r.cancel()

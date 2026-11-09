@@ -5,8 +5,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -15,15 +17,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 
-/** Material You: colours come from your wallpaper. */
+/**
+ * Material You: colours come from your wallpaper. Before Android 12 (Android TV boxes) there's no
+ * wallpaper to take them from, so it's Material's own colours.
+ */
 @Composable
 fun LenaTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val dark = isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context),
-        content = content,
-    )
+    // A plain if around the Android 12 calls, the form the build's version check (lint) is sure to follow.
+    val scheme = if (Compat.wallpaperColours) {
+        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else {
+        if (dark) darkColorScheme() else lightColorScheme()
+    }
+    MaterialTheme(colorScheme = scheme, content = content)
 }
 
 /**

@@ -112,6 +112,11 @@ class DashboardActivity : ComponentActivity() {
         /** Go straight to the screen saver (another Lena screen was left alone for a while, see [WallDisplay]). */
         const val EXTRA_IDLE = "idle"
 
+        /** The remote's volume buttons: always the TV's, never Lena's. */
+        private val VOLUME_KEYS = setOf(
+            android.view.KeyEvent.KEYCODE_VOLUME_UP, android.view.KeyEvent.KEYCODE_VOLUME_DOWN, android.view.KeyEvent.KEYCODE_VOLUME_MUTE,
+        )
+
         /**
          * Dashboard mode: the wall display is this device's home screen (Android settings → Default apps →
          * Home app → Lena). Only then are the dashboards and your chats full screen, and only then does the
@@ -170,8 +175,19 @@ class DashboardActivity : ComponentActivity() {
     private val listening = mutableStateOf(Listening.OFF)
     private var wake: WakeListener? = null
 
-    /** Whether this is the home screen (see [isHomeScreen]): full screen and the screen saver. */
+    /**
+     * Whether this is the home screen (see [isHomeScreen]): full screen and the screen saver. On a TV it
+     * always is: the wall display is all Lena is there, whichever app the Home button opens.
+     */
     private var dashboardMode = false
+
+    /** Whether this is an Android TV: no chat, and the remote instead of touch ([Tv]). */
+    private val tv by lazy { Tv.isTv(this) }
+
+    /** The TV remote: OK held (or its search button) to talk, Menu for Settings. */
+    private val remote by lazy {
+        Remote(onTalk = { wakeUp(); talk() }, onMenu = { startActivity(Intent(this, SettingsActivity::class.java)) })
+    }
 
     /** [dashboardMode], for the screen to draw from (Apps shows only then). */
     private val wallDisplay = mutableStateOf(false)
@@ -229,7 +245,7 @@ class DashboardActivity : ComponentActivity() {
      * home app can be changed in Android's settings meanwhile.
      */
     private fun applyWindowMode() {
-        dashboardMode = isHomeScreen(this)
+        dashboardMode = isHomeScreen(this) || tv
         wallDisplay.value = dashboardMode
         // The page's Apps row in Home Assistant's menu follows the same rule (assets/js/home_assistant.js).
         if (::web.isInitialized) callPage("apps", if (dashboardMode) "on" else "off")
@@ -455,6 +471,23 @@ class DashboardActivity : ComponentActivity() {
      * A touch counts as someone being there; on the screen saver, the touch that wakes it doesn't also
      * press whatever is underneath.
      */
+    /**
+     * On a TV, the remote is someone being there, like a touch. On the screen saver the button that wakes
+     * it does nothing else (the volume buttons stay the TV's); otherwise the remote's own buttons are
+     * handled by [remote]. Phones and tablets keep Android's usual keys.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (!tv || event.keyCode in VOLUME_KEYS) return super.dispatchKeyEvent(event)
+        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+            WallDisplay.touched()
+            if (dimmed.value) {
+                if (event.repeatCount == 0) wakeUp()
+                return true
+            }
+        }
+        return remote.dispatch(event) { super.dispatchKeyEvent(it) }
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             WallDisplay.touched()
@@ -658,7 +691,8 @@ class DashboardActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = if (narrow) 8.dp else 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
-                ScreenSwitcher(MainScreen.HOME, { if (it == MainScreen.CHAT) openChats() })
+                // A TV has no keyboard to chat with: the wall display is all there is ([Tv]).
+                if (!tv) ScreenSwitcher(MainScreen.HOME, { if (it == MainScreen.CHAT) openChats() })
                 if (!narrow) Column(Modifier.padding(start = 4.dp, end = 6.dp)) {
                     Text(DateFormat.getTimeFormat(this@DashboardActivity).format(clock), style = MaterialTheme.typography.titleLarge)
                     Text(

@@ -282,7 +282,9 @@ class DisplayActivity : ComponentActivity() {
         val locked = screensaver && getSystemService(KeyguardManager::class.java).isKeyguardLocked
         if (screensaver) {
             setShowWhenLocked(true)
-            registerReceiver(unplugged, android.content.IntentFilter(Intent.ACTION_POWER_DISCONNECTED), RECEIVER_NOT_EXPORTED)
+            androidx.core.content.ContextCompat.registerReceiver(
+                this, unplugged, android.content.IntentFilter(Intent.ACTION_POWER_DISCONNECTED), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()

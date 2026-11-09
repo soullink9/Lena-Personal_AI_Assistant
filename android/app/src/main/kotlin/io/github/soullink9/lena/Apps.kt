@@ -55,10 +55,15 @@ import kotlinx.coroutines.withContext
 /** An app in the apps list. */
 private data class LauncherApp(val label: String, val packageName: String, val icon: ImageBitmap)
 
-/** Every app with a launcher icon, except Lena, sorted by name. Slow (it loads icons): call off the main thread. */
+/**
+ * Every app with a launcher icon, except Lena, sorted by name. On a TV that's the TV's apps (Android TV's
+ * own "leanback" launcher category) as well, since many TV apps have no phone icon. Slow (it loads
+ * icons): call off the main thread.
+ */
 private fun launcherApps(c: Context): List<LauncherApp> {
     val pm = c.packageManager
-    return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+    val categories = if (Tv.isTv(c)) listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER) else listOf(Intent.CATEGORY_LAUNCHER)
+    return categories.flatMap { pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(it), 0) }
         .filter { it.activityInfo.packageName != c.packageName }
         .map { r ->
             LauncherApp(
@@ -129,7 +134,9 @@ fun AppsDrawer(onClose: () -> Unit) {
                                 Prefs.setHiddenApps(context, hidden)
                             } else {
                                 onClose()
-                                context.packageManager.getLaunchIntentForPackage(a.packageName)?.let { context.startActivity(it) }
+                                // A TV app may only have a TV entry (leanback), and a phone app only a phone one.
+                                (context.packageManager.getLeanbackLaunchIntentForPackage(a.packageName)
+                                    ?: context.packageManager.getLaunchIntentForPackage(a.packageName))?.let { context.startActivity(it) }
                             }
                         }.padding(vertical = 14.dp).alpha(if (editing && isHidden) 0.4f else 1f),
                     ) {

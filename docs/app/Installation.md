@@ -57,7 +57,7 @@ Download the APK on your phone and open it. Android asks once to allow installs 
 
 To check the file, compare its SHA-256 with the `SHA256SUMS` file from the same build.
 
-Lena needs **Android 16** or newer.
+Lena needs **Android 16** or newer on a phone or tablet. On Android TV (an Nvidia Shield, say) she runs as the wall display from Android 11: see [Lena on Android TV](Android-TV.md).
 
 ## 5. First run
 

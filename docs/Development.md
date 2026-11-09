@@ -55,7 +55,8 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── defaults.py                applies adjustments/defaults.env to the app's Defaults.kt
 │   ├── wall-display-debloat.sh    strips a tablet down to the wall display (run from a computer with adb)
 │   ├── debloat_lists.py           updates that script's package lists from the UAD project's list
-│   ├── make_images.py             app icon, notification icon and avatars from the logo
+│   ├── make_images.py             app icon, notification icon, avatars and the TV banner from the logo
+│   ├── android-tv-home.sh         makes Lena an Android TV's home screen (docs/app/Android-TV.md)
 │   ├── frontend_check/            the wake word front end against the original C
 │   └── commands_check/            what she understands on her own, on example sentences
 ├── scripts/                       what the workflows run, on Gitea and GitHub alike
@@ -158,6 +159,6 @@ To change the logo, run it with the new file (`python3 tools/make_images.py new-
 
 - Every file should make sense to someone seeing it for the first time. Write comments that explain why.
 - Nothing in Home Assistant is set up in YAML: the integration creates its own entities and is configured in the UI.
-- The app targets Android 16 only (`minSdk`, `targetSdk` and `compileSdk` 36).
+- The app targets Android 16 (`targetSdk` and `compileSdk` 36) and installs on Android 11 and later (`minSdk` 30), for Android TV boxes like the Nvidia Shield ([Android TV](app/Android-TV.md)). Newer calls go behind a version check (`Compat.kt`); lint's NewApi check fails the build otherwise.
 - Keep personal details out: names, addresses, IP addresses, tokens, and the contents of a real memory list. Use `Alex` and `Sam` in examples.
 - Docs live in `docs/` and are reviewed with the code. The README stays short and links here.

@@ -15,11 +15,19 @@
     <!-- Lena's own timers and alarms: exact alarm clock times, the ringing as a foreground service that
          plays sound, and the ringing screen over the lock screen. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- The same on Android 12, before USE_EXACT_ALARM existed (Android TV boxes; Android 11 needs neither). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Installing an update you downloaded in Settings > Software version > Updates (Android asks you to confirm each time). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Android TV (docs/app/Android-TV.md): Lena runs there as the wall display, driven by the remote. None of
+         these is needed, so phones, tablets and TVs all install the same app. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- Lets Lena find the phone's speech recognizer and text-to-speech engine, and (dashboard
          mode's Apps button) the apps you can open. -->
@@ -27,6 +35,11 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- A TV's apps (the Apps button on a TV). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
         <intent>
             <action android:name="android.speech.RecognitionService" />
@@ -40,6 +53,7 @@
     <application
         android:name=".LenaApp"
         android:allowBackup="false"
+        android:banner="@drawable/tv_banner"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -66,7 +80,8 @@
         </activity>
 
         <!-- Dashboard mode: your Home Assistant dashboards in a Lena frame. It can be a tablet's
-             home screen (Android settings > Apps > Default apps > Home app > Lena).
+             home screen (Android settings > Apps > Default apps > Home app > Lena), and a TV's
+             (tools/android-tv-home.sh).
              In the same task as the chat screen (one app in Recents). Its web view outlives the screen
              (DashboardWeb.kt), so coming back to Home doesn't load Home Assistant again. -->
         <activity
@@ -81,6 +96,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- On Android TV, Lena's tile in the TV's apps opens the wall display: there's no chat on a TV. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

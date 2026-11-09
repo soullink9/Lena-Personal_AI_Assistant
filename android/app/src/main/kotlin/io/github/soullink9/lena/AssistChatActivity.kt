@@ -100,6 +100,12 @@ class AssistChatActivity : ComponentActivity() {
     /** Without Assist answering there's nothing for this screen to do: Open WebUI's chat screen instead. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A TV has no chat (no keyboard to type with): the wall display instead.
+        if (Tv.isTv(this)) {
+            startActivity(Intent(this, DashboardActivity::class.java))
+            finish()
+            return
+        }
         if (Prefs.answers(this) != Answerer.ASSIST) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()

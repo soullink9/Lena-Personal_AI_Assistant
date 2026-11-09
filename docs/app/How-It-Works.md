@@ -81,7 +81,7 @@ The **Wall display** section of Settings turns a tablet on the wall (or a docked
 
 Open the dashboards with the **Home** switch on the main screen. The wake word is under **Talking to Lena**.
 
-A tablet that's only a wall display can be stripped down to Lena and a few apps you choose: see [Preparing a tablet for the wall display](Wall-Display-Tablet.md).
+A tablet that's only a wall display can be stripped down to Lena and a few apps you choose: see [Preparing a tablet for the wall display](Wall-Display-Tablet.md). On Android TV (an Nvidia Shield, say) the wall display is all she is, driven by the remote: see [Lena on Android TV](Android-TV.md).
 
 ### Dashboards
 

@@ -18,7 +18,7 @@ Instructions for AI coding assistants working in this repository. The same rules
 
 ## Standing constraints
 
-- Android: `minSdk`, `targetSdk` and `compileSdk` stay at 36.
+- Android: `targetSdk` and `compileSdk` stay at 36. `minSdk` is 30 (Android 11), approved by the owner for Android TV boxes like the Nvidia Shield; anything newer than Android 11 goes behind a version check (`Compat.kt`), and the build's lint fails on any call that isn't (NewApi is fatal).
 - Home Assistant: everything is set up in the UI; nothing in YAML.
 - Home Assistant baseline: the owner runs 2026.11. Before building something, check whether Home Assistant 2026.11 already does it, and use that instead of building it again.
 - No downloads at build time beyond Gradle's own (models and the C reference are committed).

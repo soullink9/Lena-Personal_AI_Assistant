@@ -218,10 +218,13 @@ object Updates {
             // 2. It's Lena, newer, and signed with the same key as this one.
             val pm = c.packageManager
             val flags = PackageManager.GET_SIGNING_CERTIFICATES
-            val archive: PackageInfo = pm.getPackageArchiveInfo(apk.path, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            // The int-flag calls work on every Android (Android 13 added a long-flag form, and deprecated these).
+            @Suppress("DEPRECATION")
+            val archive: PackageInfo = pm.getPackageArchiveInfo(apk.path, flags)
                 ?: throw IOException("That file isn't an app.")
             if (archive.packageName != c.packageName) throw IOException("That APK isn't Lena.")
-            val mine = pm.getPackageInfo(c.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            @Suppress("DEPRECATION")
+            val mine = pm.getPackageInfo(c.packageName, flags)
             if (archive.longVersionCode < mine.longVersionCode) throw IOException(
                 "That APK's build number (${archive.longVersionCode}) is lower than this Lena's (${mine.longVersionCode}), and Android won't " +
                     "install an older build over a newer one. Keep versionCode going up when you reset the version name, or uninstall Lena first."
@@ -318,7 +321,7 @@ object Updates {
         Logs.i(TAG, "Updated to ${installed(c)}")
         if (!p(c).getBoolean("remind_auto_blocker", false)) return
         remindAutoBlocker(c, false)
-        if (c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        if (!Compat.notificationsAllowed(c)) return
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("updates", "Updates", NotificationManager.IMPORTANCE_DEFAULT))
         val open = PendingIntent.getActivity(c, 0, autoBlocker(), PendingIntent.FLAG_IMMUTABLE)
@@ -351,7 +354,7 @@ class UpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                val confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) ?: return
+                val confirm = androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java) ?: return
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             PackageInstaller.STATUS_SUCCESS -> Logs.i("Updates", "Installed")

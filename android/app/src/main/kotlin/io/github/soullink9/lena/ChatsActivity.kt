@@ -86,6 +86,12 @@ class ChatsActivity : ComponentActivity() {
     /** Needs your Open WebUI; without one there's nothing to list. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A TV has no chat (no keyboard to type with): the wall display instead.
+        if (Tv.isTv(this)) {
+            startActivity(Intent(this, DashboardActivity::class.java))
+            finish()
+            return
+        }
         WallDisplay.watch(this)
         api = Api.from(this) ?: run { finish(); return }
         enableEdgeToEdge()

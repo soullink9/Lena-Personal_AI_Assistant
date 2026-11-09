@@ -356,6 +356,21 @@ check(len(removing) > 100, "tools/wall-display-debloat.sh has its package lists"
 overlap = sorted(removing & debloat_lists.protected())
 check(not overlap, f"the debloat script never removes a protected package ({', '.join(overlap) or 'none'})")
 
+# ---- 14b. Android TV ---------------------------------------------------------------------------------
+# The app installs on Android 11 TV boxes (minSdk 30) while phones use Android 16's features, so every
+# newer call must be behind a version check: the build's lint fails on any that isn't (NewApi, made fatal
+# in build.gradle.kts). tools/android-tv-home.sh, which makes Lena a TV's home screen, must parse.
+
+gradle_text = (ROOT / "android/app/build.gradle.kts").read_text()
+check(re.search(r"^\s*minSdk = 30\b", gradle_text, re.M) is not None, "the app's minSdk is 30 (Android 11, for Android TV boxes)")
+check('fatal += "NewApi"' in gradle_text, "release builds fail on a newer-Android call without a version check (lint NewApi is fatal)")
+manifest_text = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text()
+check("android.intent.category.LEANBACK_LAUNCHER" in manifest_text and 'android:banner="@drawable/tv_banner"' in manifest_text,
+      "the app shows in Android TV's apps, with its banner")
+if shutil.which("bash"):
+    parsed = subprocess.run(["bash", "-n", str(ROOT / "tools/android-tv-home.sh")], capture_output=True, text=True)
+    check(parsed.returncode == 0, f"tools/android-tv-home.sh parses ({parsed.stderr.strip() or 'bash -n'})")
+
 # ---- 15. The release scripts ---------------------------------------------------------------------
 # scripts/ checks the version, writes the notes, checks the APK and publishes on Gitea, in both release
 # workflows; tests/test_release.py tries each of them (against a fake Gitea), so a mistake shows up here

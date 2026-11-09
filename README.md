@@ -26,7 +26,7 @@ Lena is a Jarvis-style assistant that runs entirely on your own servers. She's o
 | [`ollama/`](ollama) | Her character and model settings (`Modelfile`), and an example Ollama setup that keeps her loaded |
 | [`home-assistant/`](home-assistant) | The **Lena** integration: her feelings, shared memory and tools, in one folder |
 | [`open-webui/`](open-webui) | A filter and a tool that bring her feelings and memory into Open WebUI and the app |
-| [`android/`](android) | The **Lena** app for Android 16, built and signed by GitHub Actions |
+| [`android/`](android) | The **Lena** app for Android 16 (and Android TV from Android 11), built and signed by the release workflows |
 | [`voice/`](voice) | An example Piper container, and the bridge that gives Open WebUI your Piper and Whisper voices |
 | [`tools/`](tools) | `check.py`, offline checks to run before committing |
 | [`docs/`](docs) | Everything in detail (see below) |
@@ -51,7 +51,7 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 | **Setup** | [Getting started](docs/Getting-Started.md) · [Lena in Open WebUI](docs/open-webui/Setup.md) · [Home Assistant installation](docs/home-assistant/Installation.md) · [App installation](docs/app/Installation.md) |
 | **Her personality** | [Personality](docs/personality/Personality.md) · [Feelings](docs/personality/Moods.md) · [Memory](docs/home-assistant/Memory.md) |
 | **Home Assistant** | [The Lena integration](docs/home-assistant/Integration.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
-| **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Wall display tablet](docs/app/Wall-Display-Tablet.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
+| **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Wall display tablet](docs/app/Wall-Display-Tablet.md) · [Android TV](docs/app/Android-TV.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
 | **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
 | **Development** | [Architecture](ARCHITECTURE.md) · [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) |
 

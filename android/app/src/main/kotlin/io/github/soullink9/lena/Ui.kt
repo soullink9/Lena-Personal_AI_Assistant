@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.border
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.getValue
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
@@ -55,7 +57,19 @@ import androidx.compose.ui.unit.Constraints
 /** A row's background. [container] defaults to the page's raised surface. */
 @Composable
 fun rowModifier(container: Color = MaterialTheme.colorScheme.surfaceContainer, minHeight: Dp = 64.dp): Modifier =
-    Modifier.fillMaxWidth().heightIn(min = minHeight).background(container)
+    Modifier.fillMaxWidth().heightIn(min = minHeight).focusOutline().background(container)
+
+/**
+ * An outline round whatever the TV remote (or a keyboard) is on, so you can see where you are; touch never
+ * shows it. Put it before the clickable part it outlines.
+ */
+@Composable
+fun Modifier.focusOutline(): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val colour = MaterialTheme.colorScheme.primary
+    return this.onFocusChanged { focused = it.hasFocus }
+        .then(if (focused) Modifier.border(3.dp, colour) else Modifier)
+}
 
 /** Rows that belong together: rounded as a whole, with a thin gap between rows. */
 @Composable

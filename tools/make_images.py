@@ -6,7 +6,7 @@
 
 With no argument it uses docs/assets/lena-logo.png. Makes the launcher icon (foreground and
 themed silhouette), the notification icon, the in-app avatar, and docs/assets/lena-avatar.png
-and social-preview.png, and the Home Assistant integration's brand images. The logo is expected to be square on a plain dark background; if yours
+and social-preview.png, Android TV's banner, and the Home Assistant integration's brand images. The logo is expected to be square on a plain dark background; if yours
 changes, update BG (its background colour) and the artwork centre and width below.
 """
 import sys, os
@@ -81,6 +81,14 @@ dr.text((680, 200), "Lena", font=title, fill=(255, 255, 255))
 for i, t in enumerate(["A personal AI assistant", "on your own hardware"]):
     dr.text((686, 390 + i * 52), t, font=line, fill=(170, 176, 210))
 sp.save(f"{assets}/social-preview.png", optimize=True)
+
+# Android TV's banner, 320x180 (xhdpi): what the TV's home screen and app row show for Lena. The logo
+# left, her name right, on the icon's dark background.
+os.makedirs(f"{RES}/drawable-xhdpi", exist_ok=True)
+banner = Image.new("RGB", (320, 180), BG)
+banner.paste(place(src, 150, 136, BG), (14, 15))
+ImageDraw.Draw(banner).text((172, 52), "Lena", font=ImageFont.truetype(f"{fonts}/InterDisplay-Bold.otf", 62), fill=(255, 255, 255))
+banner.save(f"{RES}/drawable-xhdpi/tv_banner.png", optimize=True)
 
 # ---- Home Assistant brand images ----------------------------------------------
 # Home Assistant 2026.3+ shows a custom integration's own brand/ images. The rules (from the
