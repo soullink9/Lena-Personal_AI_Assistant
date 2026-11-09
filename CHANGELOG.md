@@ -19,7 +19,7 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ### Development
 
-- `minSdk` is now 30 (Android 11); `targetSdk` and `compileSdk` stay 36. Newer calls are behind version checks (`Compat.kt`), and release builds fail on any that isn't (lint's NewApi is fatal). The APK also carries the wake word's 32-bit ARM code, for TV boxes that run 32-bit Android.
+- `minSdk` is now 30 (Android 11); `targetSdk` and `compileSdk` stay 36. Newer calls are behind version checks (`Compat.kt`, or a plain Android version check where it's used once), and release builds fail on any that isn't (lint's NewApi is fatal). Below Android 12 the orb look darkens instead of blurring and the glow uses a standard corner; below Android 13 Settings has no "Add the Quick Settings tile" button (Quick Settings' own edit button adds it). The APK also carries the wake word's 32-bit ARM code, for TV boxes that run 32-bit Android.
 
 ## [0.6.12] - 2026-11-08
 

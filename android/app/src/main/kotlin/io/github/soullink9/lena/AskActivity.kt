@@ -338,8 +338,8 @@ class AskActivity : ComponentActivity() {
             ?.let { it to intent.getBooleanExtra(EXTRA_LISTEN, false) }
 
         style = Prefs.askStyle(this)
-        // The orb blurs whatever's behind it, where the phone supports it (otherwise it just darkens).
-        if (style == AskStyle.ORB) {
+        // The orb blurs whatever's behind it, where the phone supports it (Android 12; otherwise it just darkens).
+        if (style == AskStyle.ORB && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
             window.attributes = window.attributes.also { it.blurBehindRadius = 64 }
         }
@@ -1460,9 +1460,13 @@ class AskActivity : ComponentActivity() {
     private fun GlowLook(a: AskUi) {
         val view = LocalView.current
         val density = LocalDensity.current
-        // Follow the screen's own rounded corners, so the glow hugs the glass.
+        // Follow the screen's own rounded corners, so the glow hugs the glass (Android 12 can say what they are).
         val corner = remember(view) {
-            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat()
+            } else {
+                null
+            }
         } ?: with(density) { 36.dp.toPx() }
         val spin = rememberInfiniteTransition(label = "spin")
         val turn by spin.animateFloat(

@@ -1634,7 +1634,10 @@ class SettingsActivity : ComponentActivity() {
         }
         Group {
             Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, type, new chat and your quick prompts") { addWidget() }
-            Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
+            // Android 13 can add it from here; before that, Quick Settings' own edit button adds it.
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
+            }
         }
     }
 
@@ -1967,7 +1970,8 @@ class SettingsActivity : ComponentActivity() {
         if (DateFormat.is24HourFormat(this)) "%02d:%02d".format(h, m)
         else "%d:%02d %s".format(if (h % 12 == 0) 12 else h % 12, m, if (h < 12) "AM" else "PM")
 
-    /** Asks Android to add the Talk to Lena tile to Quick Settings; Android shows its own confirmation. */
+    /** Asks Android to add the Talk to Lena tile to Quick Settings; Android shows its own confirmation (Android 13). */
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
     private fun addTile() {
         getSystemService(StatusBarManager::class.java).requestAddTileService(
             ComponentName(this, LenaTile::class.java),

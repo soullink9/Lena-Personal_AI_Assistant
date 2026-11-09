@@ -55,8 +55,13 @@ class LenaTile : TileService() {
      */
     override fun onClick() {
         val talk = AskActivity.intent(this, talk = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val pi = PendingIntent.getActivity(this, 0, talk, PendingIntent.FLAG_IMMUTABLE)
-        startActivityAndCollapse(pi)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startActivityAndCollapse(PendingIntent.getActivity(this, 0, talk, PendingIntent.FLAG_IMMUTABLE))
+        } else {
+            // Before Android 14, the intent itself (the form Android 14 deprecated).
+            @Suppress("DEPRECATION", "StartActivityAndCollapseDeprecated")
+            startActivityAndCollapse(talk)
+        }
     }
 }
 

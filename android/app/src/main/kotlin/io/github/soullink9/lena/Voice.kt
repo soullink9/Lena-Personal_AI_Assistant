@@ -329,7 +329,10 @@ class PhoneEar(private val context: Context) : Ear {
                             error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> done("")
                             error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
                                 error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
-                                runCatching { r.triggerModelDownload(request()) }
+                                // Android 13 can start the on-device model's download itself.
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                    runCatching { r.triggerModelDownload(request()) }
+                                }
                                 fail(EarUnavailable())
                             }
                             else -> fail(EarError(error))
