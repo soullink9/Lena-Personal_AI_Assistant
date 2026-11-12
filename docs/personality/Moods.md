@@ -42,7 +42,7 @@ How she acts on it is part of her baseline in the Modelfile: show it, don't anno
 
 | When | What happens |
 |---|---|
-| **Morning** | She wakes Groggy. If your special-days calendar has something today, she's Cheerful and knows why ("It's Sam's birthday today"). Otherwise she wakes in a mood of her own, sometimes coloured by the weather. |
+| **Morning** | She wakes Groggy. If your special-days calendar has something today, she's Cheerful and knows why ("It's Sam's birthday today"). Otherwise she wakes in a mood of her own, sometimes colored by the weather. |
 | **Every hour** | Energy follows her day: groggy just after waking, steady or wired through the day, a dip after lunch, drained near bedtime. Once her mood has lasted a few hours, it may drift, but only to a **neighbouring** mood, so she changes gradually the way a person does. Her energy, the weather and the house pull her toward some moods: rain toward Wistful or cozy-Content, everyone home toward Fond, an empty house toward Restless. |
 | **Someone comes home** after hours away | Moment: Delighted, with who and how long. After a day or more, her mood turns Fond. |
 | **The house is empty** for hours | Mood: Restless or Wistful. |

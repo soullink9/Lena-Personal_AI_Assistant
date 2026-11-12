@@ -65,7 +65,7 @@ The arrows move along the rows. On a Home Assistant dashboard, down and right go
 
 **The remote's microphone button** opens Google Assistant: Android keeps that button for its own assistant, so no app can have it. Two ways round it:
 
-- **A button of its own.** Lena has a second entry in the TV's apps, **Talk to Lena**, which opens her listening. Put it on a button the remote lets you customise: on a Shield, **Settings → Remotes & Accessories**, then the remote's customisable button (the menu button's double press, or the Netflix button on remotes that have one), and choose **Talk to Lena**. It works from any app, not only Lena's home.
+- **A button of its own.** Lena has a second entry in the TV's apps, **Talk to Lena**, which opens her listening. Put it on a button the remote lets you customize: on a Shield, **Settings → Remotes & Accessories**, then the remote's customizable button (the menu button's double press, or the Netflix button on remotes that have one), and choose **Talk to Lena**. It works from any app, not only Lena's home.
 - **Hold OK**, on Lena's screens.
 
 Either way she listens through **The TV's voice search**. Some remotes send their microphone button as "search", and then Lena takes it directly. To see what your remote's buttons send, press them and look in **Settings → Logs** for lines from **Remote**.
@@ -83,6 +83,6 @@ Either way she listens through **The TV's voice search**. Some remotes send thei
 
 This was built without a Shield to try it on. If something here doesn't work on yours, the log (**Settings → Logs**) says what happened; send it along.
 
-- Whether the Shield's voice search hears through the remote when Lena asks, from a customised button or OK held (it does for other apps' voice search).
-- The Shield's settings for customising a remote button (they differ between remotes and Shield versions).
+- Whether the Shield's voice search hears through the remote when Lena asks, from a customized button or OK held (it does for other apps' voice search).
+- The Shield's settings for customizing a remote button (they differ between remotes and Shield versions).
 - Moving around a Home Assistant dashboard with the arrows, and up from its first card to Lena's bar.

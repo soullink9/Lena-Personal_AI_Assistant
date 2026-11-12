@@ -50,7 +50,7 @@ Folders need Open WebUI's folders feature, which an admin can turn off for every
 - In Open WebUI and the app, update **Lena (remember, forget, feel, calendar)** in Workspace → Tools to the one in this release, so she has the calendar tool.
 - She's told to say she added it only after it worked; if it failed, she gets Home Assistant's reason and should tell you.
 
-## Memory & knowledge says a feature is turned off
+## Memory and knowledge says a feature is turned off
 
 Memories need **Admin Panel → Settings → General → Memories** (or your account's memory permission) in Open WebUI; notes need Notes turned on in Open WebUI's admin settings and, for users who aren't admins, the Notes feature permission (set in **Admin Panel → Users**, for groups or as a default); knowledge needs knowledge access for your account. An admin can turn these on.
 

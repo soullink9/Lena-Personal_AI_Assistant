@@ -2,7 +2,7 @@
 
 [← Back to the README](../README.md)
 
-How the repository is organised and how to change it without breaking things. The app has its own page with the code map and build details: [App development](app/Development.md).
+How the repository is organized and how to change it without breaking things. The app has its own page with the code map and build details: [App development](app/Development.md).
 
 ## Layout
 
@@ -97,7 +97,7 @@ On Gitea every push runs every test (`.gitea/workflows/test.yml`). On GitHub, th
 | What `/api/lena/context` returns | `view.py`, `open-webui/lena_filter.py`, `HomeAssistant.kt` in the app, and the [integration](home-assistant/Integration.md) page |
 | How `forget_fact` picks a memory | `best_match` in `brain.py` and `_best_match` in `open-webui/lena_tools.py` |
 | How calendar events are added | `events.py` (shared by `add_calendar_event` and `lena.add_event`), the `add_calendar_event` method's description in `open-webui/lena_tools.py`, `services.yaml` and `strings.json`, and [Calendars](home-assistant/Integration.md#calendars) |
-| Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](app/How-It-Works.md). It relies on Open WebUI's Tailwind colour variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
+| Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](app/How-It-Works.md). It relies on Open WebUI's Tailwind color variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](home-assistant/Installation.md) and [Performance tuning](home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `adjustments/defaults.env` |
 | The Docker network name | `ollama/docker-compose.example.yml`, `voice/bridge/compose.yaml` and the [Voice bridge](voice/Voice-Bridge.md) page |
 | The version | One version for the whole project: `versionName` in `android/app/build.gradle.kts` (and a higher `versionCode`), `version` in the integration's `manifest.json`, the `version:` line of both Open WebUI files, the voice bridge's `LenaVoiceBridge/` version in `voice/bridge/bridge.py`, and a section in `CHANGELOG.md`. `tools/check.py` checks they match (the list is `project_versions` in `scripts/release_notes.py`), and the release workflows check the tag against them. |

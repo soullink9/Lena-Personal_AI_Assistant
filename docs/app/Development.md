@@ -23,7 +23,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `AssistChat.kt`, `AssistChatActivity.kt` | Assist mode (Settings → Who answers): asking Assist (`AssistChat`), the conversation kept on the device (`AssistLog`), and Lena's own chat screen, which the chat screen hands over to. |
 | `Apps.kt` | The apps list for the wall display (dashboards and chats' menu), and choosing which apps it shows. |
 | `DashboardWeb.kt` | Keeps the dashboards' web view when its screen closes and hands it to the next one, so switching Chat \| Home stays one app and Home Assistant isn't loaded again. Page messages go to the screen showing it. |
-| `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colours, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolours through Tailwind's colour variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
+| `assets/css/open_webui.css` | Lena's look for Open WebUI's pages (warm colors, a clay accent, a serif for replies), added to the top frame when **Lena's look** is on. It recolors through Tailwind's color variables, so it doesn't depend on Open WebUI's markup. (Open WebUI's call button is hidden by `NO_CALLS_CSS` in `MainActivity.kt`, whichever look is on.) |
 | `assets/js/home_assistant.js` | The wall display's script inside Home Assistant's page (top frame of the frontend only, not frames or proxied apps): sign-in bridge, hiding its header (and the Ingress Proxy integration's toolbar), Lena's Apps and Settings at the bottom of its menu, reporting its views. |
 | `Display.kt` | Her clock and the screen saver (`DisplayActivity` and `LenaDream`). |
 | `Slideshow.kt` | The photo frame: loading albums, face-aware framing, transitions, the album picker. |
@@ -38,9 +38,9 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Defaults.kt` | Every setting's default, written from `adjustments/defaults.env` by `tools/defaults.py`. Don't edit it by hand. |
 | `Refresh.kt` | Settings → Refresh all connections: open screens reload their page when next shown. |
 | `Connections.kt` | Keeping Open WebUI and Home Assistant ready: tries a dropped connection again once the network is back (`retrying`, used by `Api.kt` and `HomeAssistant.kt`), checks both servers before asking (`ensure`, signing in again by herself), and checks them every few minutes on the wall display (`keepAlive`). |
-| `WallDisplay.kt` | The wall display on every screen: in dashboard mode each screen keeps the display on and, after **Screen saver after** without a touch (one clock for all screens), brings up the dashboard's screen saver. Every screen calls `WallDisplay.watch` in `onCreate` and `WallDisplay.touched` from `onUserInteraction`; a new screen needs both. |
+| `WallDisplay.kt` | The wall display on every screen: in dashboard mode each screen keeps the display on and, after **Screensaver after** without a touch (one clock for all screens), brings up the dashboard's screen saver. Every screen calls `WallDisplay.watch` in `onCreate` and `WallDisplay.touched` from `onUserInteraction`; a new screen needs both. |
 | `Chats.kt` | What the drawer and All chats share: chat and folder rows in each list style (one row look for both), grouping by day, and the long-press menu (pin, move to folder, rename, delete) with its dialogs. |
-| `MemoryActivity.kt` | Memory & knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |
+| `MemoryActivity.kt` | Memory and knowledge: her shared memory, your Open WebUI memories, notes (with a note editor) and knowledge collections. |
 | `Photos.kt` | Photos for the sheet: the camera hand-off, shrinking and encoding. |
 | `Background.kt` | Notifications, the finished-reply and scheduled-prompt workers (scheduled prompts go to Assist when it answers), schedule alarms, boot handling and quick prompt shortcuts. |
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
@@ -53,7 +53,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Software version → Logs. |
 | `Widgets.kt` | The Quick Settings tile (Talk to Lena) and the home screen widget. |
 | `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |
-| `Theme.kt` | Material You colours. |
+| `Theme.kt` | Material You colors. |
 
 | File | What it does |
 |---|---|
@@ -123,7 +123,7 @@ And, only if you add it, your Home Assistant, with the token you give it:
 `WakeWord.kt` runs two kinds of model with LiteRT:
 
 - **Hey Lena** (`hey_lena.tflite`) and **Lena** (`lena.tflite`): microWakeWord streaming models, each with its `.json` (the cutoff and window are read from it), plus ESPHome's voice activity model (`vad.tflite`, `vad.json`), which runs on the same features. Detection follows ESPHome's `streaming_model.cpp`: the average over the window must pass the cutoff, not within 100 frames (one second) of starting or of the last detection, counted only while the latest probability is under the cutoff, and only if the voice model heard speech in the last second. **How sure she must be** moves the cutoff halfway towards 1 and widens the window by two (Fewer false starts), or lowers it by the same step (Easier to wake).
-- Their input is the output of TensorFlow Lite Micro's audio front end, so `MicroFrontend.java` is a line-for-line port of that C code (and of KISS FFT's fixed-point FFT). It's Java because it's all integer arithmetic that relies on C's overflow behaviour, which Java's `int`, `long` and `short` reproduce exactly. `tools/frontend_check/run.sh` builds the original C and compares both on test audio; the build workflow runs it, and it must match bit for bit.
+- Their input is the output of TensorFlow Lite Micro's audio front end, so `MicroFrontend.java` is a line-for-line port of that C code (and of KISS FFT's fixed-point FFT). It's Java because it's all integer arithmetic that relies on C's overflow behavior, which Java's `int`, `long` and `short` reproduce exactly. `tools/frontend_check/run.sh` builds the original C and compares both on test audio; the build workflow runs it, and it must match bit for bit.
 - **Okay Nabu**, **Hey Mycroft**, **Alexa** and **Hey Home Assistant**, and the **stop** word: microWakeWord models like Hey Lena's, run the same way. The stop word (`StopWord`) always uses its model's own cutoff.
 - **Hey Jarvis**: openWakeWord's `melspectrogram.tflite`, `embedding_model.tflite` and `hey_jarvis_v0.1.tflite`.
 

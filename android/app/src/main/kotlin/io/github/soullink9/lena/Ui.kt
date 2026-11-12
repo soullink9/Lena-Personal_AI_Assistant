@@ -52,7 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 
 // Lena's look: rows in rounded groups with a thin gap between them, like a phone's own
-// settings. Settings, Memory & knowledge and the drawer all use these.
+// settings. Settings, Memory and knowledge and the drawer all use these.
 
 /** A row's background. [container] defaults to the page's raised surface. */
 @Composable
@@ -313,7 +313,7 @@ fun displayScale(): Float {
     return (minOf(c.screenWidthDp, c.screenHeightDp) / 400f).coerceIn(0.6f, 1f)
 }
 
-/** The widest a page of rows (Settings, All chats, Memory & knowledge) gets; on wider screens it's centred. */
+/** The widest a page of rows (Settings, All chats, Memory and knowledge) gets; on wider screens it's centred. */
 val PAGE_MAX_WIDTH: Dp = 720.dp
 
 /** Whether this screen is narrow, like a foldable's outer screen or a phone held upright (under 600dp across). */

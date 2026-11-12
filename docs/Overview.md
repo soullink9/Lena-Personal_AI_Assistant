@@ -38,7 +38,7 @@ More: [Her personality](personality/Personality.md) and [Her feelings](personali
 
 Her memory is one Home Assistant to-do list, **Lena Memory** (`todo.lena_memory`), shared everywhere. In Home Assistant the integration adds it to every request; in Open WebUI and the app the filter adds it to every chat, and the tool saves and forgets. See [Memory](home-assistant/Memory.md).
 
-Open WebUI's own memory feature is separate; turn it off for a single shared memory. The app's **Memory & knowledge** screen shows her shared list (once Home Assistant is connected in the app), Open WebUI's memories and your knowledge.
+Open WebUI's own memory feature is separate; turn it off for a single shared memory. The app's **Memory and knowledge** screen shows her shared list (once Home Assistant is connected in the app), Open WebUI's memories and your knowledge.
 
 ## One context size
 

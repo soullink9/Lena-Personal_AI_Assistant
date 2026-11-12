@@ -126,7 +126,7 @@ TV_PROTECT=(
 
     # Nvidia Shield: the remote, controllers and system updates
     com.nvidia.shieldtech.accessoryserver          # SHIELD Accessories: pairing and firmware for the remote and controllers
-    com.nvidia.shieldtech.hooks                    # the remote's buttons (Netflix button, customisation)
+    com.nvidia.shieldtech.hooks                    # the remote's buttons (Netflix button, customization)
     com.nvidia.shield.remote.server                # the SHIELD TV phone app's remote
     com.nvidia.blakepairing                        # pairing for the older remote and controller
     com.nvidia.ota                                 # Shield system updates

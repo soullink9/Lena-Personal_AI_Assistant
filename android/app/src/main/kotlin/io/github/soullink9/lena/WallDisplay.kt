@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  *
  * In dashboard mode (Lena's wall display is this device's home screen, see
  * [DashboardActivity.isHomeScreen]) every screen keeps the display on, so it never goes dark. After
- * Settings → Wall display → Screensaver → Screen saver after without a touch, on whichever screen is
+ * Settings → Wall display → Screensaver → Screensaver after without a touch, on whichever screen is
  * showing (a chat, All chats, Memory, Settings, Logs), the dashboard comes forward with its screensaver
  * on, and a touch on the screensaver shows the dashboard.
  *

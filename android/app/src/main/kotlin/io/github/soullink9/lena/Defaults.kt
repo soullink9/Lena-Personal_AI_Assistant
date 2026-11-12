@@ -12,7 +12,7 @@ object Defaults {
     val ANSWERS: Answerer = Answerer.OPEN_WEBUI
     /** Connections › Model › Her context size: 32768 */
     const val CONTEXT_TOKENS: Int = 32_768
-    /** Wall display › Screensaver › Screen saver after: 2 minutes */
+    /** Wall display › Screensaver › Screensaver after: 2 minutes */
     const val DIM_SECONDS: Int = 120
     /** Wall display › Screensaver › Back from your chats after: 1 minute */
     const val RETURN_SECONDS: Int = 60
@@ -74,8 +74,8 @@ object Defaults {
     val CHAT_LIST: ChatListStyle = ChatListStyle.SLIM
     /** Device customization › Notifications › Reply notifications: Off */
     const val NOTIFY_REPLIES: Boolean = false
-    /** Device customization › Notifications › Alerts on this phone: Off */
+    /** Device customization › Notifications › Alerts on this device: Off */
     const val ALERTS: Boolean = false
-    /** Device customization › Widgets & tile › Her mood on the widget: Off */
+    /** Device customization › Widgets and tile › Her mood on the widget: Off */
     const val WIDGET_MOOD: Boolean = false
 }

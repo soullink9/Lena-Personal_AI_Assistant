@@ -349,7 +349,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * In dashboard mode, left alone for a while (Settings → Wall display → Screensaver → Back from your
-     * chats after): back to the dashboards. The screensaver keeps its own timer (Screen saver after, on
+     * chats after): back to the dashboards. The screensaver keeps its own timer (Screensaver after, on
      * the same clock as every screen), so whichever is shorter comes first. Not while the keyboard is up,
      * while you're talking to her in the sheet, or while she's still answering; the wait starts again
      * once she's done.
@@ -900,7 +900,7 @@ class MainActivity : ComponentActivity() {
                             DrawerIcon(Icons.Outlined.Settings, "Settings") {
                                 closeThen { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
                             }
-                            DrawerIcon(Icons.Outlined.Psychology, "Memory & knowledge") {
+                            DrawerIcon(Icons.Outlined.Psychology, "Memory and knowledge") {
                                 closeThen { startActivity(Intent(this@MainActivity, MemoryActivity::class.java)) }
                             }
                             if (wallDisplay.value) {

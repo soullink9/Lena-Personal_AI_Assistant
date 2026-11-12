@@ -116,7 +116,7 @@ object Ringing {
 
     /** The channel: loud, on the lock screen, allowed through as an alarm. */
     fun channel(c: Context) {
-        val channel = NotificationChannel(CHANNEL, "Alarms & timers", NotificationManager.IMPORTANCE_HIGH).apply {
+        val channel = NotificationChannel(CHANNEL, "Alarms and timers", NotificationManager.IMPORTANCE_HIGH).apply {
             description = "Lena's timers and alarms when they ring"
             setSound(null, null) // the service plays the sound itself, looping
             setBypassDnd(true)

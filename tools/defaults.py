@@ -126,7 +126,7 @@ SETTINGS = [
         "Open WebUI": "Answerer.OPEN_WEBUI", "Home Assistant Assist": "Answerer.ASSIST"}, reset=False),
     Setting("Connections › Model › Her context size", "CONTEXT_TOKENS", "Int", number_range=(2048, 1_048_576),
             reset=False),
-    Setting("Wall display › Screensaver › Screen saver after", "DIM_SECONDS", "Int", seconds(
+    Setting("Wall display › Screensaver › Screensaver after", "DIM_SECONDS", "Int", seconds(
         ("30 seconds", 30), ("1 minute", 60), ("2 minutes", 120), ("5 minutes", 300), ("10 minutes", 600),
         ("15 minutes", 900), ("30 minutes", 1800), ("1 hour", 3600), ("Never", 0))),
     Setting("Wall display › Screensaver › Back from your chats after", "RETURN_SECONDS", "Int", seconds(
@@ -186,8 +186,8 @@ SETTINGS = [
         "Slim groups": "ChatListStyle.SLIM", "Rounded groups": "ChatListStyle.GROUPS", "Flat list": "ChatListStyle.FLAT",
         "Title and time": "ChatListStyle.TIMED", "Timeline": "ChatListStyle.TIMELINE", "Folding days": "ChatListStyle.FOLDING"}),
     Setting("Device customization › Notifications › Reply notifications", "NOTIFY_REPLIES", "Boolean", ON_OFF),
-    Setting("Device customization › Notifications › Alerts on this phone", "ALERTS", "Boolean", ON_OFF),
-    Setting("Device customization › Widgets & tile › Her mood on the widget", "WIDGET_MOOD", "Boolean", ON_OFF),
+    Setting("Device customization › Notifications › Alerts on this device", "ALERTS", "Boolean", ON_OFF),
+    Setting("Device customization › Widgets and tile › Her mood on the widget", "WIDGET_MOOD", "Boolean", ON_OFF),
 ]
 
 BY_CONST = {s.const: s for s in SETTINGS}

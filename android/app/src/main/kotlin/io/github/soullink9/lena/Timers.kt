@@ -187,7 +187,7 @@ object Timers {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** Android's alarm clock, which also shows the alarm icon and opens Settings → Alarms & timers. */
+    /** Android's alarm clock, which also shows the alarm icon and opens Settings → Alarms and timers. */
     private fun arm(c: Context, item: Countdown) {
         val show = PendingIntent.getActivity(
             c, 0, Intent(c, SettingsActivity::class.java).setAction(SettingsActivity.ACTION_ALARMS),

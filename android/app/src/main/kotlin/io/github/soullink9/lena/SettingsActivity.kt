@@ -162,7 +162,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     companion object {
-        /** Opens Settings straight on Alarms & timers (from Android's alarm icon and the clock). */
+        /** Opens Settings straight on Alarms and timers (from Android's alarm icon and the clock). */
         const val ACTION_ALARMS = "io.github.soullink9.lena.ALARMS"
     }
 
@@ -177,9 +177,9 @@ class SettingsActivity : ComponentActivity() {
         WALL_IDLE("Screensaver", Area.WALL), WALL_DASHBOARDS("Dashboards", Area.WALL),
         WAKE("Wake word", Area.TALKING), LOOK_SOUND("How she looks and sounds", Area.TALKING), GESTURE("Interacting with Lena", Area.TALKING),
         CHAT_SCREEN("Chat screen", Area.CHAT_SCREEN),
-        NOTIFICATIONS("Notifications", Area.DEVICE), PHONE("Widgets & tile", Area.DEVICE),
+        NOTIFICATIONS("Notifications", Area.DEVICE), PHONE("Widgets and tile", Area.DEVICE),
         QUICK("Quick prompts", Area.DEVICE), SCHEDULED("Scheduled prompts", Area.DEVICE), SCHEDULE("Scheduled prompt", Area.DEVICE),
-        ALARMS("Alarms & timers", Area.DEVICE),
+        ALARMS("Alarms and timers", Area.DEVICE),
         DEVELOPMENT("Development", Area.ABOUT), UPDATES("Updates", Area.ABOUT);
 
         /**
@@ -387,7 +387,7 @@ class SettingsActivity : ComponentActivity() {
                 trailing = { OpenInAndroid() }) { openDreamSettings() }
             Item(Icons.Outlined.PhotoAlbum, "Screensaver", idleLabel(s)) { open(Page.WALL_IDLE) }
             Item(Icons.Outlined.Dashboard, "Dashboards",
-                if (house) s.dashboards.joinToString(", ") { it.name.ifBlank { it.path } } else "Connect Home Assistant first") {
+                if (house) s.dashboards.joinToString(", ") { it.name.ifBlank { it.path } } else "Needs Home Assistant") {
                 open(if (house) Page.WALL_DASHBOARDS else Page.HOME_ASSISTANT)
             }
         }
@@ -411,7 +411,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Section(Area.DEVICE.title) {
             Item(Icons.Outlined.Notifications, "Notifications", notificationsLabel(s)) { open(Page.NOTIFICATIONS) }
-            if (!tv) Item(Icons.Outlined.Widgets, "Widgets & tile", if (s.widgetMood) "Widget shows her mood" else "Talk to Lena from the home screen or the shade") {
+            if (!tv) Item(Icons.Outlined.Widgets, "Widgets and tile", if (s.widgetMood) "Widget shows her mood" else "Talk to Lena from the home screen or the shade") {
                 open(Page.PHONE)
             }
             Item(Icons.Outlined.Bolt, "Quick prompts", count(s.quickPrompts.size, "prompt", "None yet")) { open(Page.QUICK) }
@@ -420,7 +420,7 @@ class SettingsActivity : ComponentActivity() {
                 open(Page.SCHEDULED)
             }
             val countdowns by Timers.items(this@SettingsActivity).collectAsState()
-            Item(Icons.Outlined.Alarm, "Alarms & timers", countdowns.orEmpty().let { list ->
+            Item(Icons.Outlined.Alarm, "Alarms and timers", countdowns.orEmpty().let { list ->
                 if (list.isEmpty()) "None set" else list.joinToString(", ") { it.name(this@SettingsActivity) }
             }) { open(Page.ALARMS) }
         }
@@ -442,7 +442,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * Alarms & timers: Lena's own, set here or by asking her ("set a 10 minute timer", "wake me up at 6:30").
+     * Alarms and timers: Lena's own, set here or by asking her ("set a 10 minute timer", "wake me up at 6:30").
      * Each shows when it rings and can be cancelled; quick timers and an alarm can be set right here.
      */
     @Composable
@@ -755,12 +755,12 @@ class SettingsActivity : ComponentActivity() {
             Findable("Folders in the menu", "drawer folders groups sidebar order reorder", Page.CHAT_SCREEN),
             Findable("All chats list style", "chat list slim groups flat timeline folding days drawer history appearance", Page.CHAT_SCREEN),
             Findable("Reply notifications", "lena finished notify answer done", Page.NOTIFICATIONS),
-            Findable("Alerts on this phone", "worried leak alarm house warning notify", Page.NOTIFICATIONS),
+            Findable("Alerts on ${Tv.thisDevice(this)}", "worried leak alarm house warning notify", Page.NOTIFICATIONS),
             Findable("Widget", "home screen launcher mood on widget", Page.PHONE),
             Findable("Quick Settings tile", "notification shade pull-down tile talk", Page.PHONE),
             Findable("Quick prompts", "shortcuts one tap chips widget prompts", Page.QUICK),
             Findable("Scheduled prompts", "briefing morning schedule repeat daily recurring automatic", Page.SCHEDULED),
-            Findable("Alarms & timers", "alarm timer wake up countdown ring snooze kitchen clock", Page.ALARMS),
+            Findable("Alarms and timers", "alarm timer wake up countdown ring snooze kitchen clock", Page.ALARMS),
         )
     }
 
@@ -1072,7 +1072,7 @@ class SettingsActivity : ComponentActivity() {
                         },
                         label = { Text(if (passwordSaved && password.isEmpty()) "Password (saved)" else "Password") },
                         placeholder = { Text(if (passwordSaved) "Type a new one to replace it" else "") },
-                        supportingText = { Text("Stored encrypted on this phone and sent only to your Open WebUI.") },
+                        supportingText = { Text("Stored encrypted on ${Tv.thisDevice(this@SettingsActivity)} and sent only to your Open WebUI.") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -1086,7 +1086,7 @@ class SettingsActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Item(null, "Test", check ?: "Signs in once with these details") {
+                Item(null, "Test connection", check ?: "Signs in once with these details") {
                     scope.launch {
                         check = "Signing in…"
                         check = OpenWebUiSignIn.test(this@SettingsActivity)
@@ -1147,7 +1147,7 @@ class SettingsActivity : ComponentActivity() {
                     },
                     label = { Text(if (tokenSaved && token.isBlank()) "Access token (saved)" else "Long-lived access token") },
                     placeholder = { Text(if (tokenSaved) "Paste a new one to replace it" else "Your profile → Security") },
-                    supportingText = { Text("Stored encrypted on this phone and sent only to your Home Assistant.") },
+                    supportingText = { Text("Stored encrypted on ${Tv.thisDevice(this@SettingsActivity)} and sent only to your Home Assistant.") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -1178,7 +1178,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Group {
-            Item(Icons.Outlined.NotificationImportant, "Alerts on this phone", if (s.alerts) "On" else "Off") { open(Page.NOTIFICATIONS) }
+            Item(Icons.Outlined.NotificationImportant, "Alerts on ${Tv.thisDevice(this@SettingsActivity)}", if (s.alerts) "On" else "Off") { open(Page.NOTIFICATIONS) }
             Item(Icons.Outlined.Dashboard, "Wall display dashboards", "Your dashboards on a tablet") { open(Page.WALL_DASHBOARDS) }
         }
         DisplayRoom(scope)
@@ -1252,7 +1252,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("Scheduled prompts always notify you with their answer.")
         Group {
-            SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on this phone",
+            SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on ${Tv.thisDevice(this@SettingsActivity)}",
                 "Checks every 15 minutes and tells you when she's worried about something at home. Needs Home Assistant.", s.alerts) {
                 set(s.copy(alerts = it))
                 if (it && !Compat.notificationsAllowed(this@SettingsActivity)) {
@@ -1327,7 +1327,7 @@ class SettingsActivity : ComponentActivity() {
         )
         if (s.answers != Answerer.ASSIST) return
         if (!hasHouse()) {
-            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
+            Group { Item(Icons.Outlined.Home, "Home Assistant", "Not connected yet: its address and a token") { open(Page.HOME_ASSISTANT) } }
             return
         }
         // null while loading; empty when Home Assistant couldn't be asked.
@@ -1403,7 +1403,7 @@ class SettingsActivity : ComponentActivity() {
             val hasHa = s.haServer.isNotBlank()
             PickItem(Icons.Outlined.Hearing, "Hearing you",
                 listOfNotNull(
-                    Hearing.PHONE to if (tv) "The TV's voice search" else "On this phone",
+                    Hearing.PHONE to if (tv) "The TV's voice search" else "On ${Tv.thisDevice(this)}",
                     if (assist) null else Hearing.SERVER to "Your server",
                     if (hasHa) Hearing.HOME_ASSISTANT to "Home Assistant" else null,
                 ), s.hearing,
@@ -1700,7 +1700,7 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun DashboardsPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
         if (!hasHouse()) {
-            Group { Item(Icons.Outlined.Home, "Connect Home Assistant first", "Its address and a token") { open(Page.HOME_ASSISTANT) } }
+            Group { Item(Icons.Outlined.Home, "Home Assistant", "Not connected yet: its address and a token") { open(Page.HOME_ASSISTANT) } }
             return
         }
         Footnote("Each one is a tab across the top. The path is what comes after your Home Assistant's address, like lovelace or dashboard-floorplan/0.")
@@ -1737,9 +1737,9 @@ class SettingsActivity : ComponentActivity() {
         var picking by remember { mutableStateOf(false) }
         val house = hasHouse()
 
-        Footnote("When Lena is this device's home screen, the screen never goes dark, and after a while without a touch on any of Lena's screens (the dashboards, your chats, Settings) this screen saver comes on. A touch on it shows the dashboard. Anywhere else Lena is a normal app that sleeps as usual. Android's own screen saver shows the same.")
+        Footnote("When Lena is this device's home screen, the screen never goes dark, and after a while without a touch on any of Lena's screens (the dashboards, your chats, Settings) this screensaver comes on. A touch on it shows the dashboard. Anywhere else Lena is a normal app that sleeps as usual. Android's own screensaver shows the same.")
         Group {
-            PickItem(Icons.Outlined.Timer, "Screen saver after",
+            PickItem(Icons.Outlined.Timer, "Screensaver after",
                 screenSaverDelays.map { it to if (it == 0) "Never" else "${duration(it)} without a touch" }, s.dimSeconds) {
                 set(s.copy(dimSeconds = it))
             }
@@ -1748,7 +1748,7 @@ class SettingsActivity : ComponentActivity() {
                 set(s.copy(returnSeconds = it))
             }
         }
-        Footnote("Opened your chats on a device where Lena is the home screen and walked away? After this long it goes back to the dashboards; the screen saver keeps its own time, so whichever is shorter comes first. Neither while you're typing, talking to her, or while she's still answering.")
+        Footnote("Opened your chats on a device where Lena is the home screen and walked away? After this long it goes back to the dashboards; the screensaver keeps its own time, so whichever is shorter comes first. Neither while you're typing, talking to her, or while she's still answering.")
 
         SectionTitle("Show")
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -1858,7 +1858,7 @@ class SettingsActivity : ComponentActivity() {
         Footnote("Started by mistake? “Hey Lena” is far less likely to be heard in ordinary talk or on TV than “Lena” on its own, and " +
             "Fewer false starts makes any of them stricter. She also ignores her name until she's been listening for a second, and when " +
             "a voice check says nobody's speaking (music, a jingle, a clatter). Each start is in Settings → Software version → Logs with how sure she was.")
-        Footnote("Some phones don't let an app use the microphone from the screen saver; it then says so and you tap to talk.")
+        Footnote("Some phones don't let an app use the microphone from the screensaver; it then says so and you tap to talk.")
     }
 
     /** Listens for the wake word right here and shows how close each try gets. */
@@ -1911,7 +1911,7 @@ class SettingsActivity : ComponentActivity() {
             return
         }
         Section("The page") {
-            SwitchItem(Icons.Outlined.Palette, "Lena's look", "Warm colours, a clay accent and replies in a serif. Off: Open WebUI's own look.", s.lenaLook) {
+            SwitchItem(Icons.Outlined.Palette, "Lena's look", "Warm colors, a clay accent and replies in a serif. Off: Open WebUI's own look.", s.lenaLook) {
                 set(s.copy(lenaLook = it))
             }
             SwitchItem(Icons.Outlined.ViewSidebar, "Open WebUI's own menus", "Its header and sidebar, under Lena's, for its model selector, chat controls and settings", s.openWebUiMenus) {

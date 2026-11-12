@@ -356,6 +356,27 @@ check(len(removing) > 100, "tools/wall-display-debloat.sh has its package lists"
 overlap = sorted(removing & debloat_lists.protected())
 check(not overlap, f"the debloat script never removes a protected package ({', '.join(overlap) or 'none'})")
 
+# ---- 14a. Settings text ------------------------------------------------------------------------------
+# docs/app/Writing.md: one name per thing in the words people read. The mechanical rules are checked here,
+# in every string of the app's code (comments aside): US spelling, no "&" between words, "sign in" not
+# "log in", and Lena's screensaver as one word (Android's own menu, quoted as "Screen saver →", is fine).
+
+text_problems = []
+NOT_WRITTEN = [(r"colour", "color"), (r"customis", "customiz"), (r"optimis", "optimiz"), (r"\blog ?in\b", "sign in"),
+               (r"\w & \w", "and"), (r"[Ss]creen saver(?! →)", "screensaver")]
+for kt in sorted((ROOT / "android/app/src/main/kotlin").rglob("*.kt")):
+    for number, line in enumerate(kt.read_text(encoding="utf-8").splitlines(), 1):
+        code = line.split("//")[0] if not line.lstrip().startswith(("*", "/*", "//")) else ""
+        if "Findable(" in code:
+            continue  # Settings' search words: what people might type, in any spelling
+        for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', code):
+            if literal.startswith(("http", "/")) or "&amp;" in literal or "<" in literal:
+                continue  # an address, a path, or a web page's markup
+            for pattern, instead in NOT_WRITTEN:
+                if re.search(pattern, literal):
+                    text_problems.append(f"{kt.name}:{number} \"{literal[:40]}\" (write {instead})")
+check(not text_problems, "the app's text follows docs/app/Writing.md" + (f" ({'; '.join(text_problems[:12])})" if text_problems else ""))
+
 # ---- 14b. Android TV ---------------------------------------------------------------------------------
 # The app installs on Android 11 TV boxes (minSdk 30) while phones use Android 16's features, so every
 # newer call must be behind a version check: the build's lint fails on any that isn't (NewApi, made fatal

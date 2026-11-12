@@ -16,6 +16,16 @@ object Tv {
     fun isTv(c: Context): Boolean = c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
     /**
+     * What to call the device in Settings' text: "this TV", "this tablet" or "this phone", so a line never
+     * says "this phone" on a TV (docs/Writing.md). A tablet is anything 600dp or wider on its short side.
+     */
+    fun thisDevice(c: Context): String = when {
+        isTv(c) -> "this TV"
+        c.resources.configuration.smallestScreenWidthDp >= 600 -> "this tablet"
+        else -> "this phone"
+    }
+
+    /**
      * Lena's screens are always dark on a TV. A TV is in a living room, often in the evening, and Android
      * TV leaves apps in light mode (it has no dark mode setting), so Settings and the Home Assistant
      * dashboards came up white. Called from each screen's attachBaseContext: night mode for that screen

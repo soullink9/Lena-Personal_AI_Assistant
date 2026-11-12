@@ -24,10 +24,10 @@ Lena is two things working together:
 - **Your order:** the **Reorder** button (⇅) on the Pinned and Folders headings puts them in the order you like, with up and down arrows. Open WebUI keeps no order for either, so it's kept on this phone; All chats uses it too. Chats you pin later come first until you reorder again, and folders inside folders stay under their parent.
 - **View all chats** opens a page with everything: all your pinned chats, every folder and your whole history (a page at a time), with **search**. Its history is listed the way you choose (Settings → Chat screen → All chats list style): slim groups (the default), rounded groups, a flat list, title and time, a timeline, or days that fold open. There you can also make a **new folder** (the folder button at the top) and long-press a folder to **rename** or **delete** it (its chats are kept and move back to your chat list).
 - **Long-press** any chat, in the drawer or All chats, to **pin** (or unpin) it, **move it to a folder** (or out of one, or into a new folder), **rename** or **delete** it (deleting removes it from Open WebUI too). A spinner marks a chat that's still being answered.
-- Along the bottom, two buttons: **Settings** and **Memory & knowledge** (what Lena remembers and what's in your knowledge collections; more below). To reload, use Settings → **Refresh all connections**.
+- Along the bottom, two buttons: **Settings** and **Memory and knowledge** (what Lena remembers and what's in your knowledge collections; more below). To reload, use Settings → **Refresh all connections**.
 - **Folders look like chats**: in the drawer and in All chats a folder is a row like the chats around it (in your list style), with a folder icon.
 
-**Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). Turn it off in Settings → Chat screen → **Lena's look**. It recolours Open WebUI through its colour settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
+**Lena's look for Open WebUI.** Open WebUI's pages get a warm, quiet style in the spirit of Claude.ai: off-white and warm charcoal instead of white and grey, a clay accent (the send button, links and switches), your messages in a soft bubble and her replies in a serif. It follows light and dark mode, uses the phone's own fonts, and applies only inside the app (the browser keeps Open WebUI's own look). Turn it off in Settings → Chat screen → **Lena's look**. It recolors Open WebUI through its color settings, so an Open WebUI update can at worst bring back parts of its own look; nothing breaks.
 
 **Open WebUI's own menus** are hidden because the top bar and drawer replace them. To get them back, for things the shell doesn't cover such as chat controls, your Open WebUI settings and signing out, turn on **Open WebUI's own menus** in Settings → Chat screen.
 
@@ -49,7 +49,7 @@ Below it, the settings are in sections, and every row says how it's set and open
 | **Wall display** | **Make it this device's home screen** ↗ (dashboard mode), **Make it this device's screensaver** ↗ (Android's screen saver while charging), **Screensaver** (what shows when no one's around, when, and what wakes it) and **Dashboards**. |
 | **Talking to Lena** | **Make Lena your digital assistant** ↗, **Wake word** (on or off, her name, how sure she must be, and whether she listens only on the wall display or whenever Lena is open), **How she looks and sounds** (her look, who hears you, her voice, keep listening) and **Interacting with Lena** (what the assistant gesture opens, and the lock screen). |
 | **Chat screen configuration** | **Chat screen**: **Lena's look** for Open WebUI's pages, **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
-| **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets & tile**, **Quick prompts** and **Scheduled prompts**. |
+| **Device customization** | **Notifications** (reply notifications and house alerts), **Widgets and tile**, **Quick prompts** and **Scheduled prompts**. |
 | **About** | The **software version**. Tap it for **Development**, a page with no row of its own: **Updates**, **Logs** and **Return to defaults**. |
 
 **Return to defaults** puts timings, the wake word's options, how she looks and sounds, the chat screen, notifications and the screensaver's options back to how a new install starts. It keeps your connections (Open WebUI, Home Assistant, signing in by herself, who answers and Assist's agent), the model and context size, your dashboards and motion sensor, the screensaver's album, whether she listens for her name (**Listen for her name** stays as you set it: switching the microphone on or off is never a reset's call), your quick and scheduled prompts, and your order of pinned chats and folders. It asks first.
@@ -64,7 +64,7 @@ Settings → Connections → **Who answers** picks who replies when you talk to 
 - **The chat screen is Lena's own:** one conversation kept on this device, newest at the bottom. Type to her there, or tap the mic for the sheet. Everything you ask her, typed, spoken, quick prompts and scheduled prompts (marked as such), is kept there with her full answer; a scheduled prompt's notification opens it. **New conversation** at the top starts a new Assist conversation and marks where it began. Its menu has Settings, her memory and, on the wall display, Apps.
 - **Settings that are only about Open WebUI step aside:** its connection and the model, the chat screen's look, menu and list options (the Chat | Home switch stays), reply notifications, a scheduled prompt's chat, and "your server" for hearing and her voice (the phone hears you and speaks). **Memory** shows only her own memory, from the Lena integration, as does her mood.
 
-**Any screen size.** On a foldable's outer screen (or any narrow screen) her clock, the photo frame's clock and the orb shrink to fit, and the drawer leaves a strip of the page showing. On a wide inner screen or a tablet, Settings, All chats and Memory & knowledge stay a readable width in the middle. Folding or unfolding keeps your chat open.
+**Any screen size.** On a foldable's outer screen (or any narrow screen) her clock, the photo frame's clock and the orb shrink to fit, and the drawer leaves a strip of the page showing. On a wide inner screen or a tablet, Settings, All chats and Memory and knowledge stay a readable width in the middle. Folding or unfolding keeps your chat open.
 
 ## Wall display
 
@@ -105,7 +105,7 @@ The same goes for Home Assistant's own pages opened from its menu (Overview, Ene
 
 ### Screensaver
 
-In dashboard mode the screen never goes dark, on any of Lena's screens. After a while without a touch (**Screen saver after**: 30 seconds, 1, 2, 5, 10, 15 or 30 minutes, an hour, or never; 2 minutes by default) the screen saver comes on, whichever screen is showing: the dashboards, your chats, All chats, Memory, Settings or Logs. It's one clock for all of them, so moving between screens doesn't start the wait again. Typing, talking to her (listening, thinking, speaking) and her still answering in a chat count as someone being there, so it never comes on mid-answer. **A touch on the screen saver always shows the dashboard**, whatever screen it came from. Android's own screen saver shows the same.
+In dashboard mode the screen never goes dark, on any of Lena's screens. After a while without a touch (**Screensaver after**: 30 seconds, 1, 2, 5, 10, 15 or 30 minutes, an hour, or never; 2 minutes by default) the screen saver comes on, whichever screen is showing: the dashboards, your chats, All chats, Memory, Settings or Logs. It's one clock for all of them, so moving between screens doesn't start the wait again. Typing, talking to her (listening, thinking, speaking) and her still answering in a chat count as someone being there, so it never comes on mid-answer. **A touch on the screen saver always shows the dashboard**, whatever screen it came from. Android's own screen saver shows the same.
 
 - **Her clock:** the time, the date, the weather, how she feels and the last thing she said, on black. It drifts a few pixels each minute so it doesn't burn into the screen, and late at night (or when she's drained) it goes dim and warm and hides what she said.
 - **Photo frame:** an album from Home Assistant's media: Immich's albums, people, tags and favorites (with Home Assistant's Immich integration), your My media folders, or any other media source with photos. Choose how long each photo shows (5 seconds to 5 minutes; a minute by default), the transition (fade, slide, slow zoom and fade, or none), shuffle, how photos fit the screen, and whether the time and her mood sit in a corner.
@@ -147,7 +147,7 @@ Ask her: "set a 10 minute pasta timer", "timer for an hour and a half", "wake me
 - **On a display registered with the Lena integration** (an Assist satellite), **timers are Home Assistant's own**: Assist sets them with its own timer support for this display, and with Open WebUI her tool does. The display keeps a copy that rings here on time even if the connection drops, and cancelling it here cancels it in Home Assistant.
 - **Alarms**, and timers on a phone or tablet without the integration, are hers: she understands these herself, in English, before anything is sent anywhere, answers at once, and they work without a connection. A longer or less clear sentence goes on to her as usual.
 
-They're set on Android's alarm clock, like a clock app's, so they ring on time while the tablet sleeps, and they're set again after a restart (one missed by less than five minutes while it was off rings when it's back). When one rings, the alarm sound plays at the alarm volume and a full-screen **Stop** appears (over the lock screen too), with **Snooze** for 10 minutes on an alarm; saying "stop" works on that screen. It stops by itself after 10 minutes. The next one counts down on the dashboards' bar and on the screensaver; tap it, or open Settings → Device customization → **Alarms & timers**, to see them all, cancel one, or set a quick timer or an alarm by hand.
+They're set on Android's alarm clock, like a clock app's, so they ring on time while the tablet sleeps, and they're set again after a restart (one missed by less than five minutes while it was off rings when it's back). When one rings, the alarm sound plays at the alarm volume and a full-screen **Stop** appears (over the lock screen too), with **Snooze** for 10 minutes on an alarm; saying "stop" works on that screen. It stops by itself after 10 minutes. The next one counts down on the dashboards' bar and on the screensaver; tap it, or open Settings → Device customization → **Alarms and timers**, to see them all, cancel one, or set a quick timer or an alarm by hand.
 
 **When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 
@@ -186,7 +186,7 @@ Never more than once every half hour on the same display.
 When something in your house worries her (a leak, smoke, a door left open: the sensors you chose in the Lena integration), she can tell you on your phone, and tapping the alert opens Lena listening so you can ask what's going on.
 
 - **Instant, in her words:** in Home Assistant, Lena integration → Configure → **Tell these phones when she's worried**, pick your phones (they need the Home Assistant companion app), and choose your Lena agent under **Write alerts in her words with**. Each alert is written by her, and an "all clear" replaces it when the sensor clears.
-- **Backup on this phone:** Settings → Notifications → **Alerts on this phone**. The app checks every 15 minutes, the shortest Android allows an app without Google's push service, so an alert can arrive up to 15 minutes late and uses the plain reason ("Leak sensor is detecting water."). Use it on phones without the companion app; on phones with both, you'd get each alert twice.
+- **Backup on this phone:** Settings → Notifications → **Alerts on this device**. The app checks every 15 minutes, the shortest Android allows an app without Google's push service, so an alert can arrive up to 15 minutes late and uses the plain reason ("Leak sensor is detecting water."). Use it on phones without the companion app; on phones with both, you'd get each alert twice.
 
 ## Share to Lena
 
@@ -198,13 +198,13 @@ Lena has no voice calls: talking to her is the Ask sheet (the assistant gesture,
 
 ## Quick Settings tile
 
-Settings → Widgets & tile → **Add the Quick Settings tile**. Tapping **Talk to Lena** in the pull-down shade opens the sheet, listening, the same as the assistant gesture (including its lock-screen setting).
+Settings → Widgets and tile → **Add the Quick Settings tile**. Tapping **Talk to Lena** in the pull-down shade opens the sheet, listening, the same as the assistant gesture (including its lock-screen setting).
 
 ## Home screen widget
 
-Settings → Widgets & tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colours.
+Settings → Widgets and tile → **Add the widget**, or add it from your launcher's widget list. It has **Talk**, **Type** and **New chat** buttons, and your first three quick prompts, which open the sheet and send straight away. It uses your wallpaper's colors.
 
-Turn on **Her mood on the widget** (Settings → Widgets & tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
+Turn on **Her mood on the widget** (Settings → Widgets and tile, needs Home Assistant) to show how she feels under her name. It updates every half hour and after you talk to her. It shows only her mood, never the reasons, since anyone can see your home screen.
 
 ## Quick prompts
 

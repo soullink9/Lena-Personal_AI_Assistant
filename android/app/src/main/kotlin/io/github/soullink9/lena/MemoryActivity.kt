@@ -219,7 +219,7 @@ class MemoryActivity : ComponentActivity() {
         val heading = when {
             openNote != null -> openNote!!.title.ifBlank { if (openNote!!.id == null) "New note" else "Note" }
             openKnowledge != null -> openKnowledge!!.name
-            else -> "Memory & knowledge"
+            else -> "Memory and knowledge"
         }
 
         Scaffold(
@@ -684,7 +684,7 @@ class MemoryActivity : ComponentActivity() {
     }
 }
 
-/** The rounded, filled search box used in the drawer and Memory & knowledge. */
+/** The rounded, filled search box used in the drawer and Memory and knowledge. */
 @Composable
 fun SearchField(value: String, placeholder: String, modifier: Modifier = Modifier, onChange: (String) -> Unit) {
     TextField(

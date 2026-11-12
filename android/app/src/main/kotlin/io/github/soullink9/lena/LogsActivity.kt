@@ -188,7 +188,7 @@ class LogsActivity : ComponentActivity() {
         if (clearing) AlertDialog(
             onDismissRequest = { clearing = false },
             title = { Text("Clear the log?") },
-            text = { Text("Lena's own log is deleted from this phone.") },
+            text = { Text("Lena's own log is deleted from ${Tv.thisDevice(this@LogsActivity)}.") },
             confirmButton = {
                 TextButton(colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error), onClick = {
                     Logs.clear()

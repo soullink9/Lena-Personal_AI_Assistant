@@ -35,7 +35,7 @@ So her character goes in one `MESSAGE system` block, and the apps only add conte
 
 Tips:
 
-- Write to her ("You are...") and describe behaviour, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".
+- Write to her ("You are...") and describe behavior, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".
 - Every word is sent with every message. Keep it tight; small models follow short, concrete rules better than long ones.
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.

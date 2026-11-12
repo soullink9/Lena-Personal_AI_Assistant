@@ -28,7 +28,7 @@ These apply to every change, by people and by AI assistants alike.
 - Consistent naming: follow the names already used for the same thing elsewhere (Kotlin `camelCase` and `PascalCase`, Python `snake_case`, settings keys `snake_case`), and call one concept by one name everywhere: in code, settings, the app's words and the docs.
 - Documentation moves with the code: when a function, class or piece of logic changes, its comment, the docs pages that describe it and the changelog change in the same commit.
 - Readable over clever: plain steps over dense one-liners, named helpers over nested expressions, and a comment that says why wherever the reason isn't obvious.
-- Nothing breaks: refactors and new features keep existing behaviour and pass `tools/check.py`, the Home Assistant tests and the app build.
+- Nothing breaks: refactors and new features keep existing behavior and pass `tools/check.py`, the Home Assistant tests and the app build.
 
 **Workflow**
 - [Conventional Commits](https://www.conventionalcommits.org/) for every commit: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `build:`, `ci:`, `chore:`, `perf:`, optionally with a scope such as `feat(app):` or `fix(integration):`. Turn on the check once per clone with `git config core.hooksPath tools/git-hooks`.

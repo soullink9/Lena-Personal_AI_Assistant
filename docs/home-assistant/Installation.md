@@ -53,7 +53,7 @@ You can change any of the three dropdowns by hand, use them in automations, or p
 Settings → Devices & services → Lena → **Configure**:
 
 - **People she misses:** coming home after a while makes her delighted; an empty house makes her restless.
-- **Weather:** a weather entity, such as your forecast. Rain, storms, snow and sunshine colour her mood.
+- **Weather:** a weather entity, such as your forecast. Rain, storms, snow and sunshine color her mood.
 - **Your weather station:** your own weather sensors (an Ecowitt in the backyard: temperature, humidity, wind, rain). She uses them for what it's like outside right now, before any forecast, in conversations and her morning briefing.
 - **Special days calendars:** birthdays, anniversaries or holidays. Anything on them today puts her in a good mood, and she knows why.
 - **Things that worry her:** problem sensors like leaks, smoke or a garage door left open. She's worried until they clear, then relieved.

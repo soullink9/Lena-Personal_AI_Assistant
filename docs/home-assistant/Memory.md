@@ -8,7 +8,7 @@ Lena has one memory, shared everywhere she lives: the **Lena Memory** to-do list
 |---|---|---|
 | Home Assistant voice | Always in her context, through the Lena choice in your agent | Her `remember_fact` and `forget_fact` tools |
 | Open WebUI and the Lena app | The Lena filter adds it to every chat | The Lena tool's remember and forget |
-| You | The To-do lists panel in Home Assistant, or **Memory & knowledge → Hers** in the app | Edit the list directly |
+| You | The To-do lists panel in Home Assistant, or **Memory and knowledge → Hers** in the app | Edit the list directly |
 
 ## How she saves
 
