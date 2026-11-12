@@ -11,7 +11,9 @@
 # plain numbers, so there are no pre-releases.
 #
 # With Gitea push-mirroring to GitHub, the new tag reaches GitHub too, and GitHub's own release workflow
-# (.github/workflows/release.yml) publishes the same release there, which is where the app updates from.
+# (.github/workflows/release.yml) publishes the same release there, which is where the app updates from. If the
+# tag doesn't start it (GitHub starts nothing for a push of more than three tags), .github/workflows/
+# catch-up-releases.yml starts it after the mirror's next push.
 #
 # Like test.yml it uses no actions, so it works when GitHub can't be reached. The release notes still point at
 # the public copy on GitHub (PUBLIC_REPOSITORY), which is where people install from.

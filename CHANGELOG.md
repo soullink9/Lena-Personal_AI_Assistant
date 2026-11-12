@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Releases
+
+- **GitHub catches up with Gitea's releases by itself.** Releases are made on Gitea and reach GitHub with the mirror's push every few hours, but GitHub starts nothing for the tags of a push that brings more than three at once, so several releases between two mirror pushes got no GitHub release. A new workflow (`.github/workflows/catch-up-releases.yml`) runs after each mirror push and every 6 hours, and starts GitHub's release workflow for each version with a tag but no release. Only the newest version is marked Latest, so the app always updates to it. Nothing changes in how you release ([Releasing](CONTRIBUTING.md#releasing)).
+
 ## [0.6.17] - 2026-11-09
 
 ### Android app

@@ -154,11 +154,15 @@ jobs:
           APK: ${{ steps.notes.outputs.apk }}
         run: |
           out=android/app/build/outputs/apk/release
+          # Latest only if it's the newest version released, so releases caught up together (catch-up-releases.yml)
+          # leave the newest on top whichever finishes last; the app updates from the Latest release.
+          gh release list --limit 200 --json tagName,isDraft > "$RUNNER_TEMP/releases.json"
+          latest=$(python3 scripts/missing_releases.py --latest "$TAG" "$RUNNER_TEMP/releases.json")
           if gh release view "$TAG" > /dev/null 2>&1; then
             # A release made by hand on GitHub: add the files and notes to it.
             gh release upload "$TAG" "$out/$APK" "$out/SHA256SUMS" --clobber
-            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md --prerelease=false --draft=false
+            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md --prerelease=false --draft=false --latest="$latest"
           else
             gh release create "$TAG" "$out/$APK" "$out/SHA256SUMS" --title "$TITLE" --notes-file notes.md \
-              --target "$GITHUB_SHA"
+              --target "$GITHUB_SHA" --latest="$latest"
           fi

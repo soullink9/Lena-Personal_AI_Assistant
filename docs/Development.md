@@ -64,6 +64,7 @@ How the repository is organised and how to change it without breaking things. Th
 │   ├── release_notes.py           checks the tag against every part's version; writes the release notes
 │   ├── check_apk.py               checks the APK before it's published (signed, Lena's version, SHA256SUMS)
 │   ├── publish_gitea_release.py   publishes the release on Gitea through its API
+│   ├── missing_releases.py        which versions GitHub has a tag but no release for (catch-up-releases.yml)
 │   ├── build_apk.sh               builds and names the APK, writes SHA256SUMS
 │   ├── android_sdk.sh             the Android SDK from Google, for the Gitea runner
 │   └── test_home_assistant.sh, start_home_assistant.sh   the integration's tests, from PyPI

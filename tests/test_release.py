@@ -1,5 +1,6 @@
 """Release scripts: the version check and notes (scripts/release_notes.py), the APK check (scripts/check_apk.py),
-and publishing on Gitea (scripts/publish_gitea_release.py) against a fake Gitea server. These run in both release
+publishing on Gitea (scripts/publish_gitea_release.py) against a fake Gitea server, and which releases GitHub is
+missing (scripts/missing_releases.py). These run in both release
 workflows, so a mistake here would stop or spoil a release.
 
 Run from the repository root:  python3 tests/test_release.py   (tools/check.py runs it too)
@@ -22,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import check_apk  # noqa: E402 - the scripts folder, added just above
 import publish_gitea_release as publish  # noqa: E402,F401 - imported so a syntax error fails here too
+import missing_releases  # noqa: E402
 import release_notes  # noqa: E402
 
 REPO = "soullink9/Lena-Personal_AI_Assistant"
@@ -292,6 +294,40 @@ result = run_publish("v0.6.99", files=(tmp / "missing.apk",))
 check(result.returncode != 0 and "missing.apk" in result.stderr and len(FakeGitea.calls) == calls_before,
       "a file that wasn't built: stops before touching the release")
 server.shutdown()
+
+# --- missing_releases.py: which versions GitHub's catch-up starts a release for ----------------------------------
+
+LOG = "\n".join(f"## [{v}] - 2026-11-01\n\n- something\n" for v in ("0.6.17", "0.6.16", "0.6.15", "0.6.14", "0.6.13", "0.6.2-beta"))
+TAGS = ["v0.6.2-beta", "v2.18.1", "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16", "v0.6.17", "v0.6.99"]
+
+
+def starts(releases, runs=(), tags=TAGS):
+    """The tags the catch-up would start, and its warnings."""
+    actions = missing_releases.to_release(tags, [{"tagName": t, "isDraft": False} for t in releases], list(runs), LOG)
+    return [t for k, t in actions if k == "release"], [t for k, t in actions if k == "warning"]
+
+
+got, _ = starts(["v0.6.15"])
+check(got == ["v0.6.16", "v0.6.17"],
+      f"versions newer than the newest released, oldest first; not v2.x, betas or a tag without a changelog section ({got})")
+got, _ = starts(["v0.6.13", "v0.6.17"])
+check(got == [], f"an older version left without a release isn't started ({got})")
+got, _ = starts([])
+check(got == ["v0.6.17"], f"no release on GitHub at all: only the newest version ({got})")
+got, _ = starts(["v0.6.15"], runs=[{"headBranch": "v0.6.16", "status": "in_progress", "conclusion": None}])
+check(got == ["v0.6.17"], f"a version whose release is already running is left to that run ({got})")
+got, warned = starts(["v0.6.15"], runs=[{"headBranch": "v0.6.16", "status": "completed", "conclusion": "failure"}])
+check(got == ["v0.6.17"] and len(warned) == 1 and "v0.6.16" in warned[0],
+      f"a failed release run isn't started again, it's reported ({got}, {warned})")
+actions = missing_releases.to_release(TAGS, [{"tagName": "v0.6.13", "isDraft": False}, {"tagName": "v0.6.14", "isDraft": True}], [], LOG)
+check([t for k, t in actions if k == "release"] == ["v0.6.14", "v0.6.15", "v0.6.16"]
+      and any("v0.6.17" in t for k, t in actions if k == "warning"),
+      f"a draft counts as missing, and at most three start at once, the rest next time ({actions})")
+releases = [{"tagName": t, "isDraft": False} for t in ("v0.6.15", "v0.6.17", "v2.18.1")]
+check(missing_releases.is_latest("v0.6.17", releases, LOG) and not missing_releases.is_latest("v0.6.16", releases, LOG),
+      "Latest only for the newest of Lena's versions released, whichever finishes last (a v2.x release doesn't count)")
+check(not missing_releases.is_latest("v0.6.16", releases + [{"tagName": "v0.6.16", "isDraft": False}], LOG),
+      "…an older release published after a newer one isn't Latest")
 
 print(f"\n{fails} failures")
 sys.exit(1 if fails else 0)
