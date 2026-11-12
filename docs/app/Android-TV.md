@@ -14,13 +14,13 @@ Later updates come through Lena herself, as on a phone (**Settings → Software 
 
 ## Set her up
 
-Lena opens on **Connect Home Assistant**. Choose **Connect from your phone**: the TV shows an address and its QR code.
+Lena opens on **Connect Home Assistant**. Choose **Set up from your phone**: the TV shows an address and its QR code.
 
-1. **Home Assistant, from your phone**: scan the QR code with your phone's camera (or type the short address into its browser), on the same Wi-Fi as the TV. On the page that opens, check your Home Assistant's address and tap **Sign in with Home Assistant**; you sign in on your Home Assistant's own page (your password manager works there), and Lena on the TV makes herself a long-lived token, named after the TV, which you'll see in your Home Assistant profile under **Security**. The page also takes a token you've made yourself, pasted. The TV closes the screen once it's connected, and the wall display starts. It's also in **Settings → Home Assistant → Connect from your phone**.
+1. **From your phone**: scan the QR code with your phone's camera, on the same Wi-Fi as the TV. On the page that opens, check your Home Assistant's address and tap **Sign in with Home Assistant**; you sign in on your Home Assistant's own page (your password manager works there), and Lena on the TV makes herself a long-lived token, named after the TV, which you'll see in your Home Assistant profile under **Security**. The same page takes everything else you'd otherwise type with the remote: a token you made yourself, Open WebUI's address, email and password, your Gitea for updates, and the motion sensors. **Send to this TV**, then press **Save** on the TV, which lists what will change. What you type is encrypted on the phone with a key in the QR code ([how](Privacy-and-Security.md)). It's also the first item in **Settings**: **Set up from your phone**.
 
 If the page says Home Assistant won't talk to the TV (HTTP 403), Home Assistant has most likely banned the TV's address after earlier failed sign-ins (a token mistyped with the remote counts). Its notifications name the address; remove that line from `ip_bans.yaml` in Home Assistant's config folder (with the File editor or Studio Code Server add-on) and restart Home Assistant. A proxy or firewall in front of Home Assistant can also refuse a device.
 
-For anything else you'd type on the TV, the **Google TV** app's remote on your phone has a keyboard that types into the TV, and you can paste there too.
+For anything the phone page doesn't cover, the **Google TV** app's remote on your phone has a keyboard that types into the TV, and you can paste there too.
 2. **Who answers**: Home Assistant's Assist is the simplest on a TV. To use Open WebUI instead, enter its address and turn on **Sign in by herself** with your Open WebUI email and password: a TV can't open Open WebUI's sign-in page.
 3. **Hearing you**: **The TV's voice search** (the default). It's the TV's own speech recognition, the one that hears through the remote's microphone.
 

@@ -128,14 +128,15 @@ jobs:
     env:
       ANDROID_HOME: /opt/android-sdk
     steps:
-      # The wake word check compiles the original C (g++) and makes its test audio with Python.
+      # The wake word check compiles the original C (g++) and makes its test audio with Python; the phone setup
+      # check runs the phone page's cipher in Node (nodejs).
       - name: Install the build tools (from Ubuntu)
         # Retried, over IPv4 (a runner without IPv6 otherwise waits on it first), so a short outage of
         # Ubuntu's servers doesn't fail the run; a longer one still does, and re-running the job is the fix.
         run: |
           apt="apt-get -qq -o Acquire::Retries=5 -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=30"
           for attempt in 1 2 3; do
-            if $apt update && DEBIAN_FRONTEND=noninteractive $apt install -y --no-install-recommends git curl unzip g++ python3 > /dev/null; then
+            if $apt update && DEBIAN_FRONTEND=noninteractive $apt install -y --no-install-recommends git curl unzip g++ python3 nodejs > /dev/null; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then

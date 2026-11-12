@@ -193,7 +193,7 @@
 
         <!-- Connect Home Assistant from your phone (a page this device serves on the home network while it shows). -->
         <activity
-            android:name=".HaPairActivity"
+            android:name=".PhoneSetupActivity"
             android:exported="false" />
 
         <service

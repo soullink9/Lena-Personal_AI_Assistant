@@ -1,8 +1,8 @@
 package io.github.soullink9.lena
 
 /**
- * A QR code for a short piece of text, such as the address a TV shows for "Connect from your phone"
- * ([HaPairActivity]): your phone's camera opens it, so nothing has to be typed.
+ * A QR code for a short piece of text, such as the address a TV shows for "Set up from your phone"
+ * ([PhoneSetupActivity]): your phone's camera opens it, so nothing has to be typed.
  *
  * Written here rather than added as a library: Lena only needs short addresses, so this covers QR versions
  * 1 to 6 (up to 106 characters) at error correction level M, which every phone camera reads. It follows the

@@ -668,14 +668,14 @@ class DashboardActivity : ComponentActivity() {
             ) {
                 Text("Connect Home Assistant", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "The wall display shows your Home Assistant dashboards. $what in Settings → Home Assistant, or sign in from your phone: no typing here.",
+                    "The wall display shows your Home Assistant dashboards. $what in Settings → Home Assistant, or set it up from your phone: no typing here.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Signing in from a phone comes first: on a TV it's the only practical way ([HaPairActivity]).
-                    FilledTonalButton(onClick = { startActivity(Intent(this@DashboardActivity, HaPairActivity::class.java)) }) { Text("Connect from your phone") }
+                    // Signing in from a phone comes first: on a TV it's the only practical way ([PhoneSetupActivity]).
+                    FilledTonalButton(onClick = { startActivity(Intent(this@DashboardActivity, PhoneSetupActivity::class.java)) }) { Text("Set up from your phone") }
                     androidx.compose.material3.OutlinedButton(onClick = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }) { Text("Settings") }
                     androidx.compose.material3.OutlinedButton(onClick = { apps = true }) { Text("Apps") }
                 }

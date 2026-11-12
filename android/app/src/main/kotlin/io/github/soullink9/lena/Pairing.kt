@@ -16,33 +16,48 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 /**
- * "Connect from your phone": a small web page this device serves on your home network for a few minutes,
- * so Home Assistant can be connected from your phone's browser instead of typing a long token with a TV
- * remote ([HaPairActivity] shows its address and a QR code).
+ * "Set up from your phone": a small web page this device serves on your home network for a few minutes,
+ * where your phone fills in every address and sign-in Lena uses, instead of typing them with a TV remote or
+ * a wall tablet's keyboard ([PhoneSetupActivity] shows its address and a QR code).
  *
- * The page offers two ways:
- * - **Sign in with Home Assistant.** Your phone goes to your Home Assistant's own sign-in page (your
- *   password manager works there), which sends it back here with a one-time code. This device swaps the
- *   code for a sign-in and asks Home Assistant for a long-lived token named after it, the same kind you'd
- *   make in your profile ([HaSignIn]).
- * - **Paste a long-lived token**, made in your profile on the phone.
+ * What the page covers ([PhoneFields]): Open WebUI's address, sign-in address, email and password; Home
+ * Assistant's address and token (or **Sign in with Home Assistant**: your phone goes to your Home
+ * Assistant's own sign-in page, which sends it back here with a one-time code, and this device makes its own
+ * long-lived token, [HaSignIn]); your Gitea for updates; and the two motion sensors.
  *
- * Every address carries a random code that's also on the TV's screen, so nothing else on the network can
- * use the page; it stops when the screen closes, after it's done, or after [LIFETIME_MS]. The token only
- * ever travels between this device and your Home Assistant (and, if you paste one, from your phone).
+ * How it stays safe:
+ * - **Write-only.** The page is never sent a saved password, email or token, only whether each is set.
+ *   Addresses are filled in, so you can correct them.
+ * - **Encrypted in the page.** The QR code carries a one-time key after a `#`, which browsers never send
+ *   over the network. The page encrypts what you type with it (ChaCha20-Poly1305, [PHONE_CIPHER_JS]) and
+ *   this device decrypts it ([decrypt]): someone listening on the Wi-Fi sees only ciphertext. (A phone
+ *   browser only has its own crypto on https pages, and this one is plain http on your network, hence the
+ *   page's own small cipher, checked against Java's in tools/pairing_check.)
+ * - **Confirmed on the device.** Nothing the phone sends is saved until someone presses OK on this device
+ *   ([Handler.propose]). Signing in with Home Assistant is the exception: that needs your Home Assistant
+ *   password, typed on Home Assistant's own https page.
+ * - **One phone, a few tries.** The first phone to open the page holds it (a cookie); any other is told
+ *   it's in use. Five requests with a wrong code close it.
+ * - **Short-lived.** It stops when the screen closes, once saved, or after [LIFETIME_MS].
+ *
+ * What it can't stop: someone already inside your network, actively rewriting the page as it loads, during
+ * those minutes. The page says so, and Home Assistant's own sign-in avoids it for that password.
  *
  * Plain Kotlin and java.net only, so it can be checked away from Android.
  */
 class PairingServer(private val handler: Handler) : Closeable {
 
-    /** What the page does; [HaPairActivity] answers, off the main thread. */
+    /** What the page does; [PhoneSetupActivity] answers, off the main thread. */
     interface Handler {
-        /** The Home Assistant address to fill in on the page (the one already set, if any). */
-        fun knownAddress(): String
+        /** What the page shows: addresses filled in, which secrets are saved (never their values), sensors. */
+        fun known(): Known
 
         /**
          * Where to send the phone to sign in, for the address typed on it: Home Assistant's sign-in page
@@ -54,9 +69,25 @@ class PairingServer(private val handler: Handler) : Closeable {
         /** Finishes signing in with Home Assistant's one-time [code]; returns what to tell the phone. */
         fun signedIn(address: String, code: String, clientId: String): String
 
-        /** Uses a pasted token; returns what to tell the phone. */
-        fun pastedToken(address: String, token: String): String
+        /** A phone opened the page (and now holds it). */
+        fun phoneConnected() {}
+
+        /**
+         * The phone sent these values (decrypted, only [PhoneFields.ALL]): show what would change on the
+         * device, and call [answer] once it's saved, refused there, or failed.
+         */
+        fun propose(changes: Map<String, String>, answer: (Outcome) -> Unit)
     }
+
+    /**
+     * What the page is filled in with. [addresses]: every field that isn't secret, as set now. [saved]: which
+     * of [PhoneFields.SECRETS] are set. [sensors]: motion sensors Home Assistant has, to pick from.
+     * [device]: "this TV", "this tablet" or "this phone".
+     */
+    data class Known(val addresses: Map<String, String>, val saved: Set<String>, val sensors: List<String>, val device: String)
+
+    /** How a save went: [state] is saved, refused or failed; [message] is shown on the phone. */
+    data class Outcome(val state: String, val message: String)
 
     companion object {
         /** The port to try first, so the address stays the same from one time to the next. */
@@ -64,6 +95,9 @@ class PairingServer(private val handler: Handler) : Closeable {
 
         /** How long the page is served at most. */
         const val LIFETIME_MS = 15 * 60_000L
+
+        /** Requests with a wrong code before the page closes (a code is about a billion guesses). */
+        const val WRONG_CODES = 5
 
         /** Letters and digits that can't be mistaken for each other when read off a TV. */
         private const val ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -77,27 +111,63 @@ class PairingServer(private val handler: Handler) : Closeable {
                 .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
                 ?.hostAddress
         }.getOrNull()
+
+        /** ChaCha20-Poly1305: Android's name for it, then Java's (the checks run on a computer's Java). */
+        private fun chacha(): Cipher = runCatching { Cipher.getInstance("ChaCha20/Poly1305/NoPadding") }
+            .getOrElse { Cipher.getInstance("ChaCha20-Poly1305") }
+
+        /** Encrypts as the page does; for the checks, which play the phone. */
+        fun encrypt(key: ByteArray, nonce: ByteArray, aad: ByteArray, plain: ByteArray): ByteArray {
+            val cipher = chacha()
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(nonce))
+            cipher.updateAAD(aad)
+            return cipher.doFinal(plain)
+        }
     }
 
+    private val random = SecureRandom()
+
     /** The code in every address, also shown on the screen. */
-    val code: String = SecureRandom().let { random -> (1..6).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("") }
+    val code: String = (1..6).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
+
+    /** The page's key, only ever in the QR code (after the #) and in memory here. */
+    val key: ByteArray = ByteArray(32).also { random.nextBytes(it) }
 
     /** The sign-in being waited for: Home Assistant sends this back, so an old or forged reply is refused. */
-    private val state: String = SecureRandom().let { random -> (1..24).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("") }
+    private val state: String = (1..24).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
 
     /** The address being signed in to, between leaving for Home Assistant's page and coming back. */
     @Volatile private var signingInTo: String? = null
+
+    /** The phone holding the page: its cookie. */
+    @Volatile private var holder: String? = null
+
+    /** Requests that guessed a code; [WRONG_CODES] of them close the page. */
+    private var wrongCodes = 0
+
+    /** Nonces already used, so a message sent again isn't taken twice. */
+    private val usedNonces = HashSet<String>()
+
+    /** The last save: waiting, saved, refused or failed. */
+    @Volatile private var outcome: Outcome? = null
 
     private var socket: ServerSocket? = null
     @Volatile private var host: String = "127.0.0.1"
     private val started = System.currentTimeMillis()
 
-    /** Whether it's done (connected), after which it answers no more. */
+    /** Whether it's done (saved), after which it answers no more. */
     @Volatile var done = false
         private set
 
-    /** The page's address for the phone, once started. */
+    /** Whether it closed itself after too many wrong codes. */
+    @Volatile var closedForWrongCodes = false
+        private set
+
+    /** The page's short address, for typing (without the key, only signing in with Home Assistant works). */
     val address: String get() = "http://$host:${socket?.localPort ?: PORT}/$code/"
+
+    /** The address in the QR code: the short one and the key after #, which the phone keeps to itself. */
+    val addressWithKey: String get() = address + "#k=" + Base64.getUrlEncoder().withoutPadding().encodeToString(key)
 
     /**
      * Starts serving on [host] (this device's address on the network), on [PORT] if it's free or any
@@ -124,15 +194,26 @@ class PairingServer(private val handler: Handler) : Closeable {
                 } catch (e: java.io.IOException) {
                     break
                 }
-                Thread({ client.use { answer(it) } }, "Lena pairing request").apply { isDaemon = true }.start()
+                Thread({ client.use { answer(it) } }, "Lena phone setup request").apply { isDaemon = true }.start()
             }
             runCatching { server.close() }
-        }, "Lena pairing").apply { isDaemon = true }.start()
+        }, "Lena phone setup").apply { isDaemon = true }.start()
     }
 
     override fun close() {
         runCatching { socket?.close() }
     }
+
+    /** Decrypts what the page sent (base64 nonce and ciphertext); null if it isn't from the page with this key. */
+    fun decrypt(nonce: String, ciphertext: String): String? = runCatching {
+        val iv = Base64.getDecoder().decode(nonce)
+        require(iv.size == 12)
+        synchronized(usedNonces) { require(usedNonces.add(nonce)) }
+        val cipher = chacha()
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "ChaCha20"), IvParameterSpec(iv))
+        cipher.updateAAD(code.toByteArray(Charsets.UTF_8))
+        String(cipher.doFinal(Base64.getDecoder().decode(ciphertext)), Charsets.UTF_8)
+    }.getOrNull()
 
     // ---- The page ----------------------------------------------------------------------------
 
@@ -152,18 +233,57 @@ class PairingServer(private val handler: Handler) : Closeable {
         val parts = requestLine.split(" ")
         if (parts.size < 2) return
         val method = parts[0]
-        val target = URI(parts[1])
+        val target = runCatching { URI(parts[1]) }.getOrNull() ?: return
         val length = headers["content-length"]?.toIntOrNull()?.coerceAtMost(64 * 1024) ?: 0
         val body = if (length > 0) String(readExactly(input, length), Charsets.UTF_8) else ""
-        val query = parseForm(target.rawQuery ?: "") + if (method == "POST") parseForm(body) else emptyMap()
+        val query = parseForm(target.rawQuery ?: "")
+        val cookie = headers["cookie"].orEmpty().split(";").map { it.trim() }
+            .firstOrNull { it.startsWith("lena_setup=") }?.substringAfter('=')
 
         val prefix = "/$code/"
         val path = target.rawPath ?: "/"
-        if (!path.startsWith(prefix) && path != "/$code") return send(out, 404, page("Not found", "<p>This address isn't open. Use the one on the TV.</p>"))
-        if (done) return send(out, 200, page("Already connected", "<p>Lena is connected to Home Assistant. You can close this page.</p>"))
+        if (!path.startsWith(prefix) && path != "/$code") {
+            countWrongCode(path)
+            return send(out, 404, page("Not found", "<p>This address isn't open. Use the one on the screen.</p>"))
+        }
+        val route = path.removePrefix(prefix).removePrefix("/$code")
+        if (done) {
+            // The page's script still asks how the save went; everything else is over.
+            if (route == "status" && cookie != null && cookie == holder) return sendJson(out, outcome ?: Outcome("saved", ""))
+            return send(out, 200, page("Saved", "<p>Lena has what you sent. You can close this page.</p>"))
+        }
         val clientId = "http://$host:${socket?.localPort ?: PORT}$prefix"
+
+        // The first phone to open the page holds it; the others are told so.
+        var setCookie: String? = null
+        if (holder == null && route == "") {
+            holder = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(16).also { random.nextBytes(it) })
+            setCookie = holder
+            handler.phoneConnected()
+        } else if (cookie == null || cookie != holder) {
+            return send(out, 200, page("Already in use", "<p>Another phone is already using this page. Close it on the screen and open it again to start over.</p>"))
+        }
+
+        when (route) {
+            "save" -> {
+                if (method != "POST") return send(out, 404, page("Not found", ""))
+                val sent = parseForm(body)
+                val plain = decrypt(sent["n"].orEmpty(), sent["c"].orEmpty())
+                    ?: return sendJson(out, Outcome("failed", "That didn't come from this page. Scan the code on the screen again."))
+                val values = parseForm(plain)
+                val changes = PhoneFields.ALL.filter { it in values }.associateWith { values[it]!!.trim() }
+                val waiting = Outcome("waiting", "Waiting for OK on ${handler.known().device}.")
+                outcome = waiting
+                handler.propose(changes) { answer ->
+                    outcome = answer
+                    if (answer.state == "saved") done = true
+                }
+                return sendJson(out, waiting)
+            }
+            "status" -> return sendJson(out, outcome ?: Outcome("idle", ""))
+        }
         val result = runCatching {
-            when (path.removePrefix(prefix).removePrefix("/$code")) {
+            when (route) {
                 "" -> form()
                 "sign-in" -> {
                     val ha = query["ha"].orEmpty()
@@ -173,65 +293,100 @@ class PairingServer(private val handler: Handler) : Closeable {
                 "done" -> {
                     val ha = signingInTo
                     when {
-                        query["state"] != state || ha == null -> page("Start again", "<p>That sign-in wasn't started from this page. Go back to the TV's address and sign in again.</p>")
+                        query["state"] != state || ha == null -> page("Start again", "<p>That sign-in wasn't started from this page. Go back to the address on the screen and sign in again.</p>")
                         query["code"].isNullOrBlank() -> page("Not signed in", "<p>Home Assistant didn't sign you in. ${htmlEscape(query["error"] ?: "")}</p>$back")
-                        else -> success(handler.signedIn(ha, query["code"]!!, clientId))
+                        else -> page("Home Assistant connected", "<p>${htmlEscape(handler.signedIn(ha, query["code"]!!, clientId))}</p>" +
+                            "<p><a href=\"/$code/\">Fill in the rest</a> (scan the code on the screen again if the page asks for its key).</p>")
                     }
                 }
-                "token" -> if (method != "POST") form() else success(handler.pastedToken(query["ha"].orEmpty(), query["token"].orEmpty()))
-                else -> page("Not found", "<p>There's nothing here. Use the address on the TV.</p>")
+                else -> page("Not found", "<p>There's nothing here. Use the address on the screen.</p>")
             }
         }.getOrElse { page("That didn't work", "<p>${htmlEscape(it.message ?: "Something went wrong.")}</p>$back") }
-        send(out, 200, result)
+        send(out, 200, result, setCookie)
+    }
+
+    /** A request for another code counts towards closing the page; a browser's own requests (its icon) don't. */
+    private fun countWrongCode(path: String) {
+        val first = path.trim('/').substringBefore('/')
+        if (!Regex("[A-Z2-9]{6}").matches(first)) return
+        synchronized(this) {
+            wrongCodes++
+            if (wrongCodes >= WRONG_CODES) {
+                closedForWrongCodes = true
+                close()
+            }
+        }
     }
 
     private val back get() = "<p><a href=\"/$code/\">Try again</a></p>"
 
-    /** The finished page; the TV sees [done] and closes its screen. */
-    private fun success(message: String): String {
-        done = true
-        return page("Connected", "<p>${htmlEscape(message)}</p><p>You can close this page; the TV carries on by itself.</p>")
-    }
-
-    /** The two ways to connect: signing in (first, the easy one) or pasting a token. */
+    /** The form: Home Assistant's sign-in first (the easy way), then every field, encrypted when sent. */
     private fun form(): String {
-        val ha = htmlEscape(handler.knownAddress())
-        return page("Connect Lena to Home Assistant", """
-            <p>Lena on the TV needs your Home Assistant. Sign in from this phone and she makes her own token.</p>
-            <form action="/$code/sign-in" method="get">
-              <label>Your Home Assistant's address<input name="ha" type="url" value="$ha" placeholder="https://ha.example.com" required autocomplete="url"></label>
-              <button type="submit">Sign in with Home Assistant</button>
+        val known = handler.known()
+        fun value(name: String) = htmlEscape(known.addresses[name].orEmpty())
+        fun secret(name: String) = if (name in known.saved) "Saved: leave empty to keep it" else "Not set"
+        val sensors = known.sensors.joinToString("") { "<option value=\"${htmlEscape(it)}\">" }
+        val device = htmlEscape(known.device)
+        return page("Set up Lena", """
+            <p>Fill in what Lena on $device needs. Nothing is saved until you press OK on $device.</p>
+            <p id="nokey" class="note" hidden>This page was opened without its key, so it can only sign in with Home Assistant. Scan the QR code on the screen to fill in the rest.</p>
+            <h2>Home Assistant</h2>
+            <label>Address<input id="ha" name="ha" type="url" value="${value(PhoneFields.HA)}" placeholder="https://ha.example.com" autocomplete="url"></label>
+            <button type="button" id="signin">Sign in with Home Assistant</button>
+            <p class="note">You sign in on your Home Assistant's own page, and Lena makes her own token.</p>
+            <form id="setup">
+              <label>Or a long-lived token (your profile → Security)<input name="ha_token" type="password" placeholder="${secret(PhoneFields.HA_TOKEN)}" autocomplete="off"></label>
+              <h2>Open WebUI</h2>
+              <label>Address<input name="owui" type="url" value="${value(PhoneFields.OWUI)}" placeholder="https://ai.example.com"></label>
+              <label>Sign-in address (optional, e.g. Authentik)<input name="owui_sign_in" type="text" value="${value(PhoneFields.OWUI_SIGN_IN)}" placeholder="https://auth.example.com"></label>
+              <label>Email<input name="owui_email" type="email" placeholder="${secret(PhoneFields.OWUI_EMAIL)}" autocomplete="username"></label>
+              <label>Password<input name="owui_password" type="password" placeholder="${secret(PhoneFields.OWUI_PASSWORD)}" autocomplete="current-password"></label>
+              <h2>Updates</h2>
+              <label>Your Gitea (optional)<input name="gitea" type="url" value="${value(PhoneFields.GITEA)}" placeholder="https://gitea.example.com/you"></label>
+              <h2>Motion sensors</h2>
+              <label>Wakes the screensaver (optional)<input name="wake_sensor" list="sensors" value="${value(PhoneFields.WAKE_SENSOR)}" placeholder="binary_sensor.hallway_motion"></label>
+              <label>Her briefing when someone comes in (optional)<input name="briefing_sensor" list="sensors" value="${value(PhoneFields.BRIEFING_SENSOR)}" placeholder="binary_sensor.kitchen_motion"></label>
+              <datalist id="sensors">$sensors</datalist>
+              <button type="submit">Send to $device</button>
             </form>
-            <details>
-              <summary>Or paste a long-lived token</summary>
-              <form action="/$code/token" method="post">
-                <label>Your Home Assistant's address<input name="ha" type="url" value="$ha" placeholder="https://ha.example.com" required></label>
-                <label>Long-lived access token (your profile → Security)<input name="token" type="password" required autocomplete="off"></label>
-                <button type="submit">Use this token</button>
-              </form>
-            </details>
+            <p id="status" role="status"></p>
+            <p class="note">What you type is encrypted on this phone with a key from the QR code, so others on your Wi-Fi can't read it. Someone already inside your network who rewrites this page as it loads could still see it; for Home Assistant, signing in on its own page avoids that.</p>
+            <script>${PHONE_CIPHER_JS}</script>
+            <script>${PHONE_PAGE_JS.replace("CODE", code)}</script>
         """.trimIndent())
     }
 
-    /** A whole page in Lena's colours, readable on a phone, with nothing loaded from elsewhere. */
+    /** A whole page in Lena's colors, readable on a phone, with nothing loaded from elsewhere. */
     private fun page(title: String, content: String) = """
         <!doctype html><html lang="en"><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1"><title>${htmlEscape(title)}</title>
         <style>
           body{font-family:system-ui,sans-serif;background:#12131a;color:#e8e6f0;margin:0;padding:24px;line-height:1.5}
-          main{max-width:440px;margin:0 auto} h1{font-size:1.4em} a{color:#b9a7ff}
+          main{max-width:440px;margin:0 auto} h1{font-size:1.4em} h2{font-size:1.1em;margin-top:28px} a{color:#b9a7ff}
           label{display:block;margin:16px 0 4px;color:#b8b4c8}
           input{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:10px;border:1px solid #444;background:#1d1f29;color:inherit;font-size:1em}
           button{margin-top:16px;width:100%;padding:14px;border:0;border-radius:24px;background:#b9a7ff;color:#12131a;font-size:1em;font-weight:600}
-          details{margin-top:28px} summary{cursor:pointer;color:#b8b4c8}
+          .note{color:#9a96ab;font-size:.9em} #status{font-weight:600;margin-top:16px}
         </style></head><body><main><h1>${htmlEscape(title)}</h1>$content</main></body></html>
     """.trimIndent()
 
-    private fun send(out: OutputStream, status: Int, html: String) {
+    private fun send(out: OutputStream, status: Int, html: String, cookie: String? = null) {
         val bytes = html.toByteArray(Charsets.UTF_8)
         val reason = if (status == 200) "OK" else "Not Found"
+        // Lax, not Strict: Home Assistant's sign-in sends the phone back here from its own site.
+        val setCookie = cookie?.let { "Set-Cookie: lena_setup=$it; Path=/$code/; HttpOnly; SameSite=Lax\r\n" } ?: ""
         out.write(("HTTP/1.1 $status $reason\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\n" +
-            "Cache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n").toByteArray())
+            setCookie + "Cache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n").toByteArray())
+        out.write(bytes)
+        out.flush()
+    }
+
+    /** An [Outcome] as the page's script reads it: {"state": ..., "message": ...}. */
+    private fun sendJson(out: OutputStream, outcome: Outcome) {
+        val json = "{\"state\":${jsonString(outcome.state)},\"message\":${jsonString(outcome.message)}}"
+        val bytes = json.toByteArray(Charsets.UTF_8)
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\n" +
+            "Cache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
         out.write(bytes)
         out.flush()
     }
@@ -241,6 +396,180 @@ class PairingServer(private val handler: Handler) : Closeable {
             "Connection: close\r\n\r\n").toByteArray())
         out.flush()
     }
+}
+
+/** The fields the phone page can fill in; the names it sends. */
+object PhoneFields {
+    const val OWUI = "owui"
+    const val OWUI_SIGN_IN = "owui_sign_in"
+    const val OWUI_EMAIL = "owui_email"
+    const val OWUI_PASSWORD = "owui_password"
+    const val HA = "ha"
+    const val HA_TOKEN = "ha_token"
+    const val GITEA = "gitea"
+    const val WAKE_SENSOR = "wake_sensor"
+    const val BRIEFING_SENSOR = "briefing_sensor"
+
+    val ALL = listOf(OWUI, OWUI_SIGN_IN, OWUI_EMAIL, OWUI_PASSWORD, HA, HA_TOKEN, GITEA, WAKE_SENSOR, BRIEFING_SENSOR)
+
+    /** Never sent to the page, only whether they're set; left empty on the page, they stay as they are. */
+    val SECRETS = setOf(OWUI_EMAIL, OWUI_PASSWORD, HA_TOKEN)
+}
+
+/**
+ * The page's script: reads the key from the address (after #), encrypts the form with it and sends it,
+ * then shows what the device says. Plain JavaScript, no library; CODE is replaced with the page's code.
+ * Empty secret fields are left out, so a saved password stays.
+ */
+private const val PHONE_PAGE_JS = """
+(function () {
+  var params = new URLSearchParams(location.hash.slice(1));
+  var keyText = params.get('k');
+  var status = document.getElementById('status');
+  var form = document.getElementById('setup');
+  var haField = document.getElementById('ha');
+  document.getElementById('signin').onclick = function () {
+    location.href = '/CODE/sign-in?ha=' + encodeURIComponent(haField.value);
+  };
+  if (!keyText) {
+    document.getElementById('nokey').hidden = false;
+    form.hidden = true;
+    return;
+  }
+  var key = LenaCipher.fromBase64(keyText.replace(/-/g, '+').replace(/_/g, '/'));
+  var secrets = ['ha_token', 'owui_email', 'owui_password'];
+  function poll() {
+    fetch('/CODE/status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+      status.textContent = s.message;
+      if (s.state === 'waiting') setTimeout(poll, 1000);
+    }).catch(function () { setTimeout(poll, 2000); });
+  }
+  form.onsubmit = function (event) {
+    event.preventDefault();
+    var values = new URLSearchParams();
+    values.append('ha', haField.value);
+    Array.prototype.forEach.call(form.elements, function (field) {
+      if (!field.name) return;
+      if (secrets.indexOf(field.name) >= 0 && !field.value) return;
+      values.append(field.name, field.value);
+    });
+    var nonce = new Uint8Array(12);
+    crypto.getRandomValues(nonce);
+    var sealed = LenaCipher.seal(key, nonce, new TextEncoder().encode('CODE'), new TextEncoder().encode(values.toString()));
+    status.textContent = 'Sending…';
+    var body = new URLSearchParams();
+    body.append('n', LenaCipher.toBase64(nonce));
+    body.append('c', LenaCipher.toBase64(sealed));
+    fetch('/CODE/save', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() })
+      .then(function (r) { return r.json(); })
+      .then(function (s) { status.textContent = s.message; if (s.state === 'waiting') setTimeout(poll, 1000); })
+      .catch(function () { status.textContent = 'Couldn\'t reach the device. Is the screen still open?'; });
+  };
+})();
+"""
+
+/**
+ * ChaCha20-Poly1305 (RFC 8439) in plain JavaScript, for the phone page: a phone browser only offers its own
+ * crypto on https pages, and this page is plain http on your network. Encrypt only (the device decrypts with
+ * Android's). tools/pairing_check runs it in Node against Java's ChaCha20-Poly1305 on the same inputs.
+ */
+const val PHONE_CIPHER_JS = """
+var LenaCipher = (function () {
+  function rotl(v, c) { return (v << c) | (v >>> (32 - c)); }
+  function quarter(s, a, b, c, d) {
+    s[a] = (s[a] + s[b]) | 0; s[d] = rotl(s[d] ^ s[a], 16);
+    s[c] = (s[c] + s[d]) | 0; s[b] = rotl(s[b] ^ s[c], 12);
+    s[a] = (s[a] + s[b]) | 0; s[d] = rotl(s[d] ^ s[a], 8);
+    s[c] = (s[c] + s[d]) | 0; s[b] = rotl(s[b] ^ s[c], 7);
+  }
+  function word(b, i) { return (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0; }
+  function block(key, counter, nonce) {
+    var start = new Uint32Array(16);
+    start[0] = 0x61707865; start[1] = 0x3320646e; start[2] = 0x79622d32; start[3] = 0x6b206574;
+    for (var i = 0; i < 8; i++) start[4 + i] = word(key, i * 4);
+    start[12] = counter >>> 0;
+    for (i = 0; i < 3; i++) start[13 + i] = word(nonce, i * 4);
+    var w = new Uint32Array(start);
+    for (i = 0; i < 10; i++) {
+      quarter(w, 0, 4, 8, 12); quarter(w, 1, 5, 9, 13); quarter(w, 2, 6, 10, 14); quarter(w, 3, 7, 11, 15);
+      quarter(w, 0, 5, 10, 15); quarter(w, 1, 6, 11, 12); quarter(w, 2, 7, 8, 13); quarter(w, 3, 4, 9, 14);
+    }
+    var out = new Uint8Array(64);
+    for (i = 0; i < 16; i++) {
+      var v = (w[i] + start[i]) >>> 0;
+      out[i * 4] = v & 255; out[i * 4 + 1] = (v >>> 8) & 255; out[i * 4 + 2] = (v >>> 16) & 255; out[i * 4 + 3] = (v >>> 24) & 255;
+    }
+    return out;
+  }
+  function number(bytes) {
+    var x = BigInt(0);
+    for (var i = bytes.length - 1; i >= 0; i--) x = (x << BigInt(8)) | BigInt(bytes[i]);
+    return x;
+  }
+  function poly1305(key, msg) {
+    var clamp = BigInt('0x0ffffffc0ffffffc0ffffffc0fffffff');
+    var r = number(key.subarray(0, 16)) & clamp;
+    var s = number(key.subarray(16, 32));
+    var p = (BigInt(1) << BigInt(130)) - BigInt(5);
+    var acc = BigInt(0);
+    for (var i = 0; i < msg.length; i += 16) {
+      var chunk = msg.subarray(i, Math.min(i + 16, msg.length));
+      acc = ((acc + number(chunk) + (BigInt(1) << BigInt(8 * chunk.length))) * r) % p;
+    }
+    acc = (acc + s) & ((BigInt(1) << BigInt(128)) - BigInt(1));
+    var tag = new Uint8Array(16);
+    for (i = 0; i < 16; i++) { tag[i] = Number(acc & BigInt(255)); acc = acc >> BigInt(8); }
+    return tag;
+  }
+  function padded(length) { return (16 - (length % 16)) % 16; }
+  function seal(key, nonce, aad, plain) {
+    var sealed = new Uint8Array(plain.length + 16);
+    for (var at = 0; at < plain.length; at += 64) {
+      var stream = block(key, 1 + at / 64, nonce);
+      for (var i = 0; i < 64 && at + i < plain.length; i++) sealed[at + i] = plain[at + i] ^ stream[i];
+    }
+    var ciphertext = sealed.subarray(0, plain.length);
+    var macData = new Uint8Array(aad.length + padded(aad.length) + plain.length + padded(plain.length) + 16);
+    macData.set(aad, 0);
+    var end = aad.length + padded(aad.length);
+    macData.set(ciphertext, end);
+    end += plain.length + padded(plain.length);
+    var lengths = [aad.length, plain.length];
+    for (var n = 0; n < 2; n++) {
+      var len = lengths[n];
+      for (i = 0; i < 8; i++) { macData[end + n * 8 + i] = len & 255; len = Math.floor(len / 256); }
+    }
+    sealed.set(poly1305(block(key, 0, nonce).subarray(0, 32), macData), plain.length);
+    return sealed;
+  }
+  function toBase64(bytes) {
+    var text = '';
+    for (var i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]);
+    return btoa(text);
+  }
+  function fromBase64(text) {
+    while (text.length % 4) text += '=';
+    var raw = atob(text);
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes;
+  }
+  return { seal: seal, toBase64: toBase64, fromBase64: fromBase64 };
+})();
+"""
+
+/** Text as a JSON string, quoted. */
+internal fun jsonString(text: String): String {
+    val out = StringBuilder("\"")
+    for (ch in text) {
+        when {
+            ch == '"' -> out.append("\\\"")
+            ch == '\\' -> out.append("\\\\")
+            ch < ' ' -> out.append("\\u%04x".format(ch.code))
+            else -> out.append(ch)
+        }
+    }
+    return out.append('"').toString()
 }
 
 /** Text made safe to put in a page. */
@@ -362,6 +691,8 @@ class MiniWebSocket(url: String) : Closeable {
         }
     }
 
+    /** One frame; synchronized, as camera mode sends from more than one thread. */
+    @Synchronized
     private fun writeFrame(opcode: Int, payload: ByteArray) {
         val frame = java.io.ByteArrayOutputStream()
         frame.write(0x80 or opcode)

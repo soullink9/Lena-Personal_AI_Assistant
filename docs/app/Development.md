@@ -46,7 +46,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Alerts.kt` | This phone's own 15-minute check for her worries. |
 | `Updates.kt` | Updating from GitHub releases (or your Gitea's): checking, downloading, verifying and installing. |
 | `UpdateSource.kt` | Where updates come from: GitHub, or the Gitea address typed on the Updates page. |
-| `HaPairActivity.kt`, `Pairing.kt`, `Qr.kt` | Connect Home Assistant from your phone: the screen with its address and QR code, the page it serves on the home network (signing in, or a pasted token; a long-lived token made over Home Assistant's WebSocket API), and the QR code itself, written here rather than added as a library. |
+| `PhoneSetupActivity.kt`, `Pairing.kt`, `Qr.kt` | Set up from your phone (every address and sign-in, encrypted on the phone, saved after OK here): the screen with its address and QR code, the page it serves on the home network (signing in, or a pasted token; a long-lived token made over Home Assistant's WebSocket API), and the QR code itself, written here rather than added as a library. |
 | `TvHome.kt`, `TalkActivity.kt` | The TV home's rows (and the Apps row's order and Choose apps), and the Talk to Lena entry for a remote button. |
 | `Tv.kt` | Android TV: whether this is a TV, its screens always dark (`darkOnTv`), and the remote's buttons (OK held or search to talk, Menu for Settings). |
 | `Compat.kt` | What differs between Android 11 (TV boxes) and Android 16: each newer feature checked once. |

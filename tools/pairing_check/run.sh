@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks "Connect from your phone" (Qr.kt, Pairing.kt) away from Android: QR codes against ones a QR reader
+# Checks "Set up from your phone" (Qr.kt, Pairing.kt) away from Android: QR codes against ones a QR reader
 # read back, and the page the device serves, used as a phone would. Plain Kotlin and java.net, so it runs on
 # any computer with kotlinc or Gradle (Gradle's own Kotlin compiler, as tools/commands_check/run.sh does).
 #

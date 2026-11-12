@@ -55,7 +55,7 @@ The full map is in [Development](docs/Development.md#layout); in short:
 pip install pyyaml
 python3 tools/check.py                 # offline, seconds; also runs tests/test_release.py
 tools/commands_check/run.sh            # timers and alarms by voice (needs kotlinc or Gradle)
-tools/pairing_check/run.sh             # Connect from your phone: QR codes and the page (needs kotlinc or Gradle)
+tools/pairing_check/run.sh             # Set up from your phone: QR codes, the page, its cipher (kotlinc or Gradle; Node for the cipher)
 tools/frontend_check/run.sh            # the wake word front end against the original C (needs g++ and a JDK)
 scripts/test_home_assistant.sh latest  # the integration in a real Home Assistant (in a virtualenv: it pip installs)
 ```

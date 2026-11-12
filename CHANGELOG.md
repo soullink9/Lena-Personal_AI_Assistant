@@ -4,6 +4,12 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [Unreleased]
 
+### Android app
+
+- **Set up from your phone.** The QR code now fills in every address and sign-in, not just Home Assistant: Open WebUI's address, sign-in address, email and password, Home Assistant's address and token (or its own sign-in, as before), your Gitea for updates, and the two motion sensors, picked from your Home Assistant's. It's the first item in Settings on every device. The page is never sent what's saved, what you type is encrypted on the phone with a key carried in the QR code (never sent over the network), nothing is saved until you press **Save** on the device, the first phone holds the page, and five guessed codes close it. Replaces Connect from your phone.
+- **Settings text, one name per thing.** It no longer says "this phone" on a TV or tablet, spells her screensaver one way, uses US spelling throughout and "and" instead of "&", and the two test buttons are both **Test connection**. A written standard ([Writing Settings text](docs/app/Writing.md)), a check in `tools/check.py` and `tools/settings_text.py` (every item in Settings, for a read-through) keep it that way.
+
+
 ### Releases
 
 - **GitHub catches up with Gitea's releases by itself.** Releases are made on Gitea and reach GitHub with the mirror's push every few hours, but GitHub starts nothing for the tags of a push that brings more than three at once, so several releases between two mirror pushes got no GitHub release. A new workflow (`.github/workflows/catch-up-releases.yml`) runs after each mirror push and every 6 hours, and starts GitHub's release workflow for each version with a tag but no release. Only the newest version is marked Latest, so the app always updates to it. Nothing changes in how you release ([Releasing](CONTRIBUTING.md#releasing)).

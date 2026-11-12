@@ -29,7 +29,15 @@ If you add your Home Assistant under **Settings → Home Assistant**, Lena uses 
 - A token can do anything its Home Assistant user can, so consider a dedicated non-admin user for Lena. Reading her feelings and memory doesn't need admin rights.
 - Revoke it any time in Home Assistant (your profile → Security), and Lena simply stops showing her feelings and shared memory.
 
-**Connect from your phone** (Settings → Home Assistant, and the wall display before it's connected) serves a small page on your home network, over plain http, only while that screen is open (15 minutes at most, and until it's connected). Its address carries a random code shown on the screen, so nothing else on the network can use it. Signing in there happens on your Home Assistant's own page; Home Assistant sends a one-time code back through the page, which Lena swaps for a long-lived token named after the device, then signs that first sign-in out. The token only travels between the device and your Home Assistant, or from your phone if you paste one.
+**Set up from your phone** (the top of Settings, Settings → Home Assistant, and the wall display before it's connected) serves a small page on your home network, over plain http, only while that screen is open (15 minutes at most, and until something is saved). There your phone fills in Open WebUI's address, email and password, Home Assistant's address and token, your Gitea and the motion sensors.
+
+- **The page never gets what's saved.** Passwords, emails and tokens are never sent to the phone, only whether each is set; leave a field empty to keep it. Addresses are filled in so you can correct them.
+- **Encrypted on the phone.** The QR code carries a one-time key after a `#`, which browsers never send over the network. The page encrypts what you type with it (ChaCha20-Poly1305) before sending, so someone listening on your Wi-Fi sees only ciphertext. The short address typed into a browser has no key, so then the page only offers Home Assistant's own sign-in.
+- **Nothing is saved until you press Save on the device.** It lists what would change (secrets only as "new") and checks the Home Assistant token and every address first.
+- **One phone, a few tries.** The first phone to open the page holds it; any other is told it's in use. Five requests guessing the code close the page.
+- **Signing in with Home Assistant** happens on your Home Assistant's own https page; Home Assistant sends a one-time code back through the page, which Lena swaps for a long-lived token named after the device, then signs that first sign-in out.
+
+What it can't stop: someone already inside your network who actively rewrites the page while it loads, during those few minutes. Signing in with Home Assistant avoids that for your Home Assistant password.
 
 ## The wall display
 

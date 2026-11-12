@@ -152,7 +152,7 @@ jobs:
         run: |
           apt="apt-get -qq -o Acquire::Retries=5 -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=30"
           for attempt in 1 2 3; do
-            if $apt update && DEBIAN_FRONTEND=noninteractive $apt install -y --no-install-recommends git curl unzip g++ python3 > /dev/null; then
+            if $apt update && DEBIAN_FRONTEND=noninteractive $apt install -y --no-install-recommends git curl unzip g++ python3 nodejs > /dev/null; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then

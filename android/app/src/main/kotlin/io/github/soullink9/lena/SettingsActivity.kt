@@ -355,7 +355,15 @@ class SettingsActivity : ComponentActivity() {
             return
         }
         val modelName = models.firstOrNull { it.id == s.model }?.name ?: s.model.ifBlank { "Lena, automatically" }
+        // Every address and sign-in at once, typed on a phone (the only practical way on a TV) and
+        // confirmed here ([PhoneSetupActivity]); Settings shows what it saved when it comes back.
+        val setup = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) set(Prefs.load(this@SettingsActivity))
+        }
         Section(Area.CONNECTIONS.title) {
+            Item(Icons.Outlined.QrCode2, "Set up from your phone", "Addresses and sign-ins, typed on your phone and saved here") {
+                setup.launch(Intent(this@SettingsActivity, PhoneSetupActivity::class.java))
+            }
             // With Assist answering, Open WebUI isn't used at all, so its rows step aside.
             val assist = s.answers == Answerer.ASSIST
             if (!assist) Item(Icons.Outlined.Language, "Open WebUI", host(s.server) ?: "Not set") { open(Page.OPEN_WEBUI) }
@@ -720,6 +728,9 @@ class SettingsActivity : ComponentActivity() {
             Findable("Home Assistant address and token", "ha url connect long-lived access token test connection integration", Page.HOME_ASSISTANT),
             Findable("This display's room", "area room satellite voice preview where location", Page.HOME_ASSISTANT),
             Findable("Music plays on", "music speaker music assistant media player whole home audio radio", Page.HOME_ASSISTANT),
+            Findable("Set up from your phone", "qr code phone scan type password token address sign in remote keyboard", null, Area.CONNECTIONS) {
+                startActivity(Intent(this, PhoneSetupActivity::class.java))
+            },
             Findable("Who answers", "open webui home assistant assist conversation agent voice assistant answers through", Page.WHO_ANSWERS),
             Findable("Assist's conversation agent", "home assistant assist agent ollama openai google conversation", Page.WHO_ANSWERS),
             Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
@@ -1113,7 +1124,7 @@ class SettingsActivity : ComponentActivity() {
         // Connected from a phone: show the address and token it saved.
         val pairing = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                set(s.copy(haServer = Prefs.haServer(this@SettingsActivity) ?: s.haServer))
+                set(Prefs.load(this@SettingsActivity))
                 tokenSaved = Secrets.has(this@SettingsActivity, Secrets.HA_TOKEN)
                 token = ""
                 check = null
@@ -1121,9 +1132,9 @@ class SettingsActivity : ComponentActivity() {
         }
         Footnote("Optional. With the Lena integration in your Home Assistant, the app shows how she feels and lets you see and edit her memory.")
         Group {
-            // A TV remote can't type a long token: sign in from a phone instead ([HaPairActivity]).
-            Item(Icons.Outlined.QrCode2, "Connect from your phone", "Sign in to Home Assistant on your phone, on the same Wi-Fi; no typing here") {
-                pairing.launch(Intent(this@SettingsActivity, HaPairActivity::class.java))
+            // A TV remote can't type a long token: sign in from a phone instead ([PhoneSetupActivity]).
+            Item(Icons.Outlined.QrCode2, "Set up from your phone", "Sign in to Home Assistant on your phone, on the same Wi-Fi; no typing here") {
+                pairing.launch(Intent(this@SettingsActivity, PhoneSetupActivity::class.java))
             }
             FieldItem {
                 val bad = s.haServer.isNotBlank() && Prefs.normalize(s.haServer) == null

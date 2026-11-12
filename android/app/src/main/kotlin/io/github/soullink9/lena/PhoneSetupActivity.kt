@@ -18,10 +18,14 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +40,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -45,14 +53,15 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Connect Home Assistant from your phone: this screen shows an address (and its QR code) that your phone
- * opens on the same Wi-Fi, where you sign in to Home Assistant or paste a token ([PairingServer]). For a TV,
- * where typing a long token with the remote isn't realistic, and handy on any wall display.
+ * Set up from your phone: this screen shows an address (and its QR code) that your phone opens on the same
+ * Wi-Fi, where you fill in every address and sign-in Lena uses ([PairingServer]). For a TV, where typing
+ * with the remote isn't realistic, and handy on any wall display or phone.
  *
- * The page is served only while this screen is open. Once Home Assistant is connected it says so and
- * closes; the wall display (or Settings) carries on from there.
+ * The page is served only while this screen is open. What the phone sends is listed here and saved only
+ * when you press OK ([Confirm]); signing in with Home Assistant saves straight away, since it needs your
+ * Home Assistant password on its own page. Once saved the screen closes after a moment.
  */
-class HaPairActivity : ComponentActivity() {
+class PhoneSetupActivity : ComponentActivity() {
 
     // Dark on a TV (Tv.darkOnTv).
     override fun attachBaseContext(newBase: Context) {
@@ -62,13 +71,20 @@ class HaPairActivity : ComponentActivity() {
 
     /** What the screen shows. */
     private sealed class State {
-        data class Waiting(val address: String, val code: String) : State()
-        data class Connected(val message: String) : State()
+        data class Waiting(val address: String, val qr: String, val code: String) : State()
+        data class Saved(val message: String) : State()
         object NoNetwork : State()
+        object TooManyTries : State()
     }
+
+    /** What the phone sent, waiting for OK here: one line per change, and where the answer goes. */
+    private class Confirm(val lines: List<String>, val changes: Map<String, String>, val answer: (PairingServer.Outcome) -> Unit)
 
     private var server: PairingServer? = null
     private var state by mutableStateOf<State>(State.NoNetwork)
+    private var phone by mutableStateOf(false)
+    private var note by mutableStateOf<String?>(null)
+    private var confirm by mutableStateOf<Confirm?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +95,7 @@ class HaPairActivity : ComponentActivity() {
     /** Serves the page while the screen shows. */
     override fun onStart() {
         super.onStart()
-        if (state is State.Connected) return
+        if (state is State.Saved) return
         val host = PairingServer.localAddress()
         if (host == null) {
             state = State.NoNetwork
@@ -87,7 +103,7 @@ class HaPairActivity : ComponentActivity() {
         }
         server = PairingServer(Handler()).also {
             runCatching { it.start(host) }
-                .onSuccess { _ -> state = State.Waiting(it.address, it.code) }
+                .onSuccess { _ -> state = State.Waiting(it.address, it.addressWithKey, it.code) }
                 .onFailure { e -> Logs.w(TAG, "Couldn't serve the page", e); state = State.NoNetwork }
         }
     }
@@ -95,12 +111,37 @@ class HaPairActivity : ComponentActivity() {
     override fun onStop() {
         server?.close()
         server = null
+        // A change waiting for OK isn't saved once the screen goes.
+        confirm?.answer?.invoke(PairingServer.Outcome("refused", "The screen was closed, so nothing was saved."))
+        confirm = null
+        phone = false
         super.onStop()
     }
 
     /** The phone page's work, on the page's own threads. */
     private inner class Handler : PairingServer.Handler {
-        override fun knownAddress(): String = Prefs.haServer(this@HaPairActivity) ?: ""
+        private val c get() = this@PhoneSetupActivity
+
+        /** Home Assistant's motion sensors, read once (only when it's connected). */
+        private val sensors: List<String> by lazy { motionSensors() }
+
+        override fun known(): PairingServer.Known {
+            val s = Prefs.load(c)
+            val addresses = mapOf(
+                PhoneFields.OWUI to s.server,
+                PhoneFields.OWUI_SIGN_IN to s.signIn,
+                PhoneFields.HA to s.haServer,
+                PhoneFields.GITEA to Updates.giteaAddress(c),
+                PhoneFields.WAKE_SENSOR to s.motionEntity,
+                PhoneFields.BRIEFING_SENSOR to Room.briefingSensor(c),
+            )
+            val saved = buildSet {
+                if (Secrets.has(c, OpenWebUiSignIn.USER)) add(PhoneFields.OWUI_EMAIL)
+                if (Secrets.has(c, OpenWebUiSignIn.PASSWORD)) add(PhoneFields.OWUI_PASSWORD)
+                if (Secrets.has(c, Secrets.HA_TOKEN)) add(PhoneFields.HA_TOKEN)
+            }
+            return PairingServer.Known(addresses, saved, sensors, Tv.thisDevice(c))
+        }
 
         override fun signInPage(address: String, clientId: String, redirectUri: String, state: String): String {
             val base = Prefs.normalize(address) ?: throw IOException("Use your Home Assistant's https:// address, the one you open it with.")
@@ -112,29 +153,126 @@ class HaPairActivity : ComponentActivity() {
         override fun signedIn(address: String, code: String, clientId: String): String {
             val base = Prefs.normalize(address) ?: throw IOException("Use your Home Assistant's https:// address.")
             val token = HaSignIn.longLivedToken(base, code, clientId, tokenName())
-            return save(base, token)
-        }
-
-        override fun pastedToken(address: String, token: String): String {
-            val base = Prefs.normalize(address) ?: throw IOException("Use your Home Assistant's https:// address.")
-            val trimmed = token.trim()
-            if (trimmed.isEmpty()) throw IOException("Paste the token first.")
-            // Says exactly what went wrong (refused, or not reached, and why), on the phone and in the log.
-            HaSignIn.verify(base, trimmed)
-            return save(base, trimmed)
-        }
-
-        /** Keeps the address and token, as typing them in Settings would, and says so on both screens. */
-        private fun save(base: String, token: String): String {
-            val c = this@HaPairActivity
             Secrets.put(c, Secrets.HA_TOKEN, token)
             Prefs.save(c, Prefs.load(c).copy(haServer = base))
             Logs.i(TAG, "Connected to Home Assistant at $base from a phone")
-            val message = "Lena on this ${if (Tv.isTv(c)) "TV" else "device"} is connected to your Home Assistant."
-            runOnUiThread { state = State.Connected(message) }
-            return message
+            runOnUiThread { note = "Home Assistant connected." }
+            return "Lena on ${Tv.thisDevice(c)} is connected to your Home Assistant."
+        }
+
+        override fun phoneConnected() {
+            runOnUiThread { phone = true }
+        }
+
+        override fun propose(changes: Map<String, String>, answer: (PairingServer.Outcome) -> Unit) {
+            val lines = describe(changes)
+            if (lines.isEmpty()) {
+                answer(PairingServer.Outcome("saved", "Nothing to change: it's all as Lena has it."))
+                return
+            }
+            runOnUiThread { confirm = Confirm(lines, changes, answer) }
         }
     }
+
+    /**
+     * What would change, one line each: addresses with their new value, secrets only as "new" (they're
+     * never shown, here or on the phone). Values that are already set are left out.
+     */
+    private fun describe(changes: Map<String, String>): List<String> {
+        val s = Prefs.load(this)
+        val now = mapOf(
+            PhoneFields.OWUI to s.server, PhoneFields.OWUI_SIGN_IN to s.signIn, PhoneFields.HA to s.haServer,
+            PhoneFields.GITEA to Updates.giteaAddress(this), PhoneFields.WAKE_SENSOR to s.motionEntity,
+            PhoneFields.BRIEFING_SENSOR to Room.briefingSensor(this),
+        )
+        val names = mapOf(
+            PhoneFields.OWUI to "Open WebUI's address", PhoneFields.OWUI_SIGN_IN to "Open WebUI's sign-in address",
+            PhoneFields.OWUI_EMAIL to "Open WebUI email", PhoneFields.OWUI_PASSWORD to "Open WebUI password",
+            PhoneFields.HA to "Home Assistant's address", PhoneFields.HA_TOKEN to "Home Assistant token",
+            PhoneFields.GITEA to "Your Gitea", PhoneFields.WAKE_SENSOR to "Sensor that wakes the screensaver",
+            PhoneFields.BRIEFING_SENSOR to "Sensor for her briefing",
+        )
+        return PhoneFields.ALL.mapNotNull { field ->
+            val value = changes[field] ?: return@mapNotNull null
+            when {
+                field in PhoneFields.SECRETS -> if (value.isBlank()) null else "${names[field]}: new"
+                value == now[field] || (value.isNotBlank() && Prefs.normalize(value) != null && Prefs.normalize(value) == now[field]) -> null
+                value.isBlank() -> "${names[field]}: removed"
+                else -> "${names[field]}: $value"
+            }
+        }
+    }
+
+    /**
+     * Checks and saves what the phone sent, after OK here; returns what to tell the phone. Every address is
+     * checked first, and the Home Assistant token against Home Assistant, so a mistake saves nothing. The
+     * Open WebUI sign-in is tried once saved, and the phone is told how it went.
+     */
+    private fun save(changes: Map<String, String>): PairingServer.Outcome {
+        val c = this
+        try {
+            var s = Prefs.load(c)
+            changes[PhoneFields.OWUI]?.let {
+                s = s.copy(server = if (it.isBlank()) "" else Prefs.normalize(it) ?: throw IOException("Open WebUI's address has to be an https:// address."))
+            }
+            changes[PhoneFields.OWUI_SIGN_IN]?.let {
+                s = s.copy(signIn = Prefs.normalizeSignIn(it) ?: throw IOException("Sign-in addresses have to be https:// addresses."))
+            }
+            changes[PhoneFields.HA]?.let {
+                s = s.copy(haServer = if (it.isBlank()) "" else Prefs.normalize(it) ?: throw IOException("Home Assistant's address has to be an https:// address."))
+            }
+            val haToken = changes[PhoneFields.HA_TOKEN]?.takeIf { it.isNotBlank() }
+            if (haToken != null) {
+                val base = s.haServer.ifBlank { throw IOException("Fill in Home Assistant's address with its token.") }
+                HaSignIn.verify(base, haToken)
+            }
+            val gitea = changes[PhoneFields.GITEA]
+            if (!gitea.isNullOrBlank() && UpdateSource.from(gitea) == null) {
+                throw IOException("Your Gitea has to be an https:// address, like https://gitea.example.com/you.")
+            }
+            val entity = Regex("[a-z_]+\\.[a-z0-9_]+")
+            changes[PhoneFields.WAKE_SENSOR]?.let {
+                if (it.isNotBlank() && !entity.matches(it)) throw IOException("$it isn't a sensor's entity ID, like binary_sensor.hallway_motion.")
+                s = s.copy(motionEntity = it)
+            }
+            changes[PhoneFields.BRIEFING_SENSOR]?.let {
+                if (it.isNotBlank() && !entity.matches(it)) throw IOException("$it isn't a sensor's entity ID, like binary_sensor.kitchen_motion.")
+            }
+            val email = changes[PhoneFields.OWUI_EMAIL]?.takeIf { it.isNotBlank() }
+            val password = changes[PhoneFields.OWUI_PASSWORD]?.takeIf { it.isNotBlank() }
+            // Her email and password are for signing in by herself: sent from the phone, that's turned on.
+            if ((email != null || password != null) && s.autoSignIn == AutoSignIn.OFF) s = s.copy(autoSignIn = AutoSignIn.PASSWORD)
+
+            Prefs.save(c, s)
+            if (haToken != null) Secrets.put(c, Secrets.HA_TOKEN, haToken)
+            if (email != null) Secrets.put(c, OpenWebUiSignIn.USER, email)
+            if (password != null) Secrets.put(c, OpenWebUiSignIn.PASSWORD, password)
+            if (gitea != null) Updates.setGiteaAddress(c, gitea)
+            changes[PhoneFields.BRIEFING_SENSOR]?.let { Room.chooseBriefingSensor(c, it) }
+            Refresh.request() // the chats and dashboards pick up new addresses when they're next shown
+            Logs.i(TAG, "Saved from a phone: ${changes.keys.filter { it !in PhoneFields.SECRETS || changes[it]!!.isNotBlank() }.joinToString()}")
+
+            val signedIn = if (email != null || password != null) {
+                " " + runBlocking { OpenWebUiSignIn.test(c) }
+            } else ""
+            return PairingServer.Outcome("saved", "Saved on ${Tv.thisDevice(c)}.$signedIn")
+        } catch (e: IOException) {
+            Logs.w(TAG, "Not saved from the phone: ${e.message}")
+            return PairingServer.Outcome("failed", "Nothing was saved: ${e.message}")
+        }
+    }
+
+    /** Home Assistant's motion and presence sensors, for the phone page to pick from; empty without it. */
+    private fun motionSensors(): List<String> = runCatching {
+        val ha = HomeAssistant.from(this) ?: return emptyList()
+        val states = org.json.JSONArray(String(runBlocking { ha.bytes("/api/states") }))
+        (0 until states.length()).mapNotNull { i ->
+            val item = states.getJSONObject(i)
+            val id = item.optString("entity_id")
+            val kind = item.optJSONObject("attributes")?.optString("device_class").orEmpty()
+            id.takeIf { it.startsWith("binary_sensor.") && kind in setOf("motion", "occupancy", "presence") }
+        }.sorted()
+    }.getOrDefault(emptyList())
 
     /** The token's name in your Home Assistant profile: this device and when, so it's easy to find (and unique). */
     private fun tokenName(): String =
@@ -143,32 +281,38 @@ class HaPairActivity : ComponentActivity() {
     @Composable
     private fun Screen() {
         val s = state
-        if (s is State.Connected) {
+        val scope = rememberCoroutineScope()
+        if (s is State.Saved) {
             LaunchedEffect(Unit) {
-                delay(2_500)
+                delay(3_000)
                 setResult(RESULT_OK)
                 finish()
             }
         }
+        // Anything saved (Home Assistant signed in) tells Settings to look again, even if closed with Back.
+        if (note != null) SideEffect { setResult(RESULT_OK) }
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).safeDrawingPadding().padding(32.dp), contentAlignment = Alignment.Center) {
             when (s) {
                 is State.Waiting -> Row(horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                    QrCode(s.address)
+                    QrCode(s.qr)
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.widthIn(max = 520.dp)) {
-                        Text("Connect Home Assistant from your phone", style = MaterialTheme.typography.headlineSmall)
+                        Text("Set up from your phone", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "Scan this with your phone's camera, or open the address below in its browser. The phone needs to be on the same Wi-Fi. Then sign in to Home Assistant there.",
+                            "Scan this with your phone's camera, on the same Wi-Fi. Fill in Lena's addresses and sign-ins there: " +
+                                "they're encrypted on the phone and saved here only when you press OK.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(s.address, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        Text("Code ${s.code}: it's in the address, so only someone who can see this screen can use the page.",
+                        Text("Typed into a browser, the address only signs in with Home Assistant; the QR code also carries the page's key.",
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(onClick = { finish() }) { Text("Cancel") }
+                        if (phone) Text("Phone connected", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        note?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+                        OutlinedButton(onClick = { finish() }) { Text(if (note != null) "Done" else "Cancel") }
                     }
                 }
-                is State.Connected -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Connected", style = MaterialTheme.typography.headlineMedium)
+                is State.Saved -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Saved", style = MaterialTheme.typography.headlineMedium)
                     Text(s.message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                 }
                 State.NoNetwork -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -176,7 +320,43 @@ class HaPairActivity : ComponentActivity() {
                     Text("Connect this device to your home Wi-Fi or Ethernet, then try again.", style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                     OutlinedButton(onClick = { finish() }) { Text("Back") }
                 }
+                State.TooManyTries -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Closed", style = MaterialTheme.typography.headlineSmall)
+                    Text("Something on the network kept guessing the page's code, so it was closed. Open it again for a new code.",
+                        style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                    OutlinedButton(onClick = { finish() }) { Text("Back") }
+                }
             }
+        }
+        // Too many wrong codes closes the page; say so instead of showing a dead address.
+        LaunchedEffect(s) {
+            while (state is State.Waiting) {
+                delay(1_000)
+                if (server?.closedForWrongCodes == true) state = State.TooManyTries
+            }
+        }
+        confirm?.let { asked ->
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Save these from the phone?") },
+                text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { asked.lines.forEach { Text(it) } } },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirm = null
+                        scope.launch {
+                            val outcome = withContext(Dispatchers.IO) { save(asked.changes) }
+                            asked.answer(outcome)
+                            if (outcome.state == "saved") state = State.Saved(outcome.message) else note = outcome.message
+                        }
+                    }) { Text("Save") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        confirm = null
+                        asked.answer(PairingServer.Outcome("refused", "Not saved: it was turned down on ${Tv.thisDevice(this@PhoneSetupActivity)}."))
+                    }) { Text("Don't save") }
+                },
+            )
         }
     }
 
@@ -202,7 +382,7 @@ class HaPairActivity : ComponentActivity() {
 
 /**
  * Signing in to Home Assistant from the phone page and turning that into a long-lived token, so the rest of
- * Lena works exactly as with one made by hand ([HaPairActivity]).
+ * Lena works exactly as with one made by hand ([PhoneSetupActivity]).
  */
 object HaSignIn {
     /**
