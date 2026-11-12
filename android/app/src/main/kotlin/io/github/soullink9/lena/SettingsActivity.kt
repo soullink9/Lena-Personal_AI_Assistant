@@ -65,7 +65,7 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AddToHomeScreen
+import androidx.compose.material.icons.automirrored.outlined.AddToHomeScreen
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Delete
@@ -89,7 +89,7 @@ import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.TouchApp
-import androidx.compose.material.icons.outlined.ViewSidebar
+import androidx.compose.material.icons.automirrored.outlined.ViewSidebar
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -300,7 +300,7 @@ class SettingsActivity : ComponentActivity() {
                 CenterAlignedTopAppBar(
                     title = { Text(page.title, style = MaterialTheme.typography.titleLarge) },
                     navigationIcon = { IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
             },
         ) { padding ->
@@ -426,7 +426,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         if (!tv) Section(Area.CHAT_SCREEN.title) {
-            Item(Icons.Outlined.ViewSidebar, "Chat screen",
+            Item(Icons.AutoMirrored.Outlined.ViewSidebar, "Chat screen",
                 if (s.answers == Answerer.ASSIST) (if (s.homeSwitch) "Chat | Home switch on" else "Chat | Home switch off") else chatScreenLabel(s)) {
                 open(Page.CHAT_SCREEN)
             }
@@ -1696,7 +1696,7 @@ class SettingsActivity : ComponentActivity() {
             }
         }
         Group {
-            Item(Icons.Outlined.AddToHomeScreen, "Add the widget", "Talk, type, new chat and your quick prompts") { addWidget() }
+            Item(Icons.AutoMirrored.Outlined.AddToHomeScreen, "Add the widget", "Talk, type, new chat and your quick prompts") { addWidget() }
             // Android 13 can add it from here; before that, Quick Settings' own edit button adds it.
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
@@ -2019,7 +2019,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchItem(Icons.Outlined.Palette, "Lena's look", "Warm colors, a clay accent and replies in a serif. Off: Open WebUI's own look.", s.lenaLook) {
                 set(s.copy(lenaLook = it))
             }
-            SwitchItem(Icons.Outlined.ViewSidebar, "Open WebUI's own menus", "Its header and sidebar, under Lena's, for its model selector, chat controls and settings", s.openWebUiMenus) {
+            SwitchItem(Icons.AutoMirrored.Outlined.ViewSidebar, "Open WebUI's own menus", "Its header and sidebar, under Lena's, for its model selector, chat controls and settings", s.openWebUiMenus) {
                 set(s.copy(openWebUiMenus = it))
             }
         }

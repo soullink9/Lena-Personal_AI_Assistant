@@ -1,5 +1,6 @@
 package io.github.soullink9.lena
 
+import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.app.KeyguardManager
 import android.content.Context
@@ -300,7 +301,7 @@ class DisplayActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+            askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
         }
         setContent { LenaTheme { LenaDisplay(locked = locked, listening = listening.value, onTalk = ::onTalk) } }
     }
@@ -325,11 +326,8 @@ class DisplayActivity : ComponentActivity() {
         startListening()
     }
 
-    /** The microphone was allowed (or not): try listening again. */
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        startListening()
-    }
+    /** The microphone, for the wake word; allowed or not, try listening again. */
+    private val askMicrophone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { startListening() }
 
     /** Starts the wake word if it's on; shows whether it's listening, or that Android won't let it here. */
     private fun startListening() {

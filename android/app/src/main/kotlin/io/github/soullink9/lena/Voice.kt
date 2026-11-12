@@ -656,6 +656,8 @@ class PhoneMouth(context: Context) : Mouth {
                     }
 
                     /** Older engines report failures here; a failed piece is skipped rather than stopping her. */
+                    // Android's older form, which older speech engines still call: kept on purpose.
+                    @Suppress("OVERRIDE_DEPRECATION")
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
                         if (cont.isActive) cont.resume(Unit)

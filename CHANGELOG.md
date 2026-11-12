@@ -16,6 +16,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 - **GitHub catches up with Gitea's releases by itself.** Releases are made on Gitea and reach GitHub with the mirror's push every few hours, but GitHub starts nothing for the tags of a push that brings more than three at once, so several releases between two mirror pushes got no GitHub release. A new workflow (`.github/workflows/catch-up-releases.yml`) runs after each mirror push and every 6 hours, and starts GitHub's release workflow for each version with a tag but no release. Only the newest version is marked Latest, so the app always updates to it. Nothing changes in how you release ([Releasing](CONTRIBUTING.md#releasing)).
 - **GitHub releases of a tag from Gitea no longer fail at the last step.** GitHub's release workflow built and signed the APK, then GitHub refused to create the release ("HTTP 403: Resource not accessible by integration"): it named the tag's commit, and GitHub refuses the workflow's token a release that names a commit other than main's newest. It now releases on the tag that's there. Started with Run workflow (as the catch-up does), it runs as it is on main and builds the code of the version's tag, so versions released before this fix get it too. To release the versions that failed (0.6.12 and later), run **Catch up releases** with **Also start again the versions whose release run failed** ticked; it starts three at a time, so run it twice for six.
 
+### Development
+
+- **A quieter build.** The app no longer uses what Android and Compose have deprecated (the old microphone permission callback, the old top bar colors and three left-to-right-only icons), so the build's warnings are the ones worth reading. `tools/check.py` reports the Python import rule as one line instead of a "PASS … isn't approved" line per import.
+
 ## [0.6.17] - 2026-11-09
 
 ### Android app

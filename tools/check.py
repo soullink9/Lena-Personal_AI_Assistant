@@ -294,11 +294,17 @@ shipped_python = (
     + [ROOT / "voice/bridge/bridge.py"]
 )
 local_modules = {p.stem for p in shipped_python}
+# One line for all of them: each file's imports beyond the standard library and its own files, and only the
+# ones that aren't provided by Home Assistant or Open WebUI named when it fails.
+unapproved = set()
 for path in shipped_python:
     for module in re.findall(r"^(?:from|import) +([\w]+)", path.read_text(), re.M):
         if module in sys.stdlib_module_names or module in local_modules or module == "__future__":
             continue
-        check(module in APPROVED_PYTHON, f"{rel(path)} imports {module}, which isn't approved")
+        if module not in APPROVED_PYTHON:
+            unapproved.add(f"{rel(path)} imports {module}")
+check(not unapproved, "the integration, Open WebUI's files and the voice bridge import only the standard library and what "
+      "Home Assistant and Open WebUI provide" + (f" (not approved: {'; '.join(sorted(unapproved))})" if unapproved else ""))
 manifest = json.loads((ROOT / "custom_components/lena/manifest.json").read_text())
 check(manifest.get("requirements", []) == [], "the integration installs no Python packages (manifest requirements is empty)")
 

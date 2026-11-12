@@ -26,7 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -324,7 +324,7 @@ class ChatActions(
                 )
                 DropdownMenuItem(
                     text = { Text("Move to folder") },
-                    leadingIcon = { Icon(Icons.Outlined.DriveFileMove, null) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.DriveFileMove, null) },
                     onClick = { menu = false; move(c) },
                 )
                 DropdownMenuItem(

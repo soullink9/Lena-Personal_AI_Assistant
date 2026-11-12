@@ -1,5 +1,6 @@
 package io.github.soullink9.lena
 
+import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
@@ -250,7 +251,7 @@ class DashboardActivity : ComponentActivity() {
         enableEdgeToEdge()
         applyWindowMode()
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+            askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
         }
         // The web view kept from the last dashboard screen, page and all (see DashboardWeb), or a new one.
         val (view, fresh) = DashboardWeb.take(this, "$server|$saved") { createWebView(it) }
@@ -612,11 +613,8 @@ class DashboardActivity : ComponentActivity() {
         }
     }
 
-    /** Whatever was answered, carry on (with or without the wake word). */
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        onResume()
-    }
+    /** The microphone, for the wake word; whatever was answered, carry on (with or without it). */
+    private val askMicrophone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { onResume() }
 
     /** Off screen: stop listening and pause the page. */
     override fun onPause() {

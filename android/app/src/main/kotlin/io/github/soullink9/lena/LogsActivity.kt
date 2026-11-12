@@ -139,7 +139,7 @@ class LogsActivity : ComponentActivity() {
                         }) { Icon(Icons.Outlined.Share, "Share") }
                         if (tab != Tab.ANDROID) IconButton(onClick = { clearing = true }) { Icon(Icons.Outlined.Delete, "Clear") }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
             },
         ) { padding ->
