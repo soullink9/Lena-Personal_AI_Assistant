@@ -781,7 +781,7 @@ class SettingsActivity : ComponentActivity() {
             Findable("Folders in the menu", "drawer folders groups sidebar order reorder", Page.CHAT_SCREEN),
             Findable("All chats list style", "chat list slim groups flat timeline folding days drawer history appearance", Page.CHAT_SCREEN),
             Findable("Reply notifications", "lena finished notify answer done", Page.NOTIFICATIONS),
-            Findable("Alerts on ${Tv.thisDevice(this)}", "worried leak alarm house warning notify", Page.NOTIFICATIONS),
+            Findable("Alerts on ${Tv.thisDevice(this@SettingsActivity)}", "worried leak alarm house warning notify", Page.NOTIFICATIONS),
             Findable("Widget", "home screen launcher mood on widget", Page.PHONE),
             Findable("Quick Settings tile", "notification shade pull-down tile talk", Page.PHONE),
             Findable("Quick prompts", "shortcuts one tap chips widget prompts", Page.QUICK),
@@ -1429,7 +1429,7 @@ class SettingsActivity : ComponentActivity() {
             val hasHa = s.haServer.isNotBlank()
             PickItem(Icons.Outlined.Hearing, "Hearing you",
                 listOfNotNull(
-                    Hearing.PHONE to if (tv) "The TV's voice search" else "On ${Tv.thisDevice(this)}",
+                    Hearing.PHONE to if (tv) "The TV's voice search" else "On ${Tv.thisDevice(this@SettingsActivity)}",
                     if (assist) null else Hearing.SERVER to "Your server",
                     if (hasHa) Hearing.HOME_ASSISTANT to "Home Assistant" else null,
                 ), s.hearing,
@@ -1763,7 +1763,7 @@ class SettingsActivity : ComponentActivity() {
     private fun CamerasPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
         val cams = s.cameras
         fun put(n: CameraSettings) = set(s.copy(cameras = n))
-        Footnote("Your Home Assistant's cameras on ${Tv.thisDevice(this)}: a grid of still pictures, or one live. They run only while camera mode is open.")
+        Footnote("Your Home Assistant's cameras on ${Tv.thisDevice(this@SettingsActivity)}: a grid of still pictures, or one live. They run only while camera mode is open.")
         Group {
             SwitchItem(Icons.Outlined.Videocam, "Camera mode", if (cams.on) "On ${Tv.thisDevice(this@SettingsActivity)}" else "Off: no cameras here", cams.on) {
                 put(cams.copy(on = it))
@@ -1776,7 +1776,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Group { Item(Icons.Outlined.Videocam, "Open camera mode", "Also from the TV home's Lena row, the bar's camera button, or \"show the cameras\"") { Cameras.open(this@SettingsActivity) } }
 
-        SectionTitle("Cameras on ${Tv.thisDevice(this)}")
+        SectionTitle("Cameras on ${Tv.thisDevice(this@SettingsActivity)}")
         var found by remember { mutableStateOf<List<FoundCamera>?>(null) }
         var problem by remember { mutableStateOf<String?>(null) }
         var included by remember { mutableStateOf(Cameras.included(this)) }
