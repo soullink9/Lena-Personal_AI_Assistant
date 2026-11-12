@@ -26,7 +26,8 @@ repository root. Each suite prints `PASS` or `FAIL` per check and exits non-zero
   files rather than doubling them; a refused token, `GITEA_INTERNAL_URL`, a missing token and a missing file.
 - `missing_releases.py`, on made-up tags, releases and runs: only Lena's versions newer than the newest released
   are started, oldest first and at most three at once (no betas, v2.x tags or tags without a changelog section);
-  with no releases only the newest; one already running is left to its run and one that failed is reported; a
+  with no releases only the newest; one already running (matched by its branch or its title) is left to its run,
+  and one that failed is reported, or started again when asked; a
   draft counts as missing; and only the newest of Lena's versions is marked Latest.
 
 What this does and does not prove:

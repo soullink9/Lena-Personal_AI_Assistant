@@ -5,8 +5,10 @@
 # version here. GitHub starts nothing for the tags of a push that brings more than three at once, though (several
 # releases between two mirror pushes), and a run can be missed. So after each mirror push, and every few hours in
 # case one is missed, this finds the versions with a tag here but no release (scripts/missing_releases.py says
-# which count) and starts release.yml for each of them, on its tag. Nothing is built or published by this
-# workflow itself, and it never starts one twice: a version whose release run failed is reported instead.
+# which count) and starts release.yml for each of them (on main, so today's release workflow builds the tag's
+# code). Nothing is built or published by this workflow itself, and it never starts one twice: a version whose
+# release run failed is reported instead. Once what failed is fixed, Run workflow with "Also start again the
+# versions whose release run failed" ticked starts those again.
 #
 # Gitea doesn't read .github/, so this only ever runs on GitHub.
 name: Catch up releases
@@ -17,6 +19,11 @@ on:
   schedule:
     - cron: "23 */6 * * *"
   workflow_dispatch:
+    inputs:
+      retry:
+        description: "Also start again the versions whose release run failed"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,19 +49,22 @@ jobs:
       - name: Start the missing releases
         env:
           GH_TOKEN: ${{ github.token }}
+          RETRY: ${{ inputs.retry }}
         run: |
           git ls-remote --tags --refs origin | sed 's#.*refs/tags/##' > "$RUNNER_TEMP/tags.txt"
           gh release list --limit 200 --json tagName,isDraft > "$RUNNER_TEMP/releases.json"
-          gh run list --workflow release.yml --limit 200 --json headBranch,status,conclusion > "$RUNNER_TEMP/runs.json"
-          python3 scripts/missing_releases.py "$RUNNER_TEMP/tags.txt" "$RUNNER_TEMP/releases.json" "$RUNNER_TEMP/runs.json" \
+          gh run list --workflow release.yml --limit 200 --json headBranch,displayTitle,status,conclusion > "$RUNNER_TEMP/runs.json"
+          retry=()
+          if [ "$RETRY" = true ]; then retry=(--retry-failed); fi
+          python3 scripts/missing_releases.py "${retry[@]+"${retry[@]}"}" "$RUNNER_TEMP/tags.txt" "$RUNNER_TEMP/releases.json" "$RUNNER_TEMP/runs.json" \
             > "$RUNNER_TEMP/actions.txt"
           started=0
           while read -r kind text; do
             case "$kind" in
               release)
                 echo "Starting the release of $text"
-                # On the tag, so it builds exactly the released commit.
-                gh workflow run release.yml --ref "$text" -f version="${text#[vV]}"
+                # On main, so it runs today's release workflow; it builds the tag's own code (its version job).
+                gh workflow run release.yml --ref main -f version="${text#[vV]}"
                 started=$((started + 1))
                 ;;
               warning)

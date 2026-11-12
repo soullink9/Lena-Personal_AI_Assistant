@@ -301,9 +301,9 @@ LOG = "\n".join(f"## [{v}] - 2026-11-01\n\n- something\n" for v in ("0.6.17", "0
 TAGS = ["v0.6.2-beta", "v2.18.1", "v0.6.13", "v0.6.14", "v0.6.15", "v0.6.16", "v0.6.17", "v0.6.99"]
 
 
-def starts(releases, runs=(), tags=TAGS):
+def starts(releases, runs=(), tags=TAGS, retry=False):
     """The tags the catch-up would start, and its warnings."""
-    actions = missing_releases.to_release(tags, [{"tagName": t, "isDraft": False} for t in releases], list(runs), LOG)
+    actions = missing_releases.to_release(tags, [{"tagName": t, "isDraft": False} for t in releases], list(runs), LOG, retry)
     return [t for k, t in actions if k == "release"], [t for k, t in actions if k == "warning"]
 
 
@@ -319,6 +319,14 @@ check(got == ["v0.6.17"], f"a version whose release is already running is left t
 got, warned = starts(["v0.6.15"], runs=[{"headBranch": "v0.6.16", "status": "completed", "conclusion": "failure"}])
 check(got == ["v0.6.17"] and len(warned) == 1 and "v0.6.16" in warned[0],
       f"a failed release run isn't started again, it's reported ({got}, {warned})")
+got, _ = starts(["v0.6.15"], runs=[{"headBranch": "main", "displayTitle": "Release 0.6.16", "status": "queued", "conclusion": None}])
+check(got == ["v0.6.17"], f"a run started from main is matched by its title, Release 0.6.16 ({got})")
+got, warned = starts(["v0.6.15"], runs=[{"headBranch": "v0.6.16", "status": "completed", "conclusion": "failure"}], retry=True)
+check(got == ["v0.6.16", "v0.6.17"] and not warned, f"asked to start failed ones again: it does ({got}, {warned})")
+got, _ = starts(["v0.6.15"], runs=[{"headBranch": "v0.6.16", "status": "completed", "conclusion": "failure"},
+                                   {"headBranch": "main", "displayTitle": "Release v0.6.16", "status": "in_progress", "conclusion": None}],
+                retry=True)
+check(got == ["v0.6.17"], f"…but not one that's running again already ({got})")
 actions = missing_releases.to_release(TAGS, [{"tagName": "v0.6.13", "isDraft": False}, {"tagName": "v0.6.14", "isDraft": True}], [], LOG)
 check([t for k, t in actions if k == "release"] == ["v0.6.14", "v0.6.15", "v0.6.16"]
       and any("v0.6.17" in t for k, t in actions if k == "warning"),
