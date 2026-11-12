@@ -230,9 +230,9 @@ class PromptWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val text = Markdown.plain(answer).take(900).ifBlank { "Assist didn't say anything." }
             Notify.show(c, Notify.SCHEDULED, title, text, null)
             Result.success()
-        } catch (_: HaAuthException) {
-            Logs.w("Scheduled prompts", "Couldn't run one through Assist: Home Assistant refused the token")
-            Notify.show(c, Notify.SCHEDULED, title, "Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.", null)
+        } catch (e: HaAuthException) {
+            Logs.w("Scheduled prompts", "Couldn't run one through Assist: ${e.message}")
+            Notify.show(c, Notify.SCHEDULED, title, e.explained("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant."), null)
             Result.success()
         } catch (e: Exception) {
             Logs.w("Scheduled prompts", "Couldn't run one through Assist (try ${runAttemptCount + 1})", e)

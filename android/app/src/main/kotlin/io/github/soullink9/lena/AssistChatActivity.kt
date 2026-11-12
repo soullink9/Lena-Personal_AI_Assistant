@@ -208,7 +208,7 @@ class AssistChatActivity : ComponentActivity() {
                         DisplaySync.now(this@AssistChatActivity)
                     }
                 } catch (e: HaAuthException) {
-                    toast("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.")
+                    toast(e.explained("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant."))
                 } catch (e: IllegalStateException) {
                     toast(e.message ?: "Set up Home Assistant first.")
                 } catch (e: Exception) {

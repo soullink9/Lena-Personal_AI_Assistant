@@ -731,8 +731,8 @@ class AskActivity : ComponentActivity() {
                 } catch (_: AuthException) {
                     note = "Open Lena and sign in first."
                     phase = Phase.IDLE
-                } catch (_: HaAuthException) {
-                    note = "Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant."
+                } catch (e: HaAuthException) {
+                    note = e.explained("Home Assistant didn't accept Lena's token. Check Settings → Connections → Home Assistant.")
                     phase = Phase.IDLE
                 } catch (e: IllegalStateException) {
                     Logs.w("Ask", e.message ?: "Couldn't ask", e)

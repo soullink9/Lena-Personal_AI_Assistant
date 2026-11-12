@@ -377,8 +377,14 @@ class SettingsActivity : ComponentActivity() {
             }
             // With Assist answering, Open WebUI isn't used at all, so its rows step aside.
             val assist = s.answers == Answerer.ASSIST
-            if (!assist) Item(Icons.Outlined.Language, "Open WebUI", host(s.server) ?: "Not set") { open(Page.OPEN_WEBUI) }
-            Item(Icons.Outlined.Home, "Home Assistant", if (house) host(s.haServer) ?: "Connected" else "Not connected") {
+            // How each server answered its last check ([Connections.state]); opening Settings checks
+            // again if the last check is more than a minute old.
+            val status by Connections.state.collectAsState()
+            LaunchedEffect(Unit) { Connections.ensure(this@SettingsActivity) }
+            if (!assist) Item(Icons.Outlined.Language, "Open WebUI", withStatus(host(s.server) ?: "Not set", status[Server.OPEN_WEBUI])) {
+                open(Page.OPEN_WEBUI)
+            }
+            Item(Icons.Outlined.Home, "Home Assistant", withStatus(if (house) host(s.haServer) ?: "Connected" else "Not connected", status[Server.HOME_ASSISTANT])) {
                 open(Page.HOME_ASSISTANT)
             }
             Item(Icons.Outlined.Assistant, "Who answers", s.answers.label) { open(Page.WHO_ANSWERS) }
@@ -645,23 +651,47 @@ class SettingsActivity : ComponentActivity() {
     }
 
     /**
-     * Refresh all connections: checks Open WebUI and Home Assistant again and says how each answered, and
-     * has your chats and the dashboards reload their pages when you go back to them. (It replaces the
-     * reload buttons that were in the menu and on the wall display.)
+     * A Connections row's text: the server's address, then how it answered its last check, "working at 9:41"
+     * or what went wrong. Just the address before the first check.
+     */
+    private fun withStatus(address: String, status: ServerStatus?): String {
+        status ?: return address
+        val at = DateFormat.getTimeFormat(this).format(java.util.Date(status.checkedAt))
+        return if (status.ok) "$address · working at $at" else "$address · ${status.problem}"
+    }
+
+    /**
+     * Refresh all connections: checks the servers in use again ([Connections.ensure], which also updates
+     * their rows) and says how each answered, and has your chats and the dashboards reload their pages when
+     * you go back to them. (It replaces the reload buttons that were in the menu and on the wall display.)
      */
     @Composable
     private fun RefreshItem() {
         val scope = rememberCoroutineScope()
         var result by remember { mutableStateOf<String?>(null) }
-        Item(Icons.Outlined.Refresh, "Refresh all connections", result ?: "Checks both servers and reloads your chats and dashboards") {
+        Item(Icons.Outlined.Refresh, "Refresh all connections", result ?: "Checks the servers and reloads your chats and dashboards") {
             Refresh.request()
             result = "Checking…"
             scope.launch {
-                val chat = Api.from(this@SettingsActivity)?.version()?.let { "Open WebUI $it" }
-                    ?: if (Prefs.server(this@SettingsActivity) == null) "No Open WebUI" else "Open WebUI unreachable"
-                val house = HomeAssistant.from(this@SettingsActivity)?.let { if (it.check()) "Home Assistant connected" else "Home Assistant unreachable" }
-                    ?: "No Home Assistant"
-                result = "$chat · $house · pages reload when you go back"
+                val c = this@SettingsActivity
+                if (!Connections.online(c)) {
+                    result = "No network · pages reload when you go back"
+                    return@launch
+                }
+                Connections.ensure(c, fresherThanMs = 0)
+                val status = Connections.state.value
+                val chat = when {
+                    Prefs.server(c) == null -> "No Open WebUI"
+                    Prefs.answers(c) == Answerer.ASSIST -> null // not used while Assist answers
+                    status[Server.OPEN_WEBUI]?.ok == true -> Api.from(c)?.version()?.let { "Open WebUI $it" } ?: "Open WebUI connected"
+                    else -> "Open WebUI unreachable"
+                }
+                val house = when {
+                    HomeAssistant.from(c) == null -> "No Home Assistant"
+                    status[Server.HOME_ASSISTANT]?.ok == true -> "Home Assistant connected"
+                    else -> "Home Assistant unreachable"
+                }
+                result = listOfNotNull(chat, house, "pages reload when you go back").joinToString(" · ")
             }
         }
     }
@@ -1194,8 +1224,9 @@ class SettingsActivity : ComponentActivity() {
                 if (url == null || saved == null) check = "Add the address and token first."
                 else scope.launch {
                     check = "Checking…"
-                    val house = HomeAssistant(url, saved)
-                    check = if (!house.check()) "Couldn't connect. Check the address and token."
+                    val house = HomeAssistant(url, saved, this@SettingsActivity)
+                    val problem = house.problem()
+                    check = if (problem != null) problem
                     else when (val f = runCatching { house.feelings() }.getOrNull()) {
                         null -> "Connected, but the Lena integration isn't set up in Home Assistant."
                         else -> "Connected. She's ${f.mood.lowercase()}."

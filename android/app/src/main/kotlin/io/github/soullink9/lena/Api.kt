@@ -15,14 +15,7 @@ import java.net.URL
 import java.net.URLEncoder
 import java.util.UUID
 
-/** Signed out, or the session expired: open Lena and sign in again. */
-class AuthException : IOException("Signed out")
-
-/** Signed in, but your account isn't allowed to do this (or the feature is turned off). */
-class ForbiddenException : IOException("Not allowed")
-
-/** Someone changed it somewhere else (in the browser, say) since it was opened here: read it again first. */
-class ConflictException : IOException("Changed elsewhere")
+// AuthException, ForbiddenException and ConflictException are in Retry.kt, with the rules for trying again.
 
 /**
  * A model on your Open WebUI, with the tools and features (web search and the like) its settings turn on by
@@ -543,10 +536,34 @@ class Api(server: String, private val context: Context? = null) {
             conversation.put(m)
         }
 
-        // 3. Ask Open WebUI to answer it server-side, with the model's tools, as its own page does.
-        request("POST", "/api/chat/completions", completionBody(id, turn, model, conversation,
-            wantTitle = existing == null && newTitle == null), readTimeoutMs = 120_000)
+        // 3. Ask Open WebUI to answer it server-side, with the model's tools, as its own page does. If its
+        //    reply to the request doesn't come (a slow server, a proxy cutting a long wait short), she may
+        //    be answering all the same: look before saying it failed, and never send it twice.
+        try {
+            request("POST", "/api/chat/completions", completionBody(id, turn, model, conversation,
+                wantTitle = existing == null && newTitle == null), readTimeoutMs = 120_000)
+        } catch (e: IOException) {
+            if (!Retry.mayBeUnderWay(e) || !answering(id, turn.replyId)) throw e
+            Logs.i("Open WebUI", "No reply to the request (${e.javaClass.simpleName}), but she's answering; following it")
+        }
         return Started(id, turn.replyId)
+    }
+
+    /**
+     * Whether the answer [replyId] in [chatId] is under way: a task is writing in the chat, or the answer
+     * has words or is done. Looks a few times, a moment apart, since the task may only just be starting.
+     */
+    private suspend fun answering(chatId: String, replyId: String): Boolean {
+        repeat(3) { look ->
+            if (look > 0) delay(1_500)
+            val tasks = runCatching { runningTasks(chatId) }.getOrDefault(0)
+            if (tasks > 0) return true
+            val reply = runCatching {
+                chat(chatId).optJSONObject("chat")?.optJSONObject("history")?.optJSONObject("messages")?.optJSONObject(replyId)
+            }.getOrNull()
+            if (reply != null && (reply.optString("content").isNotBlank() || reply.optBoolean("done", false))) return true
+        }
+        return false
     }
 
     /** One question and its (still empty) answer, as Open WebUI stores them in a chat's history. */
@@ -931,22 +948,24 @@ class Api(server: String, private val context: Context? = null) {
     /**
      * The answer as it's written, until it's done (or 15 minutes pass). Built to wait out a long think:
      * a dropped connection while polling is retried for about half a minute before giving up, and an
-     * answer with no words yet isn't taken as finished just because no task shows for a moment.
+     * answer with no words yet isn't taken as finished just because no task shows for a moment. Each look
+     * downloads the whole chat, so a long chat is looked at less often ([Retry.followWaitMs]); a chat that's
+     * gone or can't be read ends it at once ([Retry.stopsFollowing]).
      */
     fun follow(chatId: String, messageId: String): Flow<Reply> = flow {
         val deadline = System.currentTimeMillis() + 15 * 60_000
         var idle = 0
         var failures = 0
+        var chatChars = 0
         while (System.currentTimeMillis() < deadline) {
             val reply = try {
-                val msg = chat(chatId).optJSONObject("chat")?.optJSONObject("history")
+                val raw = request("GET", "/api/v1/chats/${enc(chatId)}")
+                chatChars = raw.length
+                val msg = JSONObject(raw).optJSONObject("chat")?.optJSONObject("history")
                     ?.optJSONObject("messages")?.optJSONObject(messageId)
                 Reply(msg?.optString("content") ?: "", msg?.optBoolean("done", false) ?: false)
-            } catch (e: AuthException) {
-                throw e
-            } catch (e: ForbiddenException) {
-                throw e
             } catch (e: IOException) {
+                if (Retry.stopsFollowing(e)) throw e
                 // A hiccup (Wi-Fi, a proxy, the server busy thinking): try again, up to about 30 seconds.
                 if (++failures >= 15) throw e
                 delay(2_000)
@@ -969,7 +988,7 @@ class Api(server: String, private val context: Context? = null) {
                     }
                 }
             }
-            delay(800)
+            delay(Retry.followWaitMs(chatChars))
         }
         throw IOException("Timed out")
     }

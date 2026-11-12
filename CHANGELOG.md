@@ -2,6 +2,25 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **The wall display gets back on its feet by itself.** A dashboard that can't load (Home Assistant restarting, the Wi-Fi down, a proxy's error) shows Lena's own **Can't reach Home Assistant** with the reason, instead of the web view's error page and nothing else; she asks Home Assistant again every 15 seconds and as soon as the network comes back, and loads the dashboard again once it answers. **Try again** asks now.
+- **A crashed page no longer closes the app.** When Android ends a web page (it crashed, or memory ran short on a small TV box), the dashboards, your chats and camera mode's live picture start again with a new page instead of the whole app closing.
+- **Camera mode connects again by itself.** When the connection to Home Assistant ends, it reconnects after 2, 5, 10 and then 30 seconds, or as soon as the network is back, keeping the view, your selection and the last pictures on screen.
+- **A question that got no reply is followed, not failed.** If Open WebUI took longer than two minutes to take on a question (or a proxy cut the wait short), she now looks whether she's answering it before saying it failed, and follows the answer. It's never sent twice.
+- **Following a long chat is lighter.** Each look at an answer being written downloads the whole chat, so a long chat is looked at less often (every 0.8 seconds for a short one, up to every 2.5 seconds), and a chat deleted meanwhile ends it at once.
+- **Requests try again when it's safe.** Home Assistant's requests (still pictures and photos too) wait for the network to come back before trying again, and a GET is tried again when a proxy says the server is restarting (HTTP 502, 503, 504). Nothing that may have reached the server is sent twice unless it's a GET.
+- **A Home Assistant ban says so.** When Home Assistant answers 403 (it banned the device's address after failed sign-ins), Lena says that, and how to lift it (`ip_bans.yaml`), instead of asking for a new token.
+- **Each server's status.** Settings → Connections says under Open WebUI and Home Assistant how each answered its last check, and the wall display's bar shows a cloud with a line through it while one doesn't answer. Open WebUI isn't checked while Home Assistant's Assist answers.
+- **On a TV, the connections stay ready and Home Assistant's commands arrive** whichever app is the home screen, as on a tablet that has Lena as its home screen. Android now says when the network comes back, so the wall display checks its connections at once instead of waiting for its next check.
+- **A command from Home Assistant is never done twice.** The wall display now saves its place after each command, so an announcement or timer isn't repeated if the app closes partway through a batch.
+
+### Development
+
+- `tools/connection_check` checks the rules for trying failed requests again (`Retry.kt`), in Gitea's and GitHub's test and release workflows.
+
 ## [0.6.18] - 2026-11-12
 
 ### Android app

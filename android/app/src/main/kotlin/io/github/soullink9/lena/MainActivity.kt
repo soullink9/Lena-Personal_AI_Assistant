@@ -562,6 +562,19 @@ class MainActivity : ComponentActivity() {
         }
 
         /**
+         * Android ended the page (it crashed, or memory ran short). Unhandled, that would end the whole app;
+         * instead the screen starts again with a new web view, on the same chat (its address is saved with
+         * the screen, see onSaveInstanceState). The old web view is taken off the screen first, so it can
+         * be destroyed with it.
+         */
+        override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+            Logs.w("Open WebUI", if (detail.didCrash()) "The page crashed; starting it again" else "Android closed the page to free memory; starting it again")
+            (view.parent as? android.view.ViewGroup)?.removeView(view)
+            if (!isFinishing && !isDestroyed) recreate() else view.destroy()
+            return true
+        }
+
+        /**
          * Every navigation, including Open WebUI's in-page ones: track the address (it decides the title
          * and the chat), and sign in by herself if it landed on the sign-in page.
          */

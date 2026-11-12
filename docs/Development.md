@@ -59,6 +59,7 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── android-tv-home.sh         makes Lena an Android TV's home screen (docs/app/Android-TV.md)
 │   ├── frontend_check/            the wake word front end against the original C
 │   ├── camera_check/              camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes
+│   ├── connection_check/          which failed requests are tried again, and how an answer being written is followed
 │   ├── commands_check/            what she understands on her own, on example sentences
 │   └── pairing_check/             Set up from your phone: QR codes, the page used as a phone would, its cipher (in Node) against Java's
 ├── scripts/                       what the workflows run, on Gitea and GitHub alike

@@ -164,6 +164,11 @@ jobs:
       - name: Check camera mode
         run: tools/camera_check/run.sh
 
+      # Connections: which failed requests are tried again (never a POST that may have reached the server),
+      # and how an answer being written is followed.
+      - name: Check connection rules
+        run: tools/connection_check/run.sh
+
       # A release must install over the last one, so it's signed with your key or not published at all.
       - name: Load the signing key
         env:

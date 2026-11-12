@@ -33,11 +33,14 @@ object DisplaySync {
     private const val NOTIFICATION = 7101
     private val lock = Mutex()
 
-    /** While [a] is showing in dashboard mode: syncs every few seconds and watches the Speaking first sensor. */
+    /**
+     * While [a] is showing on a wall display (the home screen, or a TV: [DashboardActivity.isWallDisplay]):
+     * syncs every few seconds and watches the Speaking first sensor.
+     */
     fun watch(a: ComponentActivity, from: AskActivity.From? = null) {
         a.lifecycleScope.launch {
             a.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                if (!DashboardActivity.isHomeScreen(a)) return@repeatOnLifecycle
+                if (!DashboardActivity.isWallDisplay(a)) return@repeatOnLifecycle
                 var sensorWas: Boolean? = null
                 while (true) {
                     val ok = runCatching { sync(a, from) }.isSuccess
@@ -81,11 +84,17 @@ object DisplaySync {
             throw e
         }
         val commands = reply.optJSONArray("commands") ?: JSONArray()
+        val boot = reply.optString("boot")
         for (i in 0 until commands.length()) {
-            runCatching { act(c, commands.getJSONObject(i), from) }
+            val command = commands.getJSONObject(i)
+            runCatching { act(c, command, from) }
                 .onFailure { Logs.w("Display", "Couldn't do what Home Assistant asked", it) }
+            // Her place is saved after each command (each carries its own number, see the integration's
+            // hub.py), so if the app is closed partway through, the next sync carries on from the next one
+            // rather than saying an announcement or setting a timer twice.
+            if (command.has("seq")) p.edit().putInt("sync_seq", command.optInt("seq")).putString("sync_boot", boot).apply()
         }
-        p.edit().putInt("sync_seq", reply.optInt("seq")).putString("sync_boot", reply.optString("boot")).apply()
+        p.edit().putInt("sync_seq", reply.optInt("seq")).putString("sync_boot", boot).apply()
     }
 
     /** Does one thing she asked this display to do. */

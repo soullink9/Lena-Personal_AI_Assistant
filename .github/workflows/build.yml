@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     # Only the app needs building; docs and Home Assistant files don't.
-    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "tools/pairing_check/**", "tools/camera_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
+    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "tools/pairing_check/**", "tools/camera_check/**", "tools/connection_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -74,6 +74,11 @@ jobs:
       # Camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes.
       - name: Check camera mode
         run: tools/camera_check/run.sh
+
+      # Connections: which failed requests are tried again (never a POST that may have reached the server),
+      # and how an answer being written is followed.
+      - name: Check connection rules
+        run: tools/connection_check/run.sh
 
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner. A test build is named after its commit.
       - name: Build

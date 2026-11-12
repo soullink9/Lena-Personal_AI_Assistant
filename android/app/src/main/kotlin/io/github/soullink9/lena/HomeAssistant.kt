@@ -24,14 +24,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/** Home Assistant turned the token down: it was revoked, or it's wrong. */
-class HaAuthException : IOException("Home Assistant token rejected")
-
-/**
- * Home Assistant answered with an error. The message stays "HTTP <code>" (what callers check); [detail] is
- * Home Assistant's own explanation, when it gave one ("There's no tidy to undo").
- */
-class HaHttpException(val code: Int, val detail: String?) : IOException("HTTP $code")
+// HaAuthException, HaForbiddenException and HaHttpException are in Retry.kt, with the rules for trying again.
 
 /** How Lena feels right now, from her helpers in Home Assistant. */
 data class Feelings(val mood: String, val moodWhy: String, val energy: String, val moment: String?, val momentWhy: String)
@@ -60,7 +53,12 @@ data class AssistReply(val speech: String, val conversationId: String?)
  * Uses a long-lived access token you paste into settings. It's stored encrypted with a key that
  * never leaves the phone's keystore, and sent only to the Home Assistant address you enter.
  */
-class HomeAssistant(server: String, private val token: String) {
+class HomeAssistant(
+    server: String,
+    private val token: String,
+    /** For waiting on the network before trying a dropped request again; null waits only the fixed pauses. */
+    private val context: Context? = null,
+) {
 
     private val base = server.trimEnd('/')
 
@@ -72,21 +70,21 @@ class HomeAssistant(server: String, private val token: String) {
         fun from(c: Context): HomeAssistant? {
             val url = Prefs.haServer(c) ?: return null
             val token = Secrets.get(c, Secrets.HA_TOKEN) ?: return null
-            return HomeAssistant(url, token)
+            return HomeAssistant(url, token, c.applicationContext)
         }
     }
 
     /**
-     * One request to Home Assistant with the token. A 401 or 403 means the token was refused, which the
-     * screens report differently from Home Assistant being unreachable. A dropped connection is tried
-     * again (see [Connections.retrying]).
+     * One request to Home Assistant with the token. A 401 means the token was refused and a 403 that Home
+     * Assistant won't talk to this device, which the screens report differently from Home Assistant being
+     * unreachable. A dropped connection is tried again once the network is back (see [Connections.retrying]).
      */
     private suspend fun call(
         method: String,
         path: String,
         body: JSONObject? = null,
         readTimeoutMs: Int = 30_000, // a large album takes a moment to list
-    ): String = Connections.retrying(null, method, "Home Assistant $method ${path.substringBefore('?')}") {
+    ): String = Connections.retrying(context, method, "Home Assistant $method ${path.substringBefore('?')}") {
         callOnce(method, path, body, readTimeoutMs)
     }
 
@@ -116,7 +114,11 @@ class HomeAssistant(server: String, private val token: String) {
                 Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: couldn't connect", e)
                 throw e
             }
-            if (code == 401 || code == 403) {
+            if (code == 403) {
+                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: Home Assistant won't talk to this device (HTTP 403)")
+                throw HaForbiddenException()
+            }
+            if (code == 401) {
                 Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: the token wasn't accepted (HTTP $code)")
                 throw HaAuthException()
             }
@@ -137,8 +139,15 @@ class HomeAssistant(server: String, private val token: String) {
     /** Encodes part of a path. */
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    /** A file from Home Assistant itself (only paths on it, so the token never goes elsewhere). */
-    suspend fun bytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+    /**
+     * A file from Home Assistant itself (only paths on it, so the token never goes elsewhere): photos for the
+     * slideshow, camera still pictures. Tried again like any other request ([Connections.retrying]).
+     */
+    suspend fun bytes(path: String): ByteArray = Connections.retrying(context, "GET", "Home Assistant GET ${path.substringBefore('?')}") {
+        bytesOnce(path)
+    }
+
+    private suspend fun bytesOnce(path: String): ByteArray = withContext(Dispatchers.IO) {
         require(path.startsWith("/") && !path.startsWith("//")) { "Not a Home Assistant path" }
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
@@ -147,10 +156,11 @@ class HomeAssistant(server: String, private val token: String) {
             conn.readTimeout = 30_000
             conn.setRequestProperty("Authorization", "Bearer $token")
             val code = conn.responseCode
-            if (code == 401 || code == 403) throw HaAuthException()
+            if (code == 403) throw HaForbiddenException()
+            if (code == 401) throw HaAuthException()
             if (code !in 200..299) {
                 Logs.w("Home Assistant", "GET ${path.substringBefore('?')}: HTTP $code")
-                throw IOException("HTTP $code")
+                throw HaHttpException(code, null)
             }
             conn.inputStream.use { it.readBytes() }
         } finally {
@@ -182,7 +192,8 @@ class HomeAssistant(server: String, private val token: String) {
                 "format=wav; codec=pcm; sample_rate=16000; bit_rate=16; channel=1; language=$language")
             conn.outputStream.use { it.write(pcm) }
             val code = conn.responseCode
-            if (code == 401 || code == 403) throw HaAuthException()
+            if (code == 403) throw HaForbiddenException()
+            if (code == 401) throw HaAuthException()
             val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.use { String(it.readBytes()) } ?: ""
             if (code !in 200..299) {
                 Logs.w("Home Assistant", "Speech-to-text ($engine): HTTP $code ${text.take(200)}")
@@ -382,7 +393,20 @@ class HomeAssistant(server: String, private val token: String) {
     }
 
     /** True when the address and token work. */
-    suspend fun check(): Boolean = runCatching { call("GET", "/api/") }.isSuccess
+    suspend fun check(): Boolean = problem() == null
+
+    /**
+     * Why Home Assistant can't be used right now, in words for the screen, or null when it answers and takes
+     * the token. For Settings' test and the connection status ([Connections.state]).
+     */
+    suspend fun problem(): String? = try {
+        call("GET", "/api/")
+        null
+    } catch (e: HaAuthException) {
+        e.explained("Home Assistant didn't accept Lena's token.")
+    } catch (e: IOException) {
+        "Couldn't reach Home Assistant (${e.message ?: e.javaClass.simpleName})."
+    }
 
     /**
      * How she feels, from the Lena integration's /api/lena/context, or null if the integration

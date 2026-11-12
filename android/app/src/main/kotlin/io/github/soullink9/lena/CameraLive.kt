@@ -3,7 +3,9 @@ package io.github.soullink9.lena
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -31,6 +33,8 @@ class CameraLive(
     private val sound: Boolean,
     private val scope: CoroutineScope,
     private val onState: (State) -> Unit,
+    /** Android ended the web view's page (it crashed, or memory ran short): this player is done; make another. */
+    private val onGone: () -> Unit,
 ) {
     /** Where the live picture is: starting, moving, or given up (camera mode shows still pictures then). */
     enum class State { CONNECTING, PLAYING, STILL }
@@ -49,6 +53,9 @@ class CameraLive(
     private var timeout: Job? = null
     private var pageReady = false
     private var startWhenReady: (() -> Unit)? = null
+
+    /** The page was ended by Android: nothing more may be asked of the web view but to be destroyed. */
+    private var gone = false
 
     /** Each camera shown gets a new number, so a late answer for the last one is ignored. */
     private var generation = 0
@@ -73,6 +80,17 @@ class CameraLive(
                 pageReady = true
                 startWhenReady?.invoke()
                 startWhenReady = null
+            }
+
+            /**
+             * Android ended the page (it crashed, or memory ran short). Unhandled, that would end the whole
+             * app; instead this player stops and camera mode makes a new one ([onGone]).
+             */
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                Logs.w(TAG, if (detail.didCrash()) "The live picture's page crashed; starting it again" else "Android closed the live picture's page to free memory; starting it again")
+                gone = true
+                scope.launch { onGone() }
+                return true
             }
         }
         addJavascriptInterface(Bridge(), "LenaCamera")
@@ -119,11 +137,13 @@ class CameraLive(
 
     fun destroy() {
         stop()
+        (view.parent as? ViewGroup)?.removeView(view)
         view.destroy()
     }
 
     private fun js(code: String) {
-        view.post { view.evaluateJavascript(code, null) }
+        if (gone) return
+        view.post { if (!gone) view.evaluateJavascript(code, null) }
     }
 
     /** WebRTC didn't work: HLS next, then still pictures. */

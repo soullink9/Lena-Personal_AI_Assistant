@@ -45,7 +45,7 @@ Below it, the settings are in sections, and every row says how it's set and open
 
 | Section | Rows |
 |---|---|
-| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself), **Home Assistant** (address, token, test), **Who answers** (Open WebUI or Home Assistant's Assist, [below](#who-answers)), **Model** (the model for new chats, the sheet and scheduled prompts, and the Assistant Lena conversation with her context size) and **Refresh all connections** (checks both servers, and reloads your chats and dashboards when you go back to them). |
+| **Connections** | **Open WebUI** (address, sign-in address, signing in by herself), **Home Assistant** (address, token, test), **Who answers** (Open WebUI or Home Assistant's Assist, [below](#who-answers)), **Model** (the model for new chats, the sheet and scheduled prompts, and the Assistant Lena conversation with her context size) and **Refresh all connections** (checks the servers, and reloads your chats and dashboards when you go back to them). Under each server, how it answered its last check: working, and when, or what went wrong. |
 | **Wall display** | **Make it this device's home screen** ↗ (dashboard mode), **Make it this device's screensaver** ↗ (Android's screen saver while charging), **Screensaver** (what shows when no one's around, when, and what wakes it) and **Dashboards**. |
 | **Talking to Lena** | **Make Lena your digital assistant** ↗, **Wake word** (on or off, her name, how sure she must be, and whether she listens only on the wall display or whenever Lena is open), **How she looks and sounds** (her look, who hears you, her voice, keep listening) and **Interacting with Lena** (what the assistant gesture opens, and the lock screen). |
 | **Chat screen configuration** | **Chat screen**: **Lena's look** for Open WebUI's pages, **Open WebUI's own menus**, the **Chat \| Home switch**, how many **pinned chats** and whether **folders** show in the menu, and the **All chats** list style. |
@@ -85,7 +85,7 @@ A tablet that's only a wall display can be stripped down to Lena and a few apps 
 
 ### Dashboards
 
-Your dashboards are signed in with the token from Lena's settings, through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each one by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`). Links that lead away from Home Assistant open in your browser; iframe and camera cards load inside it.
+Your dashboards are signed in with the token from Lena's settings, through the same "external auth" the Home Assistant companion app uses, so there's no login page. Add each one by name and path (the part after your Home Assistant's address, such as `lovelace` or `dashboard-floorplan/0`). Links that lead away from Home Assistant open in your browser; iframe and camera cards load inside it. If a dashboard can't load (Home Assistant restarting, the Wi-Fi down), Lena says so on her own screen instead of an error page and shows the dashboard again by herself once Home Assistant answers ([Troubleshooting](Troubleshooting.md#the-wall-display-says-cant-reach-home-assistant)).
 
 **One bar across the top.** Home Assistant's own header (the dashboard's name, its view tabs, search, Assist and edit) is replaced by Lena's bar, so there's a single bar:
 
@@ -97,6 +97,7 @@ Your dashboards are signed in with the token from Lena's settings, through the s
 | **The dashboard's views** | Its view tabs, as chips (only when it has more than one). |
 | **Dashboards** | Switches between the dashboards you added here (only when there's more than one). |
 | **Lena** | Her mood and why. Tap to talk to her. |
+| **A cloud with a line through it** | Only when Open WebUI or Home Assistant didn't answer its last check. Opens Settings, where **Connections** says which and why. |
 | **Apps, Settings** | Only if they couldn't be added to Home Assistant's menu (after a Home Assistant update, say): then they stay in the bar, in a **⋮** menu on a narrow screen. On a narrow screen the time and her mood's words also step aside to leave the views room. To reload the dashboard, use Settings → **Refresh all connections**. |
 
 The same goes for Home Assistant's own pages opened from its menu (Overview, Energy, Calendar, To-do, Activity, Map, History, Media and so on): their header goes too and the page moves up into its space, though a second row of filters stays where a page has one, and buttons that lived only in a page's header (such as Calendar's refresh or To-do's ⋮ menu) go with it. Apps served through the Ingress Proxy integration (Music Assistant and the like) lose the proxy's toolbar the same way. Home Assistant's settings pages keep their own headers. The dashboard's name isn't shown. Editing a dashboard (from Home Assistant's menu) brings its own header back while you edit, since its Done button lives there. **When she's worried** about something at home, the bar turns into a red banner with what's wrong and a **Talk to her** button, and the screen wakes up if it was idle.

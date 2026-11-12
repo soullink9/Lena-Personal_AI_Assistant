@@ -132,7 +132,7 @@ class MemoryActivity : ComponentActivity() {
             delete = { item -> h.removeMemory(list, current.first { it.uid == item.id }) },
             problem = {
                 when (it) {
-                    is HaAuthException -> "Home Assistant turned down the token. Check it in settings."
+                    is HaAuthException -> it.explained("Home Assistant turned down the token. Check it in settings.")
                     else -> "Couldn't reach her memory. Check Home Assistant in settings, and that the Lena integration is set up."
                 }
             },

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.FilledTonalButton
@@ -72,6 +73,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,6 +83,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -95,7 +98,9 @@ import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.util.Date
 
@@ -120,6 +125,9 @@ class DashboardActivity : ComponentActivity() {
         /** Go straight to the screen saver (another Lena screen was left alone for a while, see [WallDisplay]). */
         const val EXTRA_IDLE = "idle"
 
+        /** While the dashboard couldn't load, how often to ask whether Home Assistant answers again. */
+        private const val RETRY_PAGE_MS = 15_000L
+
         /** The remote's volume buttons: always the TV's, never Lena's. */
         private val VOLUME_KEYS = setOf(
             android.view.KeyEvent.KEYCODE_VOLUME_UP, android.view.KeyEvent.KEYCODE_VOLUME_DOWN, android.view.KeyEvent.KEYCODE_VOLUME_MUTE,
@@ -134,6 +142,14 @@ class DashboardActivity : ComponentActivity() {
             val home = c.packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo
             return home?.packageName == c.packageName && home.name == DashboardActivity::class.java.name
         }
+
+        /**
+         * Whether this device is a wall display: Lena is its home screen ([isHomeScreen]), or it's a TV,
+         * where the wall display is all Lena is whichever app the Home button opens. What keeps the
+         * connections warm and does Home Assistant's commands ([Connections.keepAlive], [DisplaySync.watch])
+         * goes by this, the same rule as the dashboards' own full screen.
+         */
+        fun isWallDisplay(c: Context): Boolean = isHomeScreen(c) || Tv.isTv(c)
 
         /**
          * Paths on Home Assistant's address that aren't its frontend: other apps served through it
@@ -177,6 +193,18 @@ class DashboardActivity : ComponentActivity() {
     private lateinit var base: Uri
     private var token = ""
     private var loaded = false
+
+    /**
+     * Why the dashboard couldn't load, in words, while Lena's own "Can't reach Home Assistant" shows over
+     * it; null while the page is up. Set by the page's errors, cleared when a load finishes cleanly.
+     */
+    private val pageProblem = mutableStateOf<String?>(null)
+
+    /** The address that didn't load, to load again once Home Assistant answers. */
+    private var failedUrl: String? = null
+
+    /** Whether the page loading now has failed: its own error, or an error page from a proxy in front. */
+    private var loadFailed = false
 
     private val tab = mutableIntStateOf(0)
     private val dimmed = mutableStateOf(false)
@@ -279,7 +307,7 @@ class DashboardActivity : ComponentActivity() {
      * home app can be changed in Android's settings meanwhile.
      */
     private fun applyWindowMode() {
-        dashboardMode = isHomeScreen(this) || tv
+        dashboardMode = isWallDisplay(this)
         wallDisplay.value = dashboardMode
         // The page's Apps row in Home Assistant's menu follows the same rule (assets/js/home_assistant.js).
         if (::web.isInitialized) callPage("apps", if (dashboardMode) "on" else "off")
@@ -344,9 +372,18 @@ class DashboardActivity : ComponentActivity() {
                 return true
             }
 
-            /** The page is up: from now on dashboards switch inside it instead of reloading. */
+            /** A new page is loading: whether it fails is up to this load. */
+            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                loadFailed = false
+            }
+
+            /**
+             * The page is up: from now on dashboards switch inside it instead of reloading. An error page
+             * isn't Home Assistant, so after a failed load the next dashboard loads in full.
+             */
             override fun onPageFinished(view: WebView, url: String?) {
-                loaded = true
+                loaded = !loadFailed
+                if (!loadFailed) pageProblem.value = null
                 canGoBack.value = view.canGoBack()
                 callPage("apps", if (dashboardMode) "on" else "off")
             }
@@ -356,14 +393,44 @@ class DashboardActivity : ComponentActivity() {
                 canGoBack.value = view.canGoBack()
             }
 
-            /** A dashboard that didn't load goes in the log, by path only. */
+            /**
+             * A dashboard that didn't load goes in the log, by path only, and Lena's own "Can't reach Home
+             * Assistant" shows instead of the web view's error page, until Home Assistant answers again
+             * ([WaitForHomeAssistant]). A load cut short by another one isn't a failure.
+             */
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
-                if (request.isForMainFrame) Logs.w("Dashboard", "Page didn't load: ${error.description} (${request.url.path})")
+                if (!request.isForMainFrame) return
+                Logs.w("Dashboard", "Page didn't load: ${error.description} (${request.url.path})")
+                if (error.errorCode == WebViewClient.ERROR_UNKNOWN && error.description?.contains("ERR_ABORTED") == true) return
+                pageFailed(request, "The dashboard didn't load (${error.description}).")
             }
 
-            /** The same for an HTTP error. */
+            /**
+             * The same for an HTTP error. Only a refusal (403) or a proxy saying Home Assistant is down or
+             * restarting (5xx) counts as not reaching it; a wrong dashboard address (404) shows Home
+             * Assistant's own page, which says so.
+             */
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: android.webkit.WebResourceResponse) {
-                if (request.isForMainFrame) Logs.w("Dashboard", "Page answered HTTP ${response.statusCode} (${request.url.path})")
+                if (!request.isForMainFrame) return
+                val code = response.statusCode
+                Logs.w("Dashboard", "Page answered HTTP $code (${request.url.path})")
+                when {
+                    code == 403 -> pageFailed(request, HaForbiddenException().message ?: "Home Assistant answered HTTP 403.")
+                    code >= 500 -> pageFailed(request, "Home Assistant answered HTTP $code: it may be restarting.")
+                }
+            }
+
+            /**
+             * Android ended the page (it crashed, or memory ran short). Unhandled, that would end the whole
+             * app; instead the web view is let go of and the screen starts again with a new one. A screen
+             * that isn't showing it any more leaves that to the next one.
+             */
+            override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+                Logs.w("Dashboard", if (detail.didCrash()) "The page crashed; starting it again" else "Android closed the page to free memory; starting it again")
+                val showing = DashboardWeb.host === this@DashboardActivity
+                DashboardWeb.drop(view)
+                if (showing && !isFinishing && !isDestroyed) recreate()
+                return true
             }
         }
         webChromeClient = object : android.webkit.WebChromeClient() {
@@ -497,6 +564,20 @@ class DashboardActivity : ComponentActivity() {
             loaded = false
             web.loadUrl(origin() + path + "?external_auth=1")
         }
+    }
+
+    /** The page didn't load: remember where it was going, and show why instead of an error page. */
+    private fun pageFailed(request: WebResourceRequest, why: String) {
+        loadFailed = true
+        loaded = false
+        failedUrl = request.url.toString()
+        pageProblem.value = why
+    }
+
+    /** Loads the page that failed again (or the first dashboard); Lena's screen stays until it loads. */
+    private fun loadAgain() {
+        val url = failedUrl
+        if (url != null) web.loadUrl(url) else open(Prefs.dashboards(this).first(), reload = true)
     }
 
     // ---- Touches, dimming and waking -------------------------------------------------------
@@ -713,6 +794,7 @@ class DashboardActivity : ComponentActivity() {
                 delay(60_000)
             }
         }
+        WaitForHomeAssistant()
         // The screen saver after a while without a touch on any Lena screen (in dashboard mode only); while
         // it shows, watch the motion sensor.
         LaunchedEffect(Unit) {
@@ -769,13 +851,73 @@ class DashboardActivity : ComponentActivity() {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
                 else Strip(now, clock, dashboards, onTalk = ::talk, onApps = { apps = true })
-                AndroidView(factory = { web }, modifier = Modifier.fillMaxWidth().weight(1f))
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    AndroidView(factory = { web }, modifier = Modifier.fillMaxSize())
+                    pageProblem.value?.let { why -> CantReach(why) }
+                }
             }
             // Dimmed: Lena's night clock over everything, at the lowest brightness.
             AnimatedVisibility(visible = dimmed.value, enter = fadeIn(), exit = fadeOut()) {
                 LenaDisplay(locked = false, listening = listening.value, onTalk = ::wakeUp)
             }
             if (apps) AppsDrawer(onClose = { apps = false })
+        }
+    }
+
+    /**
+     * While the dashboard couldn't load: asks Home Assistant every [RETRY_PAGE_MS], and at once when the
+     * network comes back, and loads the page again as soon as it answers. What it says goes on Lena's
+     * screen (a banned address, a refused token) and in the connection status ([Connections.state]).
+     */
+    @Composable
+    private fun WaitForHomeAssistant() {
+        val failing = pageProblem.value != null
+        LaunchedEffect(failing) {
+            while (pageProblem.value != null) {
+                val seen = Connections.networkReturns.value
+                withTimeoutOrNull(RETRY_PAGE_MS) { Connections.networkReturns.first { it != seen } }
+                if (pageProblem.value == null) break
+                val why = house.problem()
+                Connections.report(Server.HOME_ASSISTANT, ServerStatus(why, System.currentTimeMillis()))
+                if (why == null) {
+                    Logs.i("Dashboard", "Home Assistant answers again; loading the dashboard")
+                    loadAgain()
+                } else {
+                    pageProblem.value = why
+                }
+            }
+        }
+    }
+
+    /**
+     * Lena's own screen over a dashboard that couldn't load, instead of the web view's error page: why,
+     * that she tries again by herself, and buttons to try now or open Settings (focused first for a remote).
+     */
+    @Composable
+    private fun CantReach(why: String) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(32.dp),
+            ) {
+                Icon(Icons.Outlined.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Can't reach Home Assistant", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "$why Lena tries again by herself and shows the dashboard as soon as Home Assistant answers.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilledTonalButton(modifier = Modifier.focusRequester(focus), onClick = { loadAgain() }) { Text("Try again") }
+                    androidx.compose.material3.OutlinedButton(onClick = {
+                        startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java))
+                    }) { Text("Settings") }
+                }
+                LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+            }
         }
     }
 
@@ -830,6 +972,14 @@ class DashboardActivity : ComponentActivity() {
                     if (h.views.size > 1) h.views.forEach { v ->
                         val on = v.index == h.current && !h.subview
                         FilterChip(selected = on, onClick = { showView(v) }, label = { Text(v.title, maxLines = 1) })
+                    }
+                }
+                // A server that didn't answer its last check ([Connections.state]): a mark, which opens
+                // Settings, where the Connections rows say which and why.
+                val down = Connections.state.collectAsState().value.filterValues { !it.ok }.keys
+                if (down.isNotEmpty()) {
+                    IconButton(onClick = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) }) {
+                        Icon(Icons.Outlined.CloudOff, "Can't reach " + down.joinToString(" or ") { it.label }, tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 // Camera mode, when it's on here (Settings → Cameras).

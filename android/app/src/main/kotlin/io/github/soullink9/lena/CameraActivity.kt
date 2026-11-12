@@ -78,14 +78,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -115,6 +118,9 @@ class CameraActivity : ComponentActivity() {
         /** What was asked ("show me the front door camera"): a camera named in it opens in the spotlight. */
         const val EXTRA_ASKED = "asked"
 
+        /** The waits before connecting again after the connection to Home Assistant ends, longer each time. */
+        private val RECONNECT_MS = listOf(2_000L, 5_000L, 10_000L, 30_000L)
+
         /** More cameras than fit a screen (3 × 3): their pictures refresh half as often. */
         private const val MANY = 9
     }
@@ -122,7 +128,9 @@ class CameraActivity : ComponentActivity() {
     private val tv by lazy { Tv.isTv(this) }
 
     private var socket: HaSocket? = null
-    private var live: CameraLive? = null
+
+    /** The live picture's player; state, so a new one (after a reconnect, or a crashed page) goes on screen. */
+    private var live by mutableStateOf<CameraLive?>(null)
     private var director: CameraDirector? = null
     private var running: Job? = null
 
@@ -130,6 +138,9 @@ class CameraActivity : ComponentActivity() {
     private var cameras by mutableStateOf<List<FoundCamera>>(emptyList())
     private var screen by mutableStateOf<CameraDirector.Screen?>(null)
     private var problem by mutableStateOf<String?>(null)
+
+    /** While the connection is down with cameras on screen: what's happening, in a line over them. */
+    private var reconnecting by mutableStateOf<String?>(null)
     private var liveState by mutableStateOf(CameraLive.State.CONNECTING)
     private var choosingView by mutableStateOf(false)
     private var selected by mutableStateOf<Set<String>>(emptySet())
@@ -177,13 +188,20 @@ class CameraActivity : ComponentActivity() {
         director = null
         screen = null
         cameras = emptyList()
+        reconnecting = null
         liveState = CameraLive.State.CONNECTING
         stills.clear()
         activeSensors.clear()
         super.onStop()
     }
 
-    /** Connects, finds the included cameras, watches their motion and keeps the screen up to date. */
+    /**
+     * Connects, finds the included cameras, watches their motion and keeps the screen up to date. When the
+     * connection to Home Assistant ends (it restarted, the Wi-Fi dropped), it connects again by itself,
+     * waiting a little longer each time ([RECONNECT_MS]) or until the network comes back, and keeps the view,
+     * the selection and the last pictures on screen meanwhile. A refused token, camera mode turned off or no
+     * cameras included stop it: those need Settings, not another try.
+     */
     private suspend fun runCameras() {
         if (!Prefs.cameras(this).on) {
             problem = "Camera mode is off on ${Tv.thisDevice(this)}. Turn it on in Settings → Cameras."
@@ -193,39 +211,83 @@ class CameraActivity : ComponentActivity() {
             problem = "Camera mode needs Home Assistant. Connect it in Settings → Home Assistant."
             return
         }
-        val settings = Prefs.cameras(this)
-        try {
-            // If camera mode closes while it connects, the connection made meanwhile is closed, not left open.
-            var opened: HaSocket? = null
-            val sock = try {
-                withContext(Dispatchers.IO) { HaSocket.open(this@CameraActivity).also { opened = it } }
+        var tries = 0
+        while (true) {
+            val why = try {
+                connectAndRun { tries = 0 }
             } catch (e: CancellationException) {
-                opened?.close()
                 throw e
-            }
-            socket = sock
-            sock.onClosed = { runOnUiThread { problem = "The connection to Home Assistant ended. Open camera mode again to reconnect." } }
-            val found = Cameras.find(sock)
-            val list = Cameras.included(this).mapNotNull { id -> found.firstOrNull { it.id == id } }
-            if (list.isEmpty()) {
-                problem = "No cameras are included on ${Tv.thisDevice(this)} yet. Choose them in Settings → Cameras."
+            } catch (e: HaAuthException) {
+                problem = e.explained("Home Assistant didn't accept Lena's token. Connect it again in Settings → Home Assistant.")
                 return
+            } catch (e: NoCameras) {
+                problem = e.message
+                return
+            } catch (e: Exception) {
+                Logs.w(TAG, "Camera mode couldn't connect", e)
+                "Couldn't reach Home Assistant's cameras (${e.message ?: e.javaClass.simpleName})."
             }
-            cameras = list
-            val d = CameraDirector(list.map { it.id }, Cameras.selected(this), settings.view,
-                settings.rotateSeconds * 1000L, settings.holdSeconds * 1000L)
-            director = d
-            selected = d.selected
-            view = d.view
-            // Asked for one by name: it opens in the spotlight (once; Back goes to the grid).
-            intent.getStringExtra(EXTRA_ASKED)?.let { asked -> Cameras.named(list, asked)?.let { d.choose(it.id) } }
-            intent.removeExtra(EXTRA_ASKED)
-            Logs.i(TAG, "Camera mode: ${list.size} camera(s), ${d.view.label}")
+            closeConnection()
+            val wait = RECONNECT_MS[minOf(tries, RECONNECT_MS.lastIndex)]
+            tries++
+            // With cameras on screen already, they stay, with a line saying what's happening; before then,
+            // the reason fills the screen.
+            val waiting = "$why Trying again in ${wait / 1000} seconds…"
+            if (director == null) problem = waiting else reconnecting = waiting
+            val seen = Connections.networkReturns.value
+            withTimeoutOrNull(wait) { Connections.networkReturns.first { it != seen } }
+            reconnecting = if (director == null) null else "Connecting to Home Assistant again…"
+            if (director == null) problem = null
+        }
+    }
 
-            watchMotion(sock, list, settings.motion)
-            val base = Prefs.haServer(this) ?: return
-            live = CameraLive(this, sock, base, settings.sound, lifecycleScope) { liveState = it }
-            coroutineScope {
+    /** Camera mode has nothing to show until something changes in Settings. */
+    private class NoCameras(message: String) : Exception(message)
+
+    /**
+     * One connection to Home Assistant, from opening it to its end: returns why it ended. [onConnected] is
+     * called once the cameras are found, so a working connection starts the waits from the shortest again.
+     * The director (the view, the selection, a camera in the spotlight) is made the first time and kept
+     * across connections while the same cameras are included.
+     */
+    private suspend fun connectAndRun(onConnected: () -> Unit): String {
+        val settings = Prefs.cameras(this)
+        // If camera mode closes while it connects, the connection made meanwhile is closed, not left open.
+        var opened: HaSocket? = null
+        val sock = try {
+            withContext(Dispatchers.IO) { HaSocket.open(this@CameraActivity).also { opened = it } }
+        } catch (e: CancellationException) {
+            opened?.close()
+            throw e
+        }
+        socket = sock
+        val ended = CompletableDeferred<Unit>()
+        sock.onClosed = { ended.complete(Unit) }
+        if (sock.closed) ended.complete(Unit)
+        val found = Cameras.find(sock)
+        val list = Cameras.included(this).mapNotNull { id -> found.firstOrNull { it.id == id } }
+        if (list.isEmpty()) throw NoCameras("No cameras are included on ${Tv.thisDevice(this)} yet. Choose them in Settings → Cameras.")
+        val kept = director?.takeIf { it.included == list.map { camera -> camera.id } }
+        val d = kept ?: CameraDirector(list.map { it.id }, Cameras.selected(this), settings.view,
+            settings.rotateSeconds * 1000L, settings.holdSeconds * 1000L)
+        cameras = list
+        director = d
+        selected = d.selected
+        view = d.view
+        // Asked for one by name: it opens in the spotlight (once; Back goes to the grid).
+        intent.getStringExtra(EXTRA_ASKED)?.let { asked -> Cameras.named(list, asked)?.let { d.choose(it.id) } }
+        intent.removeExtra(EXTRA_ASKED)
+        Logs.i(TAG, "Camera mode: ${list.size} camera(s), ${d.view.label}" + if (kept != null) " (connected again)" else "")
+        onConnected()
+        reconnecting = null
+
+        // Motion starts again from Home Assistant's first report on the new connection.
+        activeSensors.clear()
+        watchMotion(sock, list, settings.motion)
+        val base = Prefs.haServer(this) ?: throw NoCameras("Camera mode needs Home Assistant. Connect it in Settings → Home Assistant.")
+        live = newPlayer(sock, base, settings.sound)
+        coroutineScope {
+            val loops = launch {
                 launch {
                     while (true) {
                         tick()
@@ -234,14 +296,31 @@ class CameraActivity : ComponentActivity() {
                 }
                 launch { refreshStills() }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: HaAuthException) {
-            problem = "Home Assistant didn't accept Lena's token. Connect it again in Settings → Home Assistant."
-        } catch (e: Exception) {
-            Logs.w(TAG, "Camera mode couldn't start", e)
-            problem = "Couldn't reach Home Assistant's cameras: ${e.message}"
+            ended.await()
+            loops.cancel()
         }
+        return "The connection to Home Assistant ended."
+    }
+
+    /**
+     * The live picture's player on [sock]. If Android ends its web view's page (it crashed, or memory ran
+     * short), a new player takes its place and the camera in the spotlight plays again.
+     */
+    private fun newPlayer(sock: HaSocket, base: String, sound: Boolean): CameraLive =
+        CameraLive(this, sock, base, sound, lifecycleScope, onState = { liveState = it }, onGone = {
+            live?.destroy()
+            live = if (sock.closed) null else newPlayer(sock, base, sound)
+            liveState = CameraLive.State.CONNECTING
+            tick()
+        })
+
+    /** Closes the player and the connection, keeping what's on screen for when it's back. */
+    private fun closeConnection() {
+        live?.destroy()
+        live = null
+        socket?.close()
+        socket = null
+        liveState = CameraLive.State.CONNECTING
     }
 
     /**
@@ -368,6 +447,13 @@ class CameraActivity : ComponentActivity() {
                 }
             }
             if (!tv && message == null && now != null) Views(Modifier.align(Alignment.TopStart))
+            reconnecting?.let { line ->
+                if (message == null && now != null) Text(
+                    line, color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
         if (choosingView) ViewPicker()
     }

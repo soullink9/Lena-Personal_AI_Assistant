@@ -14,7 +14,8 @@ import android.webkit.WebView
  * it's set aside, page and all ([putAside]), and the next dashboard screen takes it back ([take]).
  *
  * It's made on a [MutableContextWrapper], so it always belongs to the screen showing it (and to the app
- * while none is). Messages from the page go to that screen, [host].
+ * while none is). Messages from the page go to that screen, [host]. If Android ends its page, it's let go
+ * of ([drop]) and the screen starts again with a new one.
  */
 object DashboardWeb {
     private var view: WebView? = null
@@ -58,6 +59,21 @@ object DashboardWeb {
         val kept = view ?: return
         (kept.parent as? ViewGroup)?.removeView(kept)
         context?.baseContext = activity.applicationContext
+        host = null
+    }
+
+    /**
+     * Android ended [gone]'s page (it crashed, or memory ran short): a web view in that state can only be
+     * destroyed, so it's let go of, and the next dashboard screen makes a new one. Anything but the kept
+     * web view changes nothing.
+     */
+    fun drop(gone: WebView) {
+        if (view !== gone) return
+        (gone.parent as? ViewGroup)?.removeView(gone)
+        gone.destroy()
+        view = null
+        context = null
+        madeFor = ""
         host = null
     }
 }

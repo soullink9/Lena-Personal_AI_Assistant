@@ -136,7 +136,10 @@ object Logs {
     }.getOrDefault(emptyList()).reversed()
 }
 
-/** Starts the log, catches crashes into it, tidies away an update once it's installed, and readies the ringing. */
+/**
+ * Starts the log, catches crashes into it, tidies away an update once it's installed, readies the ringing
+ * and starts watching the network ([Connections.watchNetwork]).
+ */
 class LenaApp : Application() {
     /**
      * Starts the log before anything else, then records any crash before Android's own handler ends the
@@ -153,5 +156,7 @@ class LenaApp : Application() {
         Updates.cleanUp(this)
         AppVisible.track(this)
         Ringing.channel(this)
+        // Android says when the network comes back, so waiting screens and requests carry on at once.
+        Connections.watchNetwork(this)
     }
 }

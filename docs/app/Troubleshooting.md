@@ -64,6 +64,12 @@ Memories need **Admin Panel → Settings → General → Memories** (or your acc
 
 The page didn't get Lena's token. Check **Settings → Home Assistant → Test connection**, and that the dashboard path is right (open `https://<your Home Assistant>/<path>` in a browser). Updating **Android System WebView** helps if it's very old; the sign-in needs its newer features.
 
+## The wall display says "Can't reach Home Assistant"
+
+The dashboard didn't load: Home Assistant is restarting or down, the Wi-Fi dropped, or a proxy in front of it answered with an error. Lena shows why, asks Home Assistant again every 15 seconds and as soon as the network comes back, and shows the dashboard again by herself once it answers; **Try again** asks now. If it says Home Assistant won't talk to this device (HTTP 403), Home Assistant has most likely banned the device's address after failed sign-ins: its notifications name the address; remove that line from `ip_bans.yaml` in Home Assistant's config folder and restart Home Assistant.
+
+A cloud mark with a line through it in the wall display's bar means one of the servers didn't answer its last check. **Settings → Connections** says which, and why, under each server.
+
 ## The wall display isn't full screen, or the screen saver never comes on
 
 Both happen only in dashboard mode: when Lena's wall display is the device's **home screen** (Settings → **Make it this device's home screen**, then pick Lena). The category's summary says whether it is. Anywhere else the dashboards are a normal screen that sleeps as usual, on purpose, so a phone doesn't stay lit.
