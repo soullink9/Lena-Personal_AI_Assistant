@@ -18,6 +18,15 @@ private fun expect(sentence: String, wanted: String) {
 }
 
 fun main() {
+    // Camera mode, only when it's on here; otherwise cameras are Home Assistant's or her business.
+    expect("Show the cameras", "cameras")
+    expect("Lena, show me the front door camera", "cameras")
+    expect("open cameras", "cameras")
+    expect("Is the camera on?", "-")
+    Cameras.on = false
+    expect("Show the cameras", "-")
+    Cameras.on = true
+
     // Timers
     expect("Set a 10 minute timer", "timer 600000")
     expect("set a timer for 10 minutes", "timer 600000")

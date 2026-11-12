@@ -141,6 +141,19 @@ SETTINGS = [
         "Smart": "Framing.SMART", "Fill the screen": "Framing.FILL", "Whole photo": "Framing.WHOLE"}),
     Setting("Wall display › Screensaver › Time and her mood on top", "SLIDE_OVERLAY", "Boolean", ON_OFF),
     Setting("Wall display › Screensaver › Her dim clock at night", "SLIDE_CLOCK_AT_NIGHT", "Boolean", ON_OFF),
+    # Camera mode (CameraActivity): off unless switched on, per device.
+    Setting("Wall display › Cameras › Camera mode", "CAMERA_MODE", "Boolean", ON_OFF),
+    Setting("Wall display › Cameras › Show at first", "CAMERA_VIEW", "CameraView", {
+        "Show all": "CameraView.SHOW_ALL", "Selected only": "CameraView.SELECTED", "Spotlight select": "CameraView.SPOTLIGHT",
+        "Spotlight on motion": "CameraView.MOTION", "Rotate": "CameraView.ROTATE"}),
+    Setting("Wall display › Cameras › What counts as motion", "CAMERA_MOTION", "MotionKind", {
+        "People, vehicles and the doorbell": "MotionKind.PEOPLE_VEHICLES_DOORBELL", "Any motion": "MotionKind.ANY",
+        "The doorbell only": "MotionKind.DOORBELL"}),
+    Setting("Wall display › Cameras › Take turns every", "CAMERA_ROTATE_SECONDS", "Int", seconds(
+        ("5 seconds", 5), ("10 seconds", 10), ("20 seconds", 20), ("30 seconds", 30))),
+    Setting("Wall display › Cameras › Stay on motion for", "CAMERA_HOLD_SECONDS", "Int", seconds(
+        ("15 seconds", 15), ("30 seconds", 30), ("1 minute", 60))),
+    Setting("Wall display › Cameras › Sound", "CAMERA_SOUND", "Boolean", ON_OFF),
     Setting("Talking to Lena › Wake word › Listen for her name", "WAKE_WORD", "Boolean", ON_OFF, reset=False),
     Setting("Talking to Lena › Wake word › Listens", "WAKE_EVERYWHERE", "Boolean", {
         "Only on the wall display": "false", "Whenever Lena is open": "true"}),

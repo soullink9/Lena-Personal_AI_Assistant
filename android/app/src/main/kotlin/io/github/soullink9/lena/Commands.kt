@@ -62,6 +62,14 @@ object Commands {
             }
         }
 
+        // "Show the cameras", "show me the front door camera": camera mode, when it's on here (Settings →
+        // Cameras), with the camera named in the spotlight.
+        if (words.any { it == "camera" || it == "cameras" } && words.any { it in setOf("show", "open", "see", "view") }) {
+            if (!Cameras.available(c)) return null // Home Assistant or her may have something to say about cameras
+            Cameras.open(c, asked = text)
+            return "Here are the cameras."
+        }
+
         val timer = words.any { it == "timer" || it == "timers" }
         val alarm = words.any { it == "alarm" || it == "alarms" } || text.startsWith("wake me")
         // "How long is left?" names no timer, but means one when one is running.

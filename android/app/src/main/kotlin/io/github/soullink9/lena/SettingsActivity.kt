@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.material.icons.outlined.Videocam
 import android.Manifest
 import android.app.StatusBarManager
 import android.app.TimePickerDialog
@@ -164,6 +165,9 @@ class SettingsActivity : ComponentActivity() {
     companion object {
         /** Opens Settings straight on Alarms and timers (from Android's alarm icon and the clock). */
         const val ACTION_ALARMS = "io.github.soullink9.lena.ALARMS"
+
+        /** Opens Settings straight on Cameras (from camera mode, when it has nothing to show). */
+        const val ACTION_CAMERAS = "io.github.soullink9.lena.CAMERAS"
     }
 
     /**
@@ -174,7 +178,7 @@ class SettingsActivity : ComponentActivity() {
         MAIN("Settings", null),
         OPEN_WEBUI("Open WebUI", Area.CONNECTIONS), HOME_ASSISTANT("Home Assistant", Area.CONNECTIONS),
         WHO_ANSWERS("Who answers", Area.CONNECTIONS), MODEL("Model", Area.CONNECTIONS),
-        WALL_IDLE("Screensaver", Area.WALL), WALL_DASHBOARDS("Dashboards", Area.WALL),
+        WALL_IDLE("Screensaver", Area.WALL), WALL_DASHBOARDS("Dashboards", Area.WALL), CAMERAS("Cameras", Area.WALL),
         WAKE("Wake word", Area.TALKING), LOOK_SOUND("How she looks and sounds", Area.TALKING), GESTURE("Interacting with Lena", Area.TALKING),
         CHAT_SCREEN("Chat screen", Area.CHAT_SCREEN),
         NOTIFICATIONS("Notifications", Area.DEVICE), PHONE("Widgets and tile", Area.DEVICE),
@@ -247,7 +251,13 @@ class SettingsActivity : ComponentActivity() {
     @Composable
     private fun Screen() {
         var s by remember { mutableStateOf(original) }
-        var page by remember { mutableStateOf(if (intent.action == ACTION_ALARMS) Page.ALARMS else Page.MAIN) }
+        var page by remember {
+            mutableStateOf(when (intent.action) {
+                ACTION_ALARMS -> Page.ALARMS
+                ACTION_CAMERAS -> Page.CAMERAS
+                else -> Page.MAIN
+            })
+        }
         var editing by remember { mutableStateOf<String?>(null) }
         var query by remember { mutableStateOf("") } // Search settings; kept while you look at a result
         var models by remember { mutableStateOf<List<Model>>(emptyList()) }
@@ -328,6 +338,7 @@ class SettingsActivity : ComponentActivity() {
                             Page.PHONE -> PhonePage(s, ::set)
                             Page.WALL_DASHBOARDS -> DashboardsPage(s, ::set) { page = it }
                             Page.WALL_IDLE -> IdlePage(s, ::set) { page = it }
+                            Page.CAMERAS -> CamerasPage(s, ::set) { page = it }
                             Page.WAKE -> WakePage(s, ::set)
                             Page.ALARMS -> AlarmsPage()
                             Page.DEVELOPMENT -> DevelopmentPage(s, ::set) { page = it }
@@ -397,6 +408,9 @@ class SettingsActivity : ComponentActivity() {
             Item(Icons.Outlined.Dashboard, "Dashboards",
                 if (house) s.dashboards.joinToString(", ") { it.name.ifBlank { it.path } } else "Needs Home Assistant") {
                 open(if (house) Page.WALL_DASHBOARDS else Page.HOME_ASSISTANT)
+            }
+            Item(Icons.Outlined.Videocam, "Cameras", if (!s.cameras.on) "Off" else if (house) "On: ${s.cameras.view.label}" else "Needs Home Assistant") {
+                open(Page.CAMERAS)
             }
         }
         Section(Area.TALKING.title) {
@@ -731,6 +745,7 @@ class SettingsActivity : ComponentActivity() {
             Findable("Set up from your phone", "qr code phone scan type password token address sign in remote keyboard", null, Area.CONNECTIONS) {
                 startActivity(Intent(this, PhoneSetupActivity::class.java))
             },
+            Findable("Cameras", "camera cameras security unifi protect doorbell motion spotlight rotate cctv video live", Page.CAMERAS),
             Findable("Who answers", "open webui home assistant assist conversation agent voice assistant answers through", Page.WHO_ANSWERS),
             Findable("Assist's conversation agent", "home assistant assist agent ollama openai google conversation", Page.WHO_ANSWERS),
             Findable("Model", "llm ollama default model lena gemma new chats", Page.MODEL),
@@ -1739,7 +1754,86 @@ class SettingsActivity : ComponentActivity() {
         Footnote("Home Assistant's own header is replaced by Lena's bar: Home Assistant's menu (back is the back gesture), the time and the weather, the dashboard's views as tabs, how she feels (tap to talk), and buttons to reload, for your other apps and for settings; the Chat | Home switch beside the menu opens your chats. With more than one dashboard here, a dashboards button switches between them. When she's worried about something at home the bar turns into a banner saying what's wrong. Editing a dashboard brings Home Assistant's header back while you edit.")
     }
 
-    /** What it shows when no one's using it, and what wakes it up. Also the screen saver. */
+    /**
+     * Cameras: camera mode on this device ([CameraActivity]). Off unless switched on; then which of your Home
+     * Assistant's cameras it may show, each one's motion sensor, and how it shows them. Cameras run only
+     * while camera mode is open: nothing here watches them in the background.
+     */
+    @Composable
+    private fun CamerasPage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
+        val cams = s.cameras
+        fun put(n: CameraSettings) = set(s.copy(cameras = n))
+        Footnote("Your Home Assistant's cameras on ${Tv.thisDevice(this)}: a grid of still pictures, or one live. They run only while camera mode is open.")
+        Group {
+            SwitchItem(Icons.Outlined.Videocam, "Camera mode", if (cams.on) "On ${Tv.thisDevice(this@SettingsActivity)}" else "Off: no cameras here", cams.on) {
+                put(cams.copy(on = it))
+            }
+        }
+        if (!cams.on) return
+        if (!hasHouse()) {
+            Group { Item(Icons.Outlined.Home, "Home Assistant", "Needs Home Assistant: its address and a token") { open(Page.HOME_ASSISTANT) } }
+            return
+        }
+        Group { Item(Icons.Outlined.Videocam, "Open camera mode", "Also from the TV home's Lena row, the bar's camera button, or \"show the cameras\"") { Cameras.open(this@SettingsActivity) } }
+
+        SectionTitle("Cameras on ${Tv.thisDevice(this)}")
+        var found by remember { mutableStateOf<List<FoundCamera>?>(null) }
+        var problem by remember { mutableStateOf<String?>(null) }
+        var included by remember { mutableStateOf(Cameras.included(this)) }
+        LaunchedEffect(Unit) {
+            try {
+                val socket = withContext(Dispatchers.IO) { HaSocket.open(this@SettingsActivity) }
+                try {
+                    found = Cameras.find(socket)
+                } finally {
+                    socket.close()
+                }
+            } catch (e: Exception) {
+                problem = "Couldn't list Home Assistant's cameras: ${e.message}"
+            }
+        }
+        val list = found
+        Group {
+            when {
+                problem != null -> Item(null, "Cameras", problem) {}
+                list == null -> Item(null, "Looking in Home Assistant…", null) {}
+                list.isEmpty() -> Item(null, "No cameras", "Home Assistant has no camera entities") {}
+                else -> list.forEach { camera ->
+                    val on = camera.id in included
+                    val triggers = CameraFinder.triggers(camera, cams.motion, Cameras.chosenSensor(this@SettingsActivity, camera.id))
+                    SwitchItem(null, camera.name, if (!on) "Not shown here" else if (triggers.isEmpty()) "Motion: none" else "Motion: " + triggers.joinToString(", "), on) {
+                        included = if (it) included + camera.id else included - camera.id
+                        Cameras.setIncluded(this@SettingsActivity, included)
+                    }
+                    if (on && camera.sensors.isNotEmpty()) {
+                        var chosen by remember(camera.id) { mutableStateOf(Cameras.chosenSensor(this@SettingsActivity, camera.id)) }
+                        PickItem(null, "${camera.name}: its motion sensor",
+                            listOf<Pair<String?, String>>(null to "Found on its device", "" to "None") + camera.sensors.map { it to it },
+                            chosen) {
+                            chosen = it
+                            Cameras.chooseSensor(this@SettingsActivity, camera.id, it)
+                        }
+                    }
+                }
+            }
+        }
+
+        SectionTitle("How it shows them")
+        Group {
+            PickItem(null, "Show at first", CameraView.entries.map { it to it.label }, cams.view, detail = { it.detail }) { put(cams.copy(view = it)) }
+            PickItem(null, "What counts as motion", MotionKind.entries.map { it to it.label }, cams.motion) { put(cams.copy(motion = it)) }
+            PickItem(null, "Take turns every", listOf(5, 10, 20, 30).map { it to "$it seconds" }, cams.rotateSeconds) { put(cams.copy(rotateSeconds = it)) }
+            PickItem(null, "Stay on motion for", listOf(15 to "15 seconds", 30 to "30 seconds", 60 to "1 minute"), cams.holdSeconds) {
+                put(cams.copy(holdSeconds = it))
+            }
+            SwitchItem(null, "Sound", if (cams.sound) "The camera in the spotlight, when it has sound" else "Off: always muted", cams.sound) {
+                put(cams.copy(sound = it))
+            }
+        }
+        Footnote("UniFi Protect: turn on each camera's low resolution stream in Home Assistant (the camera's device page), so the grid's pictures come from it and the console isn't asked for full-size snapshots.")
+    }
+
+    /** What it shows when no one's using it, and what wakes it up. Also the screensaver. */
     @Composable
     private fun IdlePage(s: Settings, set: (Settings) -> Unit, open: (Page) -> Unit) {
         val sl = s.slides

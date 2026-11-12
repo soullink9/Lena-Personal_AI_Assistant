@@ -77,6 +77,19 @@ data class Slides(
     val clockAtNight: Boolean = Defaults.SLIDE_CLOCK_AT_NIGHT,
 )
 
+/**
+ * Camera mode (Settings → Cameras, [CameraActivity]): off unless switched on. Which cameras are included,
+ * selected and their motion sensors are kept apart ([Cameras]), as Return to defaults doesn't touch them.
+ */
+data class CameraSettings(
+    val on: Boolean = Defaults.CAMERA_MODE,
+    val view: CameraView = Defaults.CAMERA_VIEW,
+    val motion: MotionKind = Defaults.CAMERA_MOTION,
+    val rotateSeconds: Int = Defaults.CAMERA_ROTATE_SECONDS,
+    val holdSeconds: Int = Defaults.CAMERA_HOLD_SECONDS,
+    val sound: Boolean = Defaults.CAMERA_SOUND,
+)
+
 /** One of your Home Assistant dashboards, shown as a tab in dashboard mode. */
 data class Dashboard(val name: String, val path: String)
 
@@ -216,6 +229,7 @@ data class Settings(
     val assistAgent: String = "",
     val motionEntity: String = "",
     val slides: Slides = Slides(),
+    val cameras: CameraSettings = CameraSettings(),
 )
 
 /** Her memory to-do list, created by the Lena integration in Home Assistant. */
@@ -369,6 +383,8 @@ object Prefs {
         schedules = current.schedules,
         slides = Slides(on = current.slides.on, album = current.slides.album, albumName = current.slides.albumName),
         wakeWord = current.wakeWord,
+        // Camera mode stays on or off: it's whether this device shows cameras at all, not a preference.
+        cameras = CameraSettings(on = current.cameras.on),
     )
 
     /** Every setting at once, for the Settings screen. */
@@ -411,6 +427,7 @@ object Prefs {
         assistAgent = assistAgent(c) ?: "",
         motionEntity = motionEntity(c),
         slides = slides(c),
+        cameras = cameras(c),
     )
 
     /**
@@ -468,6 +485,12 @@ object Prefs {
             .putString("slides_framing", s.slides.framing.name)
             .putBoolean("slides_overlay", s.slides.overlay)
             .putBoolean("slides_night", s.slides.clockAtNight)
+            .putBoolean("cameras_on", s.cameras.on)
+            .putString("cameras_view", s.cameras.view.name)
+            .putString("cameras_motion", s.cameras.motion.name)
+            .putInt("cameras_rotate_seconds", s.cameras.rotateSeconds)
+            .putInt("cameras_hold_seconds", s.cameras.holdSeconds)
+            .putBoolean("cameras_sound", s.cameras.sound)
             .apply()
     }
 
@@ -504,6 +527,16 @@ object Prefs {
         framing = enumPref(c, "slides_framing", Defaults.SLIDE_FRAMING),
         overlay = p(c).getBoolean("slides_overlay", Defaults.SLIDE_OVERLAY),
         clockAtNight = p(c).getBoolean("slides_night", Defaults.SLIDE_CLOCK_AT_NIGHT),
+    )
+
+    /** Camera mode's settings. */
+    fun cameras(c: Context): CameraSettings = CameraSettings(
+        on = p(c).getBoolean("cameras_on", Defaults.CAMERA_MODE),
+        view = enumPref(c, "cameras_view", Defaults.CAMERA_VIEW),
+        motion = enumPref(c, "cameras_motion", Defaults.CAMERA_MOTION),
+        rotateSeconds = p(c).getInt("cameras_rotate_seconds", Defaults.CAMERA_ROTATE_SECONDS),
+        holdSeconds = p(c).getInt("cameras_hold_seconds", Defaults.CAMERA_HOLD_SECONDS),
+        sound = p(c).getBoolean("cameras_sound", Defaults.CAMERA_SOUND),
     )
 
     /** Seconds without a touch before the wall display's screen saver; 0 never. */

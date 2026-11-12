@@ -170,7 +170,7 @@ sequenceDiagram
 |---|---|
 | The rules, configuration consistency, versions, private data, the release scripts | `python3 tools/check.py` (offline, seconds; runs `tests/test_release.py`) |
 | The integration in a real Home Assistant | `scripts/test_home_assistant.sh` (pytest-homeassistant-custom-component, oldest supported and latest) and `scripts/start_home_assistant.sh` (the newest release) |
-| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh`, `tools/pairing_check/run.sh` |
+| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works, camera mode chooses right | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh`, `tools/pairing_check/run.sh`, `tools/camera_check/run.sh` |
 | Everything with real voices, models and devices | By hand; see the test steps in each setup guide |
 
 ## Building and releasing

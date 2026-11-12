@@ -191,10 +191,17 @@
             </intent-filter>
         </activity>
 
-        <!-- Connect Home Assistant from your phone (a page this device serves on the home network while it shows). -->
+        <!-- Set up from your phone (a page this device serves on the home network while it shows). -->
         <activity
             android:name=".PhoneSetupActivity"
             android:exported="false" />
+
+        <!-- Camera mode: Home Assistant's cameras, only while this screen is open. -->
+        <activity
+            android:name=".CameraActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <service
             android:name=".LenaTile"

@@ -174,9 +174,13 @@ jobs:
       - name: Check timers and alarms by voice
         run: tools/commands_check/run.sh
 
-      # Connect from your phone: the QR code and the page it serves, used as a phone would.
-      - name: Check connecting from a phone
+      # Set up from your phone: the QR code, the page it serves used as a phone would, and the page's cipher.
+      - name: Check setting up from a phone
         run: tools/pairing_check/run.sh
+
+      # Camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes.
+      - name: Check camera mode
+        run: tools/camera_check/run.sh
 
       - name: Install the Android SDK (from Google)
         run: scripts/android_sdk.sh

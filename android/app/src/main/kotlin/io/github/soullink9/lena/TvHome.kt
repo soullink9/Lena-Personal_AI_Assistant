@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tv
@@ -141,6 +142,10 @@ fun TvHome(
                 }
                 items(dashboards, key = { "dashboard:" + it.path }) { d ->
                     TvCard(CARD_WIDTH, onClick = { onDashboard(d) }) { CardLabel(Icons.Outlined.Dashboard, d.name, "Home Assistant") }
+                }
+                // Camera mode, when it's on here (Settings → Cameras): opened only from here, never by itself.
+                if (Cameras.available(context)) item {
+                    TvCard(CARD_WIDTH, onClick = { Cameras.open(context) }) { CardLabel(Icons.Outlined.Videocam, "Cameras", "Home Assistant") }
                 }
                 item { TvCard(CARD_WIDTH, onClick = onSettings) { CardLabel(Icons.Outlined.Settings, "Lena's settings", null) } }
                 item {

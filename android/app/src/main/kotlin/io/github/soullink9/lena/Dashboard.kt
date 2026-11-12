@@ -49,6 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.outlined.Settings
@@ -832,6 +833,10 @@ class DashboardActivity : ComponentActivity() {
                         val on = v.index == h.current && !h.subview
                         FilterChip(selected = on, onClick = { showView(v) }, label = { Text(v.title, maxLines = 1) })
                     }
+                }
+                // Camera mode, when it's on here (Settings → Cameras).
+                if (Cameras.available(this@DashboardActivity)) {
+                    IconButton(onClick = { Cameras.open(this@DashboardActivity) }) { Icon(Icons.Outlined.Videocam, "Cameras") }
                 }
                 if (dashboards.size > 1) Box {
                     IconButton(onClick = { pickDashboard = true }) { Icon(Icons.Outlined.Dashboard, "Dashboards") }

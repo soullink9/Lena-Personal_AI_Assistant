@@ -43,3 +43,10 @@ object Timers {
     fun clock(c: Context, at: Long): String = java.text.SimpleDateFormat("HH:mm").format(java.util.Date(at))
     fun day(at: Long) = "soon"
 }
+
+/** Camera mode: on in these checks; opening it is recorded. */
+object Cameras {
+    var on = true
+    fun available(c: Context) = on
+    fun open(c: Context, asked: String = "") { did += "cameras" }
+}

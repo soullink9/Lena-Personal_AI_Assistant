@@ -28,6 +28,18 @@ object Defaults {
     const val SLIDE_OVERLAY: Boolean = true
     /** Wall display › Screensaver › Her dim clock at night: On */
     const val SLIDE_CLOCK_AT_NIGHT: Boolean = true
+    /** Wall display › Cameras › Camera mode: Off */
+    const val CAMERA_MODE: Boolean = false
+    /** Wall display › Cameras › Show at first: Show all */
+    val CAMERA_VIEW: CameraView = CameraView.SHOW_ALL
+    /** Wall display › Cameras › What counts as motion: People, vehicles and the doorbell */
+    val CAMERA_MOTION: MotionKind = MotionKind.PEOPLE_VEHICLES_DOORBELL
+    /** Wall display › Cameras › Take turns every: 10 seconds */
+    const val CAMERA_ROTATE_SECONDS: Int = 10
+    /** Wall display › Cameras › Stay on motion for: 30 seconds */
+    const val CAMERA_HOLD_SECONDS: Int = 30
+    /** Wall display › Cameras › Sound: Off */
+    const val CAMERA_SOUND: Boolean = false
     /** Talking to Lena › Wake word › Listen for her name: Off */
     const val WAKE_WORD: Boolean = false
     /** Talking to Lena › Wake word › Listens: Whenever Lena is open */

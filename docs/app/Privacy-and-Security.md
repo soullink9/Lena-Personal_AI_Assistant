@@ -39,6 +39,10 @@ If you add your Home Assistant under **Settings → Home Assistant**, Lena uses 
 
 What it can't stop: someone already inside your network who actively rewrites the page while it loads, during those few minutes. Signing in with Home Assistant avoids that for your Home Assistant password.
 
+## Camera mode
+
+[Camera mode](Cameras.md) is off unless you turn it on, on each device, and shows only the cameras you switch on there. It runs only while it's open: the connection to Home Assistant, the still pictures and the motion it watches all stop when it closes, and nothing opens it by itself. Still pictures are fetched by the app with its token and kept in memory, never saved. The live picture plays in a page from inside the app; the app does every message to Home Assistant, so that page never holds the token (an HLS stream's address carries Home Assistant's own short-lived stream token). Camera pictures never go into Lena's log.
+
 ## The wall display
 
 The wall display shows your Home Assistant's own pages in a web view and signs them in with your saved token, handing it over only when Home Assistant's page asks (the way the companion app does), only on your Home Assistant's address, only to the top frame, and only while that frame shows Home Assistant's own frontend. Iframe and camera cards never get it, and neither do other apps served from your Home Assistant's address (add-on ingress or the Ingress Proxy integration, under `/api/`), whether they're in a frame or opened as the whole page; Lena's page script isn't added to them at all. The token is never put in an address or written into the page. Because the dashboard is your real Home Assistant, anyone at the tablet can do whatever that token's user can; for a shared tablet, use a token from a non-admin Home Assistant user.

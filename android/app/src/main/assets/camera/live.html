@@ -1,0 +1,95 @@
+<!doctype html>
+<!--
+  Camera mode's live picture (CameraLive.kt): plays one of Home Assistant's cameras with WebRTC, or with HLS
+  when WebRTC doesn't connect. The app does every message to Home Assistant over its own connection, so this
+  page never holds a token; it only makes the WebRTC offer and plays what comes back. Served from the app's
+  assets (WebViewAssetLoader), not from the network.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  video { width: 100%; height: 100%; object-fit: contain; background: transparent; }
+</style>
+</head>
+<body>
+<video id="live" autoplay playsinline muted></video>
+<script>
+  var video = document.getElementById('live');
+  var peer = null;
+  var playing = false;
+
+  // The picture is moving: the app stops showing its still picture behind.
+  video.addEventListener('playing', function () {
+    if (!playing) { playing = true; LenaCamera.playing(); }
+  });
+  // Only a failure while there's something to play counts (stopping empties the video on purpose).
+  video.addEventListener('error', function () {
+    if (video.getAttribute('src')) LenaCamera.failed('the stream could not be played');
+  });
+
+  // Starts WebRTC: an offer to receive video and sound, with Home Assistant's ICE servers ([config]).
+  window.lenaStart = function (config, sound) {
+    lenaStop();
+    video.muted = !sound;
+    try {
+      peer = new RTCPeerConnection(config || {});
+      peer.addTransceiver('video', { direction: 'recvonly' });
+      peer.addTransceiver('audio', { direction: 'recvonly' });
+      peer.ontrack = function (event) {
+        var stream = event.streams && event.streams[0];
+        if (!stream) {
+          stream = video.srcObject || new MediaStream();
+          stream.addTrack(event.track);
+        }
+        if (video.srcObject !== stream) video.srcObject = stream;
+        video.play().catch(function () {});
+      };
+      peer.onicecandidate = function (event) {
+        if (!event.candidate) return;
+        LenaCamera.candidate(JSON.stringify({
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex
+        }));
+      };
+      peer.onconnectionstatechange = function () {
+        if (peer && peer.connectionState === 'failed') LenaCamera.failed('the WebRTC connection failed');
+      };
+      peer.createOffer()
+        .then(function (offer) { return peer.setLocalDescription(offer); })
+        .then(function () { LenaCamera.offer(peer.localDescription.sdp); })
+        .catch(function (e) { LenaCamera.failed(String(e)); });
+    } catch (e) {
+      LenaCamera.failed(String(e));
+    }
+  };
+
+  // Home Assistant's answer, and its ICE candidates as they come.
+  window.lenaAnswer = function (sdp) {
+    if (peer) peer.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function (e) { LenaCamera.failed(String(e)); });
+  };
+  window.lenaCandidate = function (candidate) {
+    if (peer) peer.addIceCandidate(candidate).catch(function () {});
+  };
+
+  // HLS instead: Home Assistant's stream address, with its own short-lived token in it.
+  window.lenaHls = function (url, sound) {
+    lenaStop();
+    video.muted = !sound;
+    video.src = url;
+    video.play().catch(function () {});
+  };
+
+  window.lenaStop = function () {
+    playing = false;
+    if (peer) { peer.close(); peer = null; }
+    video.srcObject = null;
+    video.removeAttribute('src');
+    video.load();
+  };
+</script>
+</body>
+</html>

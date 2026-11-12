@@ -657,6 +657,11 @@ class MiniWebSocket(url: String) : Closeable {
         if (accept != expected) throw java.io.IOException("$url isn't a WebSocket")
     }
 
+    /** How long [receive] waits for a message, 0 for as long as it takes (a subscription that waits for motion). */
+    fun readTimeout(ms: Int) {
+        socket.soTimeout = ms
+    }
+
     /** Sends one text message (masked, as a client must). */
     fun send(text: String) {
         val payload = text.toByteArray(Charsets.UTF_8)

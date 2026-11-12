@@ -47,6 +47,12 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `Updates.kt` | Updating from GitHub releases (or your Gitea's): checking, downloading, verifying and installing. |
 | `UpdateSource.kt` | Where updates come from: GitHub, or the Gitea address typed on the Updates page. |
 | `PhoneSetupActivity.kt`, `Pairing.kt`, `Qr.kt` | Set up from your phone (every address and sign-in, encrypted on the phone, saved after OK here): the screen with its address and QR code, the page it serves on the home network (signing in, or a pasted token; a long-lived token made over Home Assistant's WebSocket API), and the QR code itself, written here rather than added as a library. |
+| `CameraActivity.kt` | Camera mode's screen: the grid of still pictures, the spotlight, the views, the remote and touch, and the motion it watches while it's open. |
+| `CameraDirector.kt` | What camera mode shows from moment to moment in each of its five views (plain Kotlin, checked by `tools/camera_check`). |
+| `CameraFinder.kt` | Finds the cameras in Home Assistant's entities (one per device, UniFi Protect's streams) and their motion sensors and events (plain Kotlin, checked by `tools/camera_check`). |
+| `CameraLive.kt`, `assets/camera/live.html` | The spotlight's live picture: Home Assistant's WebRTC, signalled by the app so the page never holds the token, with HLS and then still pictures to fall back on. |
+| `Cameras.kt` | Which cameras are included and selected on this device, sensors picked by hand, opening camera mode, and listing Home Assistant's cameras. |
+| `HaSocket.kt` | A Home Assistant WebSocket connection that stays open (camera mode): calls, subscriptions and pings, on `MiniWebSocket`. |
 | `TvHome.kt`, `TalkActivity.kt` | The TV home's rows (and the Apps row's order and Choose apps), and the Talk to Lena entry for a remote button. |
 | `Tv.kt` | Android TV: whether this is a TV, its screens always dark (`darkOnTv`), and the remote's buttons (OK held or search to talk, Menu for Settings). |
 | `Compat.kt` | What differs between Android 11 (TV boxes) and Android 16: each newer feature checked once. |
