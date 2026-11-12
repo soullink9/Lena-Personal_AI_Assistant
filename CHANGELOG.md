@@ -2,6 +2,13 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Cameras are found on a large Home Assistant.** Settings → Cameras and camera mode said "Couldn't list Home Assistant's cameras: The connection to Home Assistant ended" (the log: "Message too long"): Lena's WebSocket client refused any message over 1 MB, and the state of every entity, which camera mode reads to find the cameras, is bigger than that on a large home. It now takes messages of up to 64 MB, counted across all the parts of a message.
+- **Set up from your phone is in one place.** It's the first item in Settings; the copy on the Home Assistant page is gone.
+
 ## [0.6.19] - 2026-11-12
 
 ### Android app

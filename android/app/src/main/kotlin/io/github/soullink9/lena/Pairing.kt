@@ -668,6 +668,13 @@ class MiniWebSocket(url: String) : Closeable {
         writeFrame(0x1, payload)
     }
 
+    /**
+     * The largest message taken. Home Assistant's answers can be big: the state of every entity (camera
+     * mode's search) runs to several megabytes on a large home. A message over this ends the connection
+     * rather than filling the memory of a small TV box.
+     */
+    private val maxMessage = 64L * 1024 * 1024
+
     /** The next text message, answering pings on the way. */
     fun receive(): String {
         val message = java.io.ByteArrayOutputStream()
@@ -681,7 +688,8 @@ class MiniWebSocket(url: String) : Closeable {
             if (length == 126L) length = ((input.read() shl 8) or input.read()).toLong()
             else if (length == 127L) length = (0 until 8).fold(0L) { acc, _ -> (acc shl 8) or input.read().toLong() }
             val mask = if (second and 0x80 != 0) readExactly(input, 4) else null
-            if (length > 1_000_000) throw java.io.IOException("Message too long")
+            // Over the limit with what's already come of the same message (a message can come in parts).
+            if (length < 0 || message.size() + length > maxMessage) throw java.io.IOException("Message too long")
             val payload = readExactly(input, length.toInt())
             if (mask != null) for (i in payload.indices) payload[i] = (payload[i].toInt() xor mask[i % 4].toInt()).toByte()
             when (opcode) {

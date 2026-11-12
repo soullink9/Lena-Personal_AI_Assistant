@@ -1166,21 +1166,9 @@ class SettingsActivity : ComponentActivity() {
         var token by remember { mutableStateOf("") }
         var tokenSaved by remember { mutableStateOf(Secrets.has(this, Secrets.HA_TOKEN)) }
         var check by remember { mutableStateOf<String?>(null) }
-        // Connected from a phone: show the address and token it saved.
-        val pairing = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
-                set(Prefs.load(this@SettingsActivity))
-                tokenSaved = Secrets.has(this@SettingsActivity, Secrets.HA_TOKEN)
-                token = ""
-                check = null
-            }
-        }
+        // Signing in from a phone (no typing on a TV) is Set up from your phone, the first item in Settings.
         Footnote("Optional. With the Lena integration in your Home Assistant, the app shows how she feels and lets you see and edit her memory.")
         Group {
-            // A TV remote can't type a long token: sign in from a phone instead ([PhoneSetupActivity]).
-            Item(Icons.Outlined.QrCode2, "Set up from your phone", "Sign in to Home Assistant on your phone, on the same Wi-Fi; no typing here") {
-                pairing.launch(Intent(this@SettingsActivity, PhoneSetupActivity::class.java))
-            }
             FieldItem {
                 val bad = s.haServer.isNotBlank() && Prefs.normalize(s.haServer) == null
                 OutlinedTextField(

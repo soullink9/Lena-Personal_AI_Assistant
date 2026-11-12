@@ -189,12 +189,21 @@ fun main() {
             out.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: $accept\r\n\r\n".toByteArray())
             val hello = """{"type":"auth_required"}""".toByteArray()
             out.write(byteArrayOf(0x81.toByte(), hello.size.toByte()) + hello)
+            // A big answer, like the state of every entity on a large home (several megabytes, in one frame
+            // with a 64-bit length), then one in two parts.
+            val big = ("""{"result":"""" + "x".repeat(3_000_000) + """"}""").toByteArray()
+            out.write(byteArrayOf(0x81.toByte(), 127) + ByteArray(8) { i -> (big.size.toLong() ushr (8 * (7 - i))).toByte() } + big)
+            val first = """{"type":""".toByteArray()
+            val rest = """"result"}""".toByteArray()
+            out.write(byteArrayOf(0x01, first.size.toByte()) + first + byteArrayOf(0x80.toByte(), rest.size.toByte()) + rest)
             out.flush()
-            Thread.sleep(500)
+            Thread.sleep(2_000)
         }
     }.start()
     val ws = MiniWebSocket("ws://127.0.0.1:${listener.localPort}/api/websocket")
     check(ws.receive() == """{"type":"auth_required"}""", "the WebSocket client connects and reads Home Assistant's first message")
+    check(ws.receive().length == 3_000_000 + 13, "it reads a message of several megabytes (every entity's state on a large home)")
+    check(ws.receive() == """{"type":"result"}""", "it puts a message that came in two parts back together")
     ws.close()
 
     println()

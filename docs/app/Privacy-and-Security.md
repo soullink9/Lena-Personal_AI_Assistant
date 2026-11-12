@@ -29,7 +29,7 @@ If you add your Home Assistant under **Settings → Home Assistant**, Lena uses 
 - A token can do anything its Home Assistant user can, so consider a dedicated non-admin user for Lena. Reading her feelings and memory doesn't need admin rights.
 - Revoke it any time in Home Assistant (your profile → Security), and Lena simply stops showing her feelings and shared memory.
 
-**Set up from your phone** (the top of Settings, Settings → Home Assistant, and the wall display before it's connected) serves a small page on your home network, over plain http, only while that screen is open (15 minutes at most, and until something is saved). There your phone fills in Open WebUI's address, email and password, Home Assistant's address and token, your Gitea and the motion sensors.
+**Set up from your phone** (the top of Settings, and the wall display before it's connected) serves a small page on your home network, over plain http, only while that screen is open (15 minutes at most, and until something is saved). There your phone fills in Open WebUI's address, email and password, Home Assistant's address and token, your Gitea and the motion sensors.
 
 - **The page never gets what's saved.** Passwords, emails and tokens are never sent to the phone, only whether each is set; leave a field empty to keep it. Addresses are filled in so you can correct them.
 - **Encrypted on the phone.** The QR code carries a one-time key after a `#`, which browsers never send over the network. The page encrypts what you type with it (ChaCha20-Poly1305) before sending, so someone listening on your Wi-Fi sees only ciphertext. The short address typed into a browser has no key, so then the page only offers Home Assistant's own sign-in.
