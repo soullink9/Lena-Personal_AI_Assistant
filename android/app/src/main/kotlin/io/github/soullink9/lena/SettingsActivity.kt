@@ -1793,7 +1793,7 @@ class SettingsActivity : ComponentActivity() {
             Group { Item(Icons.Outlined.Home, "Home Assistant", "Needs Home Assistant: its address and a token") { open(Page.HOME_ASSISTANT) } }
             return
         }
-        Group { Item(Icons.Outlined.Videocam, "Open camera mode", "Also from the TV home's Lena row, the bar's camera button, or \"show the cameras\"") { Cameras.open(this@SettingsActivity) } }
+        Group { Item(Icons.Outlined.Videocam, "Open camera mode", if (Tv.isTv(this@SettingsActivity)) "Also from its card on the TV home, or \"show the cameras\"" else "Also from the wall display's bar, or \"show the cameras\"") { Cameras.open(this@SettingsActivity) } }
 
         SectionTitle("Cameras on ${Tv.thisDevice(this@SettingsActivity)}")
         var found by remember { mutableStateOf<List<FoundCamera>?>(null) }

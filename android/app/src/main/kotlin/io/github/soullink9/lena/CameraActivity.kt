@@ -23,12 +23,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -36,11 +39,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,7 +64,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -75,6 +76,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
@@ -426,45 +428,121 @@ class CameraActivity : ComponentActivity() {
         tick()
     }
 
+    /**
+     * The monitor: its bar across the top, and under it the grid or the spotlight, with the live picture's
+     * web view always there underneath (so it's made once). The clock ticks every second for the OSD.
+     */
     @Composable
     private fun Screen() {
         BackHandler {
             val d = director
             if (d != null && d.back(System.currentTimeMillis())) tick() else finish()
         }
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                clock = System.currentTimeMillis()
+                delay(1_000 - clock % 1_000)
+            }
+        }
+        // A TV crops the picture's edges: the monitor stays inside its safe area, with black around it.
+        val safe = if (tv) Modifier.padding(horizontal = 48.dp, vertical = 27.dp) else Modifier.safeDrawingPadding()
+        Box(Modifier.fillMaxSize().background(CameraLook.screen)) {
             val now = screen
             val message = problem
             when {
                 message != null -> Problem(message)
-                now == null -> Text("Looking for cameras…", color = Color.White, modifier = Modifier.align(Alignment.Center))
-                else -> {
-                    // The live picture is always there, under the grid, so its web view is made once.
-                    live?.let { player ->
-                        key(player) { AndroidView(factory = { player.view }, modifier = Modifier.fillMaxSize()) }
+                now == null -> Text(
+                    "SEARCHING FOR CAMERAS…", style = CameraLook.text(15.sp, CameraLook.osdDim),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+                else -> Column(Modifier.fillMaxSize().then(safe)) {
+                    MonitorBar(now, clock)
+                    Box(Modifier.fillMaxWidth().weight(1f).background(CameraLook.divider)) {
+                        live?.let { player ->
+                            key(player) { AndroidView(factory = { player.view }, modifier = Modifier.fillMaxSize()) }
+                        }
+                        if (now.spotlight != null) Spotlight(now.spotlight, now.moving, clock) else Grid(now, clock)
                     }
-                    if (now.spotlight != null) Spotlight(now.spotlight, now.moving) else Grid(now)
                 }
             }
-            if (!tv && message == null && now != null) Views(Modifier.align(Alignment.TopStart))
             reconnecting?.let { line ->
-                if (message == null && now != null) Text(
-                    line, color = Color.White, style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                if (message == null && now != null) Row(
+                    Modifier.align(Alignment.BottomCenter).then(safe).padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.75f)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CameraLook.LiveDot("SIGNAL LOST", CameraLook.motion)
+                    Spacer(Modifier.width(12.dp))
+                    Text(line, style = CameraLook.text(13.sp, CameraLook.osd))
+                }
             }
         }
         if (choosingView) ViewPicker()
     }
 
-    /** Why camera mode can't show anything, and where to fix it. */
+    /**
+     * The monitor's bar: what's recording (a blinking REC), the view and how many cameras, and the date and
+     * time. On a touch screen it also has back and the five views; on a TV, a reminder that Menu chooses
+     * the view.
+     */
+    @Composable
+    private fun MonitorBar(now: CameraDirector.Screen, clock: Long) {
+        Column(Modifier.fillMaxWidth().background(Color(0xFF0A0C0D))) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = if (tv) 16.dp else 4.dp, vertical = if (tv) 10.dp else 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (!tv) IconButton(onClick = { finish() }) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Close camera mode", tint = CameraLook.osd)
+                }
+                CameraLook.LiveDot("REC")
+                Spacer(Modifier.width(16.dp))
+                Text("CAMERAS", style = CameraLook.text(15.sp, bold = true))
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    "${view.label.uppercase()} · ${now.grid.size} CH",
+                    style = CameraLook.text(13.sp, CameraLook.osdDim), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (tv) {
+                    Text("MENU: VIEW", style = CameraLook.text(12.sp, CameraLook.osdDim))
+                    Spacer(Modifier.width(20.dp))
+                }
+                Text(CameraLook.date(clock) + "  " + CameraLook.time(this@CameraActivity, clock), style = CameraLook.text(15.sp))
+                if (!tv) Spacer(Modifier.width(8.dp))
+            }
+            if (!tv) Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CameraView.entries.forEach { option -> ViewTab(option) }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(CameraLook.divider))
+        }
+    }
+
+    /** One of the views along the top on a touch screen, as a recorder's mode button: outlined when it's on. */
+    @Composable
+    private fun ViewTab(option: CameraView) {
+        val on = view == option
+        Text(
+            option.label.uppercase(),
+            style = CameraLook.text(12.sp, if (on) CameraLook.osd else CameraLook.osdDim, bold = on),
+            modifier = Modifier
+                .border(1.dp, if (on) CameraLook.osd else CameraLook.divider)
+                .clickable { switchView(option) }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+    }
+
+    /** Why camera mode can't show anything, and where to fix it: the monitor's NO SIGNAL. */
     @Composable
     private fun Problem(message: String) {
-        Column(Modifier.fillMaxSize().padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        Column(Modifier.fillMaxSize().monitorGlass().padding(48.dp), verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Cameras", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-            Text(message, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center)
+            Text("NO SIGNAL", style = CameraLook.text(28.sp, CameraLook.osdDim, bold = true))
+            Text(message, style = CameraLook.text(15.sp), textAlign = TextAlign.Center)
             val focus = remember { FocusRequester() }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalButton(modifier = Modifier.focusRequester(focus), onClick = {
@@ -476,9 +554,9 @@ class CameraActivity : ComponentActivity() {
         }
     }
 
-    /** The grid of still pictures: up to 3 across, filling the screen inside a TV's safe area. */
+    /** The grid of still pictures: up to 3 across, edge to edge with thin dividers, as on a recorder's monitor. */
     @Composable
-    private fun Grid(now: CameraDirector.Screen) {
+    private fun Grid(now: CameraDirector.Screen, clock: Long) {
         val columns = when (now.grid.size) {
             1 -> 1
             in 2..4 -> 2
@@ -487,14 +565,14 @@ class CameraActivity : ComponentActivity() {
         val first = remember { FocusRequester() }
         LazyVerticalGrid(
             GridCells.Fixed(columns),
-            contentPadding = if (tv) PaddingValues(horizontal = 48.dp, vertical = 27.dp) else PaddingValues(top = 64.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+            contentPadding = PaddingValues(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.fillMaxSize().background(CameraLook.divider),
         ) {
             items(now.grid, key = { it }) { id ->
                 val camera = cameras.firstOrNull { it.id == id } ?: return@items
-                Tile(camera, id in now.moving, id in selected, if (id == now.grid.first()) Modifier.focusRequester(first) else Modifier)
+                Tile(camera, id in now.moving, id in selected, clock, if (id == now.grid.first()) Modifier.focusRequester(first) else Modifier)
             }
         }
         LaunchedEffect(now.grid.firstOrNull()) {
@@ -506,27 +584,24 @@ class CameraActivity : ComponentActivity() {
     }
 
     /**
-     * One camera's picture in the grid: its name, a colored edge while it sees motion, a tick when it's
-     * selected, and an outline when the remote is on it. OK or a tap: the spotlight; OK held or a long press:
-     * select it.
+     * One camera's picture in the grid, with a recorder's OSD: its channel and name, the time, MOTION while
+     * it sees motion (and an amber edge), and SELECTED when it's selected. A white edge when the remote is on
+     * it. OK or a tap: the spotlight; OK held or a long press: select it.
      */
     @Composable
-    private fun Tile(camera: FoundCamera, moving: Boolean, isSelected: Boolean, modifier: Modifier) {
+    private fun Tile(camera: FoundCamera, moving: Boolean, isSelected: Boolean, clock: Long, modifier: Modifier) {
         val interaction = remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         var held by remember { mutableStateOf(false) }
-        val shape = RoundedCornerShape(12.dp)
         val edge = when {
-            focused -> Color.White
-            moving -> Color(0xFFFFB300)
+            focused -> CameraLook.osd
+            moving -> CameraLook.motion
             else -> Color.Transparent
         }
         Box(
             modifier
                 .aspectRatio(16f / 9f)
-                .clip(shape)
-                .background(Color(0xFF1C1D24))
-                .border(if (focused || moving) 3.dp else 0.dp, edge, shape)
+                .background(CameraLook.emptyPicture)
                 // OK held: select, as a long press does (the remote's OK only ever clicks on its own).
                 .onPreviewKeyEvent { e ->
                     val ok = e.key.nativeKeyCode in setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
@@ -554,25 +629,32 @@ class CameraActivity : ComponentActivity() {
                 ),
         ) {
             val picture = stills[camera.id]
-            if (picture != null) {
-                Image(picture, camera.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                Text("Loading…", color = Color.White.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.Center))
+            Box(Modifier.fillMaxSize().monitorGlass()) {
+                if (picture != null) {
+                    Image(picture, camera.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text("CONNECTING…", style = CameraLook.text(12.sp, CameraLook.osdDim), modifier = Modifier.align(Alignment.Center))
+                }
             }
-            Text(
-                camera.name,
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            )
-            if (isSelected) Icon(Icons.Rounded.CheckCircle, "Selected", tint = Color.White,
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp))
+            val small = if (cameras.size > MANY) 11.sp else 13.sp
+            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${channelOf(camera)} ${camera.name.uppercase()}", style = CameraLook.text(small),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Text(CameraLook.time(this@CameraActivity, clock), style = CameraLook.text(small, CameraLook.osdDim))
+            }
+            Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (moving) CameraLook.Tag("MOTION", CameraLook.motion)
+                Spacer(Modifier.weight(1f))
+                if (isSelected) CameraLook.Tag("SELECTED", CameraLook.osd)
+            }
+            if (focused || moving) Box(Modifier.fillMaxSize().border(if (focused) 3.dp else 2.dp, edge))
         }
     }
+
+    /** A camera's channel: its place among the included cameras (CH01 for the first), as a recorder numbers them. */
+    private fun channelOf(camera: FoundCamera): String = CameraLook.channel(cameras.indexOf(camera).coerceAtLeast(0))
 
     private fun toggleSelected(camera: String) {
         val d = director ?: return
@@ -583,50 +665,44 @@ class CameraActivity : ComponentActivity() {
     }
 
     /**
-     * One camera live, full screen: its still picture shows until the live picture moves (and stays, if live
-     * pictures don't work here). Its name, the view, and on a touch screen arrows to the camera before and after.
+     * One camera live, filling the monitor: its still picture shows until the live picture moves (and stays,
+     * if live pictures don't work here). The OSD over it: channel and name, LIVE (or what it's waiting for),
+     * the date and time, the view, MOTION; on a touch screen, arrows to the camera before and after.
      */
     @Composable
-    private fun Spotlight(id: String, moving: Set<String>) {
+    private fun Spotlight(id: String, moving: Set<String>, clock: Long) {
         val camera = cameras.firstOrNull { it.id == id } ?: return
         Box(Modifier.fillMaxSize()) {
             if (liveState != CameraLive.State.PLAYING) {
+                Box(Modifier.fillMaxSize().background(CameraLook.screen))
                 stills[id]?.let { Image(it, camera.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
             }
-            Column(Modifier.align(Alignment.BottomStart).padding(if (tv) 48.dp else 16.dp).padding(bottom = if (tv) 0.dp else 16.dp)) {
-                Text(camera.name + if (id in moving) " · motion" else "", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                Text(
-                    view.label + when (liveState) {
-                        CameraLive.State.CONNECTING -> " · connecting…"
-                        CameraLive.State.PLAYING -> ""
-                        CameraLive.State.STILL -> " · still pictures (no live picture from Home Assistant)"
-                    },
-                    color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyMedium,
-                )
+            // The monitor's glass over the live picture too, lighter, so the picture stays clear.
+            Box(Modifier.fillMaxSize().monitorGlass(lines = 0.06f, corners = 0.35f))
+            Column(Modifier.align(Alignment.TopStart).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${channelOf(camera)} ${camera.name.uppercase()}", style = CameraLook.text(20.sp, bold = true))
+                when (liveState) {
+                    CameraLive.State.PLAYING -> CameraLook.LiveDot("LIVE")
+                    CameraLive.State.CONNECTING -> CameraLook.Tag("CONNECTING…", CameraLook.motion, 13.sp)
+                    CameraLive.State.STILL -> CameraLook.Tag("STILL PICTURES · NO LIVE PICTURE FROM HOME ASSISTANT", CameraLook.osdDim, 13.sp)
+                }
+            }
+            Text(
+                CameraLook.date(clock) + "  " + CameraLook.time(this@CameraActivity, clock), style = CameraLook.text(20.sp),
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            )
+            Row(Modifier.align(Alignment.BottomStart).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(view.label.uppercase(), style = CameraLook.text(14.sp, CameraLook.osdDim))
+                if (id in moving) CameraLook.Tag("MOTION", CameraLook.motion, 13.sp)
             }
             if (!tv && cameras.size > 1) {
                 IconButton(onClick = { director?.previous(System.currentTimeMillis()); tick() }, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.Rounded.ChevronLeft, "Camera before", tint = Color.White, modifier = Modifier.size(40.dp))
+                    Icon(Icons.Rounded.ChevronLeft, "Camera before", tint = CameraLook.osd, modifier = Modifier.size(40.dp))
                 }
                 IconButton(onClick = { director?.next(System.currentTimeMillis()); tick() }, modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Icon(Icons.Rounded.ChevronRight, "Next camera", tint = Color.White, modifier = Modifier.size(40.dp))
+                    Icon(Icons.Rounded.ChevronRight, "Next camera", tint = CameraLook.osd, modifier = Modifier.size(40.dp))
                 }
-            }
-        }
-    }
-
-    /** On a touch screen: back, and the five views along the top. */
-    @Composable
-    private fun Views(modifier: Modifier) {
-        Row(
-            modifier.fillMaxWidth().safeDrawingPadding().background(Color(0x88000000)).horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { finish() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Close camera mode", tint = Color.White) }
-            CameraView.entries.forEach { option ->
-                FilterChip(selected = view == option, onClick = { switchView(option) }, label = { Text(option.label) })
             }
         }
     }

@@ -8,9 +8,13 @@ It uses the cameras Home Assistant already has, so it works with any camera inte
 
 1. **Settings → Cameras → Camera mode** on the device (needs Home Assistant connected).
 2. Under **Cameras on this TV** (or tablet, or phone), switch on the cameras it may show. A camera that isn't switched on here never appears on this device.
-3. Open it: the **Cameras** card in the TV home's Lena row, the camera button on the wall display's bar, **Open camera mode** in Settings, or ask Lena to "show the cameras" (or "show me the front door camera", which opens that one live).
+3. Open it: on a TV, the **Cameras** card in the TV home's Lena row, right after **Talk to Lena**; on a tablet or phone, the camera button on the wall display's bar. Or **Open camera mode** in Settings, or ask Lena to "show the cameras" (or "show me the front door camera", which opens that one live). On a TV, camera mode isn't on the dashboards' bar: a dashboard there is only Home Assistant's.
 
 **UniFi Protect:** Home Assistant turns on only each camera's high resolution stream. Turn on the **low resolution** one too (the camera's device page in Home Assistant, its camera entities), so the grid's pictures come from it and your console isn't asked for full-size snapshots.
+
+## How it looks
+
+Like a security monitor. Across the top, the monitor's bar: a blinking **REC**, the view and how many cameras, and the date and time (on a TV, also a reminder that Menu chooses the view; on a touch screen, back and the views). Under it, the pictures edge to edge on black with thin dividers, each with the on-screen text a CCTV recorder draws: its channel and name (**CH01 FRONT DOOR**, numbered in the order the cameras are switched on in Settings) and the time, in a monospaced face that reads over any picture. **MOTION** marks a camera that sees motion, with an amber edge; **SELECTED** marks a selected one; the camera the remote is on has a white edge. In the spotlight, a blinking red **LIVE** once the live picture moves (**CONNECTING…** until then). Faint scan lines and darker corners give it a monitor's glass. When Home Assistant can't be reached, it says **NO SIGNAL**, and while it connects again, **SIGNAL LOST** along the bottom.
 
 ## The views
 

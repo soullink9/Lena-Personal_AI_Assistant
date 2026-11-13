@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -135,6 +136,12 @@ fun TvHome(
                         CardLabel(Icons.Outlined.Mic, "Talk to Lena", "Or hold OK anywhere")
                     }
                 }
+                // Camera mode, when it's on here (Settings → Cameras): its own card, next to talking to her, that
+                // opens it straight away. Opened only from here (or by asking), never by itself, and it shows no
+                // pictures here: the cameras run only while camera mode is open.
+                if (Cameras.available(context)) item {
+                    TvCard(TALK_WIDTH, onClick = { Cameras.open(context) }) { CamerasCard(Cameras.included(context).size) }
+                }
                 items(countdowns.orEmpty(), key = { it.id }) { c ->
                     TvCard(CARD_WIDTH, onClick = onTalk) {
                         CardLabel(countdownIcon(c.kind), c.name(context), left(context, c, tick))
@@ -142,10 +149,6 @@ fun TvHome(
                 }
                 items(dashboards, key = { "dashboard:" + it.path }) { d ->
                     TvCard(CARD_WIDTH, onClick = { onDashboard(d) }) { CardLabel(Icons.Outlined.Dashboard, d.name, "Home Assistant") }
-                }
-                // Camera mode, when it's on here (Settings → Cameras): opened only from here, never by itself.
-                if (Cameras.available(context)) item {
-                    TvCard(CARD_WIDTH, onClick = { Cameras.open(context) }) { CardLabel(Icons.Outlined.Videocam, "Cameras", "Home Assistant") }
                 }
                 item { TvCard(CARD_WIDTH, onClick = onSettings) { CardLabel(Icons.Outlined.Settings, "Lena's settings", null) } }
                 item {
@@ -290,6 +293,30 @@ private fun TvCard(width: Dp, modifier: Modifier = Modifier, onClick: () -> Unit
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         content = content,
     )
+}
+
+/**
+ * Camera mode's card, in camera mode's own look ([CameraLook]): a dark monitor with its glass, a blinking
+ * REC, and how many cameras it shows.
+ */
+@Composable
+private fun CamerasCard(count: Int) {
+    Box(Modifier.fillMaxSize().background(CameraLook.screen).monitorGlass()) {
+        Box(Modifier.align(Alignment.TopStart).padding(12.dp)) { CameraLook.LiveDot("REC", size = 12.sp) }
+        Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+            Icon(Icons.Outlined.Videocam, null, tint = CameraLook.osd, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(6.dp))
+            Text("CAMERAS", style = CameraLook.text(15.sp, bold = true))
+            Text(
+                when (count) {
+                    0 -> "NONE INCLUDED YET"
+                    1 -> "1 CAMERA"
+                    else -> "$count CAMERAS"
+                },
+                style = CameraLook.text(11.sp, CameraLook.osdDim), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 /** A card's icon, name and a line under it. */

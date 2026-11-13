@@ -2,6 +2,13 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Camera mode looks like a security monitor.** A monitor's bar across the top (a blinking REC, the view and how many cameras, the date and time to the second), pictures edge to edge on black with thin dividers, and a CCTV recorder's on-screen text on each: its channel and name (CH01 FRONT DOOR) and the time. MOTION and SELECTED are words on the picture, with an amber edge for motion; the spotlight shows a blinking LIVE once the live picture moves; NO SIGNAL and SIGNAL LOST when Home Assistant can't be reached. Faint scan lines and darker corners give it a monitor's glass ([Camera mode](docs/app/Cameras.md#how-it-looks)).
+- **On a TV, camera mode has its own card.** The **Cameras** card is now right after **Talk to Lena** on the TV home, in camera mode's own look, and opens it straight away. The camera button is gone from the dashboards' bar on a TV (it stays on a tablet or phone).
+
 ## [0.6.20] - 2026-11-12
 
 ### Android app

@@ -51,6 +51,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `CameraActivity.kt` | Camera mode's screen: the grid of still pictures, the spotlight, the views, the remote and touch, and the motion it watches while it's open. |
 | `CameraDirector.kt` | What camera mode shows from moment to moment in each of its five views (plain Kotlin, checked by `tools/camera_check`). |
 | `CameraFinder.kt` | Finds the cameras in Home Assistant's entities (one per device, UniFi Protect's streams) and their motion sensors and events (plain Kotlin, checked by `tools/camera_check`). |
+| `CameraLook.kt` | Camera mode's security-monitor look (its colors, the on-screen text, the blinking REC, the scan lines), shared with its card on the TV home. |
 | `CameraLive.kt`, `assets/camera/live.html` | The spotlight's live picture: Home Assistant's WebRTC, signalled by the app so the page never holds the token, with HLS and then still pictures to fall back on. |
 | `Cameras.kt` | Which cameras are included and selected on this device, sensors picked by hand, opening camera mode, and listing Home Assistant's cameras. |
 | `HaSocket.kt` | A Home Assistant WebSocket connection that stays open (camera mode): calls, subscriptions and pings, on `MiniWebSocket`. |

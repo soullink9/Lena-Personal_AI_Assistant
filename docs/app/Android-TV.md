@@ -46,7 +46,7 @@ On a TV, Lena's home screen is rows you move through with the remote, over your 
 - **Lena**: **Talk to Lena**, chosen when the screen opens, so pressing OK talks straight away; every timer, alarm and reminder that's running, with the time left; your wall display dashboards (Settings → Home Assistant → Wall display dashboards), each opening full screen with Lena's bar (Back from its first page, or Home, returns to the rows); and Lena's settings and the TV's.
 - **Apps**: your TV apps, the ones you open most first; **Choose apps**; and **All apps**.
 
-With camera mode on (Settings → Cameras), the Lena row also has **Cameras**: your Home Assistant's cameras, in a grid or live ([Camera mode](Cameras.md)).
+With camera mode on (Settings → Cameras), the Lena row also has **Cameras**, right after **Talk to Lena**: it opens your Home Assistant's cameras straight away, on a security monitor's screen, in a grid or live ([Camera mode](Cameras.md)). It's the way in on a TV; the dashboards' bar has no camera button there.
 
 **Choose apps** lists every TV app; press OK on one to hide it from the Apps row, and again to show it. It stays installed, and Back is done. Hidden apps are still in **All apps**.
 

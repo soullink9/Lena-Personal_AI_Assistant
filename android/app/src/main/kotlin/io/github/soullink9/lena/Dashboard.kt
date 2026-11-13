@@ -982,8 +982,9 @@ class DashboardActivity : ComponentActivity() {
                         Icon(Icons.Outlined.CloudOff, "Can't reach " + down.joinToString(" or ") { it.label }, tint = MaterialTheme.colorScheme.error)
                     }
                 }
-                // Camera mode, when it's on here (Settings → Cameras).
-                if (Cameras.available(this@DashboardActivity)) {
+                // Camera mode, when it's on here (Settings → Cameras). Not on a TV: there it has its own card
+                // on the TV home, and a dashboard is only Home Assistant's.
+                if (!tv && Cameras.available(this@DashboardActivity)) {
                     IconButton(onClick = { Cameras.open(this@DashboardActivity) }) { Icon(Icons.Outlined.Videocam, "Cameras") }
                 }
                 if (dashboards.size > 1) Box {
