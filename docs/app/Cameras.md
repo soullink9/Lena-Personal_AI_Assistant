@@ -14,7 +14,9 @@ It uses the cameras Home Assistant already has, so it works with any camera inte
 
 ## How it looks
 
-Like a security monitor. Across the top, the monitor's bar: a blinking **REC**, the view and how many cameras, and the date and time (on a TV, also a reminder that Menu chooses the view; on a touch screen, back and the views). Under it, the pictures edge to edge on black with thin dividers, each with the on-screen text a CCTV recorder draws: its channel and name (**CH01 FRONT DOOR**, numbered in the order the cameras are switched on in Settings) and the time, in a monospaced face that reads over any picture. **MOTION** marks a camera that sees motion, with an amber edge; **SELECTED** marks a selected one; the camera the remote is on has a white edge. In the spotlight, a blinking red **LIVE** once the live picture moves (**CONNECTING…** until then). Faint scan lines and darker corners give it a monitor's glass. When Home Assistant can't be reached, it says **NO SIGNAL**, and while it connects again, **SIGNAL LOST** along the bottom.
+Like UniFi Protect's live view: the pictures fill the whole screen, on a TV too, edge to edge with hairline gaps and nothing else taking room. The grid picks how many go across so each picture keeps close to its shape, and the last row's pictures widen to fill it, so no cell is empty. Each picture has only a small label in its corner: its name, and **Motion** (with an orange edge) while it sees motion. A tick marks a selected camera, and a blue edge the one the remote is on. Full screen, the corner says **Live** with a red dot once the live picture moves (**Connecting…** until then).
+
+The bar (**Cameras**, the view and how many, the date and time) floats over the top only for a few seconds after a touch or a key press, then fades away. On a touch screen it also has back and the views; on a TV, what the remote's keys do. While Home Assistant can't be reached, **Reconnecting** shows along the bottom.
 
 ## The views
 
@@ -36,7 +38,7 @@ From any grid, choosing a camera puts it live in the spotlight; Back returns to 
 | Spotlight a camera | OK | Tap |
 | Select or unselect a camera | Hold OK | Long press |
 | Next or previous camera in the spotlight | Right, left | The arrows on the picture |
-| Choose the view | Menu (☰) | The views along the top |
+| Choose the view | Menu (☰) | Touch the screen, then the views along the top |
 | Back to the grid, then out | Back | Back |
 
 In camera mode, holding OK selects a camera instead of talking to Lena.

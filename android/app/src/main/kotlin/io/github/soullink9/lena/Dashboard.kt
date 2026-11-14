@@ -844,9 +844,9 @@ class DashboardActivity : ComponentActivity() {
                     onSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) },
                 )
             } else Column(
+                // The whole screen, a TV's too: today's TVs and boxes like the Shield show the picture's edges,
+                // so the dashboard runs edge to edge and only the bar's text keeps off the very edge (Strip).
                 Modifier.fillMaxSize().navigationBarsPadding()
-                    // A TV crops the picture's edges: keep the bar and the dashboard inside its safe area.
-                    .then(if (tv) Modifier.padding(horizontal = 48.dp, vertical = 27.dp) else Modifier)
             ) {
                 // Lena's strip: or, when she's worried, what's wrong.
                 if (worried) WorriedBar(f!!.momentWhy)
@@ -938,7 +938,9 @@ class DashboardActivity : ComponentActivity() {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (narrow) 6.dp else 10.dp),
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = if (narrow) 8.dp else 16.dp, top = 8.dp, bottom = 8.dp),
+                // On a TV the bar's ends keep a little further from the edge, which some TVs crop.
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(
+                    start = if (tv) 24.dp else 8.dp, end = if (tv) 32.dp else if (narrow) 8.dp else 16.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 IconButton(onClick = ::menu) { Icon(Icons.Rounded.Menu, "Home Assistant's menu") }
                 // A TV has no keyboard to chat with: the wall display is all there is ([Tv]).

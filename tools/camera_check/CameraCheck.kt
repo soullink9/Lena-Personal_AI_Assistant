@@ -1,8 +1,9 @@
 // Checks camera mode's choices away from Android: which cameras and sensors it finds in Home Assistant's
 // entities (CameraFinder.kt, on UniFi Protect's names) and what it shows from moment to moment
-// (CameraDirector.kt). Run by run.sh next to this file.
+// (CameraDirector.kt), and how its grid fills the screen (CameraGrid). Run by run.sh next to this file.
 import io.github.soullink9.lena.CameraDirector
 import io.github.soullink9.lena.CameraFinder
+import io.github.soullink9.lena.CameraGrid
 import io.github.soullink9.lena.CameraView
 import io.github.soullink9.lena.HaEntity
 import io.github.soullink9.lena.MotionKind
@@ -96,6 +97,14 @@ fun main() {
     s.previous(0)
     check(s.screen(0).spotlight == "c" && s.back(0) && s.screen(0).spotlight == "a" && s.back(0) && s.view == CameraView.SHOW_ALL,
         "left goes round backwards; Back returns to it, then to Show all")
+
+    // The grid fills the screen: no margins, no empty cells.
+    check(CameraGrid.rows(1, 1920f, 1080f) == listOf(1), "one camera fills the screen")
+    check(CameraGrid.rows(4, 1920f, 1080f) == listOf(2, 2), "four cameras: 2 by 2")
+    check(CameraGrid.rows(5, 1920f, 1080f) == listOf(3, 2), "five: 3 then 2, the last row's pictures wider, no empty cell")
+    check(CameraGrid.rows(9, 1920f, 1080f) == listOf(3, 3, 3), "nine: 3 by 3")
+    check(CameraGrid.rows(3, 1080f, 2340f).all { it == 1 }, "a phone held upright: one picture across")
+    check((1..20).all { n -> CameraGrid.rows(n, 1920f, 1080f).sum() == n }, "every camera has a cell, from 1 to 20 of them")
 
     println()
     if (failures > 0) {

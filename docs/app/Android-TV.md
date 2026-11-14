@@ -40,7 +40,7 @@ To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV 
 
 ## The TV home
 
-On a TV, Lena's home screen is rows you move through with the remote, over your photo slideshow (dimmed) if you've chosen an album. It keeps inside the TV's safe area, as TVs crop the edges of the picture.
+On a TV, Lena's home screen is rows you move through with the remote, over your photo slideshow (dimmed) if you've chosen an album. It keeps inside the TV's safe area, as some TVs crop the edges of the picture. A dashboard and camera mode use the whole screen, edge to edge.
 
 - At the top, the time, the date and weather, and how Lena feels.
 - **Lena**: **Talk to Lena**, chosen when the screen opens, so pressing OK talks straight away; every timer, alarm and reminder that's running, with the time left; your wall display dashboards (Settings → Home Assistant → Wall display dashboards), each opening full screen with Lena's bar (Back from its first page, or Home, returns to the rows); and Lena's settings and the TV's.

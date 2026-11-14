@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -296,24 +295,24 @@ private fun TvCard(width: Dp, modifier: Modifier = Modifier, onClick: () -> Unit
 }
 
 /**
- * Camera mode's card, in camera mode's own look ([CameraLook]): a dark monitor with its glass, a blinking
- * REC, and how many cameras it shows.
+ * Camera mode's card, in camera mode's own look ([CameraLook]): black like its screen, the camera in its
+ * blue, and how many cameras it shows. No picture: the cameras run only while camera mode is open.
  */
 @Composable
 private fun CamerasCard(count: Int) {
-    Box(Modifier.fillMaxSize().background(CameraLook.screen).monitorGlass()) {
-        Box(Modifier.align(Alignment.TopStart).padding(12.dp)) { CameraLook.LiveDot("REC", size = 12.sp) }
+    Box(Modifier.fillMaxSize().background(CameraLook.screen)) {
+        CameraLook.Pill("Live", dot = CameraLook.live, modifier = Modifier.align(Alignment.TopStart).padding(10.dp))
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
-            Icon(Icons.Outlined.Videocam, null, tint = CameraLook.osd, modifier = Modifier.size(22.dp))
+            Icon(Icons.Outlined.Videocam, null, tint = CameraLook.focus, modifier = Modifier.size(24.dp))
             Spacer(Modifier.height(6.dp))
-            Text("CAMERAS", style = CameraLook.text(15.sp, bold = true))
+            Text("Cameras", style = MaterialTheme.typography.titleSmall, color = Color.White)
             Text(
                 when (count) {
-                    0 -> "NONE INCLUDED YET"
-                    1 -> "1 CAMERA"
-                    else -> "$count CAMERAS"
+                    0 -> "None included yet"
+                    1 -> "1 camera"
+                    else -> "$count cameras"
                 },
-                style = CameraLook.text(11.sp, CameraLook.osdDim), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall, color = CameraLook.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
     }

@@ -2,6 +2,13 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Camera mode looks like UniFi Protect's live view.** The pictures fill the whole screen, edge to edge with hairline gaps: the grid picks how many go across so the pictures keep their shape, and the last row's pictures widen so no cell is empty. Each picture has just its name in the corner, and Motion with an orange edge while it sees motion; a blue edge shows where the remote is. The bar with the views and the time floats over the top for a few seconds after a touch or a key press, then fades away, so it takes no room. This replaces 0.6.21's security monitor look ([Camera mode](docs/app/Cameras.md#how-it-looks)).
+- **Dashboards and camera mode use the whole TV screen.** They kept a margin all round for TVs that crop the picture's edges, which today's TVs and the Shield don't; now they run edge to edge, and only the dashboards' bar keeps its text a little off the edge. The TV home keeps its margins.
+
 ## [0.6.21] - 2026-11-12
 
 ### Android app

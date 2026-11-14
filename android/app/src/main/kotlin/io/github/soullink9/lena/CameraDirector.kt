@@ -187,3 +187,29 @@ class CameraDirector(
         return false
     }
 }
+
+/**
+ * How camera mode's grid fills the screen, as UniFi Protect's live view does: no margins and no empty
+ * cells. Plain Kotlin, so tools/camera_check can check it.
+ */
+object CameraGrid {
+    /** A camera's picture: 16:9, as most cameras' streams are. */
+    private const val PICTURE = 16.0 / 9.0
+
+    /**
+     * How many pictures go in each row, top to bottom, for [count] cameras on a screen [width] by [height]
+     * (any unit). The number across is the one whose cells come closest to a picture's shape, so little is
+     * cropped; rows are filled in order and the last row's pictures widen to fill it, so no cell is empty.
+     */
+    fun rows(count: Int, width: Float, height: Float): List<Int> {
+        if (count <= 0 || width <= 0f || height <= 0f) return emptyList()
+        val across = (1..count).minByOrNull { columns ->
+            val rows = (count + columns - 1) / columns
+            val cell = (width / columns) / (height / rows)
+            // How far the cell is from a picture's shape, wider or taller alike.
+            Math.abs(Math.log(cell / PICTURE))
+        } ?: 1
+        val rows = (count + across - 1) / across
+        return List(rows) { row -> if (row < rows - 1) across else count - across * (rows - 1) }
+    }
+}
