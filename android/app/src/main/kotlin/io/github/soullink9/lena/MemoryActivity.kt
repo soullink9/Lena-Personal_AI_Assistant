@@ -68,6 +68,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -684,15 +691,27 @@ class MemoryActivity : ComponentActivity() {
     }
 }
 
-/** The rounded, filled search box used in the drawer and Memory and knowledge. */
+/**
+ * The rounded, filled search box used in the drawer, Memory and knowledge, Logs and Settings.
+ *
+ * On a TV the remote's arrows move focus onto the box on their way down the screen, and a text field that
+ * gets focus opens the keyboard at once, covering the screen; Settings has its search box at the top, so
+ * the keyboard came up every time. So on a TV the box stays read-only (no keyboard) while it only has
+ * focus, and OK on the remote turns typing on: Compose's text field starts typing, and opens the keyboard,
+ * as soon as a focused field stops being read-only. Moving off the box turns typing off again. On a phone
+ * or tablet it's an ordinary text field.
+ */
 @Composable
 fun SearchField(value: String, placeholder: String, modifier: Modifier = Modifier, onChange: (String) -> Unit) {
+    val tv = Tv.isTv(LocalContext.current)
+    var typing by remember { mutableStateOf(false) } // TV only: OK was pressed on the box
     TextField(
         value = value,
         onValueChange = onChange,
         placeholder = { Text(placeholder) },
         leadingIcon = { Icon(Icons.Outlined.Search, null) },
         trailingIcon = { if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Icons.Outlined.Close, "Clear") } },
+        readOnly = tv && !typing,
         singleLine = true,
         shape = RoundedCornerShape(28.dp),
         colors = TextFieldDefaults.colors(
@@ -701,6 +720,14 @@ fun SearchField(value: String, placeholder: String, modifier: Modifier = Modifie
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
         ),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { if (tv && typing && !it.isFocused && !it.hasFocus) typing = false }
+            .onPreviewKeyEvent { e ->
+                val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
+                if (!tv || typing || !ok) return@onPreviewKeyEvent false
+                if (e.type == KeyEventType.KeyDown) typing = true
+                true
+            },
     )
 }

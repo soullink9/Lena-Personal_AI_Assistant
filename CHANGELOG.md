@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **On a TV, the search boxes wait for OK.** Moving onto **Search settings** (or any of the app's search boxes) with the remote's arrows opened the keyboard straight away, and since it's at the top of Settings, it came up every time Settings opened. Now the box only lights up when the remote lands on it; press OK to type, and move off it to put typing away. Phones and tablets are unchanged.
+
 ## [0.6.22] - 2026-11-14
 
 ### Android app

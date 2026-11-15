@@ -39,7 +39,7 @@ Lena hides Open WebUI's own header and sidebar because the top bar and drawer re
 
 ## Settings
 
-Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives.
+Open them from the drawer (or long-press Lena's icon). **Search settings** at the top finds any setting by its name or by what it's about ("photos", "voice", "token", "folders") and says where it lives. On a TV, moving onto it with the remote only highlights it; press OK to type.
 
 Below it, the settings are in sections, and every row says how it's set and opens its own page. A setting with several choices shows **only the current one**; tap it for the list, with a line on each choice. Rows with ↗ open Android's own settings, for the three things only Android can change.
 
