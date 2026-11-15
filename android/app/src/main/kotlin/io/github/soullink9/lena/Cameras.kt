@@ -2,6 +2,8 @@ package io.github.soullink9.lena
 
 import android.content.Context
 import android.content.Intent
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import org.json.JSONObject
 
 /**
@@ -59,9 +61,13 @@ object Cameras {
      * Every camera Home Assistant has, paired with its device's motion sensors and events: from its entity
      * registry (which entity is on which device; the version any user may read), its device registry (the
      * devices' names, when this user may read it) and the entities' states (device classes, event types).
+     * The three are asked for at once, so opening camera mode waits for the slowest, not for all three in turn.
      */
-    suspend fun find(socket: HaSocket): List<FoundCamera> {
-        val display = socket.call(JSONObject().put("type", "config/entity_registry/list_for_display")).optJSONObject("result")
+    suspend fun find(socket: HaSocket): List<FoundCamera> = coroutineScope {
+        val displayAsked = async { socket.call(JSONObject().put("type", "config/entity_registry/list_for_display")) }
+        val devicesAsked = async { runCatching { socket.list("config/device_registry/list") }.getOrNull() }
+        val statesAsked = async { socket.list("get_states") }
+        val display = displayAsked.await().optJSONObject("result")
         val registry = display?.optJSONArray("entities")
         val deviceOf = HashMap<String, String>()
         if (registry != null) for (i in 0 until registry.length()) {
@@ -70,13 +76,13 @@ object Cameras {
             if (device.isNotBlank()) deviceOf[e.optString("ei")] = device
         }
         val deviceNames = HashMap<String, String>()
-        runCatching { socket.list("config/device_registry/list") }.getOrNull()?.let { devices ->
+        devicesAsked.await()?.let { devices ->
             for (i in 0 until devices.length()) {
                 val d = devices.getJSONObject(i)
                 deviceNames[d.optString("id")] = d.optString("name_by_user").takeIf { it.isNotBlank() && it != "null" } ?: d.optString("name")
             }
         }
-        val states = socket.list("get_states")
+        val states = statesAsked.await()
         val entities = (0 until states.length()).map { i ->
             val state = states.getJSONObject(i)
             val id = state.optString("entity_id")
@@ -90,6 +96,6 @@ object Cameras {
                 name = attributes.optString("friendly_name"),
             )
         }.filter { it.entityId.startsWith("camera.") || it.entityId.startsWith("binary_sensor.") || it.entityId.startsWith("event.") }
-        return CameraFinder.find(entities, deviceNames)
+        CameraFinder.find(entities, deviceNames)
     }
 }

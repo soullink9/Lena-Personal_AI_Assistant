@@ -16,6 +16,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -89,8 +90,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -122,6 +121,9 @@ class CameraActivity : ComponentActivity() {
         private const val TAG = "Cameras"
         private const val TICK_MS = 500L
         private const val STILL_MS = 2_000L
+
+        /** How often [refreshStills] looks for a camera whose picture is due. */
+        private const val STILL_LOOK_MS = 250L
 
         /** What was asked ("show me the front door camera"): a camera named in it opens in the spotlight. */
         const val EXTRA_ASKED = "asked"
@@ -393,31 +395,63 @@ class CameraActivity : ComponentActivity() {
     /**
      * Still pictures, every [STILL_MS] (twice that with more than [MANY]): the grid's, from each camera's
      * lightest stream; behind the spotlight, its own camera's best stream, until the live picture moves.
+     *
+     * Each camera is fetched on its own: a picture goes on screen as soon as it arrives, and a camera slow
+     * to answer is skipped while its last request is still out, instead of holding up every other picture.
+     * Home Assistant scales each picture to the size it's shown at ([stillWidth]), so a 4K camera doesn't
+     * send (and the TV doesn't decode) a full-size picture for a small tile.
      */
     private suspend fun refreshStills() {
         val ha = HomeAssistant.from(this) ?: return
-        while (true) {
-            val now = screen
-            val wanted: List<Pair<String, String>> = when {
-                now == null -> emptyList()
-                now.spotlight != null -> {
-                    val camera = cameras.firstOrNull { it.id == now.spotlight }
-                    if (camera == null || liveState == CameraLive.State.PLAYING) emptyList() else listOf(camera.id to camera.live)
-                }
-                else -> now.grid.mapNotNull { id -> cameras.firstOrNull { it.id == id }?.let { it.id to it.still } }
-            }
-            coroutineScope {
-                wanted.map { (id, entity) ->
-                    async(Dispatchers.IO) {
-                        runCatching {
-                            val bytes = ha.bytes("/api/camera_proxy/$entity")
-                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                        }.getOrNull()?.let { id to it }
+        // By stream entity, not by camera: opening the spotlight fetches its best stream's picture at once,
+        // even if the grid fetched the camera's light stream a moment ago.
+        val fetching = HashMap<String, Job>()
+        val startedAt = HashMap<String, Long>()
+        coroutineScope {
+            while (true) {
+                val now = screen
+                val wanted: List<Pair<String, String>> = when {
+                    now == null -> emptyList()
+                    now.spotlight != null -> {
+                        val camera = cameras.firstOrNull { it.id == now.spotlight }
+                        if (camera == null || liveState == CameraLive.State.PLAYING) emptyList() else listOf(camera.id to camera.live)
                     }
-                }.awaitAll().filterNotNull().forEach { (id, picture) -> stills[id] = picture }
+                    else -> now.grid.mapNotNull { id -> cameras.firstOrNull { it.id == id }?.let { it.id to it.still } }
+                }
+                val every = if (wanted.size > MANY) STILL_MS * 2 else STILL_MS
+                val width = stillWidth(now)
+                val clock = SystemClock.elapsedRealtime()
+                for ((id, entity) in wanted) {
+                    if (fetching[entity]?.isActive == true) continue
+                    val last = startedAt[entity]
+                    if (last != null && clock - last < every) continue
+                    startedAt[entity] = clock
+                    fetching[entity] = launch {
+                        val picture = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val bytes = ha.bytes("/api/camera_proxy/$entity?width=$width")
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                            }.getOrNull()
+                        }
+                        if (picture != null) stills[id] = picture
+                    }
+                }
+                delay(STILL_LOOK_MS)
             }
-            delay(if (wanted.size > MANY) STILL_MS * 2 else STILL_MS)
         }
+    }
+
+    /**
+     * The width, in pixels, a still picture is shown at on this screen: the whole screen's behind the
+     * spotlight; in the grid, its widest tile's (the last row's tiles are the widest, [CameraGrid]).
+     */
+    private fun stillWidth(now: CameraDirector.Screen?): Int {
+        val metrics = resources.displayMetrics
+        val full = metrics.widthPixels
+        if (now == null || now.spotlight != null) return full
+        val rows = CameraGrid.rows(now.grid.size, metrics.widthPixels.toFloat(), metrics.heightPixels.toFloat())
+        val fewest = rows.minOrNull() ?: return full
+        return full / fewest
     }
 
     /** On a TV: Menu chooses the view; left and right change camera in the spotlight. */

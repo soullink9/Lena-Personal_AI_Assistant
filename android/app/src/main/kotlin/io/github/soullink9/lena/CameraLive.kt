@@ -24,6 +24,10 @@ import org.json.JSONObject
  * back the answer, so the page never holds the token. If WebRTC doesn't start within [WEBRTC_MS], it asks
  * for Home Assistant's HLS stream instead; if that fails too, camera mode keeps showing still pictures.
  *
+ * To start sooner: each camera's ICE servers are asked for once per player ([iceConfigs]), not on every
+ * switch, and a camera whose WebRTC didn't start goes straight to HLS the next time it's shown ([hlsOnly]),
+ * instead of waiting [WEBRTC_MS] again on every turn of Rotate.
+ *
  * Only the camera in the spotlight plays, and only while camera mode is on screen ([show], [stop]).
  */
 class CameraLive(
@@ -53,6 +57,12 @@ class CameraLive(
     private var timeout: Job? = null
     private var pageReady = false
     private var startWhenReady: (() -> Unit)? = null
+
+    /** Each camera's WebRTC client configuration (its ICE servers), asked for the first time it's shown. */
+    private val iceConfigs = HashMap<String, JSONObject>()
+
+    /** Cameras whose WebRTC didn't start on this player: they go straight to HLS. */
+    private val hlsOnly = HashSet<String>()
 
     /** The page was ended by Android: nothing more may be asked of the web view but to be destroyed. */
     private var gone = false
@@ -104,10 +114,13 @@ class CameraLive(
         entity = camera ?: return
         val mine = ++generation
         onState(State.CONNECTING)
+        if (camera in hlsOnly) {
+            playHls(mine, "WebRTC didn't start for $camera last time")
+            return
+        }
         scope.launch {
             try {
-                val config = socket.call(JSONObject().put("type", "camera/webrtc/get_client_config").put("entity_id", camera))
-                    .optJSONObject("result")?.optJSONObject("configuration") ?: JSONObject()
+                val config = iceConfig(camera)
                 if (mine != generation) return@launch
                 val start = { js("lenaStart(${config}, $sound)") }
                 if (pageReady) start() else startWhenReady = start
@@ -119,6 +132,15 @@ class CameraLive(
                 if (mine == generation) giveUp(mine, "WebRTC isn't offered for $camera: ${e.message}")
             }
         }
+    }
+
+    /** [camera]'s WebRTC client configuration: asked of Home Assistant the first time, then remembered. */
+    private suspend fun iceConfig(camera: String): JSONObject {
+        iceConfigs[camera]?.let { return it }
+        val reply = socket.call(JSONObject().put("type", "camera/webrtc/get_client_config").put("entity_id", camera))
+        val config = reply.optJSONObject("result")?.optJSONObject("configuration") ?: JSONObject()
+        iceConfigs[camera] = config
+        return config
     }
 
     /** Stops whatever plays. */
@@ -157,6 +179,15 @@ class CameraLive(
             onState(State.STILL)
             return
         }
+        // WebRTC failing once for a camera (a stream WebRTC can't carry, such as H.265) fails every time,
+        // so this camera skips it from now on, on this player.
+        hlsOnly += camera
+        playHls(mine, why)
+    }
+
+    /** Asks Home Assistant for the camera's HLS stream and plays it; still pictures if that fails too. */
+    private fun playHls(mine: Int, why: String) {
+        val camera = entity ?: return
         triedHls = true
         Logs.i(TAG, "$why; trying HLS for $camera")
         scope.launch {
@@ -165,7 +196,8 @@ class CameraLive(
                     .optJSONObject("result")?.optString("url").orEmpty()
                 if (mine != generation) return@launch
                 if (url.isBlank()) throw IllegalStateException("no stream address")
-                js("lenaHls(${JSONObject.quote(base.trimEnd('/') + url)}, $sound)")
+                val start = { js("lenaHls(${JSONObject.quote(base.trimEnd('/') + url)}, $sound)") }
+                if (pageReady) start() else startWhenReady = start
                 timeout = scope.launch {
                     delay(WEBRTC_MS * 2)
                     if (mine == generation) giveUp(mine, "HLS didn't start")

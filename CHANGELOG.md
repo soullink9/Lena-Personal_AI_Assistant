@@ -7,6 +7,8 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 ### Android app
 
 - **On a TV, the search boxes wait for OK.** Moving onto **Search settings** (or any of the app's search boxes) with the remote's arrows opened the keyboard straight away, and since it's at the top of Settings, it came up every time Settings opened. Now the box only lights up when the remote lands on it; press OK to type, and move off it to put typing away. Phones and tablets are unchanged.
+- **Camera mode's pictures load faster.** Home Assistant now scales each still picture to the size it's shown at, so a 4K camera no longer sends a full-size picture for a small tile (and a TV box no longer decodes one). Each camera's picture is fetched on its own and goes on screen as soon as it arrives; before, every tile waited for the slowest camera. Opening camera mode asks Home Assistant for its cameras' details all at once instead of one after another ([Camera mode](docs/app/Cameras.md#how-it-plays)).
+- **The live picture starts sooner and plays more smoothly.** Home Assistant's connection details for a camera are asked for once, not on every switch, and a camera whose WebRTC didn't start goes straight to HLS next time instead of waiting 12 seconds on every turn. Candidates Home Assistant sends before its answer are no longer lost, so WebRTC has every path to connect on. The live picture runs about a quarter of a second behind, so it doesn't stutter on Wi-Fi. If a camera is still slow, [Camera mode](docs/app/Cameras.md#how-it-plays) says what to change in UniFi Protect and Home Assistant.
 
 ## [0.6.22] - 2026-11-14
 

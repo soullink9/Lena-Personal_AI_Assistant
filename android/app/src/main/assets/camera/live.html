@@ -20,6 +20,14 @@
   var video = document.getElementById('live');
   var peer = null;
   var playing = false;
+  // Home Assistant's candidates that came before its answer: added once the answer is set, since a
+  // candidate added before then is refused (and was lost, leaving fewer paths to connect on).
+  var early = [];
+  var answered = false;
+
+  // A small steady delay (in milliseconds) on the live picture, so a camera on Wi-Fi plays smoothly instead
+  // of stuttering whenever a few packets come late. Older web views without it play as before.
+  var SMOOTHING_MS = 250;
 
   // The picture is moving: the app stops showing its still picture behind.
   video.addEventListener('playing', function () {
@@ -39,6 +47,7 @@
       peer.addTransceiver('video', { direction: 'recvonly' });
       peer.addTransceiver('audio', { direction: 'recvonly' });
       peer.ontrack = function (event) {
+        if ('jitterBufferTarget' in event.receiver) event.receiver.jitterBufferTarget = SMOOTHING_MS;
         var stream = event.streams && event.streams[0];
         if (!stream) {
           stream = video.srcObject || new MediaStream();
@@ -69,10 +78,21 @@
 
   // Home Assistant's answer, and its ICE candidates as they come.
   window.lenaAnswer = function (sdp) {
-    if (peer) peer.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function (e) { LenaCamera.failed(String(e)); });
+    if (!peer) return;
+    var mine = peer;
+    mine.setRemoteDescription({ type: 'answer', sdp: sdp })
+      .then(function () {
+        if (mine !== peer) return;
+        answered = true;
+        early.forEach(function (candidate) { mine.addIceCandidate(candidate).catch(function () {}); });
+        early = [];
+      })
+      .catch(function (e) { LenaCamera.failed(String(e)); });
   };
   window.lenaCandidate = function (candidate) {
-    if (peer) peer.addIceCandidate(candidate).catch(function () {});
+    if (!peer) return;
+    if (answered) peer.addIceCandidate(candidate).catch(function () {});
+    else early.push(candidate);
   };
 
   // HLS instead: Home Assistant's stream address, with its own short-lived token in it.
@@ -85,6 +105,8 @@
 
   window.lenaStop = function () {
     playing = false;
+    early = [];
+    answered = false;
     if (peer) { peer.close(); peer = null; }
     video.srcObject = null;
     video.removeAttribute('src');
