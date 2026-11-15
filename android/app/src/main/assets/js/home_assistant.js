@@ -19,7 +19,8 @@
  *     settings by calling the callback Home Assistant named.
  *
  *  2. Hides Home Assistant's own header, so Lena's bar is the only one (also the Ingress Proxy
- *     integration's toolbar over the apps it serves), and puts Lena's Apps and Settings at the
+ *     integration's toolbar over the apps it serves; on Settings and Profile, all but the tabs and
+ *     buttons only that row has), and puts Lena's Apps and Settings at the
  *     bottom of Home Assistant's menu, out of her bar. The header lives inside
  *     several shadow roots, which a page-wide stylesheet can't reach, so a small style is added
  *     inside each one as the pages appear. Edit mode keeps its header (its Done button is there).
@@ -62,6 +63,29 @@
   // proxy's own slim toolbar above them; Lena's bar replaces it. The app itself is in a frame
   // underneath, which this script never touches.
   var PROXY_PANEL_CSS = '.toolbar{display:none!important}';
+
+  // Settings and Profile. Their pages carry their own row (hass-subpage, hass-tabs-subpage, or the
+  // standard app bar on Settings' first page), and unlike Calendar's or Map's, that row often holds
+  // things you can't get anywhere else: tabs (Automations | Scenes | Scripts), a page's own buttons
+  // and ⋮ menu (Save, Delete, Restart), the search box of a list on a phone, or the selection bar.
+  // So what Lena's bar already does goes from every page: the menu button (it's in her bar), the back
+  // arrow (back is the back gesture, as on dashboards) and the title. A row with nothing left in it,
+  // which the script marks `lena-bare`, goes as well with the space it took, so the page sits right
+  // under Lena's bar. A row with something still in it keeps only that. A list's search box, put
+  // where the title goes on a phone, is marked `lena-own-title` and stays.
+  var SUBPAGE_CSS =
+    '.toolbar-content>ha-menu-button,.toolbar-content>ha-icon-button-arrow-prev{display:none!important}' +
+    ':host(:not([lena-own-title])) .main-title{visibility:hidden!important}' +
+    ':host([lena-bare]){--header-height:0px!important}' +
+    ':host([lena-bare]) .toolbar-content{display:none!important}' +
+    ':host([lena-bare]) .toolbar{border-bottom:0!important}';
+  var SETTINGS_APP_BAR_CSS =
+    '#navigation>*,#title>*,.section.center{visibility:hidden!important}' +
+    ':host([lena-bare]){--header-height:0px!important}' +
+    ':host([lena-bare]) .row{display:none!important}';
+
+  // The pages that get SUBPAGE_CSS: Settings (ha-panel-config) and Profile (ha-panel-profile).
+  var SETTINGS_PANELS = ['HA-PANEL-CONFIG', 'HA-PANEL-PROFILE'];
 
   // Lena's Apps and Settings, at the bottom of Home Assistant's menu rather than in her bar. They're
   // Home Assistant's own menu rows, so they look like the rest of the menu.
@@ -150,6 +174,54 @@
     return true;
   }
 
+  // The page showing now inside Settings or Profile. Both are routers that put their pages straight
+  // inside themselves, not in a shadow root, and a section of Settings (Automations, say) can be a
+  // router again, so it goes down through those to the first page with a shadow root.
+  function shownPage(p) {
+    var el = p;
+    for (var depth = 0; el && !el.shadowRoot && depth < 5; depth++) {
+      var shown = [].slice.call(el.children).filter(function (k) { return k.getClientRects().length > 0; });
+      el = shown[shown.length - 1];
+    }
+    return shadow(el) ? el : null;
+  }
+
+  // Whether a slot of a Settings or Profile row has something of the page's in it.
+  function filled(root, name) {
+    var slot = root.querySelector('slot[name="' + name + '"]');
+    return !!(slot && slot.assignedElements().length > 0);
+  }
+
+  // Trims the row of a Settings or Profile page (see SUBPAGE_CSS), and marks whether anything's left.
+  function trimSettingsPage(p) {
+    var page = shownPage(p);
+    if (!page) return;
+    var hosts = [].slice.call(page.shadowRoot.querySelectorAll(
+      'hass-subpage, hass-tabs-subpage, hass-tabs-subpage-data-table, ha-top-app-bar-fixed, ha-two-pane-top-app-bar-fixed'));
+    for (var i = 0; i < hosts.length; i++) {
+      var host = hosts[i];
+      var tag = host.tagName.toLowerCase();
+      // A list page holds its tabs subpage inside its own shadow root.
+      if (tag === 'hass-tabs-subpage-data-table') {
+        host = shadow(host) && host.shadowRoot.querySelector('hass-tabs-subpage');
+        tag = 'hass-tabs-subpage';
+      }
+      if (!shadow(host)) continue;
+      var root = host.shadowRoot;
+      if (tag.indexOf('top-app-bar') >= 0) {
+        addStyle(host, 'lena-bar', SETTINGS_APP_BAR_CSS);
+        host.toggleAttribute('lena-bare', !filled(root, 'actionItems'));
+      } else {
+        addStyle(host, 'lena-bar', SUBPAGE_CSS);
+        var ownTitle = filled(root, 'header');
+        host.toggleAttribute('lena-own-title', ownTitle);
+        host.toggleAttribute('lena-bare', !ownTitle &&
+          !root.querySelector('#tabbar:not(.bottom-bar)') && // tabs in the row (on a phone they're at the bottom)
+          !filled(root, 'toolbar-icon') && !filled(root, 'toolbar'));
+      }
+    }
+  }
+
   // The dashboard on that page, if it is one.
   function dashboard() {
     var p = panel();
@@ -191,6 +263,8 @@
       var p = panel();
       var bars = shadow(p) ? p.shadowRoot.querySelectorAll('ha-top-app-bar-fixed, ha-two-pane-top-app-bar-fixed') : [];
       for (var i = 0; i < bars.length; i++) addStyle(bars[i], 'lena-bar', APP_BAR_CSS);
+
+      if (p && SETTINGS_PANELS.indexOf(p.tagName) >= 0) trimSettingsPage(p);
 
       // A custom panel (ha-panel-custom) holds its element as a plain child.
       var custom = p && p.tagName === 'HA-PANEL-CUSTOM' ? p.firstElementChild : null;

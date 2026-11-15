@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Settings and Profile fit under Lena's bar.** On the wall display, Home Assistant's Settings and Profile pages kept their own header under Lena's bar, the only pages that still did. Now their menu button, back arrow and title go, as on dashboards (the menu is in Lena's bar, back is the back gesture), and a page with nothing else in that row moves up into its space. Where the row holds things found nowhere else (tabs like Automations | Scenes | Scripts, a page's Save or ⋮ menu, Restart on Settings' first page, a list's search box on a phone), just those stay ([How it works](docs/app/How-It-Works.md)).
+
 ## [0.6.23] - 2026-11-15
 
 ### Android app
