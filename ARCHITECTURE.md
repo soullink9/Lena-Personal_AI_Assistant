@@ -180,12 +180,12 @@ The project lives on Gitea, which push-mirrors to GitHub, the public copy people
 
 | File | What it does |
 |---|---|
-| `.gitea/workflows/test.yml` | Every push and pull request on Gitea: `tools/check.py`, the Open WebUI files on Python 3.11, the integration on Home Assistant 2026.9 and the latest, the newest Home Assistant starting, and the app's checks and build |
+| `.gitea/workflows/test.yml` | Every push and pull request on Gitea: `tools/check.py`, the Open WebUI files on Python 3.11, the integration on Home Assistant 2026.11 and the latest, the newest Home Assistant starting, and the app's checks and build |
 | `.gitea/workflows/release.yml` | Run workflow (a version) or a pushed `v*.*.*` tag on Gitea: the same tests, then the signed APK checked and published as the Gitea release |
 | `.github/workflows/release.yml` | The same release on GitHub, started by the tag Gitea's mirror pushes (or its own Run workflow) |
 | `.github/workflows/catch-up-releases.yml` | After each mirror push and every 6 hours: starts `release.yml` on each version's tag that has no GitHub release yet (GitHub starts nothing for a push of more than three tags) |
 | `.github/workflows/build.yml` | A test build of the app on GitHub for each change to it, kept as the run's artifact |
-| `.github/workflows/home-assistant.yml` | The integration's tests on GitHub, plus Home Assistant's hassfest and HACS's checks, which only exist as GitHub actions |
+| `.github/workflows/home-assistant.yml` | The integration's tests on GitHub, plus Home Assistant's hassfest and the Marketplace's checks, which only exist as GitHub actions |
 | `scripts/release_notes.py` | Checks the tag against every part's version and the changelog; writes the notes (install steps, then the changelog section, linking to GitHub) |
 | `scripts/check_apk.py` | Checks the APK as Lena's updater and Android will: signed with the release key, Lena's package and version, listed in `SHA256SUMS` |
 | `scripts/publish_gitea_release.py` | Creates or updates the Gitea release and replaces its files, through Gitea's API |

@@ -1,6 +1,5 @@
 """Lena's integration in a real Home Assistant: setup, entities, her AI tools, the view, events."""
 
-import dataclasses
 from datetime import timedelta
 
 import pytest
@@ -43,17 +42,29 @@ async def setup(hass: HomeAssistant, options=None) -> MockConfigEntry:
 
 
 def context() -> llm.LLMContext:
-    """An LLMContext for whichever fields this Home Assistant has."""
-    values = {"platform": "test", "context": None, "language": "en", "assistant": "conversation", "device_id": None}
-    names = {f.name for f in dataclasses.fields(llm.LLMContext)}
-    return llm.LLMContext(**{k: v for k, v in values.items() if k in names})
+    """An LLMContext as Assist would make it for a typed request."""
+    return llm.LLMContext(platform="test", context=None, language="en", assistant="conversation", device_id=None)
 
 
-def data(result):
-    """A tool's result data: Home Assistant returns a ToolResult on newer versions and a plain dict on
-    older ones.
+async def test_entity_id_change_in_place(hass: HomeAssistant) -> None:
+    """Changing one of her entity IDs (Settings → Entities) renames it in place, as Home Assistant does for
+    its own, instead of removing and adding it again.
     """
-    return getattr(result, "data", result)
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers.entity import _entity_class_requires_readd
+
+    from custom_components.lena.assist_satellite import LenaSatellite
+    from custom_components.lena.select import FeelingSelect
+    from custom_components.lena.todo import LenaMemory
+
+    for entity_class in (FeelingSelect, LenaMemory, LenaSatellite):
+        assert not _entity_class_requires_readd(entity_class), entity_class.__name__
+
+    await setup(hass)
+    er.async_get(hass).async_update_entity("select.lena_mood", new_entity_id="select.her_mood")
+    await hass.async_block_till_done()
+    assert hass.states.get("select.lena_mood") is None
+    assert hass.states.get("select.her_mood").state == hass.data[DOMAIN].feelings.mood
 
 
 async def test_entities(hass: HomeAssistant) -> None:
@@ -92,16 +103,19 @@ async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
     names = {t.name for t in api.tools}
     assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_alarm",
                      "set_reminder", "cancel_alarm_or_reminder", "list_alarms_and_reminders", "set_volume", "announce"}
+    # Each tool says whose it is and how it behaves, so Home Assistant (and its MCP server) don't take it for
+    # one that destroys things outside the house.
+    assert all(t.integration == DOMAIN and t.title and t.annotations != llm.ToolAnnotations() for t in api.tools)
 
     result = await api.async_call_tool(llm.ToolInput(tool_name="remember_fact", tool_args={"fact": "Alex likes the office at seventy degrees."}))
-    assert data(result)["saved"].startswith("Alex")
+    assert result.data["saved"].startswith("Alex")
     await hass.async_block_till_done()
     assert hass.states.get("todo.lena_memory").state == "1"
     api = await llm.async_get_api(hass, "lena", context())
     assert "Alex likes the office at seventy degrees." in api.api_prompt
 
     result = await api.async_call_tool(llm.ToolInput(tool_name="record_feeling", tool_args={"moment": "Pleased", "reason": "Alex said thanks."}))
-    assert data(result)["recorded"] is True
+    assert result.data["recorded"] is True
     await hass.async_block_till_done()
     moment = hass.states.get("select.lena_moment")
     assert moment.state == "Pleased" and moment.attributes["reason"] == "Alex said thanks."
@@ -453,7 +467,7 @@ async def test_add_calendar_event_tool(hass: HomeAssistant) -> None:
         tool_name="add_calendar_event",
         tool_args={"calendar": "personal", "title": "Dentist", "start": "2026-11-14T15:30", "location": "Main St"},
     ))
-    assert data(result)["added"] == "Dentist" and data(result)["calendar"] == "Personal"
+    assert result.data["added"] == "Dentist" and result.data["calendar"] == "Personal"
     call = calls[-1].data
     assert call["entity_id"] == "calendar.personal" and call["summary"] == "Dentist" and call["location"] == "Main St"
     start = dt_util.parse_datetime(call["start_date_time"])
@@ -473,7 +487,7 @@ async def test_add_calendar_event_tool(hass: HomeAssistant) -> None:
         tool_name="add_calendar_event",
         tool_args={"calendar": "Personal", "title": "Call", "start": "2026-11-14T15:30", "end": "2026-11-14T15:00"},
     ))
-    assert data(result)["added"] is None and "after the start" in data(result)["error"]
+    assert result.error and result.data["added"] is None and "after the start" in result.data["error"]
     assert len(calls) == count
 
 
@@ -689,13 +703,14 @@ async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass
         await hass.services.async_call(DOMAIN, "set_timer", {"seconds": 90000, "device_id": kitchen}, blocking=True, return_response=True)
 
     # Her Assist tools use the device the question came from.
-    names = {f.name for f in dataclasses.fields(llm.LLMContext)}
-    values = {"platform": "test", "context": None, "language": "en", "assistant": "conversation", "device_id": kitchen}
-    api = await llm.async_get_api(hass, "lena", llm.LLMContext(**{k: v for k, v in values.items() if k in names}))
-    result = data(await api.async_call_tool(llm.ToolInput(tool_name="set_volume", tool_args={"change": "quieter"})))
-    assert result == {"volume": "quieter", "on": "Kitchen tablet"}
-    result = data(await api.async_call_tool(llm.ToolInput(tool_name="set_alarm", tool_args={"time": "25:00"})))
-    assert result["done"] is False and "isn't a time" in result["error"]
+    api = await llm.async_get_api(hass, "lena", llm.LLMContext(
+        platform="test", context=None, language="en", assistant="conversation", device_id=kitchen,
+    ))
+    result = await api.async_call_tool(llm.ToolInput(tool_name="set_volume", tool_args={"change": "quieter"}))
+    assert result.data == {"volume": "quieter", "on": "Kitchen tablet"} and not result.error
+    # A miss comes back marked as an error, with words she can act on.
+    result = await api.async_call_tool(llm.ToolInput(tool_name="set_alarm", tool_args={"time": "25:00"}))
+    assert result.error and result.data["done"] is False and "isn't a time" in result.data["error"]
     latest = await _sync(client, "kitchen-tab", after=first["seq"], boot=first["boot"])
     assert [c["type"] for c in latest["commands"]] == ["cancel", "volume"]
     assert latest["commands"][0]["ha_id"] == timer["ha_id"]

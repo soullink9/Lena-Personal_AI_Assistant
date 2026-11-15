@@ -8,20 +8,20 @@ Menu names change between Home Assistant versions; if a path doesn't match, look
 
 ## What you need
 
-- Home Assistant 2026.9 or newer (the integration is tested against 2026.9 and the latest release).
+- Home Assistant 2026.11 or newer. Lena is built for the newest Home Assistant only: each release of hers may need the Home Assistant release that came out before it, so update Home Assistant first.
 - Lena built in Ollama ([Getting started, part 1](../Getting-Started.md#1-her-model)).
 - For voice: speech-to-text and text-to-speech connected to Home Assistant, for example Whisper and Piper through the Wyoming integration ([Piper](../voice/Piper.md)). Not needed if you only type to her.
-- To install by hand rather than with HACS: a way to copy a folder into your Home Assistant config folder (the File editor or Studio Code Server add-on, a Samba share, or SSH).
+- To install by hand rather than from the Marketplace: a way to copy a folder into your Home Assistant config folder (the File editor or Studio Code Server add-on, a Samba share, or SSH).
 
 ## 1. Install the integration
 
-**With HACS, or Home Assistant's Marketplace** (Home Assistant 2026.11 and newer, where HACS is built in): add this repository as a custom repository, type **Integration**:
+**From the Marketplace** (Settings → Marketplace, which replaced HACS in Home Assistant 2026.11): select **Add from link** and enter this repository (the first time, it asks you to connect a GitHub account, which only reads public repositories):
 
 ```
 https://github.com/soullink9/Lena-Personal_AI_Assistant
 ```
 
-Then find **Lena**, download it, and restart Home Assistant. Updates then show up there whenever a new version is released. It offers released versions only, never work in progress.
+Then open **Lena**, select **Install**, and Home Assistant goes straight on to adding her (step 2), with no restart. Updates show up under Settings → Updates whenever a new version is released; installing one needs a restart, which Home Assistant offers in Repairs. It offers released versions only, never work in progress. If you had installed her with HACS before 2026.11, she moved to the Marketplace by herself.
 
 **By hand:** copy `custom_components/lena` from this repository into your Home Assistant config folder (the one with `configuration.yaml`), so you have:
 
@@ -98,4 +98,4 @@ If something's wrong, see [Troubleshooting](Troubleshooting.md). Then finish the
 
 ## Updating
 
-With HACS or the Marketplace, update it there when a new version shows, then restart. By hand, copy the new `custom_components/lena` folder over the old one and restart. Either way, your edits to `feelings.yaml` are overwritten, so keep a copy if you've changed it.
+From the Marketplace, install the update under Settings → Updates, then restart. By hand, copy the new `custom_components/lena` folder over the old one and restart. Either way, your edits to `feelings.yaml` are overwritten, so keep a copy if you've changed it.

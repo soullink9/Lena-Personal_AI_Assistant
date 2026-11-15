@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from homeassistant.components import persistent_notification
+from homeassistant.components.homeassistant.exposed_entities import async_should_expose
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -420,10 +421,6 @@ class LenaCore:
         ("curtains" doesn't find "Living Room Curtains"), so without this she guesses. Names only,
         never states: states change, and she checks those live.
         """
-        try:
-            from homeassistant.components.homeassistant.exposed_entities import async_should_expose
-        except ImportError:
-            return ""
         entities, devices, areas = er.async_get(self.hass), dr.async_get(self.hass), ar.async_get(self.hass)
         rooms: dict[str, dict[str, list[str]]] = {}
         count, more = 0, False

@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from homeassistant.components.homeassistant.exposed_entities import async_should_expose
 from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
 
@@ -30,10 +31,8 @@ class HistoryError(ValueError):
 def _exposed(hass: HomeAssistant, entity_id: str) -> bool:
     """Whether she's allowed to see it: exposed to Assist, as her other house tools are."""
     try:
-        from homeassistant.components.homeassistant.exposed_entities import async_should_expose
-
         return async_should_expose(hass, "conversation", entity_id)
-    except (ImportError, KeyError):
+    except KeyError:  # exposure settings not loaded yet
         return True
 
 

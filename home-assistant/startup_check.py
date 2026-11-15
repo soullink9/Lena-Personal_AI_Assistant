@@ -2,8 +2,9 @@
 
 The tests (tests/) need Home Assistant's test harness, which is published a little after each Home
 Assistant release. This check needs only Home Assistant itself, so it can try a release the day it comes
-out: Lena must load, her context endpoint must answer, and every warning or error Home Assistant logs
-about her (including its notes on things she uses that are deprecated) is listed.
+out: Lena must load, her context endpoint must answer, one of her Assist tools must answer the way this
+Home Assistant expects, renaming one of her entities must keep it, and she must unload cleanly. Every warning
+or error Home Assistant logs about her (including its notes on things she uses that are deprecated) is listed.
 
     python startup_check.py CONFIG_DIR
 
@@ -25,6 +26,9 @@ from homeassistant import bootstrap, runner
 from homeassistant.auth.models import TOKEN_TYPE_LONG_LIVED_ACCESS_TOKEN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import __version__
+from homeassistant.helpers import entity_registry as er, llm
+from homeassistant.helpers.entity import _entity_class_requires_readd
+from homeassistant.helpers.entity_platform import async_get_platforms
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -103,12 +107,50 @@ async def check(config_dir: Path) -> int:
         except Exception as e:  # noqa: BLE001 - any failure is the finding
             print(f"Her context didn't answer: {e!r}")
 
+    # One of her Assist tools, called as a conversation agent calls it: the answer must be a ToolResult.
+    tool_ok = False
+    if loaded:
+        try:
+            api = await llm.async_get_api(hass, "lena", llm.LLMContext(
+                platform="startup_check", context=None, language="en", assistant="conversation", device_id=None,
+            ))
+            result = await api.async_call_tool(
+                llm.ToolInput(tool_name="remember_fact", tool_args={"fact": "The start-up check ran."})
+            )
+            tool_ok = isinstance(result, llm.ToolResult) and not result.error
+            print(f"Her tools: {len(api.tools)}, remember_fact answered {result!r}")
+        except Exception as e:  # noqa: BLE001 - any failure is the finding
+            print(f"Her tools didn't answer: {e!r}")
+
+    # Renaming an entity ID (Settings → Entities) changes each of her entities in place, as Home Assistant
+    # does for its own, rather than removing it and adding it again (the fallback ends in 2027.11).
+    rename_ok = False
+    if loaded:
+        readded = sorted({
+            type(entity).__name__
+            for platform in async_get_platforms(hass, "lena")
+            for entity in platform.entities.values()
+            if _entity_class_requires_readd(type(entity))
+        })
+        er.async_get(hass).async_update_entity("select.lena_mood", new_entity_id="select.lena_mood_renamed")
+        await hass.async_block_till_done()
+        moved = hass.states.get("select.lena_mood") is None and hass.states.get("select.lena_mood_renamed") is not None
+        rename_ok = moved and not readded
+        print(f"Renaming her entity IDs: {'in place' if rename_ok else f'removed and added again ({readded})'}")
+
+    # Unloading, as disabling or reloading her does.
+    unload_ok = False
+    if loaded:
+        unload_ok = await hass.config_entries.async_unload(entries[0].entry_id)
+        await hass.async_block_till_done()
+        print(f"Unloading her: {entries[0].state.value}")
+
     await hass.async_stop()
     errors = 0
     for level, line in dict.fromkeys(collected.lines):
         print(f"{level}: {line}")
         errors += level in ("ERROR", "CRITICAL")
-    return 0 if loaded and context_ok and errors == 0 else 1
+    return 0 if loaded and context_ok and tool_ok and rename_ok and unload_ok and errors == 0 else 1
 
 
 def main() -> int:

@@ -1,8 +1,8 @@
 name: Home Assistant integration
 
 # Tests custom_components/lena against a real Home Assistant, and checks it the way Home Assistant
-# (hassfest) and HACS / Home Assistant's Marketplace do. The tests also run on the Gitea runner
-# (.gitea/workflows/test.yml, with the same scripts); hassfest and HACS's checks are GitHub actions, so they
+# (hassfest) and Home Assistant's Marketplace do. The tests also run on the Gitea runner
+# (.gitea/workflows/test.yml, with the same scripts); hassfest and the Marketplace's checks are GitHub actions, so they
 # run here only.
 on:
   push:
@@ -19,10 +19,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The newest Home Assistant the test harness supports, and the oldest Lena supports (keep that one
-        # last: tools/check.py compares it with hacs.json). The start-up job below tries a release before
-        # its harness is out.
-        home-assistant: ["latest", "2026.9"]
+        # The newest Home Assistant the test harness supports, and the release Lena targets (keep that one
+        # last: tools/check.py compares it with hacs.json). Lena supports only that release and newer; until
+        # the harness for it is out, the tests are skipped with a warning and the start-up job below checks her.
+        home-assistant: ["latest", "2026.11"]
     name: test (Home Assistant ${{ matrix.home-assistant }})
     steps:
       - uses: actions/checkout@v5
@@ -35,7 +35,8 @@ jobs:
 
   startup:
     # The newest Home Assistant on PyPI, even before its test harness is out: Lena must load, her context
-    # must answer over HTTP, and nothing it logs about her may be an error (home-assistant/startup_check.py).
+    # must answer over HTTP, a tool must answer, renaming an entity ID must happen in place, she must unload,
+    # and nothing it logs about her may be an error (home-assistant/startup_check.py).
     name: start-up (newest Home Assistant)
     runs-on: ubuntu-24.04
     steps:
@@ -54,8 +55,9 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
-    # What HACS (and Home Assistant's Marketplace, built from it) checks before it can install Lena.
-    # HACS only validates public repositories, so this waits until the repository is public.
+    # What Home Assistant's Marketplace (HACS until 2026.11) checks before it can list Lena: hacs.json, the
+    # manifest and its categories, brand images. It only validates public repositories, so this waits until
+    # the repository is public.
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     steps:

@@ -279,7 +279,7 @@ APPROVED_GRADLE = {
 }
 APPROVED_GRADLE_PLUGINS = {"com.android.application", "org.jetbrains.kotlin.android", "org.jetbrains.kotlin.plugin.compose"}
 # What Home Assistant and Open WebUI already provide to the code that runs inside them.
-APPROVED_PYTHON = {"homeassistant", "aiohttp", "voluptuous", "probatio", "yaml", "pydantic"}
+APPROVED_PYTHON = {"homeassistant", "aiohttp", "probatio", "yaml", "pydantic"}
 
 used_gradle = set(re.findall(r'(?:implementation|platform)\("([\w.\-]+:[\w.\-]+)', gradle))
 for dep in sorted(used_gradle - APPROVED_GRADLE):
@@ -320,9 +320,11 @@ for issue in issues:
     check(False, f"adjustments/defaults.env: {issue}")
 check(not issues, "adjustments/defaults.env is applied and matches Defaults.kt")
 
-# ---- 13. HACS and Home Assistant's Marketplace ---------------------------------------------------
-# They install the one integration under custom_components/ at the repository's root, need hacs.json,
-# these manifest keys, and brand images in the integration (https://hacs.xyz/docs/publish/integration).
+# ---- 13. Home Assistant's Marketplace -------------------------------------------------------------
+# It installs the one integration under custom_components/ at the repository's root, needs hacs.json, these
+# manifest keys, and brand images in the integration (https://hacs.xyz/docs/publish/integration). It browses by
+# the manifest's categories: one to three from https://contributors.home-assistant.io/core/integrations/categories/
+# (its check fails on an unknown one).
 
 hacs = json.loads((ROOT / "hacs.json").read_text())
 check(bool(hacs.get("name")), "hacs.json has a name")
@@ -331,17 +333,20 @@ check(integrations == ["lena"], f"custom_components/ holds only lena (found {int
 for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
     check(bool(manifest.get(key)), f"the integration's manifest.json has {key}")
 check((LENA / "brand" / "icon.png").exists(), "custom_components/lena/brand/icon.png exists")
+check(manifest.get("categories") == ["ai_voice.voice_assistants"],
+      "the integration's manifest.json lists its Marketplace category (ai_voice.voice_assistants)")
 # Gitea's runner runs steps with sh unless told otherwise; the steps are written for bash, as on GitHub.
 for workflow in sorted((ROOT / ".gitea" / "workflows").glob("*.yml")):
     shell = (yaml.safe_load(workflow.read_text()).get("defaults") or {}).get("run", {}).get("shell")
     check(shell == "bash", f"{workflow.relative_to(ROOT)} runs its steps in bash (defaults: run: shell: bash)")
 
-# The tests run on GitHub and on Gitea, before every release too, each with the same list of Home Assistant releases.
+# The tests run on GitHub and on Gitea, before every release too, each with the same list of Home Assistant releases,
+# the last being the one Lena targets: the one in hacs.json, the only one she supports along with newer ones.
 for workflow in (".github/workflows/home-assistant.yml", ".github/workflows/release.yml",
                  ".gitea/workflows/test.yml", ".gitea/workflows/release.yml"):
     oldest = re.search(r'home-assistant: \[.*"(\d{4}\.\d+)"\]', (ROOT / workflow).read_text())
     check(oldest is not None and hacs.get("homeassistant", "").startswith(oldest.group(1) + "."),
-          f"hacs.json's minimum Home Assistant is the oldest one {workflow} tests on")
+          f"hacs.json's minimum Home Assistant is the release {workflow} tests on last")
 
 # ---- 14. The wall display debloat script ------------------------------------------------------------
 # tools/wall-display-debloat.sh must parse, and its lists (written by tools/debloat_lists.py) must never

@@ -18,11 +18,12 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
+from homeassistant.components.homeassistant.exposed_entities import async_should_expose
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
+import probatio as vol
 
-from .compat import vol
 
 # CalendarEntityFeature.CREATE_EVENT; a plain number, so this file doesn't depend on the calendar
 # integration being loaded.
@@ -39,25 +40,19 @@ class EventError(Exception):
 def writable_calendars(hass: HomeAssistant) -> dict[str, str]:
     """The calendars she may add to, by name: exposed to Assist and able to take new events.
 
-    If Home Assistant's exposure settings can't be read (they always can in a running Home
-    Assistant), every calendar that takes new events counts.
+    If Home Assistant's exposure settings aren't loaded yet, every calendar that takes new events
+    counts.
     """
-    try:
-        from homeassistant.components.homeassistant.exposed_entities import async_should_expose
-    except ImportError:
-        async_should_expose = None
-
     calendars: dict[str, str] = {}
     for state in hass.states.async_all("calendar"):
         features = state.attributes.get("supported_features", 0) or 0
         if not features & CREATE_EVENT:
             continue
-        if async_should_expose is not None:
-            try:
-                if not async_should_expose(hass, "conversation", state.entity_id):
-                    continue
-            except KeyError:  # exposure settings not loaded: fall back to every writable calendar
-                pass
+        try:
+            if not async_should_expose(hass, "conversation", state.entity_id):
+                continue
+        except KeyError:  # exposure settings not loaded: fall back to every writable calendar
+            pass
         calendars[state.name] = state.entity_id
     return calendars
 

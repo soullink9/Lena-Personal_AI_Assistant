@@ -3,7 +3,11 @@
 # and what Lena loads at the versions that release pins, then runs home-assistant/tests.
 #
 #   scripts/test_home_assistant.sh latest     the newest release the harness supports
-#   scripts/test_home_assistant.sh 2026.9     the newest harness for that release (the oldest Lena supports)
+#   scripts/test_home_assistant.sh 2026.11    the newest harness for that release (the one Lena targets, hacs.json)
+#
+# Lena supports only the Home Assistant release in hacs.json and newer. The harness comes out days or weeks after
+# each release, so until there is one for that release the tests are skipped with a warning on the run, and
+# scripts/start_home_assistant.sh (which needs no harness) is what checks her on it.
 #
 # Used by the workflows on Gitea (.gitea/workflows/test.yml, release.yml) and GitHub (home-assistant.yml,
 # release.yml), so every runner tests the same way. It pip installs, so run it in a container or a virtualenv.
@@ -17,25 +21,44 @@ repo="$(cd "$(dirname "$0")/.." && pwd)"
 log="$(mktemp)"
 export PIP_ROOT_USER_ACTION=ignore PIP_DISABLE_PIP_VERSION_CHECK=1  # containers run as root; that's fine here
 
-if [ "$release" = "latest" ]; then
-  pip install -q pytest-homeassistant-custom-component
-else
-  # The test harness is released once per Home Assistant version; find the newest one for this release.
-  harness=$(python - "$release" <<'PY'
+# The test harness is released once per Home Assistant version. Find the newest one for this release (or the
+# newest of all for "latest"), and only one for the release in hacs.json or newer: older ones aren't supported.
+# Prints "<harness version> <its Home Assistant version>", or nothing.
+found=$(python - "$release" "$repo/hacs.json" <<'PY'
 import json, sys, urllib.request
-want = sys.argv[1] + "."
-info = json.load(urllib.request.urlopen("https://pypi.org/pypi/pytest-homeassistant-custom-component/json"))
+
+release, hacs = sys.argv[1], sys.argv[2]
+
+
+def year_month(version: str) -> tuple[int, int]:
+    year, month = version.split(".")[:2]
+    return int(year), int(month)
+
+
+minimum = year_month(json.load(open(hacs))["homeassistant"])
+url = "https://pypi.org/pypi/pytest-homeassistant-custom-component"
+info = json.load(urllib.request.urlopen(f"{url}/json"))
 for version in sorted(info["releases"], key=lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")], reverse=True):
-    meta = json.load(urllib.request.urlopen(f"https://pypi.org/pypi/pytest-homeassistant-custom-component/{version}/json"))
-    if any(r.replace(" ", "").startswith("homeassistant==" + want) for r in meta["info"].get("requires_dist") or []):
-        print(version)
+    meta = json.load(urllib.request.urlopen(f"{url}/{version}/json"))
+    pins = [r.replace(" ", "").split("==")[1] for r in meta["info"].get("requires_dist") or []
+            if r.replace(" ", "").startswith("homeassistant==")]
+    if not pins:
+        continue
+    if release != "latest" and year_month(pins[0]) < year_month(release):
+        break  # newest first, so there's none for this release
+    if release == "latest" or pins[0].startswith(release + "."):
+        if year_month(pins[0]) >= minimum:
+            print(version, pins[0])
         break
 PY
-  )
-  if [ -z "$harness" ]; then echo "::error::No test harness for Home Assistant $release on PyPI"; exit 1; fi
-  echo "Test harness $harness"
-  pip install -q "pytest-homeassistant-custom-component==$harness"
+)
+if [ -z "$found" ]; then
+  echo "::warning title=Home Assistant tests skipped::Home Assistant's test harness for $release (or for $(python -c "import json; print(json.load(open('$repo/hacs.json'))['homeassistant'])") and newer, which Lena needs) isn't on PyPI yet. The start-up check runs her on the newest Home Assistant in the meantime."
+  exit 0
 fi
+read -r harness harness_ha <<< "$found"
+echo "Test harness $harness (Home Assistant $harness_ha)"
+pip install -q "pytest-homeassistant-custom-component==$harness"
 # Her tools are called through the conversation integration, and each display is an Assist satellite with
 # Home Assistant's timers: install what those load, at the versions this Home Assistant pins.
 reqs=$(python "$repo/home-assistant/requirements.py" conversation assist_satellite intent)

@@ -84,6 +84,11 @@ class LenaMemory(TodoListEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_UPDATED, self._updated))
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Renaming the entity ID changes it in place: nothing here is keyed on it."""
+        super().async_entity_id_changed(old_entity_id)
+
+    @callback
     def _updated(self) -> None:
         """The memory changed (she remembered or forgot something): refresh and write the state."""
         self._refresh()

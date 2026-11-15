@@ -7,7 +7,7 @@ repository root. Each suite prints `PASS` or `FAIL` per check and exits non-zero
 |---|---|
 | `python3 tools/check.py` | Offline, in seconds: versions, feelings, defaults, private data, approved dependencies, and `tests/test_release.py` |
 | `python3 tests/test_release.py` | The release scripts in `scripts/`, including publishing to a fake Gitea server |
-| `scripts/test_home_assistant.sh latest` (or `2026.9`) | The integration in a real Home Assistant (`home-assistant/tests`); it pip installs, so use a virtualenv |
+| `scripts/test_home_assistant.sh latest` (or `2026.11`) | The integration in a real Home Assistant (`home-assistant/tests`); it pip installs, so use a virtualenv |
 | `scripts/start_home_assistant.sh` | The newest Home Assistant on PyPI starting with Lena |
 | `tools/commands_check/run.sh` | What she understands on her own (timers, alarms, "stop") on example sentences |
 | `tools/pairing_check/run.sh` | Set up from your phone: Lena's QR codes against ones a QR reader read back, the page the device serves used as a phone would, and the page's cipher (in Node, when it's installed) against Java's; and the WebSocket client, with a message of several megabytes and one in two parts |

@@ -13,10 +13,19 @@ from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, llm
+import probatio as vol
 
 from . import abilities, actions, brain, events, history
-from .compat import tool_result, vol
 from .const import DOMAIN, HOUSE_MOMENTS
+
+# How each tool behaves, for whoever lists her tools (Home Assistant's MCP server passes these on to MCP
+# clients). Home Assistant assumes the worst of a tool that says nothing: that it writes, destroys and reaches
+# outside the house.
+READS = llm.ToolAnnotations(read_only=True, destructive=False, idempotent=True, open_world=False)
+ADDS = llm.ToolAnnotations(destructive=False, open_world=False)
+SETS = llm.ToolAnnotations(destructive=False, idempotent=True, open_world=False)
+CHANGES = llm.ToolAnnotations(destructive=True, open_world=False)
+REMOVES = llm.ToolAnnotations(destructive=True, idempotent=True, open_world=False)
 
 SPOKEN = "You're talking through Home Assistant, so your replies are usually spoken aloud through the house's speakers."
 
@@ -36,6 +45,8 @@ class RememberTool(llm.Tool):
     knows it.
     """
     name = "remember_fact"
+    title = "Remember a fact"
+    annotations = ADDS
     integration = DOMAIN
     description = (
         "Save something to your memory, which is shared with the chat app and the phone. Use it when someone "
@@ -48,12 +59,14 @@ class RememberTool(llm.Tool):
     async def async_call(self, hass, tool_input, llm_context):
         """Saves the fact and tells her what was saved."""
         item = _core(hass).remember(tool_input.tool_args["fact"])
-        return tool_result({"saved": item["summary"]})
+        return llm.ToolResult(data={"saved": item["summary"]})
 
 
 class ForgetTool(llm.Tool):
     """forget_fact: removes the saved fact that best matches what she was asked to forget."""
     name = "forget_fact"
+    title = "Forget a fact"
+    annotations = CHANGES
     integration = DOMAIN
     description = "Remove something from your memory when someone asks you to forget it."
     parameters = vol.Schema({
@@ -65,7 +78,7 @@ class ForgetTool(llm.Tool):
         forgotten something she never knew.
         """
         removed = _core(hass).forget(tool_input.tool_args["fact"])
-        return tool_result({"forgot": removed} if removed else {"forgot": None, "note": "Nothing like that was saved."})
+        return llm.ToolResult(data={"forgot": removed} if removed else {"forgot": None, "note": "Nothing like that was saved."})
 
 
 class FeelTool(llm.Tool):
@@ -73,6 +86,8 @@ class FeelTool(llm.Tool):
     (thanks, an insult, good news).
     """
     name = "record_feeling"
+    title = "Record a feeling"
+    annotations = SETS
     integration = DOMAIN
     description = (
         "Record how something the person just said or did made you feel. Use it only when it genuinely affects "
@@ -92,7 +107,7 @@ class FeelTool(llm.Tool):
     async def async_call(self, hass, tool_input, llm_context):
         """Sets the moment and reason; false if the moment isn't one of hers."""
         ok = _core(hass).feel(tool_input.tool_args["moment"], tool_input.tool_args.get("reason", ""))
-        return tool_result({"recorded": ok})
+        return llm.ToolResult(data={"recorded": ok}, error=not ok)
 
 
 class AddEventTool(llm.Tool):
@@ -101,6 +116,8 @@ class AddEventTool(llm.Tool):
     lena.add_event action that Open WebUI uses.
     """
     name = "add_calendar_event"
+    title = "Add a calendar event"
+    annotations = llm.ToolAnnotations(destructive=False)
     integration = DOMAIN
     description = (
         "Add an event to a calendar when someone asks you to put something on it, book it or remind them on a "
@@ -131,8 +148,8 @@ class AddEventTool(llm.Tool):
                 args.get("end"), args.get("location"), args.get("description"),
             )
         except events.EventError as error:
-            return tool_result({"added": None, "error": str(error)})
-        return tool_result(added)
+            return llm.ToolResult(data={"added": None, "error": str(error)}, error=True)
+        return llm.ToolResult(data=added)
 
 
 ROOM = "Optional. The room, when they name one (\"tell the kitchen\", \"remind the bedroom\"); leave out to use the display you're talking through"
@@ -148,19 +165,23 @@ class _DisplayTool(llm.Tool):
         raise NotImplementedError
 
     async def async_call(self, hass, tool_input, llm_context):
-        """Runs it, or tells her what's missing (which room, a time she can't read) so she can ask or fix it."""
+        """Runs it, or tells her what's missing (which room, a time she can't read) so she can ask or fix it.
+        A miss is marked as an error, which Home Assistant hands the model along with the words.
+        """
         try:
-            result = self.run(_core(hass), dict(tool_input.tool_args), getattr(llm_context, "device_id", None))
+            result = self.run(_core(hass), dict(tool_input.tool_args), llm_context.device_id)
             if hasattr(result, "__await__"):
                 result = await result
-            return tool_result(result)
+            return llm.ToolResult(data=result)
         except (abilities.AbilityError, history.HistoryError) as error:
-            return tool_result({"done": False, "error": str(error)})
+            return llm.ToolResult(data={"done": False, "error": str(error)}, error=True)
 
 
 class SetAlarmTool(_DisplayTool):
     """set_alarm: an alarm at a time of day."""
     name = "set_alarm"
+    title = "Set an alarm"
+    annotations = ADDS
     description = "Set an alarm that rings on the display at the next time the clock shows that time."
     parameters = vol.Schema({
         vol.Required("time", description="24-hour HH:MM, e.g. 06:45 or 19:00"): cv.string,
@@ -175,6 +196,8 @@ class SetAlarmTool(_DisplayTool):
 class SetReminderTool(_DisplayTool):
     """set_reminder: she says something on the display at a time, or after a while."""
     name = "set_reminder"
+    title = "Set a reminder"
+    annotations = ADDS
     description = ("Remind them of something: at a time (\"at 7\") or after a while (\"in 20 seconds\"). She says the "
                    "message out loud on the display when it's time. Give either at or in_seconds. For something on a "
                    "later day than next week, add a calendar event instead.")
@@ -192,6 +215,8 @@ class SetReminderTool(_DisplayTool):
 class CancelReminderTool(_DisplayTool):
     """cancel_alarm_or_reminder: cancels her alarms or reminders (timers are Home Assistant's own tools)."""
     name = "cancel_alarm_or_reminder"
+    title = "Cancel an alarm or reminder"
+    annotations = REMOVES
     description = "Cancel an alarm or a reminder: the one named, or all of a kind. (For timers, use the timer tools.)"
     parameters = vol.Schema({
         vol.Required("kind", description="alarm or reminder"): vol.In(["alarm", "reminder"]),
@@ -207,6 +232,8 @@ class CancelReminderTool(_DisplayTool):
 class ListRemindersTool(_DisplayTool):
     """list_alarms_and_reminders: what's set (timers are Home Assistant's own tools)."""
     name = "list_alarms_and_reminders"
+    title = "List alarms and reminders"
+    annotations = READS
     description = "What alarms and reminders are set, on this display or everywhere. (For timers, use the timer tools.)"
     parameters = vol.Schema({
         vol.Optional("everywhere", description="True for every display in the house"): cv.boolean,
@@ -220,6 +247,8 @@ class ListRemindersTool(_DisplayTool):
 class SetVolumeTool(_DisplayTool):
     """set_volume: how loudly she speaks."""
     name = "set_volume"
+    title = "Set her volume"
+    annotations = ADDS
     description = "Change how loudly you speak on the display: a level, or quieter or louder."
     parameters = vol.Schema({
         vol.Optional("level", description="0 to 100"): vol.Coerce(int),
@@ -234,6 +263,8 @@ class SetVolumeTool(_DisplayTool):
 class AnnounceTool(_DisplayTool):
     """announce: the intercom."""
     name = "announce"
+    title = "Announce in a room"
+    annotations = ADDS
     description = ("Say something out loud on the display in another room, like an intercom (\"tell the kitchen dinner's "
                    "ready\"). With listen, she listens there for an answer and answers it herself.")
     parameters = vol.Schema({
@@ -249,6 +280,8 @@ class AnnounceTool(_DisplayTool):
 class UpdateFactTool(_DisplayTool):
     """update_fact: corrects a memory in place."""
     name = "update_fact"
+    title = "Correct a fact"
+    annotations = CHANGES
     description = ("Correct something you remember when it's changed or was wrong (\"Alex moved to the night shift\"), "
                    "instead of saving a second, conflicting memory.")
     parameters = vol.Schema({
@@ -263,6 +296,8 @@ class UpdateFactTool(_DisplayTool):
 class HistoryTool(_DisplayTool):
     """house_history: what happened in the house."""
     name = "house_history"
+    title = "Look up the house's history"
+    annotations = READS
     description = ("Look back at the house's history: when something last happened (\"when did the garage door last "
                    "open?\"), how long something lasted (\"how long was the back door open?\"), or what happened today "
                    "(\"what did I miss?\": people coming and going, doors, locks, alarms).")

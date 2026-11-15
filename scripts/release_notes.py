@@ -98,7 +98,7 @@ def install_steps(repo, tag, version):
         f"- **The app:** in Lena, Settings → tap **Software version** → **Updates**. For a first install, "
         f"download [{apk_name(version)}]({apk_url}) on an Android 16 phone and open it "
         "([Installation](docs/app/Installation.md)); `SHA256SUMS` below lets you check the file.\n"
-        "- **Home Assistant integration:** update **Lena** in HACS (or Home Assistant's Marketplace) and restart "
+        "- **Home Assistant integration:** update **Lena** under Settings → Updates (from the Marketplace) and restart "
         "Home Assistant, or copy `custom_components/lena` over the old folder "
         "([Installation](docs/home-assistant/Installation.md)).\n"
         "- **Open WebUI:** paste the new `open-webui/lena_filter.py` and `open-webui/lena_tools.py` over the "

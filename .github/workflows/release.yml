@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        home-assistant: ["latest", "2026.9"]
+        home-assistant: ["latest", "2026.11"]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5

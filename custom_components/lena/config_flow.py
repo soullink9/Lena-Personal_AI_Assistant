@@ -19,9 +19,9 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TimeSelector,
 )
+import probatio as vol
 
 from . import brain
-from .compat import vol
 from .const import (
     CONF_ALERT_AGENT,
     CONF_ALERT_ALL_CLEAR,

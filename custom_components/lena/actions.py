@@ -15,9 +15,9 @@ from typing import Any
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+import probatio as vol
 
 from . import abilities, history
-from .compat import vol
 from .const import DOMAIN
 
 TARGET = {

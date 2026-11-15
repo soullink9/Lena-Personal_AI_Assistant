@@ -75,12 +75,14 @@ jobs:
         run: python3 -m py_compile open-webui/lena_filter.py open-webui/lena_tools.py
 
   home-assistant:
-    # The integration in a real Home Assistant: the newest release its test harness supports, and the oldest Lena
-    # supports (keep that one last: tools/check.py compares it with hacs.json). Python 3.14, which both run on.
+    # The integration in a real Home Assistant: the newest release its test harness supports, and the release Lena
+    # targets (keep that one last: tools/check.py compares it with hacs.json). Lena supports only that release and
+    # newer; until the harness for it is out, the tests are skipped with a warning and the start-up job checks her.
+    # Python 3.14, which both run on.
     strategy:
       fail-fast: false
       matrix:
-        home-assistant: ["latest", "2026.9"]
+        home-assistant: ["latest", "2026.11"]
     runs-on: ubuntu-latest
     container:
       image: python:3.14-bookworm

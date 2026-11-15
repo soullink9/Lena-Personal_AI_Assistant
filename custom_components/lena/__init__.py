@@ -16,9 +16,9 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er, llm
+import probatio as vol
 
 from . import actions, events, tidy
-from .compat import vol
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
 from .displays import LenaDisplayView, display_id_of, displays
@@ -32,7 +32,7 @@ PLATFORMS = [Platform.ASSIST_SATELLITE, Platform.SELECT, Platform.TODO]
 type LenaConfigEntry = ConfigEntry[LenaCore]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None:
     """Starts Lena for this config entry: loads her feelings from feelings.yaml (in the executor, since
     it reads a file), starts the core that runs her day, then the entities, the views and the feel
     and add_event actions.
@@ -159,7 +159,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool
     entry.async_on_unload(lambda: hass.services.async_remove(DOMAIN, "undo_memory_tidy"))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
 
 
 async def async_remove_config_entry_device(hass: HomeAssistant, entry: LenaConfigEntry, device: dr.DeviceEntry) -> bool:
@@ -169,12 +168,10 @@ async def async_remove_config_entry_device(hass: HomeAssistant, entry: LenaConfi
     return display_id_of(device) is not None
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None:
     """Unloads the entities and forgets the core; the core's own timers and listeners stop through the
-    entry's unload callbacks.
+    entry's unload callbacks. Raises (and keeps the core) if Home Assistant couldn't unload an entity.
     """
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data.pop(DOMAIN, None)
-    return unloaded
+    await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
+    hass.data.pop(DOMAIN, None)
 

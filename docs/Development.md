@@ -19,7 +19,7 @@ How the repository is organized and how to change it without breaking things. Th
 ├── ollama/
 │   ├── Modelfile                  her character (MESSAGE system) and model settings
 │   └── docker-compose.example.yml Ollama + keep-alive watchdog
-├── custom_components/lena/        the Lena integration (where HACS looks), copied into Home Assistant as it is
+├── custom_components/lena/        the Lena integration (where the Marketplace looks), copied into Home Assistant as it is
 │   ├── feelings.yaml              every feeling and how it sounds (the only file people edit)
 │   ├── brain.py                   what moves her feelings: plain Python, no Home Assistant
 │   ├── core.py                    runs the brain in Home Assistant, saves feelings and memory
@@ -34,14 +34,13 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── view.py                    GET /api/lena/context for Open WebUI and the app
 │   ├── select.py, todo.py         her dropdowns and her memory list
 │   ├── config_flow.py             adding and configuring her in the UI
-│   ├── compat.py                  differences between Home Assistant versions
 │   └── brand/                     her icon and logo in Home Assistant (made by make_images.py)
 ├── home-assistant/
 │   ├── tests/                     runs the integration in a real Home Assistant
 │   ├── startup_check.py           starts the newest Home Assistant with Lena, before its test harness is out
 │   ├── requirements.py            the packages Home Assistant pins for what Lena loads, for CI
 │   └── pytest.ini
-├── hacs.json                      for HACS and Home Assistant's Marketplace
+├── hacs.json                      for Home Assistant's Marketplace: her name and the Home Assistant she needs
 ├── open-webui/
 │   ├── lena_filter.py             feelings and memory into chats
 │   └── lena_tools.py              memory, feelings, calendar events, timers, intercom, volume, history
@@ -81,7 +80,7 @@ How the repository is organized and how to change it without breaking things. Th
 └── .github/                       GitHub, the public mirror
     ├── workflows/release.yml      the same release on GitHub, from the tag Gitea's mirror pushes
     ├── workflows/build.yml        a test build of the app for each change to it
-    ├── workflows/home-assistant.yml tests the integration on Home Assistant 2026.9 and the latest, plus hassfest and HACS
+    ├── workflows/home-assistant.yml tests the integration on Home Assistant 2026.11 and the latest, plus hassfest and the Marketplace's checks
     └── ISSUE_TEMPLATE/
 ```
 
@@ -125,7 +124,7 @@ The script checks that:
 - the Python files compile, the compose watchdog escapes its dollar signs, and no obvious private data (home IP addresses, tokens, passwords) has crept in;
 - the release scripts work: `tests/test_release.py` (see [tests/README.md](../tests/README.md)).
 
-It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's own tests do run Home Assistant: they start it with the integration on the Gitea runner for every push (and on GitHub for every change to `home-assistant/`), on 2026.9 and the newest release. To run them yourself, in a virtualenv: `scripts/test_home_assistant.sh latest` (or `2026.9`).
+It can't run Home Assistant, Ollama, Open WebUI or the app. The integration's own tests do run Home Assistant: they start it with the integration on the Gitea runner for every push (and on GitHub for every change to `home-assistant/`), on 2026.11 (the release Lena targets) and the newest release. To run them yourself, in a virtualenv: `scripts/test_home_assistant.sh latest` (or `2026.11`).
 
 ## Testing a change for real
 
@@ -155,7 +154,7 @@ Everything shares one version and one changelog.
 | `drawable-nodpi/lena_avatar.png` | Her round avatar in the sheet, drawer, settings, widget and notifications |
 | `docs/assets/lena-avatar.png` | The `lena` model's profile image in Open WebUI |
 | `docs/assets/social-preview.png` | GitHub's social preview: Settings → General → Social preview |
-| `custom_components/lena/brand/` | The integration's icon and logo in Home Assistant 2026.3+: `icon.png` and `@2x` (the logo on its rounded dark tile), `logo.png` with her name in dark text, `dark_logo.png` in white for dark themes |
+| `custom_components/lena/brand/` | The integration's icon and logo in Home Assistant and its Marketplace: `icon.png` and `@2x` (the logo on its rounded dark tile), `logo.png` with her name in dark text, `dark_logo.png` in white for dark themes |
 
 To change the logo, run it with the new file (`python3 tools/make_images.py new-logo.png`), then check the icon in a circle and a rounded square, the notification icon at small size, and the integration's logo on a light and a dark Home Assistant theme.
 

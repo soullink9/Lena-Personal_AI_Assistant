@@ -11,6 +11,9 @@
     "recorder",
     "tts"
   ],
+  "categories": [
+    "ai_voice.voice_assistants"
+  ],
   "codeowners": [
     "@soullink9"
   ],

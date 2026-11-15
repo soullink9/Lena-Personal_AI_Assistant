@@ -12,6 +12,12 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 - **Settings and Profile fit under Lena's bar.** On the wall display, Home Assistant's Settings and Profile pages kept their own header under Lena's bar, the only pages that still did. Now their menu button, back arrow and title go, as on dashboards (the menu is in Lena's bar, back is the back gesture), and a page with nothing else in that row moves up into its space. Where the row holds things found nowhere else (tabs like Automations | Scenes | Scripts, a page's Save or ⋮ menu, Restart on Settings' first page, a list's search box on a phone), just those stay ([How it works](docs/app/How-It-Works.md)).
 
+### Home Assistant integration
+
+- **Built for Home Assistant 2026.11 and its Marketplace.** The integration now needs Home Assistant 2026.11 or newer, and the code that kept it working on 2026.9 and 2026.10 is gone. Update Home Assistant before updating Lena. Install and update her from **Settings → Marketplace**, which replaced HACS in 2026.11 (a HACS install moves there by itself): she's in its voice assistants category (AI and voice), and a first install goes straight on to adding her, with no restart ([Home Assistant installation](docs/home-assistant/Installation.md#1-install-the-integration)).
+- **Her tools describe themselves.** Each of her Assist tools has a title and says how it behaves (whether it only reads, changes or removes something), which Home Assistant passes on, for example to MCP clients through its MCP server; before, Home Assistant took every one of them for a tool that destroys things. When one can't do what was asked, its answer is marked as an error, so the model knows it didn't happen.
+- **Renaming her entities keeps them.** Changing the entity ID of her mood, energy, moment, memory or a display's Assist satellite now renames it in place, as Home Assistant does for its own entities, instead of removing it and adding it again.
+
 ## [0.6.23] - 2026-11-15
 
 ### Android app
