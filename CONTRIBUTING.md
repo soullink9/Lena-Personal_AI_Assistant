@@ -47,7 +47,7 @@ The full map is in [Development](docs/Development.md#layout); in short:
 | `scripts/` | What the workflows run, on Gitea and GitHub alike: the release scripts and the build and test steps |
 | `tests/` | Tests of the release scripts ([tests/README.md](tests/README.md)) |
 | `.gitea/workflows/` | Testing and releasing on the Gitea runner, where the project lives |
-| `.github/workflows/` | The same on GitHub, the public mirror, plus Home Assistant's and HACS's own checks |
+| `.github/workflows/` | The same on GitHub, the public mirror, plus Home Assistant's and the Marketplace's own checks |
 
 ## Checking a change
 
@@ -91,6 +91,7 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 - Her character lives only in `ollama/Modelfile`. Don't copy it into the Home Assistant prompt or Open WebUI.
 - If you add or rename a feeling, follow [Her feelings](docs/personality/Moods.md#adding-or-removing-one); `tools/check.py` tells you what's out of step.
 - Nothing in Home Assistant is set up in YAML: the integration creates what it needs and is configured in the UI.
+- The integration is built for the latest Home Assistant release only (now 2026.11, the `homeassistant` in `hacs.json`), and is installed from Home Assistant's Marketplace. Write it against that release's API and add no code or tests for older releases; when the owner moves to a newer Home Assistant, raise the minimum in `hacs.json` and the last release in the workflows' test matrix together (`tools/check.py` keeps them equal), and remove whatever only the old release needed.
 
 ### The app
 
