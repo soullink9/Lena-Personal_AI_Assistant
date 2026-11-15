@@ -614,7 +614,8 @@ class Api(server: String, private val context: Context? = null) {
     /**
      * Adds this turn to an existing chat after [parentId] (or its latest message), saves it, and
      * returns the thread the model should see: every question and answer from the start of the
-     * chat down this branch to your new message, trimmed to fit half the model's context.
+     * chat down this branch to your new message, trimmed to fit half the model's context, with a note
+     * wherever a long pause came between two messages ([TimePassing]), so she knows what's old.
      * Open WebUI keeps a chat as a tree (edits and regenerations make branches), so the thread is
      * found by walking parent links back from the new message rather than by list order.
      */
@@ -640,11 +641,15 @@ class Api(server: String, private val context: Context? = null) {
             if (role == "user" || role == "assistant") {
                 // Her earlier answers go back without the markup Open WebUI adds (tool-call details and the like).
                 val content = m.optString("content")
-                thread.add(0, JSONObject().put("role", role).put("content", if (role == "assistant") Markdown.clean(content) else content))
+                val message = JSONObject().put("role", role).put("content", if (role == "assistant") Markdown.clean(content) else content)
+                // When it was said, for the notes on time passing (taken off again before it's sent).
+                val at = m.optLong("timestamp")
+                if (at > 0) message.put(TimePassing.AT, toMillis(at))
+                thread.add(0, message)
             }
             cursor = if (m.isNull("parentId")) null else m.optString("parentId")
         }
-        return fitToBudget(thread, contextTokens)
+        return TimePassing.annotate(fitToBudget(thread, contextTokens))
     }
 
     /**
@@ -657,7 +662,7 @@ class Api(server: String, private val context: Context? = null) {
      */
     private fun requestNotes(spoken: Boolean, locked: Boolean, instruction: String?): List<String> {
         val local = java.time.ZonedDateTime.now()
-        val part = when (local.hour) { in 5..11 -> "morning"; in 12..16 -> "afternoon"; in 17..20 -> "evening"; else -> "night" }
+        val part = TimePassing.partOfDay(local.hour)
         val clock = local.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, h:mm a", java.util.Locale.US))
         return listOfNotNull(
             "The time on the phone: $clock ($part).",

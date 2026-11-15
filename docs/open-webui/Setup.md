@@ -45,9 +45,12 @@ Any user's token works; no admin rights are needed. A Home Assistant user just f
    | ha_token | The token from step 3 |
    | memory | On, to include her shared memory |
    | devices | On, to include the exact names of the devices you've exposed to Assist, by room |
+   | time_passing | On, to tell her how much time passed between messages (below) |
    | cache_seconds | 60. How long to reuse Home Assistant's answer |
 
    The date and time come from Home Assistant, in your house's time zone; the model has no clock of its own.
+
+   **Why time_passing:** a model reads every message as if it came a moment ago, so coming back to a chat the next day, she'd carry on with yesterday's topic as if you'd never left. With it on, wherever 30 minutes or more passed between two messages she's told so, and before your new message how long it's been and that the earlier conversation is over; she answers what you say now. The times come from the chat as Open WebUI saved it, in your browser's time zone, so this works even without Home Assistant. The notes go with each request only and never show in the chat. The Lena app adds the same notes itself.
 
    **Why devices:** Home Assistant's house tools find a device only by its exact name or one of its aliases: asked for "curtains", they don't find "Living Room Curtains". With the list of names (by room and kind, never states, so it can't be out of date), she asks for the right thing the first time. It's what Home Assistant's own voice assistant gives the model too. Only what's exposed under Settings → Voice assistants → Expose is listed. For words you use a lot, add an alias to the device there as well (say "Curtains" on Living Room Curtains): it helps her and Home Assistant's own Assist.
 

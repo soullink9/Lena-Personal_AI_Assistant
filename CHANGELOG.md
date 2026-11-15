@@ -4,6 +4,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [Unreleased]
 
+### Her character, the app and Open WebUI
+
+- **She knows how long it's been.** Coming back to a chat after a break, she used to pick up the last topic as if you'd never left, because a model reads every message as if it came a moment ago. Now, wherever 30 minutes or more passed between two messages, she's told so, and before your new message how long it's been ("2 days since the last message, Thursday evening") and that the earlier conversation is over. She answers what you say now, doesn't go back to the old topic unless you do, and doesn't take what was said then as still true. The app adds this to its chats itself; the Open WebUI filter adds it for Open WebUI's own page (its new `time_passing` setting, on by default, which works without Home Assistant). The Modelfile tells her what the notes mean, so rebuild her from the current Modelfile too ([Open WebUI setup](docs/open-webui/Setup.md#4-add-the-filter)).
+
 ### Android app
 
 - **Settings and Profile fit under Lena's bar.** On the wall display, Home Assistant's Settings and Profile pages kept their own header under Lena's bar, the only pages that still did. Now their menu button, back arrow and title go, as on dashboards (the menu is in Lena's bar, back is the back gesture), and a page with nothing else in that row moves up into its space. Where the row holds things found nowhere else (tabs like Automations | Scenes | Scripts, a page's Save or ⋮ menu, Restart on Settings' first page, a list's search box on a phone), just those stay ([How it works](docs/app/How-It-Works.md)).
