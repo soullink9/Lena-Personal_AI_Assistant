@@ -7,6 +7,7 @@ import io.github.soullink9.lena.CameraGrid
 import io.github.soullink9.lena.CameraView
 import io.github.soullink9.lena.HaEntity
 import io.github.soullink9.lena.MotionKind
+import io.github.soullink9.lena.PictureStream
 
 private var failures = 0
 
@@ -105,6 +106,20 @@ fun main() {
     check(CameraGrid.rows(9, 1920f, 1080f) == listOf(3, 3, 3), "nine: 3 by 3")
     check(CameraGrid.rows(3, 1080f, 2340f).all { it == 1 }, "a phone held upright: one picture across")
     check((1..20).all { n -> CameraGrid.rows(n, 1920f, 1080f).sum() == n }, "every camera has a cell, from 1 to 20 of them")
+
+    // Home Assistant's picture stream (MJPEG): each picture whole, with and without its length.
+    val jpegA = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 0x0D, 0x0A, 3, 0xFF.toByte(), 0xD9.toByte())
+    val jpegB = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 4, 5, 0xFF.toByte(), 0xD9.toByte())
+    fun part(jpeg: ByteArray, length: Boolean) =
+        ("--frameboundary\r\nContent-Type: image/jpeg\r\n" + (if (length) "Content-Length: ${jpeg.size}\r\n" else "") + "\r\n").toByteArray() +
+            jpeg + "\r\n".toByteArray()
+    val stream = PictureStream((part(jpegA, true) + part(jpegB, true) + part(jpegA, false)).inputStream())
+    check(stream.next()?.contentEquals(jpegA) == true && stream.next()?.contentEquals(jpegB) == true,
+        "the picture stream gives each picture whole, even with line breaks inside it")
+    check(stream.next()?.contentEquals(jpegA) == true && stream.next() == null,
+        "a picture without its length is read to the JPEG's end; then the stream ends")
+    val cut = PictureStream(part(jpegA, true).copyOf(30).inputStream())
+    check(cut.next() == null, "a picture cut off is no picture")
 
     println()
     if (failures > 0) {

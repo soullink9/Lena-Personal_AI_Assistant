@@ -302,7 +302,8 @@ class CameraActivity : ComponentActivity() {
         activeSensors.clear()
         watchMotion(sock, list, settings.motion)
         val base = Prefs.haServer(this) ?: throw NoCameras("Camera mode needs Home Assistant. Connect it in Settings → Home Assistant.")
-        live = newPlayer(sock, base, settings.sound)
+        val ha = HomeAssistant.from(this) ?: throw NoCameras("Camera mode needs Home Assistant. Connect it in Settings → Home Assistant.")
+        live = newPlayer(sock, ha, base, settings.sound)
         coroutineScope {
             val loops = launch {
                 launch {
@@ -321,15 +322,21 @@ class CameraActivity : ComponentActivity() {
 
     /**
      * The live picture's player on [sock]. If Android ends its web view's page (it crashed, or memory ran
-     * short), a new player takes its place and the camera in the spotlight plays again.
+     * short), a new player takes its place and the camera in the spotlight plays again. Pictures from Home
+     * Assistant's picture stream ([CameraLive.State.PICTURES]) take the place of the spotlight camera's still
+     * picture, as each arrives.
      */
-    private fun newPlayer(sock: HaSocket, base: String, sound: Boolean): CameraLive =
-        CameraLive(this, sock, base, sound, lifecycleScope, onState = { liveState = it }, onGone = {
-            live?.destroy()
-            live = if (sock.closed) null else newPlayer(sock, base, sound)
-            liveState = CameraLive.State.CONNECTING
-            tick()
-        })
+    private fun newPlayer(sock: HaSocket, ha: HomeAssistant, base: String, sound: Boolean): CameraLive =
+        CameraLive(this, sock, ha, base, sound, lifecycleScope, onState = { liveState = it },
+            onPicture = { entity, picture ->
+                cameras.firstOrNull { it.live == entity }?.let { stills[it.id] = picture.asImageBitmap() }
+            },
+            onGone = {
+                live?.destroy()
+                live = if (sock.closed) null else newPlayer(sock, ha, base, sound)
+                liveState = CameraLive.State.CONNECTING
+                tick()
+            })
 
     /** Closes the player and the connection, keeping what's on screen for when it's back. */
     private fun closeConnection() {
@@ -414,7 +421,9 @@ class CameraActivity : ComponentActivity() {
                     now == null -> emptyList()
                     now.spotlight != null -> {
                         val camera = cameras.firstOrNull { it.id == now.spotlight }
-                        if (camera == null || liveState == CameraLive.State.PLAYING) emptyList() else listOf(camera.id to camera.live)
+                        // Not while it's live: in the web view, or picture by picture from the picture stream.
+                        val moving = liveState == CameraLive.State.PLAYING || liveState == CameraLive.State.PICTURES
+                        if (camera == null || moving) emptyList() else listOf(camera.id to camera.live)
                     }
                     else -> now.grid.mapNotNull { id -> cameras.firstOrNull { it.id == id }?.let { it.id to it.still } }
                 }
@@ -744,6 +753,7 @@ class CameraActivity : ComponentActivity() {
                 CameraLook.Pill(camera.name, size = 15.sp)
                 when (liveState) {
                     CameraLive.State.PLAYING -> CameraLook.Pill("Live", dot = CameraLook.live, blink = true, size = 15.sp)
+                    CameraLive.State.PICTURES -> CameraLook.Pill("Live, picture by picture", dot = CameraLook.live, blink = true, size = 15.sp)
                     CameraLive.State.CONNECTING -> CameraLook.Pill("Connecting…", dot = CameraLook.motion, size = 15.sp)
                     CameraLive.State.STILL -> CameraLook.Pill("Still pictures: no live picture from Home Assistant", size = 15.sp)
                 }

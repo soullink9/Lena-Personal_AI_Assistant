@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Checks camera mode away from Android (CameraFinder.kt, CameraDirector.kt): which cameras and sensors it
-# finds in UniFi Protect's entities, and what it shows from moment to moment, against made-up motion. Plain
-# Kotlin, so it runs on any computer with kotlinc or Gradle (Gradle's own Kotlin compiler, as commands_check does).
+# Checks camera mode away from Android (CameraFinder.kt, CameraDirector.kt, PictureStream.kt): which cameras
+# and sensors it finds in UniFi Protect's entities, what it shows from moment to moment, against made-up
+# motion, and how it reads Home Assistant's picture stream.
+# Plain Kotlin, so it runs on any computer with kotlinc or Gradle (Gradle's own Kotlin compiler, as commands_check does).
 #
 #   tools/camera_check/run.sh        (nothing is downloaded)
 set -euo pipefail
@@ -10,7 +11,7 @@ repo="$(cd "$here/../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 src="$repo/android/app/src/main/kotlin/io/github/soullink9/lena"
-sources=("$src/CameraFinder.kt" "$src/CameraDirector.kt" "$here/CameraCheck.kt")
+sources=("$src/CameraFinder.kt" "$src/CameraDirector.kt" "$src/PictureStream.kt" "$here/CameraCheck.kt")
 
 if command -v kotlinc >/dev/null; then
   kotlinc -nowarn "${sources[@]}" -include-runtime -d "$work/check.jar" 2>&1 | grep -v "^warning" || true

@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Android app
+
+- **Live pictures with the cameras on their own network.** Camera mode's live picture said Live over a black screen on phones and tablets, and gave up on still pictures on a TV. Now everything still comes from Home Assistant (never from the cameras, so a camera VLAN only Home Assistant can reach stays as it is), and **Live** only shows once a frame is actually on screen: a WebRTC or HLS stream that opens but never draws one moves on to the next way instead of sitting on black. After WebRTC and HLS comes a third way, Home Assistant's own picture stream (MJPEG), read by the app with its token: a few pictures a second, but it works wherever still pictures do, and the spotlight says **Live, picture by picture**. Each camera starts at the way that worked for it last time ([Camera mode](docs/app/Cameras.md#how-it-plays)).
+
 ## [0.6.24] - 2026-11-15
 
 ### Her character, the app and Open WebUI
