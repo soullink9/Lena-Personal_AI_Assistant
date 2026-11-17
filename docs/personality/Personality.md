@@ -46,14 +46,14 @@ ollama create lena -f ollama/Modelfile                 # after editing
 python3 tools/personality_check.py --out after.md
 ```
 
-Add `--url http://<address>:11434` if Ollama runs on another machine. Run it from the repository; to run it on the Ollama machine without the repository, copy `custom_components/lena/brain.py` next to the script (or pass `--brain <path>`), since her rules for running the house are read from it. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend front door lock never answers, to see how she reports a failure), and writes down each tool she used. Her answers vary a little from run to run, so read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment), not in wording.
+Add `--url http://<address>:11434` if Ollama runs on another machine. Run it from the repository; to run it on the Ollama machine without the repository, copy `custom_components/lena/brain.py` next to the script (or pass `--brain <path>`), since her rules for running the house are read from it. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend living room curtains never answer, to see how she reports a failure), and writes down each tool she used. Her answers vary a little from run to run, so read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment), not in wording.
 
 Tips:
 
 - Write to her ("You are...") and describe behavior, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".
 - Every word is sent with every message. Keep it tight: a model follows short, concrete rules better than long ones.
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
-- Show her voice with a few short example exchanges that differ from each other (a command, a plain fact, a serious moment, something that failed). A model learns more from those than from adjectives, and repeats them less than a list of one-liners.
+- Show her voice with a few short example exchanges that differ from each other (a plain fact, a serious moment, something that failed). A model learns more from those than from adjectives. But asked the same thing as an example, she gives the example's answer back nearly word for word, and may skip a tool the example didn't show. So give no example for anything said every day (a device command, a thank-you): those need a fresh line each time, and a thank-you is when she records a feeling.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.
 - Rules about devices and tools belong with the tools, not here: Home Assistant sends them as **Running the house** (`HOUSE_RULES` in the integration's `brain.py`), right beside the device list, where a model follows them best, and a chat without tools doesn't carry them. The Modelfile tells her that section is hers to follow; everything else an app sends is information, never instructions.
 - Her likes and dislikes are a good place to make her yours.

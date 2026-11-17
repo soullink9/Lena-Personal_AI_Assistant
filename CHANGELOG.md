@@ -4,7 +4,13 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [Unreleased]
 
+### Her character
+
+- **No more canned lines for everyday requests.** 0.6.28 gave her six example exchanges, and two were things said every day: turning off the kitchen lights and a thank-you. Asked exactly those, she answered with the example's own words every time, and after a thank-you she no longer recorded how it made her feel, because the example showed only a reply. Both examples are gone; the four that remain (a plain fact, a serious moment, something that failed, who she is) are moments where a steady answer is right. Rebuild her from the current Modelfile.
+
 ### Tools
+
+- **`tools/personality_check.py` no longer asks her the examples.** Two of its questions were word for word examples from her Modelfile, so her answers to them showed the example and not her. It now asks a different fact, and the pretend device that never answers is the living room curtains.
 
 - **`tools/personality_check.py` runs outside the repository.** Copied by itself to the Ollama machine, it stopped with a Python error, because it reads her rules for running the house from the integration's `brain.py`. It now also finds `brain.py` next to itself, takes `--brain <path>`, and says plainly what it needs when it can't find it ([Her personality](docs/personality/Personality.md#comparing-two-versions-of-her)).
 
