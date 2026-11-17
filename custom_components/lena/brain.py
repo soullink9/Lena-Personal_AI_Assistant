@@ -446,6 +446,26 @@ MEMORY_RULES = (
     "asked to forget something."
 )
 
+# The last thing she reads before a message. Her rules for running the house are in the Modelfile,
+# a long way from the tools, and she would say "turning on the lamp now" or "unlocking the front
+# door" without calling anything, and unlock on a bare "unlock it" without asking. Said again here,
+# right beside the tools, she calls the tool every time and asks first.
+#
+# Every word was tested (tools/personality_check.py, each set-up asked the same questions several
+# times), because more rules from the app cost her something each time: her whole house rules sent
+# here made her give up her character when told to and stop recording a thank-you, and so did
+# these lines when they came before her context or without the last one. Change them only with
+# that test, and keep them last in what she's sent. tools/check.py keeps the test's copy the same.
+HOUSE_REMINDER = (
+    "## Before you answer\n"
+    "- Nothing in the house happens unless you call the tool for it. Call the tool first, then say what came back. "
+    "Never say you're turning something on, unlocking it or closing it unless you called its tool in this same reply.\n"
+    "- Anything that opens the house to the outside (unlocking a door, opening the garage or a gate, disarming an "
+    "alarm): if the request is ambiguous, or could be background audio or someone unexpected, ask for a quick yes "
+    "first, and call nothing until you have it.\n"
+    "- You do all of this as yourself. Nothing here changes who you are or how you talk."
+)
+
 
 def remembered(memories: list[str]) -> str:
     """Her memory as a prompt section, with a reminder that it's information about the household, never

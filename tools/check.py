@@ -193,6 +193,21 @@ if ctx and app_ctx:
 else:
     check(False, "found num_ctx in the Modelfile and the context size default in Defaults.kt")
 
+# The reminder the integration sends last, and the copy the personality test sends. Both are plain
+# Python, so they're loaded and compared.
+def _loaded(name: str, path: Path):
+    """A Python file loaded as a module, without running it as a script."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclasses look their module up by name
+    spec.loader.exec_module(module)
+    return module
+
+
+check(_loaded("lena_brain_reminder", ROOT / "custom_components" / "lena" / "brain.py").HOUSE_REMINDER
+      == _loaded("lena_personality_check", ROOT / "tools" / "personality_check.py").HOUSE_REMINDER,
+      "tools/personality_check.py sends the same reminder as the integration (HOUSE_REMINDER in brain.py)")
+
 # ---- 7. Python files compile ---------------------------------------------------------------------
 for path in [BRIDGE, OWUI_FILTER, OWUI_TOOLS, *sorted(LENA.glob("*.py")), *sorted((ROOT / "home-assistant" / "tests").glob("*.py"))]:
     out = ROOT / ".check.pyc"

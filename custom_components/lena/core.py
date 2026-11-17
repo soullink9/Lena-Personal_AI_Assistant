@@ -471,9 +471,11 @@ class LenaCore:
             out.append(f"{state.name} {state.state}{' ' + unit if unit else ''}")
         return out
 
-    def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False) -> str:
+    def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False,
+                reminder: bool = False) -> str:
         """The time, who's home, the weather outside from your own sensors, how she feels and what she
-        remembers (and, if asked, the home's devices).
+        remembers (and, if asked, the home's devices, and last of all the reminder to call a tool before
+        saying something's done).
         """
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
         right_now = (
@@ -489,6 +491,8 @@ class LenaCore:
             parts.append(brain.remembered(self.memories()))
         if devices and (index := self.devices()):
             parts.append(index)
+        if reminder:
+            parts.append(brain.HOUSE_REMINDER)  # last: see brain.py
         return "\n\n".join(parts)
 
     # ---- Events ------------------------------------------------------------------------------

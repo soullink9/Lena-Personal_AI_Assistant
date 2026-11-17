@@ -45,7 +45,7 @@ ollama create lena -f ollama/Modelfile                 # after editing
 python3 tools/personality_check.py --out after.md
 ```
 
-Add `--url http://<address>:11434` if Ollama runs on another machine. The script is one file and needs nothing else from the repository, so it can be copied to the Ollama machine by itself. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend living room curtains never answer, to see how she reports a failure), and writes down each tool she used. Her answers vary from run to run, and so does whether she uses a tool, so add `--runs 3` to ask everything three times, and read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment, a tool she stopped using), not in wording.
+Add `--url http://<address>:11434` if Ollama runs on another machine. The script is one file and needs nothing else from the repository, so it can be copied to the Ollama machine by itself. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home, the integration's **Before you answer** reminder (`--no-reminder` leaves it out) and pretend tools, answers for the tools itself (the pretend living room curtains never answer, to see how she reports a failure), and writes down each tool she used. Her answers vary from run to run, and so does whether she uses a tool, so add `--runs 3` to ask everything three times, and read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment, a tool she stopped using), not in wording.
 
 Tips:
 
@@ -53,6 +53,7 @@ Tips:
 - Every word is sent with every message. Keep it tight: a model follows short, concrete rules better than long ones.
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
 - Change what works one piece at a time, and test it. Three well-meant changes made her worse in 0.6.28 to 0.6.30 and were taken out again: replacing her sample lines with example exchanges cost her the remark she adds to everyday answers; moving her house rules out of this file and sending them with the tools made her drop her character when pushed and stop recording how a thank-you made her feel; and a closing line added nothing. `tools/personality_check.py --runs 3` shows this kind of thing; one run doesn't.
+- What she's sent after her character matters as much as the character. The integration ends her context with three lines (**Before you answer**, `HOUSE_REMINDER` in its `brain.py`) that make her call a tool before saying something's done. The same lines placed before her context, or without their last one ("You do all of this as yourself"), made her give up her character when told to. Test any change there the same way.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.
 - Her likes and dislikes are a good place to make her yours.
 

@@ -36,7 +36,8 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
    - that her replies are usually spoken;
    - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), and who's home;
    - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason;
-   - what she remembers, and when to remember or forget something.
+   - what she remembers, and when to remember or forget something;
+   - last of all, a three-line reminder (**Before you answer**): nothing in the house happens unless she calls the tool for it, she asks before opening the house, and she does all of it as herself. Her house rules are in the Modelfile, a long way from the tools, and without the reminder she would sometimes say "turning on the lamp now" without doing it. It has to stay last and as worded: see `HOUSE_REMINDER` in `brain.py`.
 5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact`, `record_feeling` and, when there's a calendar she can write to, `add_calendar_event`.
 
 ### Calendars
@@ -126,7 +127,7 @@ Returns:
 }
 ```
 
-Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
+Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. With the devices comes the same **Before you answer** reminder Home Assistant's own conversations get, at the very end. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
 
 ## /api/lena/display
 

@@ -100,6 +100,8 @@ async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
     assert "Mood: Grumpy." in api.api_prompt
     assert "Mood: Cheerful." not in api.api_prompt  # only her current feelings
     assert "At home: " in api.api_prompt
+    # The reminder to call a tool before saying something's done comes last; it only works there.
+    assert api.api_prompt.endswith("Nothing here changes who you are or how you talk.")
     names = {t.name for t in api.tools}
     assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_alarm",
                      "set_reminder", "cancel_alarm_or_reminder", "list_alarms_and_reminders", "set_volume", "announce"}
@@ -311,9 +313,11 @@ async def test_devices_in_context(hass: HomeAssistant, hass_client) -> None:
     assert "- Living Room: cover: Living Room Curtains (also Curtains)" in text
     assert "- No room: calendar: Personal calendar; cover: Garage Door" in text  # calendars too: their tool wants the name
     assert "Secret Lamp" not in text  # not exposed to Assist
-    assert "closed" not in text.split("## Your home")[1]  # names only, no states
+    assert "closed" not in text.split("## Your home")[1].split("## Before you answer")[0]  # names only, no states
+    assert text.endswith("Nothing here changes who you are or how you talk.")  # the reminder comes with the devices, last
     plain = (await (await client.get("/api/lena/context")).json())["context"]
     assert "## Your home" not in plain
+    assert "## Before you answer" not in plain
 
 
 async def test_time_of_day_in_context(hass: HomeAssistant, freezer) -> None:

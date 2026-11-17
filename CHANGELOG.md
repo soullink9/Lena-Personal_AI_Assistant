@@ -2,6 +2,16 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Home Assistant integration
+
+- **She does what she says she's doing.** Asked to make it brighter or to unlock a door, she would sometimes answer "turning on the Living Room Lamp now" or "I'm unlocking the front door" without calling the tool, so nothing happened, and she'd unlock on a bare "unlock it" without asking. The integration now ends what it sends her with three lines (**Before you answer**): nothing in the house happens unless she calls the tool for it, she asks before opening the house, and she does all of it as herself. Asked the same questions several times with and without them, she went from claiming an action she hadn't taken in about half her answers to never, and asked before unlocking every time, while staying herself when pushed (6 of 6) and still recording a thank-you (6 of 6). Open WebUI and the app get the same lines through the filter, with the device list. **Update the integration; her Modelfile is unchanged, so there's nothing to rebuild** ([What she's told](docs/home-assistant/Integration.md#what-shes-told)).
+
+### Tools
+
+- **`tools/personality_check.py` sends that reminder too**, as the apps do, so its answers show her as she is in use; `--no-reminder` asks her without it.
+
 ## [0.6.31] - 2026-11-17
 
 ### Her character and the Home Assistant integration
