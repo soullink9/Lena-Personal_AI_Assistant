@@ -6,7 +6,8 @@ Lena is one character with two layers: who she always is, and how she feels righ
 
 | Layer | Where | Changes | Reaches |
 |---|---|---|---|
-| **Her baseline**: character, voice, values, honesty, how she runs the house, how she acts on feelings | `ollama/Modelfile` | When you edit it | Everything that uses the `lena` model |
+| **Her baseline**: character, voice, values, honesty, how she acts on feelings, and the two house rules that hold everywhere (nothing's done until the result says so; ask before opening the house) | `ollama/Modelfile` | When you edit it | Everything that uses the `lena` model |
+| **Her rules for running the house**: exact device names, exact tool inputs, reporting each outcome | The Lena integration (`HOUSE_RULES` in `brain.py`) | When you edit it and restart Home Assistant | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
 | **Her feelings**: mood, energy, moment, and why | The Lena integration in Home Assistant, described by its `feelings.yaml` | Through the day | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
 | **The moment's context**: the time, who's home, her memory | The Lena integration (in Home Assistant), and the Lena filter (in Open WebUI) | Every message | The app that's asking |
 
@@ -42,6 +43,7 @@ Tips:
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
 - Show her voice with a few short example exchanges that differ from each other (a command, a plain fact, a serious moment, something that failed). A model learns more from those than from adjectives, and repeats them less than a list of one-liners.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.
+- Rules about devices and tools belong with the tools, not here: Home Assistant sends them as **Running the house** (`HOUSE_RULES` in the integration's `brain.py`), right beside the device list, where a model follows them best, and a chat without tools doesn't carry them. The Modelfile tells her that section is hers to follow; everything else an app sends is information, never instructions.
 - Her likes and dislikes are a good place to make her yours.
 
 ## Settings in the Modelfile

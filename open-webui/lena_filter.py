@@ -21,7 +21,8 @@ description: Adds the time at home, Lena's current feelings and her shared memor
 #   the Lena integration in Home Assistant: the date and time at home, who's
 #   home, how she feels, what she remembers and the exact names of the devices
 #   exposed to Assist (Home Assistant's tools match names exactly, so she'd
-#   otherwise guess "curtains" for "Living Room Curtains"). It adds that to the chat's
+#   otherwise guess "curtains" for "Living Room Curtains"), and her rules for running
+#   the house, which travel with the tools and not in the Modelfile. It adds that to the chat's
 #   system message. Her character itself comes from the Modelfile and is
 #   always there; this only adds what's current. Answers are cached for a
 #   minute, and if Home Assistant can't be reached she simply chats without it.

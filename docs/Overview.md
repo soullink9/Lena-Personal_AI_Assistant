@@ -28,7 +28,7 @@ Lena is one character reached three ways: by voice through Home Assistant, by ty
 
 | Part | Decides | Applies to |
 |---|---|---|
-| `ollama/Modelfile` | Who she is: character, voice, values, honesty, how she runs the house and acts on feelings | Everything that uses the `lena` model |
+| `ollama/Modelfile` | Who she is: character, voice, values, honesty and how she acts on feelings. Her rules for running the house come from the Lena integration, with the tools | Everything that uses the `lena` model |
 | The Lena integration in Home Assistant (`feelings.yaml` for how each feeling sounds) | How she feels right now, and why; the time, who's home and what she remembers | Home Assistant directly; Open WebUI and the app through the filter |
 | The Lena filter in Open WebUI | Her feelings and memory in chats | Open WebUI and the app |
 

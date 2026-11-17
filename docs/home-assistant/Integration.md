@@ -36,7 +36,8 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
    - that her replies are usually spoken;
    - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), and who's home;
    - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason;
-   - what she remembers, and when to remember or forget something.
+   - what she remembers, and when to remember or forget something;
+   - her rules for running the house (**Running the house**): exact device names, exact tool inputs, reporting each outcome of several actions. They sit here, beside the devices and tools they're about, and not in the Modelfile, which keeps only the two that hold everywhere: never say something's done before the result confirms it, and ask before opening the house.
 5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact`, `record_feeling` and, when there's a calendar she can write to, `add_calendar_event`.
 
 ### Calendars
@@ -126,7 +127,7 @@ Returns:
 }
 ```
 
-Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
+`context` ends with her rules for running the house (**Running the house**, the same text Home Assistant's own conversations get); add `?house_rules=0` to leave them out. Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
 
 ## /api/lena/display
 

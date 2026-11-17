@@ -89,6 +89,7 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 ### Personality and Home Assistant
 
 - Her character lives only in `ollama/Modelfile`. Don't copy it into the Home Assistant prompt or Open WebUI.
+- Her rules for running the house (device names, tool inputs) are not character: they live only in `HOUSE_RULES` in `custom_components/lena/brain.py` and are sent with the tools. Don't put them back in the Modelfile.
 - If you add or rename a feeling, follow [Her feelings](docs/personality/Moods.md#adding-or-removing-one); `tools/check.py` tells you what's out of step.
 - Nothing in Home Assistant is set up in YAML: the integration creates what it needs and is configured in the UI.
 - The integration is built for the latest Home Assistant release only (now 2026.11, the `homeassistant` in `hacs.json`), and is installed from Home Assistant's Marketplace. Write it against that release's API and add no code or tests for older releases; when the owner moves to a newer Home Assistant, raise the minimum in `hacs.json` and the last release in the workflows' test matrix together (`tools/check.py` keeps them equal), and remove whatever only the old release needed.

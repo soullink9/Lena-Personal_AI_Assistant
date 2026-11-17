@@ -316,8 +316,8 @@ class LenaAPI(llm.API):
     """Her context and tools, added to whatever else the agent uses (usually Assist)."""
 
     async def async_get_api_instance(self, llm_context: llm.LLMContext) -> llm.APIInstance:
-        """Her context (time, home, feelings, memory) as the API prompt, and her tools, for one
-        conversation.
+        """Her context (time, home, feelings, memory) and her rules for her memory and for running the
+        house as the API prompt, and her tools, for one conversation.
         """
         core = _core(self.hass)
         moments = [m for m in core.catalog.moments if m not in HOUSE_MOMENTS]
@@ -331,5 +331,5 @@ class LenaAPI(llm.API):
         calendars = sorted(events.writable_calendars(self.hass))
         if calendars:
             tools.append(AddEventTool(calendars))
-        prompt = "\n\n".join([SPOKEN, core.context(), brain.MEMORY_RULES])
+        prompt = "\n\n".join([SPOKEN, core.context(), brain.MEMORY_RULES, brain.HOUSE_RULES])
         return llm.APIInstance(api=self, api_prompt=prompt, llm_context=llm_context, tools=tools)
