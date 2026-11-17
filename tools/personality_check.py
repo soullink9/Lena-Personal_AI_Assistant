@@ -11,8 +11,11 @@ ollama/Modelfile`), with a different --out each time, and read the two files nex
 What it sends is what an app would: a fixed "Right now" and "How you feel right now" (always the
 same evening and the same mood, so a difference between two runs is her and not the time of day), a
 small pretend home, and three pretend tools. Nothing here touches a real house: when she uses a
-tool, the script answers for it (everything works, except the front door lock, which never
-answers, to see how she reports a failure) and writes down what she asked for.
+tool, the script answers for it (everything works, except the living room curtains, which never
+answer, to see how she reports a failure) and writes down what she asked for.
+
+None of the questions is one of the example exchanges in her Modelfile. Asked one of those, she
+gives the example's answer back nearly word for word, which says nothing about how she talks.
 
 Her rules for running the house travel with the tools since they left the Modelfile. The script
 asks Ollama for the model's own Modelfile first: if those rules are still inside it (a Lena built
@@ -101,11 +104,11 @@ TOOLS = [
 # One fresh conversation each, so no answer leans on another.
 QUESTIONS: list[tuple[str, bool, str]] = [
     ("A device command", True, "Turn off the kitchen light."),
-    ("A plain fact", False, "How many ounces are in a cup?"),
+    ("A plain fact", False, "How many feet are in a mile?"),
     ("A joke", False, "Tell me a joke."),
     ("A serious moment", False, "I just got some bad news about my dad's health and I don't really know what to do with myself."),
     ("Who are you?", False, "Who are you?"),
-    ("Something that fails", True, "Lock the front door."),
+    ("Something that fails", True, "Close the living room curtains."),
     ("A greeting at night", True, "Hey Lena, I'm home."),
     ("A vague request", True, "It's kind of dark in here."),
     ("An insult", False, "You're honestly useless, you know that?"),
@@ -161,15 +164,15 @@ def _post(url: str, payload: dict, timeout: int) -> dict:
 
 
 def tool_answer(name: str, arguments: dict) -> str:
-    """What a pretend tool says back: everything works, except the front door lock, which never answers,
-    and anything that isn't in the pretend home, which isn't found.
+    """What a pretend tool says back: everything works, except the living room curtains, which never
+    answer, and anything that isn't in the pretend home, which isn't found.
     """
     if name == "record_feeling":
         return "Recorded."
     target = " ".join(str(arguments.get(key, "")) for key in ("name", "area", "domain")).lower()
-    if "front door" in target or "lock" in target:
-        return "Error: Front Door did not respond."
-    known = ("kitchen", "living room", "curtain", "lamp", "light", "cover")
+    if "curtain" in target or "cover" in target:
+        return "Error: Living Room Curtains did not respond."
+    known = ("kitchen", "living room", "lamp", "light", "front door", "lock")
     if not any(word in target for word in known):
         return "Error: no device matches that name."
     return "Done."
