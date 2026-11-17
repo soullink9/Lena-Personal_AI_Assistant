@@ -25,9 +25,10 @@ Run it from the repository, or copy it to the Ollama machine together with
 custom_components/lena/brain.py (next to it, or anywhere with --brain <path>): that's where her
 rules for running the house are read from.
 
-Needs only Python's standard library and an Ollama it can reach. Her answers vary a little from run
-to run, the way a person's do; look for changes in kind (a made-up device, a lost personality, a
-joke at the wrong moment), not in wording.
+Needs only Python's standard library and an Ollama it can reach. Her answers vary from run to run,
+the way a person's do: asked the same thing twice she may use a tool once and not the other time.
+Add --runs 3 to ask everything three times, and look for changes in kind (a made-up device, a lost
+personality, a joke at the wrong moment, a tool she stopped using), not in wording.
 """
 
 from __future__ import annotations
@@ -210,6 +211,8 @@ def main() -> int:
     parser.add_argument("--model", default="lena", help="The model to ask")
     parser.add_argument("--out", default="", help="Where to save the answers (default: personality-<date and time>.md)")
     parser.add_argument("--timeout", type=int, default=300, help="Seconds to wait for one answer")
+    parser.add_argument("--runs", type=int, default=1,
+                        help="How many times to ask each question (her answers vary; 3 shows what's habit and what's chance)")
     parser.add_argument("--brain", default="", help="The integration's brain.py, when this script isn't run from the repository")
     args = parser.parse_args()
     base = args.url.rstrip("/")
@@ -247,14 +250,18 @@ def main() -> int:
     for number, (title, spoken, question) in enumerate(QUESTIONS, start=1):
         parts = ([SPOKEN] if spoken else []) + [RIGHT_NOW, FEELINGS, HOME] + ([rules] if rules else [])
         print(f"{number}/{len(QUESTIONS)} {title}...", flush=True)
-        try:
-            answer, used = ask(base, args.model, "\n\n".join(parts), question, args.timeout)
-        except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
-            answer, used = f"(no answer: {error})", []
         lines += [f"## {number}. {title}" + (" (spoken)" if spoken else ""), "", f"**Asked:** {question}", ""]
-        for use in used:
-            lines += [f"**Tool:** `{use}`", ""]
-        lines += [f"**Lena:** {answer or '(nothing)'}", ""]
+        # Each run is a fresh conversation, so one answer can't lean on another.
+        for run in range(1, max(1, args.runs) + 1):
+            try:
+                answer, used = ask(base, args.model, "\n\n".join(parts), question, args.timeout)
+            except (urllib.error.URLError, OSError, KeyError, ValueError) as error:
+                answer, used = f"(no answer: {error})", []
+            if args.runs > 1:
+                lines += [f"*Run {run}*", ""]
+            for use in used:
+                lines += [f"**Tool:** `{use}`", ""]
+            lines += [f"**Lena:** {answer or '(nothing)'}", ""]
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved to {out}")
     return 0
