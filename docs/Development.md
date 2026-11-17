@@ -94,7 +94,6 @@ On Gitea every push runs every test (`.gitea/workflows/test.yml`). On GitHub, th
 | If you change... | ...also update |
 |---|---|
 | Her character | Only `ollama/Modelfile`. Nothing else repeats it. Rebuild the model. |
-| Her rules for running the house | Only `HOUSE_RULES` in `custom_components/lena/brain.py`, sent with the tools (Home Assistant's prompt, `/api/lena/context`). The Modelfile names the section ("Running the house") as hers to follow, so keep that heading the same in both. |
 | A feeling's name (adding, renaming) | `feelings.yaml`; the tables in `brain.py` if her drift uses it; for moments she sets herself, the `Literal` in `open-webui/lena_tools.py`. See [Her feelings](personality/Moods.md#adding-or-removing-one). |
 | An entity ID the integration creates | The [integration](home-assistant/Integration.md) and [installation](home-assistant/Installation.md) pages, the `memory_list` setting of the Open WebUI tool, and `DEFAULT_MEMORY_LIST` in the app's `Prefs.kt` |
 | What `/api/lena/context` returns | `view.py`, `open-webui/lena_filter.py`, `HomeAssistant.kt` in the app, and the [integration](home-assistant/Integration.md) page |

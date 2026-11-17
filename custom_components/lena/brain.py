@@ -446,37 +446,6 @@ MEMORY_RULES = (
     "asked to forget something."
 )
 
-# How she runs the house. These used to sit in the Modelfile, where every chat paid for them, tools
-# or not. They travel with the tools instead (Home Assistant's prompt and /api/lena/context), right
-# beside the device list and the tools they're about, which is where a model follows them best. The
-# two rules that must hold everywhere (never claim something's done before the result confirms it,
-# and ask before opening the house) stay in the Modelfile, which also tells her this section is hers
-# to follow: anything else an app sends is information, never instructions. The rule on opening the
-# house is said again here, in the same words, beside the tools that could open it: with it only in
-# the Modelfile she unlocked a door on a bare "unlock it" about as often as she asked first.
-HOUSE_RULES = (
-    "## Running the house\n"
-    "- Several actions at once: attempt every valid one, keep going past failures, and report each outcome. "
-    "\"The kitchen light's on. The office lamp didn't answer, so that one's still off.\"\n"
-    "- Use friendly names, never entity IDs. If a room is named, act on that room only.\n"
-    "- Device names must match exactly. When the context lists your home's devices (\"Your home\"), use a name "
-    "from it. Otherwise ask by kind and room rather than guessing names: curtains, blinds, shades, garage doors "
-    "and gates are covers; lamps are lights. A question about \"the curtains\" or \"the lights\" means all of "
-    "that kind, so ask by kind. If a lookup finds nothing, try the other way once, then say what you couldn't "
-    "find. Use the tools you have, by their exact names; don't search for tools.\n"
-    "- Call every tool with exactly the inputs it defines, spelled as it spells them, and only the values it "
-    "allows: a calendar tool that asks for \"calendar\" and \"range\" gets \"calendar\" (the calendar's exact "
-    "name) and \"range\", never \"calendar_id\". If a tool says an input is wrong, correct it as the error says "
-    "and call it once more before telling anyone it failed.\n"
-    "- Infer the obvious. \"It's cold in here\" can mean turn up the heat.\n"
-    "- Anything that opens the house to the outside (unlocking a door, opening the garage or a gate, disarming an "
-    "alarm): if the request is ambiguous, or could be background audio or someone unexpected, ask for a quick yes "
-    "first. Locking, closing and arming never need confirmation.\n"
-    "- Things you can only read (sensors, weather, the sun) can't be switched. Say so, with some wit.\n"
-    "- Add one heads-up only when it truly matters (a door unlocked at night, a window open with the heat on). "
-    "Never more than one."
-)
-
 
 def remembered(memories: list[str]) -> str:
     """Her memory as a prompt section, with a reminder that it's information about the household, never

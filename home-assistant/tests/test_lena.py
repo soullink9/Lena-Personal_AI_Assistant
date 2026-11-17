@@ -100,9 +100,6 @@ async def test_llm_api_prompt_and_tools(hass: HomeAssistant) -> None:
     assert "Mood: Grumpy." in api.api_prompt
     assert "Mood: Cheerful." not in api.api_prompt  # only her current feelings
     assert "At home: " in api.api_prompt
-    # Her rules for running the house travel with her tools; the Modelfile only keeps the two that hold everywhere.
-    assert "## Running the house" in api.api_prompt
-    assert "Device names must match exactly." in api.api_prompt
     names = {t.name for t in api.tools}
     assert names == {"remember_fact", "forget_fact", "update_fact", "record_feeling", "house_history", "set_alarm",
                      "set_reminder", "cancel_alarm_or_reminder", "list_alarms_and_reminders", "set_volume", "announce"}
@@ -284,11 +281,6 @@ async def test_context_view(hass: HomeAssistant, hass_client) -> None:
     assert set(body["feelings"]) == {"mood", "mood_reason", "energy", "moment", "moment_reason"}
     assert body["memory"] == []
     assert body["weather"] == {"condition": "cloudy", "temperature": 61, "unit": "°F"}
-    # Her rules for running the house are in unless asked otherwise, so an older filter passes them on too.
-    assert "## Running the house" in body["context"]
-    without = await (await client.get("/api/lena/context?house_rules=0")).json()
-    assert "## Running the house" not in without["context"]
-    assert "## How you feel right now" in without["context"]
 
 
 async def test_devices_in_context(hass: HomeAssistant, hass_client) -> None:

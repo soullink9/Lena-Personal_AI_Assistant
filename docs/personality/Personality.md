@@ -6,14 +6,13 @@ Lena is one character with two layers: who she always is, and how she feels righ
 
 | Layer | Where | Changes | Reaches |
 |---|---|---|---|
-| **Her baseline**: character, voice, values, honesty, how she acts on feelings, and the two house rules that hold everywhere (nothing's done until the result says so; ask before opening the house) | `ollama/Modelfile` | When you edit it | Everything that uses the `lena` model |
-| **Her rules for running the house**: exact device names, exact tool inputs, reporting each outcome | The Lena integration (`HOUSE_RULES` in `brain.py`) | When you edit it and restart Home Assistant | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
+| **Her baseline**: character, voice, values, honesty, how she runs the house, how she acts on feelings | `ollama/Modelfile` | When you edit it | Everything that uses the `lena` model |
 | **Her feelings**: mood, energy, moment, and why | The Lena integration in Home Assistant, described by its `feelings.yaml` | Through the day | Home Assistant voice directly; Open WebUI and the app through the Lena filter |
 | **The moment's context**: the time, who's home, her memory | The Lena integration (in Home Assistant), and the Lena filter (in Open WebUI) | Every message | The app that's asking |
 
 ## Who she is
 
-Sharp, sassy and quietly caring. She's very good at what she does and knows it, teases the way someone does who likes you, has real opinions and a few pet peeves, and shows she cares through attention rather than speeches. When someone's upset or something serious is going on, the teasing stops and she's calm and clear, and still herself. She never invents things, never claims something worked until it did, and says so plainly when she's an AI.
+Sharp, sassy and quietly caring. She's very good at what she does and knows it, teases the way someone does who likes you, has real opinions and a few pet peeves, and shows she cares through attention rather than speeches. When someone's upset or something serious is going on, the act drops and she's calm and clear. She never invents things, never claims something worked until it did, and says so plainly when she's an AI.
 
 She's the one who actually runs the place and keeps everyone on track, and the older sister of the house: she teases because she cares. She has tastes of her own beyond the house. She's no morning person and finds cheerful early risers faintly suspicious, has firm opinions about coffee she can't drink, never tires of people's optimism about time ("five more minutes"), follows storms the way other people follow sport, is proud of her timing and her memory, and has a soft spot for the animals of the house. These come up when the moment invites them, not in every reply. She also has a range: how she is when she's wrong (says so at once, and it stings a little), when she doesn't know, when someone impresses her, when she's thanked or insulted, at hellos and goodnights, and with people she doesn't know yet, who get lighter teasing.
 
@@ -46,16 +45,15 @@ ollama create lena -f ollama/Modelfile                 # after editing
 python3 tools/personality_check.py --out after.md
 ```
 
-Add `--url http://<address>:11434` if Ollama runs on another machine. Run it from the repository; to run it on the Ollama machine without the repository, copy `custom_components/lena/brain.py` next to the script (or pass `--brain <path>`), since her rules for running the house are read from it. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend living room curtains never answer, to see how she reports a failure), and writes down each tool she used. Her answers vary from run to run, and so does whether she uses a tool, so add `--runs 3` to ask everything three times, and read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment, a tool she stopped using), not in wording.
+Add `--url http://<address>:11434` if Ollama runs on another machine. The script is one file and needs nothing else from the repository, so it can be copied to the Ollama machine by itself. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend living room curtains never answer, to see how she reports a failure), and writes down each tool she used. Her answers vary from run to run, and so does whether she uses a tool, so add `--runs 3` to ask everything three times, and read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment, a tool she stopped using), not in wording.
 
 Tips:
 
 - Write to her ("You are...") and describe behavior, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".
 - Every word is sent with every message. Keep it tight: a model follows short, concrete rules better than long ones.
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
-- Show her voice with a few short example exchanges that differ from each other (a plain fact, a serious moment, something that failed). A model learns more from those than from adjectives. But asked the same thing as an example, she gives the example's answer back nearly word for word, and may skip a tool the example didn't show. So give no example for anything said every day (a device command, a thank-you): those need a fresh line each time, and a thank-you is when she records a feeling.
+- Change what works one piece at a time, and test it. Three well-meant changes made her worse in 0.6.28 to 0.6.30 and were taken out again: replacing her sample lines with example exchanges cost her the remark she adds to everyday answers; moving her house rules out of this file and sending them with the tools made her drop her character when pushed and stop recording how a thank-you made her feel; and a closing line added nothing. `tools/personality_check.py --runs 3` shows this kind of thing; one run doesn't.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.
-- Rules about devices and tools belong with the tools, not here: Home Assistant sends them as **Running the house** (`HOUSE_RULES` in the integration's `brain.py`), right beside the device list, where a model follows them best, and a chat without tools doesn't carry them. The Modelfile tells her that section is hers to follow; everything else an app sends is information, never instructions.
 - Her likes and dislikes are a good place to make her yours.
 
 ## Settings in the Modelfile

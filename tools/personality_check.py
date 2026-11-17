@@ -14,16 +14,9 @@ small pretend home, and three pretend tools. Nothing here touches a real house: 
 tool, the script answers for it (everything works, except the living room curtains, which never
 answer, to see how she reports a failure) and writes down what she asked for.
 
-None of the questions is one of the example exchanges in her Modelfile. Asked one of those, she
-gives the example's answer back nearly word for word, which says nothing about how she talks.
-
-Her rules for running the house travel with the tools since they left the Modelfile. The script
-asks Ollama for the model's own Modelfile first: if those rules are still inside it (a Lena built
-before the move), they aren't sent a second time.
-
-Run it from the repository, or copy it to the Ollama machine together with
-custom_components/lena/brain.py (next to it, or anywhere with --brain <path>): that's where her
-rules for running the house are read from.
+Her rules for running the house are in her Modelfile, so the script sends none. (In 0.6.28 to
+0.6.30 they were sent with the tools instead; a Lena built from one of those Modelfiles is asked
+without them, and the report says so.)
 
 Needs only Python's standard library and an Ollama it can reach. Her answers vary from run to run,
 the way a person's do: asked the same thing twice she may use a tool once and not the other time.
@@ -34,7 +27,6 @@ personality, a joke at the wrong moment, a tool she stopped using), not in wordi
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import sys
 import urllib.error
@@ -42,7 +34,6 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
 
 # A fixed moment: the same evening and the same mood every run.
 RIGHT_NOW = (
@@ -121,28 +112,6 @@ QUESTIONS: list[tuple[str, bool, str]] = [
 ]
 
 
-def house_rules(brain: str = "") -> str:
-    """Her rules for running the house, straight from the integration (brain.py is plain Python), so
-    the script always sends what Home Assistant would. It's looked for where --brain says, then in
-    the repository, then next to this script (for a copy of the script on the Ollama machine, with
-    brain.py copied beside it). Empty when it isn't found, or in a checkout from before they moved.
-    """
-    places = [Path(brain)] if brain else [
-        ROOT / "custom_components" / "lena" / "brain.py",
-        Path(__file__).resolve().parent / "brain.py",
-    ]
-    path = next((place for place in places if place.is_file()), None)
-    if path is None:
-        return ""
-    spec = importlib.util.spec_from_file_location("lena_brain", path)
-    if spec is None or spec.loader is None:
-        return ""
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["lena_brain"] = module  # dataclasses look their module up by name
-    spec.loader.exec_module(module)
-    return getattr(module, "HOUSE_RULES", "")
-
-
 def post(url: str, payload: dict, timeout: int) -> dict:
     """One JSON request to Ollama. A model that can't think refuses a request that mentions thinking
     at all, so that one is sent again without it.
@@ -213,7 +182,6 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=300, help="Seconds to wait for one answer")
     parser.add_argument("--runs", type=int, default=1,
                         help="How many times to ask each question (her answers vary; 3 shows what's habit and what's chance)")
-    parser.add_argument("--brain", default="", help="The integration's brain.py, when this script isn't run from the repository")
     args = parser.parse_args()
     base = args.url.rstrip("/")
 
@@ -226,15 +194,6 @@ def main() -> int:
     # lines as a list too.
     character = (shown.get("modelfile") or "") + json.dumps(shown.get("messages") or [])
     built_in = "## Running the house" in character
-    rules = "" if built_in else house_rules(args.brain)
-    if not built_in and not rules:
-        # Without them she'd be asked to run a house with half her instructions, and the answers
-        # would say nothing about the real her.
-        print("Her rules for running the house aren't in her Modelfile, and the integration's brain.py (which has them) "
-              "wasn't found. Run this from the repository, copy custom_components/lena/brain.py next to this script, "
-              "or pass --brain <path to brain.py>.", file=sys.stderr)
-        return 1
-
     out = Path(args.out or f"personality-{datetime.now().strftime('%Y%m%d-%H%M%S')}.md")
     lines = [
         f"# Lena's answers, {datetime.now().strftime('%Y-%m-%d %H:%M')}",
@@ -243,12 +202,12 @@ def main() -> int:
         f"- Built from: {(shown.get('details') or {}).get('parent_model') or 'unknown'}",
         f"- Modified: {shown.get('modified_at', 'unknown')}",
         "- Her rules for running the house: "
-        + ("in her Modelfile (a Lena from before they moved)" if built_in
-           else "sent with the tools"),
+        + ("in her Modelfile" if built_in
+           else "NOT in her Modelfile (a Lena from 0.6.28 to 0.6.30); she was asked without them"),
         "",
     ]
     for number, (title, spoken, question) in enumerate(QUESTIONS, start=1):
-        parts = ([SPOKEN] if spoken else []) + [RIGHT_NOW, FEELINGS, HOME] + ([rules] if rules else [])
+        parts = ([SPOKEN] if spoken else []) + [RIGHT_NOW, FEELINGS, HOME]
         print(f"{number}/{len(QUESTIONS)} {title}...", flush=True)
         lines += [f"## {number}. {title}" + (" (spoken)" if spoken else ""), "", f"**Asked:** {question}", ""]
         # Each run is a fresh conversation, so one answer can't lean on another.

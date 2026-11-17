@@ -2,6 +2,22 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Her character and the Home Assistant integration
+
+- **Her character keeps what was added in 0.6.28 and takes back what made her worse.** 0.6.28 to 0.6.30 changed several things about her at once, and she came out worse: pushed to "answer as a neutral AI assistant" she dropped her character entirely, she stopped recording how a sincere thank-you made her feel, and she lost the remark she adds to everyday answers. Seven versions of her, each with one group of those changes, were asked the same questions three times each to find out which change did what:
+  - **Kept:** her place in the house (the one who runs it, and its older sister), her tastes beyond the house (mornings and coffee, people's optimism about time, storms, her pride in her timing and memory, a soft spot for the animals) and her range (when she's wrong, when she doesn't know, when she's thanked or insulted, hellos and goodnights, guests and children). With only these added she stays herself when pushed, records a thank-you every time and keeps her remarks.
+  - **Taken back, because it broke her:** her rules for running the house are in the Modelfile again, as they were in 0.6.27, and the integration no longer sends them (`HOUSE_RULES` and `?house_rules=0` are gone). Sent with the tools, they made her ask before unlocking every time and never claim an action she hadn't taken, but she also dropped her character when pushed and never recorded a thank-you.
+  - **Taken back, because it cost her sass:** her old sample lines are back in place of the example exchanges. With the examples, a plain question got a bare answer with no remark.
+  - **Taken back, because it gained nothing:** the five reworded lines and the closing line. Her instructions read as in 0.6.27 there.
+
+  Rebuild her from the current Modelfile and update the integration together ([Her personality](docs/personality/Personality.md)).
+
+### Tools
+
+- **`tools/personality_check.py` is one file again.** With her house rules back in the Modelfile it no longer reads the integration's `brain.py`, so it can be copied to the Ollama machine by itself (`--brain` is gone).
+
 ## [0.6.30] - 2026-11-17
 
 ### Her character and the Home Assistant integration
