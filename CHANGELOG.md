@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.27] - 2026-11-17
+
+### Android app
+
+- **Camera mode opens again.** Since 0.6.23 it asks Home Assistant for its cameras' entities, devices and states at once, and those messages could leave the app out of order. Home Assistant refuses a message whose ID isn't higher than the one before ("Identifier values have to increase") and closes the connection, so camera mode often stayed blank, said it couldn't connect, or lost its live picture. Every message to Home Assistant now goes out from one place, in the order its ID was given, so the IDs always increase.
+
 ## [0.6.26] - 2026-11-17
 
 ### Android app
