@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.26] - 2026-11-17
+
+### Android app
+
+- **Real live video behind Traefik.** With Home Assistant behind a reverse proxy and only its address open, WebRTC can't reach a device and HLS didn't play either, so camera mode fell back to a few pictures a second. Now HLS is played by camera mode's own small player, with every file fetched by the app from the Home Assistant address it already uses: nothing more to open, no CORS settings, and it no longer depends on the web view playing HLS by itself, which many TV boxes' can't. The picture is a second or two behind. Each camera remembers on the device for a day which way worked, so camera mode doesn't wait 12 seconds on WebRTC every time it opens ([Camera mode](docs/app/Cameras.md#how-it-plays)).
+
 ## [0.6.25] - 2026-11-16
 
 ### Android app
