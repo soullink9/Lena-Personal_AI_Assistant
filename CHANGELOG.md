@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Gitea workflows
+
+- **The build tools step shows what went wrong.** The app job's first step (Install the build tools, in the test and release workflows) sent apt's output to nowhere, so when it failed on a Gitea runner the log showed only "debconf: delaying package configuration" and no reason. apt's full output is now kept: folded in the log when it worked, printed in full when it didn't. Each try has a time limit (10 minutes for the package lists, 20 for the install), so a stuck download fails with a message instead of holding the job. Only a network problem is tried again (three tries, 30 seconds apart); any other apt error fails at once and says retrying won't help. It also fails with a clear message when the job's container doesn't run as root and has no sudo, keeps the image's config files instead of asking about them, and checks that every tool is really there afterwards. Nothing to update; it's in the workflows.
+
 ## [0.6.32] - 2026-11-17
 
 ### Home Assistant integration

@@ -150,19 +150,59 @@ jobs:
       # The wake word check compiles the original C (g++); the release scripts are Python.
       - name: Install the build tools (from Ubuntu)
         # Retried, over IPv4 (a runner without IPv6 otherwise waits on it first), so a short outage of
-        # Ubuntu's servers doesn't fail the run; a longer one still does, and re-running the job is the fix.
+        # Ubuntu's servers doesn't fail the run. apt's own output is kept and shown (folded when it worked, in
+        # full when it didn't), each try has a time limit so a stuck download fails instead of hanging the job,
+        # and only a network problem is tried again: anything else fails at once with apt's message.
         run: |
-          apt="apt-get -qq -o Acquire::Retries=5 -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=30"
+          export DEBIAN_FRONTEND=noninteractive
+          sudo=""
+          if [ "$(id -u)" -ne 0 ]; then
+            if command -v sudo > /dev/null; then sudo="sudo -E"; else
+              echo "::error::This step installs packages and needs root, but the job runs as $(id -un) and the image has no sudo. Run the job's container as root."
+              exit 1
+            fi
+          fi
+          apt="$sudo apt-get -q -o Acquire::Retries=5 -o Acquire::ForceIPv4=true -o Acquire::http::Timeout=30 -o Dpkg::Use-Pty=0 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+          packages="git curl unzip g++ python3 nodejs"
+          log=$(mktemp)
+          network='Failed to fetch|Could not resolve|Temporary failure|Could not connect|Connection timed out|Connection failed|Unable to connect|Hash Sum mismatch|Unable to locate package|Some index files failed'
+          # Runs apt with a time limit and keeps its output; says what failed, and returns 2 when it was the network.
+          run() {
+            what=$1 limit=$2; shift 2
+            echo "$what..."
+            rc=0
+            timeout "$limit" "$@" > "$log" 2>&1 || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              echo "::group::apt's output ($what)"; cat "$log"; echo "::endgroup::"
+              return 0
+            fi
+            echo "---- apt's output ($what, exit code $rc) ----"; cat "$log"; echo "----"
+            if [ "$rc" -eq 124 ]; then echo "$what took longer than $limit and was stopped."; return 2; fi
+            if grep -Eq "$network" "$log"; then return 2; fi
+            return 1
+          }
           for attempt in 1 2 3; do
-            if $apt update && DEBIAN_FRONTEND=noninteractive $apt install -y --no-install-recommends git curl unzip g++ python3 nodejs > /dev/null; then
+            rc=0
+            run "Downloading Ubuntu's package lists (attempt $attempt of 3)" 10m $apt update || rc=$?
+            # apt update can finish with only a warning when a server didn't answer; the install then says so.
+            [ "$rc" -eq 0 ] && { run "Installing $packages" 20m $apt install -y --no-install-recommends $packages || rc=$?; }
+            if [ "$rc" -eq 0 ]; then
+              for tool in git curl unzip g++ python3 node; do
+                command -v "$tool" > /dev/null || { echo "::error::apt finished but $tool isn't installed. See apt's output above."; exit 1; }
+              done
+              echo "Installed: $packages."
               exit 0
+            fi
+            if [ "$rc" -eq 1 ]; then
+              echo "::error::apt couldn't install the build tools, and it wasn't the network; apt's message is just above. Trying again won't help."
+              exit 1
             fi
             if [ "$attempt" -lt 3 ]; then
               echo "Ubuntu's package servers didn't answer (attempt $attempt of 3); trying again in 30 seconds."
               sleep 30
             fi
           done
-          echo "::error::Couldn't reach Ubuntu's package servers (archive.ubuntu.com) from the runner. Re-run the job when they're back."
+          echo "::error::Couldn't reach Ubuntu's package servers from the runner after 3 tries (apt's messages are above). Re-run the job when they're back."
           exit 1
 
       - name: Get the code
