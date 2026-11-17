@@ -2,7 +2,7 @@ package io.github.soullink9.lena
 
 import android.content.Context
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.io.Closeable
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Executors
 
 /**
  * A connection to Home Assistant's WebSocket API that stays open, for camera mode: its cameras and their
@@ -18,7 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * live picture (WebRTC). Signed in with Lena's token, on [MiniWebSocket].
  *
  * One thread reads every message and hands each to whoever asked ([call]) or subscribed ([subscribe]);
- * another pings every 30 seconds, so a connection that died quietly is noticed and [onClosed] is told.
+ * one thread sends every message ([sender]), giving each its ID as it goes out, because Home Assistant
+ * refuses a message whose ID isn't higher than the last one it got ("Identifier values have to increase")
+ * and drops the connection; another pings every 30 seconds, so a connection that died quietly is noticed and [onClosed] is told.
  * It's opened when camera mode opens and closed when it closes ([CameraActivity]).
  */
 class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
@@ -47,7 +49,17 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
         }
     }
 
-    private val nextId = AtomicInteger(1)
+    /**
+     * Every message goes out on this one thread, and takes its ID there ([nextId], only ever touched on it),
+     * so IDs reach Home Assistant in increasing order even when several are asked for at once (camera mode
+     * asks for its cameras' entities, devices and states together). Taking the ID first and sending it later
+     * from whichever thread let a higher ID overtake a lower one.
+     */
+    private val senderThread = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "Lena Home Assistant send").apply { isDaemon = true }
+    }
+    private val sender = senderThread.asCoroutineDispatcher()
+    private var nextId = 1
     private val waiting = ConcurrentHashMap<Int, CompletableDeferred<JSONObject>>()
     private val listeners = ConcurrentHashMap<Int, (JSONObject) -> Unit>()
 
@@ -86,10 +98,8 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
         while (!closed) {
             Thread.sleep(PING_MS)
             if (closed) return
-            val id = nextId.getAndIncrement()
             val pong = CompletableDeferred<JSONObject>()
-            waiting[id] = pong
-            runCatching { ws.send(JSONObject().put("id", id).put("type", "ping").toString()) }
+            runCatching { senderThread.execute { sendNow(JSONObject().put("type", "ping")) { id -> waiting[id] = pong } } }
             Thread.sleep(10_000)
             if (!pong.isCompleted) {
                 Logs.w(TAG, "Home Assistant didn't answer a ping; closing the connection")
@@ -101,6 +111,7 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
     private fun end() {
         if (closed) return
         closed = true
+        senderThread.shutdown()
         runCatching { ws.close() }
         waiting.values.forEach { it.completeExceptionally(IOException("The connection to Home Assistant ended")) }
         waiting.clear()
@@ -112,12 +123,38 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
         end()
     }
 
+    /**
+     * Sends [message] with the next ID, on [senderThread] only. [before] is told the ID before the message
+     * goes out, so an answer can't arrive before anyone waits for it. Returns the ID.
+     */
+    private fun sendNow(message: JSONObject, before: (Int) -> Unit = {}): Int {
+        if (closed) throw IOException("The connection to Home Assistant ended")
+        val id = nextId++
+        before(id)
+        ws.send(message.put("id", id).toString())
+        return id
+    }
+
+    /** [sendNow] from a coroutine: waits for its turn on [senderThread]. */
+    private suspend fun sendInTurn(message: JSONObject, before: (Int) -> Unit): Int = try {
+        withContext(sender) { sendNow(message, before) }
+    } catch (e: java.util.concurrent.RejectedExecutionException) {
+        throw IOException("The connection to Home Assistant ended")
+    }
+
     /** Sends [message] with a new ID, and waits for Home Assistant's result. Throws if it says no. */
     suspend fun call(message: JSONObject): JSONObject {
-        val id = nextId.getAndIncrement()
         val result = CompletableDeferred<JSONObject>()
-        waiting[id] = result
-        withContext(Dispatchers.IO) { ws.send(message.put("id", id).toString()) }
+        var id = -1
+        try {
+            sendInTurn(message) { taken ->
+                id = taken
+                waiting[taken] = result
+            }
+        } catch (e: Exception) {
+            if (id >= 0) waiting.remove(id)
+            throw e
+        }
         val reply = try {
             withTimeout(20_000) { result.await() }
         } finally {
@@ -138,11 +175,21 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
      * its events to [onEvent], on the reading thread. Returns its ID, for [unsubscribe].
      */
     suspend fun subscribe(message: JSONObject, onEvent: (JSONObject) -> Unit): Int {
-        val id = nextId.getAndIncrement()
-        listeners[id] = onEvent
         val result = CompletableDeferred<JSONObject>()
-        waiting[id] = result
-        withContext(Dispatchers.IO) { ws.send(message.put("id", id).toString()) }
+        var id = -1
+        try {
+            sendInTurn(message) { taken ->
+                id = taken
+                listeners[taken] = onEvent
+                waiting[taken] = result
+            }
+        } catch (e: Exception) {
+            if (id >= 0) {
+                listeners.remove(id)
+                waiting.remove(id)
+            }
+            throw e
+        }
         val reply = try {
             withTimeout(20_000) { result.await() }
         } catch (e: Exception) {
@@ -161,14 +208,17 @@ class HaSocket private constructor(private val ws: MiniWebSocket) : Closeable {
     /** Ends a subscription; its events stop at once, whether or not Home Assistant answers. */
     fun unsubscribe(id: Int) {
         if (listeners.remove(id) == null || closed) return
-        val message = JSONObject().put("id", nextId.getAndIncrement()).put("type", "unsubscribe_events").put("subscription", id)
-        Thread({ runCatching { ws.send(message.toString()) } }, "Lena unsubscribe").apply { isDaemon = true }.start()
+        later(JSONObject().put("type", "unsubscribe_events").put("subscription", id))
     }
 
     /** Sends a message whose answer doesn't matter (a WebRTC candidate). */
     fun send(message: JSONObject) {
         if (closed) return
-        val text = message.put("id", nextId.getAndIncrement()).toString()
-        Thread({ runCatching { ws.send(text) } }, "Lena send").apply { isDaemon = true }.start()
+        later(message)
+    }
+
+    /** Queues [message] on [senderThread] without waiting; lost quietly if the connection has ended. */
+    private fun later(message: JSONObject) {
+        runCatching { senderThread.execute { runCatching { sendNow(message) } } }
     }
 }
