@@ -46,7 +46,7 @@ ollama create lena -f ollama/Modelfile                 # after editing
 python3 tools/personality_check.py --out after.md
 ```
 
-Add `--url http://<address>:11434` if Ollama runs on another machine. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend front door lock never answers, to see how she reports a failure), and writes down each tool she used. Her answers vary a little from run to run, so read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment), not in wording.
+Add `--url http://<address>:11434` if Ollama runs on another machine. Run it from the repository; to run it on the Ollama machine without the repository, copy `custom_components/lena/brain.py` next to the script (or pass `--brain <path>`), since her rules for running the house are read from it. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend front door lock never answers, to see how she reports a failure), and writes down each tool she used. Her answers vary a little from run to run, so read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment), not in wording.
 
 Tips:
 

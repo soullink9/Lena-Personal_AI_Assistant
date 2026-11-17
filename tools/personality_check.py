@@ -18,6 +18,10 @@ Her rules for running the house travel with the tools since they left the Modelf
 asks Ollama for the model's own Modelfile first: if those rules are still inside it (a Lena built
 before the move), they aren't sent a second time.
 
+Run it from the repository, or copy it to the Ollama machine together with
+custom_components/lena/brain.py (next to it, or anywhere with --brain <path>): that's where her
+rules for running the house are read from.
+
 Needs only Python's standard library and an Ollama it can reach. Her answers vary a little from run
 to run, the way a person's do; look for changes in kind (a made-up device, a lost personality, a
 joke at the wrong moment), not in wording.
@@ -113,11 +117,19 @@ QUESTIONS: list[tuple[str, bool, str]] = [
 ]
 
 
-def house_rules() -> str:
+def house_rules(brain: str = "") -> str:
     """Her rules for running the house, straight from the integration (brain.py is plain Python), so
-    the script always sends what Home Assistant would. Empty in a checkout from before they moved.
+    the script always sends what Home Assistant would. It's looked for where --brain says, then in
+    the repository, then next to this script (for a copy of the script on the Ollama machine, with
+    brain.py copied beside it). Empty when it isn't found, or in a checkout from before they moved.
     """
-    path = ROOT / "custom_components" / "lena" / "brain.py"
+    places = [Path(brain)] if brain else [
+        ROOT / "custom_components" / "lena" / "brain.py",
+        Path(__file__).resolve().parent / "brain.py",
+    ]
+    path = next((place for place in places if place.is_file()), None)
+    if path is None:
+        return ""
     spec = importlib.util.spec_from_file_location("lena_brain", path)
     if spec is None or spec.loader is None:
         return ""
@@ -195,6 +207,7 @@ def main() -> int:
     parser.add_argument("--model", default="lena", help="The model to ask")
     parser.add_argument("--out", default="", help="Where to save the answers (default: personality-<date and time>.md)")
     parser.add_argument("--timeout", type=int, default=300, help="Seconds to wait for one answer")
+    parser.add_argument("--brain", default="", help="The integration's brain.py, when this script isn't run from the repository")
     args = parser.parse_args()
     base = args.url.rstrip("/")
 
@@ -207,7 +220,14 @@ def main() -> int:
     # lines as a list too.
     character = (shown.get("modelfile") or "") + json.dumps(shown.get("messages") or [])
     built_in = "## Running the house" in character
-    rules = "" if built_in else house_rules()
+    rules = "" if built_in else house_rules(args.brain)
+    if not built_in and not rules:
+        # Without them she'd be asked to run a house with half her instructions, and the answers
+        # would say nothing about the real her.
+        print("Her rules for running the house aren't in her Modelfile, and the integration's brain.py (which has them) "
+              "wasn't found. Run this from the repository, copy custom_components/lena/brain.py next to this script, "
+              "or pass --brain <path to brain.py>.", file=sys.stderr)
+        return 1
 
     out = Path(args.out or f"personality-{datetime.now().strftime('%Y%m%d-%H%M%S')}.md")
     lines = [
@@ -218,7 +238,7 @@ def main() -> int:
         f"- Modified: {shown.get('modified_at', 'unknown')}",
         "- Her rules for running the house: "
         + ("in her Modelfile (a Lena from before they moved)" if built_in
-           else "sent with the tools" if rules else "not found (neither in her Modelfile nor in this checkout)"),
+           else "sent with the tools"),
         "",
     ]
     for number, (title, spoken, question) in enumerate(QUESTIONS, start=1):

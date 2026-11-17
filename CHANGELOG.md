@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Tools
+
+- **`tools/personality_check.py` runs outside the repository.** Copied by itself to the Ollama machine, it stopped with a Python error, because it reads her rules for running the house from the integration's `brain.py`. It now also finds `brain.py` next to itself, takes `--brain <path>`, and says plainly what it needs when it can't find it ([Her personality](docs/personality/Personality.md#comparing-two-versions-of-her)).
+
 ## [0.6.28] - 2026-11-17
 
 ### Her character
