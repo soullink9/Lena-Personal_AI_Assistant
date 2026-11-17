@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
@@ -22,6 +23,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.FilterInputStream
 import java.net.HttpURLConnection
 
 /**
@@ -32,7 +35,11 @@ import java.net.HttpURLConnection
  * 1. **WebRTC**, in a web view showing a small page from the app's assets (assets/camera/live.html): this
  *    asks Home Assistant for its ICE servers, passes the page's offer and candidates over the app's own
  *    connection ([HaSocket]) and hands back the answer, so the page never holds the token.
- * 2. **HLS**, Home Assistant's stream address played by the same page.
+ * 2. **HLS**, Home Assistant's stream played by the same page with its own small player (Media Source
+ *    Extensions), every request going through the app ([hlsThroughApp]) to Home Assistant's own address. So it
+ *    works with only that address reachable (Home Assistant behind a reverse proxy such as Traefik), and on
+ *    web views that can't play HLS by themselves. A web view without Media Source Extensions for the stream's
+ *    codecs is given the stream's address to try by itself.
  * 3. **Pictures**: Home Assistant's camera picture stream (MJPEG, [PictureStream]), read by the app with its
  *    token and shown picture by picture over the still picture ([onPicture]). Fewer pictures a second, but
  *    it works wherever still pictures do.
@@ -42,8 +49,9 @@ import java.net.HttpURLConnection
  * Live over a black screen). WebRTC and HLS each get [WEBRTC_MS] (HLS twice that, it starts slower) to draw one.
  *
  * To start sooner: each camera's ICE servers are asked for once per player ([iceConfigs]), not on every
- * switch, and a camera remembers the way that worked ([startWith]), so Rotate doesn't wait through the ways
- * that failed on every turn.
+ * switch, and a camera remembers the way that worked for a day, on this device ([Cameras.liveWay]), so neither
+ * Rotate nor opening camera mode again waits through the ways that failed (behind a reverse proxy, WebRTC's
+ * video can't reach the device at all). After a day it tries them again, in case the network changed.
  *
  * Only the camera in the spotlight plays, and only while camera mode is on screen ([show], [stop]).
  */
@@ -73,7 +81,11 @@ class CameraLive(
         private const val TAG = "Cameras"
         private const val WEBRTC_MS = 12_000L
         private const val PICTURES_MS = 15_000L
-        private const val PAGE = "https://appassets.androidplatform.net/assets/camera/live.html"
+        private const val ASSETS = "appassets.androidplatform.net"
+        private const val PAGE = "https://$ASSETS/assets/camera/live.html"
+
+        /** The page asks for Home Assistant's HLS files here; [hlsThroughApp] fetches them from Home Assistant. */
+        private const val HLS_THROUGH_APP = "/ha/api/hls/"
     }
 
     private var entity: String? = null
@@ -93,8 +105,7 @@ class CameraLive(
     /** Each camera's WebRTC client configuration (its ICE servers), asked for the first time it's shown. */
     private val iceConfigs = HashMap<String, JSONObject>()
 
-    /** The way to start each camera with on this player: past the ways that didn't give it a picture. */
-    private val startWith = HashMap<String, Way>()
+    private val appContext = context.applicationContext
 
     /** The page was ended by Android: nothing more may be asked of the web view but to be destroyed. */
     private var gone = false
@@ -112,8 +123,12 @@ class CameraLive(
         isFocusable = false // the remote stays with camera mode's own buttons
         val assets = WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context)).build()
         webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-                assets.shouldInterceptRequest(request.url)
+            // On a web view thread of its own, so fetching from Home Assistant here holds nothing else up.
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                val url = request.url
+                if (url.host == ASSETS && url.encodedPath.orEmpty().startsWith(HLS_THROUGH_APP)) return hlsThroughApp(url)
+                return assets.shouldInterceptRequest(url)
+            }
 
             // The page is the app's own and goes nowhere else.
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
@@ -146,7 +161,7 @@ class CameraLive(
         entity = camera ?: return
         val mine = ++generation
         onState(State.CONNECTING)
-        when (startWith[camera]) {
+        when (Cameras.liveWay(appContext, camera)) {
             Way.HLS -> playHls(mine, "WebRTC didn't give $camera a picture last time")
             Way.PICTURES -> playPictures(mine, "WebRTC and HLS didn't give $camera a picture last time")
             else -> playWebRtc(mine, camera)
@@ -220,11 +235,11 @@ class CameraLive(
         subscription = null
         when (way) {
             Way.WEBRTC -> {
-                startWith[camera] = Way.HLS
+                Cameras.setLiveWay(appContext, camera, Way.HLS)
                 playHls(mine, why)
             }
             Way.HLS -> {
-                startWith[camera] = Way.PICTURES
+                Cameras.setLiveWay(appContext, camera, Way.PICTURES)
                 playPictures(mine, why)
             }
             Way.PICTURES -> {
@@ -235,7 +250,10 @@ class CameraLive(
         }
     }
 
-    /** Asks Home Assistant for the camera's HLS stream and plays it in the page. */
+    /**
+     * Asks Home Assistant for the camera's HLS stream and plays it in the page: its player fetches the files
+     * through the app ([HLS_THROUGH_APP]); the direct address is for a web view that can only play it itself.
+     */
     private fun playHls(mine: Int, why: String) {
         val camera = entity ?: return
         way = Way.HLS
@@ -246,7 +264,10 @@ class CameraLive(
                     .optJSONObject("result")?.optString("url").orEmpty()
                 if (mine != generation) return@launch
                 if (url.isBlank()) throw IllegalStateException("no stream address")
-                val start = { js("lenaHls(${JSONObject.quote(base.trimEnd('/') + url)}, $sound)") }
+                if (!url.startsWith("/api/hls/")) throw IllegalStateException("an unexpected stream address")
+                val throughApp = JSONObject.quote("https://$ASSETS/ha$url")
+                val direct = JSONObject.quote(base.trimEnd('/') + url)
+                val start = { js("lenaHls($throughApp, $direct, $sound)") }
                 if (pageReady) start() else startWhenReady = start
                 timeout = scope.launch {
                     delay(WEBRTC_MS * 2)
@@ -341,6 +362,45 @@ class CameraLive(
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= width) sample *= 2
         return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    /**
+     * One of Home Assistant's HLS files (playlist, init or segment) for the page's player, fetched from Home
+     * Assistant's own address with the app's token and handed over as it arrives. Only HLS paths: the page
+     * can't reach anything else of Home Assistant this way. The page is same-origin with these answers, so
+     * Home Assistant needs no CORS settings. An error is passed on as its HTTP status, for the player to report.
+     */
+    private fun hlsThroughApp(url: Uri): WebResourceResponse {
+        val path = url.encodedPath.orEmpty().removePrefix("/ha") + (url.encodedQuery?.let { "?$it" } ?: "")
+        if (path.contains("..")) return failure(400)
+        return try {
+            val conn = ha.openStream(path)
+            val type = conn.contentType?.substringBefore(';')?.trim()?.ifBlank { null } ?: "application/octet-stream"
+            WebResourceResponse(type, null, 200, "OK", mapOf("Cache-Control" to "no-store"), Disconnecting(conn))
+        } catch (e: HaHttpException) {
+            failure(if (e.code in 400..599) e.code else 502)
+        } catch (e: HaForbiddenException) {
+            failure(403)
+        } catch (e: HaAuthException) {
+            failure(401)
+        } catch (e: Exception) {
+            Logs.w(TAG, "HLS: couldn't reach Home Assistant: ${e.message}")
+            failure(502)
+        }
+    }
+
+    private fun failure(code: Int) =
+        WebResourceResponse("text/plain", "utf-8", code, "Error", mapOf("Cache-Control" to "no-store"), ByteArrayInputStream(ByteArray(0)))
+
+    /** A response's body that lets its connection go once the web view has read it. */
+    private class Disconnecting(private val conn: HttpURLConnection) : FilterInputStream(conn.inputStream) {
+        override fun close() {
+            try {
+                super.close()
+            } finally {
+                conn.disconnect()
+            }
+        }
     }
 
     /** The page's side; called on the web view's own thread, so everything goes to [scope] (the main thread). */

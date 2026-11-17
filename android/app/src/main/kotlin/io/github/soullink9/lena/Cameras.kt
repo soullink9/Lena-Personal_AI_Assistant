@@ -9,7 +9,8 @@ import org.json.JSONObject
 /**
  * Camera mode's choices that Return to defaults leaves alone: which cameras this device may show
  * (**included**, in Settings → Cameras), which of those are **selected** (in camera mode, for Selected only
- * and Rotate), and a motion sensor picked by hand for a camera. Kept on this device only.
+ * and Rotate), a motion sensor picked by hand for a camera, and the way each camera's live picture last worked
+ * ([liveWay]). Kept on this device only.
  *
  * A camera is known by its Home Assistant device ([FoundCamera.id]), so a stream entity being renamed or a
  * new stream quality turned on doesn't lose it.
@@ -35,6 +36,25 @@ object Cameras {
         if (entity == null) edit.remove("sensor:$camera") else edit.putString("sensor:$camera", entity)
         edit.apply()
     }
+
+    /** How long a camera's live picture starts at the way that last worked, before trying the earlier ways again. */
+    private const val LIVE_WAY_MS = 24 * 60 * 60 * 1000L
+
+    /**
+     * The way [camera]'s live picture (a stream entity) starts with on this device: past the ways that gave it
+     * no picture in the last day ([CameraLive.Way]), so camera mode doesn't wait through them every time it
+     * opens. Null to start with WebRTC.
+     */
+    fun liveWay(c: Context, camera: String): CameraLive.Way? {
+        val saved = p(c).getString("way:$camera", null) ?: return null
+        val name = saved.substringBefore('@')
+        val since = saved.substringAfter('@', "").toLongOrNull() ?: return null
+        if (System.currentTimeMillis() - since !in 0..LIVE_WAY_MS) return null
+        return CameraLive.Way.entries.firstOrNull { it.name == name }
+    }
+
+    fun setLiveWay(c: Context, camera: String, way: CameraLive.Way) =
+        p(c).edit().putString("way:$camera", "${way.name}@${System.currentTimeMillis()}").apply()
 
     /** Whether camera mode is on here (Settings → Cameras → Camera mode), with Home Assistant connected. */
     fun available(c: Context): Boolean = Prefs.cameras(c).on && Prefs.haServer(c) != null && Secrets.has(c, Secrets.HA_TOKEN)

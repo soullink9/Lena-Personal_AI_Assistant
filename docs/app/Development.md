@@ -52,7 +52,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `CameraDirector.kt` | What camera mode shows from moment to moment in each of its five views (plain Kotlin, checked by `tools/camera_check`). |
 | `CameraFinder.kt` | Finds the cameras in Home Assistant's entities (one per device, UniFi Protect's streams) and their motion sensors and events (plain Kotlin, checked by `tools/camera_check`). |
 | `CameraLook.kt` | Camera mode's look, after UniFi Protect's live view (its colors, the labels on the pictures), shared with its card on the TV home. How the grid fills the screen is `CameraGrid`, in `CameraDirector.kt`. |
-| `CameraLive.kt`, `assets/camera/live.html` | The spotlight's live picture, all of it through Home Assistant: its WebRTC, signalled by the app so the page never holds the token, then its HLS, then its picture stream, then still pictures. Live only counts once a frame is drawn. |
+| `CameraLive.kt`, `assets/camera/live.html` | The spotlight's live picture, all of it through Home Assistant: its WebRTC, signalled by the app so the page never holds the token, then its HLS (played by the page's own Media Source Extensions player, every file fetched through the app from Home Assistant's address), then its picture stream, then still pictures. Live only counts once a frame is drawn. |
 | `PictureStream.kt` | Reads Home Assistant's camera picture stream (MJPEG) one picture at a time, for the live picture's last way. |
 | `Cameras.kt` | Which cameras are included and selected on this device, sensors picked by hand, opening camera mode, and listing Home Assistant's cameras. |
 | `HaSocket.kt` | A Home Assistant WebSocket connection that stays open (camera mode): calls, subscriptions and pings, on `MiniWebSocket`. |

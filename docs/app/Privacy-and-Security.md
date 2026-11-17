@@ -41,7 +41,7 @@ What it can't stop: someone already inside your network who actively rewrites th
 
 ## Camera mode
 
-[Camera mode](Cameras.md) is off unless you turn it on, on each device, and shows only the cameras you switch on there. It runs only while it's open: the connection to Home Assistant, the still pictures and the motion it watches all stop when it closes, and nothing opens it by itself. Still pictures are fetched by the app with its token and kept in memory, never saved. The live picture plays in a page from inside the app; the app does every message to Home Assistant, so that page never holds the token (an HLS stream's address carries Home Assistant's own short-lived stream token). When it falls back to Home Assistant's picture stream, the app reads it itself with its token and keeps the pictures in memory only. Camera pictures never go into Lena's log.
+[Camera mode](Cameras.md) is off unless you turn it on, on each device, and shows only the cameras you switch on there. It runs only while it's open: the connection to Home Assistant, the still pictures and the motion it watches all stop when it closes, and nothing opens it by itself. Still pictures are fetched by the app with its token and kept in memory, never saved. The live picture plays in a page from inside the app; the app does every message to Home Assistant, so that page never holds the token (an HLS stream's address carries Home Assistant's own short-lived stream token). HLS's files are fetched by the app for the page, from Home Assistant's own address and only from its HLS paths. When it falls back to Home Assistant's picture stream, the app reads it itself with its token and keeps the pictures in memory only. Camera pictures never go into Lena's log.
 
 ## The wall display
 

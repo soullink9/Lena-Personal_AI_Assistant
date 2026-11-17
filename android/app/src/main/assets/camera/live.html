@@ -116,13 +116,147 @@
     else early.push(candidate);
   };
 
-  // HLS instead: Home Assistant's stream address, with its own short-lived token in it.
-  window.lenaHls = function (url, sound) {
+  // HLS instead: Home Assistant's stream (its address carries its own short-lived token). [throughApp] is the
+  // same stream asked for through the app (CameraLive.hlsThroughApp), which fetches every file from Home
+  // Assistant's own address: same-origin for this page, and the only way when nothing but that address can be
+  // reached (Home Assistant behind Traefik or another reverse proxy). It's played here with Media Source
+  // Extensions, since a web view can't be counted on to play HLS by itself; [direct] is only for a web view
+  // without them for this stream's codecs, to try by itself.
+  window.lenaHls = function (throughApp, direct, sound) {
     lenaStop();
     video.muted = !sound;
-    video.src = url;
-    video.play().catch(function () {});
+    var mine = attempt;
+    throughApp = new URL(throughApp, location.href).href;
+    getText(throughApp).then(function (master) {
+      if (mine !== attempt) return;
+      var variant = mediaPlaylist(master, throughApp);
+      var type = variant && variant.codecs ? 'video/mp4; codecs="' + variant.codecs + '"' : null;
+      if (!variant || !window.MediaSource || !type || !MediaSource.isTypeSupported(type)) {
+        video.src = direct;
+        video.play().catch(function () {});
+        return;
+      }
+      var source = new MediaSource();
+      source.addEventListener('sourceopen', function () {
+        if (mine === attempt) playHls(source, type, variant.url, mine);
+      }, { once: true });
+      video.src = URL.createObjectURL(source);
+      video.play().catch(function () {});
+    }).catch(function (e) {
+      if (mine === attempt) LenaCamera.failed('HLS: ' + (e && e.message || e));
+    });
   };
+
+  function get(url) {
+    return fetch(url, { cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error('HTTP ' + response.status + ' from Home Assistant');
+      return response;
+    });
+  }
+  function getText(url) { return get(url).then(function (r) { return r.text(); }); }
+  function getBytes(url) { return get(url).then(function (r) { return r.arrayBuffer(); }); }
+
+  // The master playlist's first stream: its media playlist's address and its codecs.
+  function mediaPlaylist(text, base) {
+    var lines = text.split('\n').map(function (line) { return line.trim(); });
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].indexOf('#EXT-X-STREAM-INF:') !== 0) continue;
+      var codecs = /CODECS="([^"]+)"/.exec(lines[i]);
+      for (var j = i + 1; j < lines.length; j++) {
+        if (lines[j] && lines[j][0] !== '#') return { url: new URL(lines[j], base).href, codecs: codecs && codecs[1] };
+      }
+    }
+    return null;
+  }
+
+  // A media playlist: its init file, target duration and whole segments (with their sequence numbers, and
+  // whether a discontinuity comes before them, after which the init is added again). Low-latency parts
+  // (#EXT-X-PART) are left out: whole segments are enough for a picture a second or two behind.
+  function segments(text, base) {
+    var list = { map: null, target: 2, sequence: 0, segments: [] };
+    var count = 0, inf = false, gap = false;
+    text.split('\n').forEach(function (raw) {
+      var line = raw.trim();
+      var map = /^#EXT-X-MAP:.*URI="([^"]+)"/.exec(line);
+      if (map) list.map = new URL(map[1], base).href;
+      else if (line.indexOf('#EXT-X-TARGETDURATION:') === 0) list.target = parseFloat(line.substring(22)) || 2;
+      else if (line.indexOf('#EXT-X-MEDIA-SEQUENCE:') === 0) list.sequence = parseInt(line.substring(22), 10) || 0;
+      else if (line === '#EXT-X-DISCONTINUITY') gap = true;
+      else if (line.indexOf('#EXTINF:') === 0) inf = true;
+      else if (line && line[0] !== '#' && inf) {
+        list.segments.push({ sequence: list.sequence + count, url: new URL(line, base).href, gap: gap });
+        count++;
+        inf = false;
+        gap = false;
+      }
+    });
+    return list;
+  }
+
+  // Feeds the stream to the video: the init, then each new whole segment as the playlist gains it, starting
+  // a segment back from the newest; keeps the picture near the newest and drops what's long been shown.
+  function playHls(source, type, url, mine) {
+    var buffer = source.addSourceBuffer(type);
+    buffer.mode = 'sequence'; // a discontinuity's new timestamps simply carry on
+    var next = null;
+    var initAdded = null;
+
+    function update(change) {
+      return new Promise(function (resolve, reject) {
+        function done() { buffer.removeEventListener('error', failed); resolve(); }
+        function failed() { buffer.removeEventListener('updateend', done); reject(new Error('the stream could not be decoded')); }
+        buffer.addEventListener('updateend', done, { once: true });
+        buffer.addEventListener('error', failed, { once: true });
+        change();
+      });
+    }
+    function append(bytes) { return update(function () { buffer.appendBuffer(bytes); }); }
+    function tidy() {
+      if (!buffer.buffered.length || video.currentTime - buffer.buffered.start(0) < 30) return null;
+      var upTo = video.currentTime - 10;
+      return update(function () { buffer.remove(0, upTo); });
+    }
+    function keepNearNewest(target) {
+      if (!buffer.buffered.length) return;
+      var end = buffer.buffered.end(buffer.buffered.length - 1);
+      if (end - video.currentTime > Math.max(3 * target, 6)) video.currentTime = end - 0.5;
+      if (video.paused) video.play().catch(function () {});
+    }
+
+    function look() {
+      if (mine !== attempt) return;
+      getText(url).then(function (text) {
+        if (mine !== attempt) return;
+        var list = segments(text, url);
+        if (!list.map) throw new Error('the playlist has no init');
+        var newest = list.sequence + list.segments.length - 1;
+        if (next === null) next = Math.max(list.sequence, newest - 1);
+        if (next < list.sequence) next = list.sequence; // fell behind what Home Assistant still keeps
+        var chain = Promise.resolve();
+        list.segments.forEach(function (segment) {
+          if (segment.sequence < next) return;
+          chain = chain.then(function () {
+            if (mine !== attempt) return;
+            var init = (initAdded !== list.map || segment.gap)
+              ? getBytes(list.map).then(append).then(function () { initAdded = list.map; })
+              : Promise.resolve();
+            return init
+              .then(function () { return getBytes(segment.url); })
+              .then(append)
+              .then(function () { next = segment.sequence + 1; return tidy(); });
+          });
+        });
+        return chain.then(function () {
+          if (mine !== attempt) return;
+          keepNearNewest(list.target);
+          setTimeout(look, Math.max(500, list.target * 500));
+        });
+      }).catch(function (e) {
+        if (mine === attempt) LenaCamera.failed('HLS: ' + (e && e.message || e));
+      });
+    }
+    look();
+  }
 
   window.lenaStop = function () {
     attempt++;
