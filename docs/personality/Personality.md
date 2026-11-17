@@ -51,7 +51,7 @@ Add `--url http://<address>:11434` if Ollama runs on another machine. It needs o
 Tips:
 
 - Write to her ("You are...") and describe behavior, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".
-- Every word is sent with every message. Keep it tight; small models follow short, concrete rules better than long ones.
+- Every word is sent with every message. Keep it tight: a model follows short, concrete rules better than long ones.
 - Use quoted "never say X" phrases sparingly. Models sometimes repeat the very phrases they're told to avoid.
 - Show her voice with a few short example exchanges that differ from each other (a command, a plain fact, a serious moment, something that failed). A model learns more from those than from adjectives, and repeats them less than a list of one-liners.
 - Keep anything that changes (moods, the time, the house) out of the Modelfile. That belongs to Home Assistant.
@@ -62,8 +62,10 @@ Tips:
 
 | Setting | Value | Why |
 |---|---|---|
-| `FROM` | `gemma4:12b` | Fits a 16 GB GPU with a 32k context, supports tools, holds a character well. Alternatives are listed in the file. |
+| `FROM` | `gemma4:12b` | Fits a 16 GB GPU with a 32k context, supports tools, holds a character well. Alternatives are listed in the file. Her character is written for a model of this size or larger. |
 | `num_ctx` | 32768 | Room for her character, Home Assistant's device list and tools, and a long chat. Keep it the same in Home Assistant and the app. |
-| `temperature`, `top_p`, `top_k` | 1.0, 0.95, 64 | Google's recommended settings for Gemma 4. Lower temperature to 0.7 if device control gets sloppy. |
+| `temperature` | 0.7 | Google recommends 1.0 for Gemma 4, but at 1.0 she misspelled tool names and guessed device names. Go back to 1.0 if she starts to sound flat. |
+| `top_p`, `top_k` | 0.95, 64 | Google's recommended settings for Gemma 4. They belong to the base model: with another one, set its recommended values or delete both lines to use the ones it ships with. |
+| `num_predict` | 4096 | A ceiling on one reply, thinking included, so a model stuck redrafting a sentence stops instead of running on. |
 
 More on speed and memory use: [Performance tuning](../home-assistant/Performance-Tuning.md). How her feelings work: [Her feelings](Moods.md).

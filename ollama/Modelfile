@@ -8,7 +8,9 @@
 # What does NOT live here is anything that changes: her current mood, energy
 # and reactions, the time, who's home and what she remembers. Home Assistant
 # works those out and sends them with each request (home-assistant/), and
-# Open WebUI picks them up from Home Assistant (open-webui/).
+# Open WebUI picks them up from Home Assistant (open-webui/). Her rules for
+# running the house (device names, tool inputs) aren't here either: the Lena
+# integration sends them with the tools (HOUSE_RULES in its brain.py).
 #
 # Build it:
 #     ollama create lena -f Modelfile
@@ -36,7 +38,9 @@
 FROM gemma4:12b
 
 # Alternatives. Swap by commenting/uncommenting, then rebuild, and change the
-# sampling settings below to the ones the new model's page recommends.
+# sampling settings below to the ones the new model's page recommends. Her
+# character is written for a model of this size or larger, and whatever you
+# pick must support tool calling.
 # FROM qwen3.5:9b      (Qwen: temperature 0.7, top_p 0.8, top_k 20)
 # FROM gpt-oss:20b     (always "thinks" first, which is slow for voice)
 
@@ -58,6 +62,9 @@ PARAMETER num_ctx 32768
 # tool names and guessed device names. 0.7 keeps her personality and gets
 # names right. Go back to 1.0 if she starts to sound flat.
 PARAMETER temperature 0.7
+# These two are Google's values for Gemma 4, and belong to the FROM line above.
+# With another base model, set that model's recommended values here, or delete
+# both lines to use the ones the model ships with.
 PARAMETER top_p 0.95
 PARAMETER top_k 64
 
