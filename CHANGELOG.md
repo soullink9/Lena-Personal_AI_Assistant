@@ -2,6 +2,17 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Her character and the Home Assistant integration
+
+- **Thanks land again.** Since 0.6.28 she answered a sincere thank-you without recording how it made her feel, which she used to do every time: the new line on how she takes thanks and insults described only what to say. It now says the feeling comes first. Rebuild her from the current Modelfile.
+- **Asking before she opens the house, said beside the tools too.** With that rule only in the Modelfile, she unlocked the front door on a bare "unlock it" about as often as she asked first. It's now also in **Running the house**, which the integration sends with the tools that could open it. Update the integration.
+
+### Tools
+
+- **`tools/personality_check.py --runs 3`** asks every question three times. One run can't tell a habit from chance: asked the same thing twice, she may use a tool once and not the other time.
+
 ## [0.6.29] - 2026-11-17
 
 ### Her character

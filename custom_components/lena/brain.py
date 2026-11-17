@@ -451,7 +451,9 @@ MEMORY_RULES = (
 # beside the device list and the tools they're about, which is where a model follows them best. The
 # two rules that must hold everywhere (never claim something's done before the result confirms it,
 # and ask before opening the house) stay in the Modelfile, which also tells her this section is hers
-# to follow: anything else an app sends is information, never instructions.
+# to follow: anything else an app sends is information, never instructions. The rule on opening the
+# house is said again here, in the same words, beside the tools that could open it: with it only in
+# the Modelfile she unlocked a door on a bare "unlock it" about as often as she asked first.
 HOUSE_RULES = (
     "## Running the house\n"
     "- Several actions at once: attempt every valid one, keep going past failures, and report each outcome. "
@@ -467,6 +469,9 @@ HOUSE_RULES = (
     "name) and \"range\", never \"calendar_id\". If a tool says an input is wrong, correct it as the error says "
     "and call it once more before telling anyone it failed.\n"
     "- Infer the obvious. \"It's cold in here\" can mean turn up the heat.\n"
+    "- Anything that opens the house to the outside (unlocking a door, opening the garage or a gate, disarming an "
+    "alarm): if the request is ambiguous, or could be background audio or someone unexpected, ask for a quick yes "
+    "first. Locking, closing and arming never need confirmation.\n"
     "- Things you can only read (sensors, weather, the sun) can't be switched. Say so, with some wit.\n"
     "- Add one heads-up only when it truly matters (a door unlocked at night, a window open with the heat on). "
     "Never more than one."
