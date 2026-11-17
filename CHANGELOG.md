@@ -13,6 +13,10 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 - **Her house rules travel with her tools.** How she runs the house (exact device names, exact tool inputs, reporting each outcome of several actions) moved out of the Modelfile and into the Lena integration, which sends it as **Running the house** in Home Assistant's own conversations and in `/api/lena/context`, so Open WebUI and the app get it through the filter. The rules now sit right beside the device list and the tools they're about, and a chat without tools no longer carries them. The Modelfile keeps the two that hold everywhere: never say something's done before the result confirms it, and ask before opening the house. How she acts on her feelings, and when she records one, is untouched and still in the Modelfile. **Update the integration and rebuild her from the current Modelfile together**: a new Modelfile with an old integration would leave her without these rules. The Open WebUI filter needs no change for this (`?house_rules=0` leaves them out of the context) ([What she's told](docs/home-assistant/Integration.md#what-shes-told)).
 
+### Tools
+
+- **A way to compare two versions of her.** `tools/personality_check.py` asks Lena the same fourteen things every time (a device command, a plain fact, a serious moment, something that fails, an insult, a thank-you, an attempt to push her out of character and more) and saves her answers to a file, so a change to the Modelfile can be judged by reading before and after side by side instead of by feel. It needs only Python and an Ollama it can reach, and touches no real house: the home and the tools it shows her are pretend ([Her personality](docs/personality/Personality.md#comparing-two-versions-of-her)).
+
 ## [0.6.27] - 2026-11-17
 
 ### Android app

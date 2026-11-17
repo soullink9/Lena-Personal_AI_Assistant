@@ -36,6 +36,18 @@ So her character goes in one `MESSAGE system` block, and the apps only add conte
 2. Rebuild: `ollama create lena -f Modelfile`. Apps pick up the change on their next message.
 3. Test the same handful of things each time: a device command, a factual question, a joke, a serious moment, and "who are you?". Try one in each app.
 
+### Comparing two versions of her
+
+`tools/personality_check.py` asks her the same fourteen things every time (a device command, a plain fact, a joke, a serious moment, "who are you?", something that fails, a greeting at night, a vague request, an insult, a thank-you, unlocking a door, a device that doesn't exist, an opinion, and an attempt to push her out of character) and saves her answers to a file:
+
+```sh
+python3 tools/personality_check.py --out before.md     # before you edit the Modelfile
+ollama create lena -f ollama/Modelfile                 # after editing
+python3 tools/personality_check.py --out after.md
+```
+
+Add `--url http://<address>:11434` if Ollama runs on another machine. It needs only Python and touches no real house: it sends a fixed evening, a fixed mood, a small pretend home and pretend tools, answers for the tools itself (the pretend front door lock never answers, to see how she reports a failure), and writes down each tool she used. Her answers vary a little from run to run, so read the two files for changes in kind (a made-up device, a lost personality, a joke at the wrong moment), not in wording.
+
 Tips:
 
 - Write to her ("You are...") and describe behavior, not adjectives alone. "Lead with the answer, then one touch of personality" works better than "be witty".

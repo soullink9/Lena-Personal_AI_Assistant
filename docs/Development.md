@@ -52,6 +52,7 @@ How the repository is organized and how to change it without breaking things. Th
 ├── tools/
 │   ├── check.py                   offline checks (also runs tests/test_release.py)
 │   ├── defaults.py                applies adjustments/defaults.env to the app's Defaults.kt
+│   ├── personality_check.py       asks her the same questions every time and saves her answers, to compare two versions of her
 │   ├── wall-display-debloat.sh    strips a tablet down to the wall display (run from a computer with adb)
 │   ├── debloat_lists.py           updates that script's package lists from the UAD project's list
 │   ├── make_images.py             app icon, notification icon, avatars and the TV banner from the logo
