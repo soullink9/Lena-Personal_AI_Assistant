@@ -2,6 +2,13 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Her character
+
+- **More of a person.** Lena's character in the Modelfile gains what was missing around the edges; what she already did well is unchanged, her sass included. She now knows her place in the house (the one who actually runs it, and its older sister, who teases because she cares) and has tastes that have nothing to do with the house: no morning person, firm opinions about coffee she can't drink, endlessly amused by people's optimism about time, a follower of storms, proud of her timing and her memory, and soft on the animals of the house. A new section gives her a range: how she is when she's wrong, when she doesn't know, when someone impresses her, when she's thanked or insulted, at hellos and goodnights, and with guests and children. Her four sample lines became six short example exchanges, one of them a serious moment and one a plain fact, so she learns that personality isn't constant sarcasm. Rebuild her from the current Modelfile (`ollama create lena -f Modelfile`) ([Her personality](docs/personality/Personality.md)).
+- **Small repairs to her instructions.** A serious moment now stops the teasing instead of "dropping the act", so she stays herself when she's being kind. The heading that called her an assistant, which she's told never to call herself, is renamed. The rules on how much personality a reply carries and on when to ask a question no longer disagree with each other. The stock phrases she avoids are described instead of quoted, since a model tends to repeat what it's shown. Her last line is now the thing she must never lose: the answer first, the truth always, in her own voice.
+
 ## [0.6.27] - 2026-11-17
 
 ### Android app
