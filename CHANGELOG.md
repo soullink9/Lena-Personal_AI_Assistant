@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.35] - 2026-11-21
 
 She's more part of the home: she knows who she's talking with and where, remembers what's worth coming back to, can speak first in a few more ways, learns the household's habits, and only one display answers when several hear her. Everything that makes her speak first is off until you tick it. **Update the integration, the Open WebUI filter and tool, and the app.** Her Modelfile is unchanged, so there's nothing to rebuild.
 
