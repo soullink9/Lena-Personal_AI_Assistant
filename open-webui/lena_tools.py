@@ -19,7 +19,10 @@ description: Lets Lena save, correct and remove her Home Assistant memories, rec
 #
 # WHAT IT DOES
 #   remember / forget  add to or remove from her memory list (todo.lena_memory),
-#                      the same list she uses in Home Assistant.
+#                      the same list she uses in Home Assistant. remember runs
+#                      lena.remember, which keeps who it's about, a day to ask
+#                      how it went, whether it's her own opinion, and who said it
+#                      (your Open WebUI name).
 #   feel               runs the lena.feel action, the same way her voice does,
 #                      so her reaction carries everywhere.
 #   add_calendar_event runs the lena.add_event action, which adds the event with
@@ -148,21 +151,34 @@ class Tools:
         answer = reply.get("service_response") if isinstance(reply, dict) else None
         return json.dumps(answer) if answer else "Done."
 
-    async def remember(self, fact: str) -> str:
+    async def remember(
+        self,
+        fact: str,
+        about: str = "",
+        follow_up: str = "",
+        kind: Literal["fact", "plan", "hers", ""] = "",
+        __user__: dict | None = None,
+    ) -> str:
         """
         Save something to your memory, which is shared with Home Assistant and the phone.
         Use it when someone asks you to remember something, or tells you a lasting fact that
         clearly matters (a preference, a routine, a name, a standing rule). Never save passing
         moods, one-off requests, things already saved, or secrets like passwords or door codes.
         :param fact: One short statement in the third person, under fifteen words, saying who it's about. For example "Alex likes the office at seventy degrees."
+        :param about: Optional. Who it's about: a person's or pet's name.
+        :param follow_up: Optional. YYYY-MM-DD to ask how it went.
+        :param kind: Optional. hers for your own opinion or running joke.
         """
         if not self.valves.ha_token:
             return "Memory isn't set up: the tool has no Home Assistant token."
+        data = {"fact": fact.strip(), "about": about.strip(), "follow_up": follow_up.strip(), "kind": kind,
+                "by": str((__user__ or {}).get("name") or "").strip()}
         try:
-            await self._call("todo", "add_item", {"entity_id": self.valves.memory_list, "item": fact.strip()})
+            reply = await self._call("lena", "remember", {k: v for k, v in data.items() if v}, response=True)
         except Exception as error:
-            return f"Saving failed: {error}. Tell the person it didn't save."
-        return f"Saved: {fact.strip()}"
+            return f"Saving failed: {_problem(error)} Tell the person it didn't save."
+        saved = (reply or {}).get("service_response", {}) if isinstance(reply, dict) else {}
+        return f"Saved: {saved.get('saved', fact.strip())}"
 
     async def forget(self, fact: str) -> str:
         """

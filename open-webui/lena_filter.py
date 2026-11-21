@@ -3,7 +3,7 @@ title: Lena (feelings and memory)
 author: soullink9
 version: 0.6.34
 license: GPL-3.0
-description: Adds the time at home, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant, and tells her how much time passed between messages.
+description: Adds the time at home, who she's talking with, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant, and tells her how much time passed between messages.
 """
 
 # =============================================================================
@@ -22,7 +22,10 @@ description: Adds the time at home, Lena's current feelings and her shared memor
 #   home, how she feels, what she remembers and the exact names of the devices
 #   exposed to Assist (Home Assistant's tools match names exactly, so she'd
 #   otherwise guess "curtains" for "Living Room Curtains"). It adds that to the chat's
-#   system message. Her character itself comes from the Modelfile and is
+#   system message. It also says who's asking (your Open WebUI name, matched
+#   to the person of that name in Home Assistant, so she knows when you last
+#   talked) and, from the Lena app, which display, so she knows the room and
+#   keeps it soft in a bedroom at night (who_and_where). Her character itself comes from the Modelfile and is
 #   always there; this only adds what's current. Answers are cached for a
 #   minute, and if Home Assistant can't be reached she simply chats without it.
 #
@@ -48,6 +51,7 @@ import inspect
 import json
 import logging
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Optional
@@ -252,6 +256,10 @@ class Filter:
             default=True,
             description="Include the exact names of the devices exposed to Assist, by room, so she finds them the first time.",
         )
+        who_and_where: bool = Field(
+            default=True,
+            description="Tell Home Assistant who's asking (your Open WebUI name, matched to the person of that name) and from which Lena display, so she knows who she's talking with, when you last talked, and the room.",
+        )
         time_passing: bool = Field(
             default=True,
             description="Tell her how much time passed between messages, so after a break she doesn't pick up the old topic as if you'd never left.",
@@ -262,14 +270,25 @@ class Filter:
     def __init__(self):
         """Open WebUI creates the filter once and keeps it, so the cache lives across requests."""
         self.valves = self.Valves()
-        self._cache: tuple[float, str] = (0.0, "")
+        # Home Assistant's answers, by who's asking and from where: {(user, display): (time, text)}.
+        self._cache: dict[tuple[str, str], tuple[float, str]] = {}
 
-    async def _context(self) -> str:
+    async def _context(self, user: str = "", display: str = "") -> str:
         """Fetches her context from Home Assistant, or an empty string if it can't be reached: she
         should still chat when Home Assistant is down. The request runs in a thread because urllib
-        blocks and Open WebUI's server is async.
+        blocks and Open WebUI's server is async. [user] and [display] say who's asking and through which
+        Lena display, when known.
         """
-        query = "&".join(q for q in ("" if self.valves.memory else "memory=0", "devices=1" if self.valves.devices else "") if q)
+        params = {}
+        if not self.valves.memory:
+            params["memory"] = "0"
+        if self.valves.devices:
+            params["devices"] = "1"
+        if user:
+            params.update({"user": user, "talking": "1"})
+        if display:
+            params["device"] = display
+        query = urllib.parse.urlencode(params)
         url = self.valves.ha_url.rstrip("/") + "/api/lena/context" + (f"?{query}" if query else "")
         try:
             body = await asyncio.to_thread(_get, url, self.valves.ha_token, 4)
@@ -308,18 +327,27 @@ class Filter:
 
     async def inlet(self, body: dict, __user__: Optional[dict] = None, __metadata__: Optional[dict] = None) -> dict:
         """Adds the notes on time passing between messages, then her context to the request's system
-        message (or as one, if there isn't one). Home Assistant is asked at most once a minute: a chat
-        sends many requests, and her feelings don't change that fast.
+        message (or as one, if there isn't one). Home Assistant is asked at most once a minute for each
+        person and display: a chat sends many requests, and her feelings don't change that fast.
         """
         if self.valves.time_passing:
             await self._time_notes(body, __metadata__ or {})
         if not self.valves.ha_token:
             return body
 
-        cached_at, text = self._cache
+        user, display = "", ""
+        if self.valves.who_and_where:
+            variables = (__metadata__ or {}).get("variables") or {}
+            display = str(variables.get("{{LENA_DISPLAY}}") or "")[:64]
+            # A wall display is shared: the account signed in there isn't necessarily who's talking.
+            if not variables.get("{{LENA_SHARED}}"):
+                user = str((__user__ or {}).get("name") or "")[:100]
+        cached_at, text = self._cache.get((user, display), (0.0, ""))
         if time.monotonic() - cached_at > self.valves.cache_seconds:
-            text = await self._context()
-            self._cache = (time.monotonic(), text)
+            text = await self._context(user, display)
+            # Old answers are dropped, so the cache stays as small as the household.
+            self._cache = {k: v for k, v in self._cache.items() if time.monotonic() - v[0] <= self.valves.cache_seconds}
+            self._cache[(user, display)] = (time.monotonic(), text)
         if not text:
             return body
 
