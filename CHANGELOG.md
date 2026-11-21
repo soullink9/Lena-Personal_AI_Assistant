@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.37] - 2026-11-21
 
 A camera that once failed to play live no longer stays on a black screen. Also the tidy-up below: leftovers nobody uses any more are gone. **Update the app.** Nothing else changes.
 
