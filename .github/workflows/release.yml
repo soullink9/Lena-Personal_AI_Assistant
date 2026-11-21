@@ -169,6 +169,11 @@ jobs:
       - name: Check connection rules
         run: tools/connection_check/run.sh
 
+      # One display answers: how loud the wake word was above the room's noise, and what each display says
+      # it's doing (listening, thinking, speaking) for Home Assistant.
+      - name: Check wake word claims and display state
+        run: tools/presence_check/run.sh
+
       # A release must install over the last one, so it's signed with your key or not published at all.
       - name: Load the signing key
         env:

@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     # Only the app needs building; docs and Home Assistant files don't.
-    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "tools/pairing_check/**", "tools/camera_check/**", "tools/connection_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
+    paths: ["android/**", "tools/frontend_check/**", "tools/commands_check/**", "tools/pairing_check/**", "tools/camera_check/**", "tools/connection_check/**", "tools/presence_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -79,6 +79,11 @@ jobs:
       # and how an answer being written is followed.
       - name: Check connection rules
         run: tools/connection_check/run.sh
+
+      # One display answers: how loud the wake word was above the room's noise, and what each display says
+      # it's doing (listening, thinking, speaking) for Home Assistant.
+      - name: Check wake word claims and display state
+        run: tools/presence_check/run.sh
 
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner. A test build is named after its commit.
       - name: Build
