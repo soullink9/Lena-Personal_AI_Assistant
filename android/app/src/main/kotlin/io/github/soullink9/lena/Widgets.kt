@@ -50,18 +50,12 @@ class LenaTile : TileService() {
     }
 
     /**
-     * Opens the sheet, listening, and closes the shade (Android 14+ requires a PendingIntent for that).
+     * Opens the sheet, listening, and closes the shade (Android takes a PendingIntent for that).
      * The sheet handles the lock screen itself, as it does for the assistant gesture.
      */
     override fun onClick() {
         val talk = AskActivity.intent(this, talk = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startActivityAndCollapse(PendingIntent.getActivity(this, 0, talk, PendingIntent.FLAG_IMMUTABLE))
-        } else {
-            // Before Android 14, the intent itself (the form Android 14 deprecated).
-            @Suppress("DEPRECATION", "StartActivityAndCollapseDeprecated")
-            startActivityAndCollapse(talk)
-        }
+        startActivityAndCollapse(PendingIntent.getActivity(this, 0, talk, PendingIntent.FLAG_IMMUTABLE))
     }
 }
 

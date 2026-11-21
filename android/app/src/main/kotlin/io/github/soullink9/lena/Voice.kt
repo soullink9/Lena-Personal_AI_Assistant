@@ -74,8 +74,8 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
 
 /**
  * Android's on-device speech recognizer: shows your words as you speak, and the audio never
- * leaves the phone. On Android TV, and before Android 12, it's the device's own speech service instead
- * ([onDevice]): on a TV, that's what hears through the remote's microphone.
+ * leaves the phone. On Android TV it's the TV's own speech service instead ([onDevice]): that's what
+ * hears through the remote's microphone.
  *
  * One recognizer per sheet, destroyed when the sheet closes: a recognizer kept longer can outlive the
  * speech service it's connected to (Android restarts it while the tablet sits idle) and then never
@@ -101,13 +101,11 @@ class PhoneEar(private val context: Context) : Ear {
         }
 
         /**
-         * Whether to use the on-device recognizer (Android 12 and later), which never sends your voice
-         * anywhere. On a TV it's the TV's own speech recognition instead: that's the one that can hear
-         * through the remote's microphone, as the TV's voice search does. Before Android 12 there's only
-         * the device's speech service (Google's, on most).
+         * Whether to use the on-device recognizer, which never sends your voice anywhere. On a TV it's the
+         * TV's own speech recognition instead: that's the one that can hear through the remote's
+         * microphone, as the TV's voice search does.
          */
-        @androidx.annotation.ChecksSdkIntAtLeast(api = android.os.Build.VERSION_CODES.S)
-        fun onDevice(c: Context): Boolean = Compat.onDeviceRecognizer && !Tv.isTv(c)
+        fun onDevice(c: Context): Boolean = !Tv.isTv(c)
 
         /** Gives the phone's recognizer another chance (choosing On this phone again in Settings). */
         fun trustAgain(c: Context) {
@@ -186,8 +184,8 @@ class PhoneEar(private val context: Context) : Ear {
         var relayFailed = false
         while (true) {
             try {
-                // Only Android 13 and later can listen through the wake word's microphone.
-                val relay = if (relayFailed || !Compat.recognizerTakesAudio) null.also { MicRelay.drop() } else MicRelay.take()
+                // The recognizer listens through the wake word's microphone, unless that failed this time.
+                val relay = if (relayFailed) null.also { MicRelay.drop() } else MicRelay.take()
                 return once(onPartial, onLevel, relay = relay)
             } catch (e: EarError) {
                 when {
@@ -329,10 +327,8 @@ class PhoneEar(private val context: Context) : Ear {
                             error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> done("")
                             error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
                                 error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
-                                // Android 13 can start the on-device model's download itself.
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                    runCatching { r.triggerModelDownload(request()) }
-                                }
+                                // Start the on-device model's download, for next time.
+                                runCatching { r.triggerModelDownload(request()) }
                                 fail(EarUnavailable())
                             }
                             else -> fail(EarError(error))

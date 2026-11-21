@@ -11,7 +11,7 @@ when the signing secrets are missing) installs over nothing, so it must never re
 
 1. it's an APK that opens (a zip with every file intact) with what Android needs: AndroidManifest.xml,
    classes.dex and resources.arsc;
-2. it's signed with Android's v2/v3 APK signature (the only kind for minSdk 36), and not with the debug key;
+2. it's signed with Android's v2/v3 APK signature (the only kind needed from minSdk 24; the app is 35), and not with the debug key;
 3. its manifest names Lena's package and the repository's version, so it's the build it claims to be;
 4. its file name is the one the release notes link to, and SHA256SUMS lists it with its real checksum.
 

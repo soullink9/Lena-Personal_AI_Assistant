@@ -5,7 +5,7 @@ import android.os.Bundle
 
 /**
  * "Talk to Lena" in a TV's apps: opens her listening, and nothing else. It's its own entry so a remote's
- * customisable button can open it (on a Shield: Settings → Remotes & Accessories → customise a button →
+ * customisable button can open it (Settings → Remotes & Accessories, or the remote maker's app →
  * Talk to Lena), since the remote's microphone button always belongs to Google Assistant. She then
  * listens through the TV's own speech service ([PhoneEar]); see docs/app/Android-TV.md.
  *

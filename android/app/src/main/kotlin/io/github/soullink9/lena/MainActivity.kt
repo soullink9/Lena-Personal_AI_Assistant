@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.ViewGroup
+import android.view.WindowInsetsController
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -131,9 +132,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
@@ -327,12 +325,12 @@ class MainActivity : ComponentActivity() {
     private fun applyWindowMode() {
         dashboardMode = DashboardActivity.isHomeScreen(this)
         wallDisplay.value = dashboardMode
-        WindowCompat.getInsetsController(window, window.decorView).apply {
+        window.insetsController?.apply {
             if (dashboardMode) {
-                hide(WindowInsetsCompat.Type.systemBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(android.view.WindowInsets.Type.systemBars())
+                systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             } else {
-                show(WindowInsetsCompat.Type.systemBars())
+                show(android.view.WindowInsets.Type.systemBars())
             }
         }
     }
@@ -392,7 +390,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("lena", MODE_PRIVATE)
         if (prefs.getBoolean("asked_notifications", false) || !Prefs.notifyReplies(this)) return
         prefs.edit().putBoolean("asked_notifications", true).apply()
-        if (!Compat.notificationsAllowed(this)) {
+        if (!notificationsAllowed()) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -740,7 +738,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         if (!::web.isInitialized || !Prefs.notifyReplies(this)) return
-        if (!Compat.notificationsAllowed(this)) return
+        if (!notificationsAllowed()) return
         val chatId = chatIdOf(currentUrl.value) ?: return
         val appContext = applicationContext
         lifecycleScope.launch {

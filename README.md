@@ -27,7 +27,7 @@ Lena is a Jarvis-style assistant that runs entirely on your own servers. She's o
 | [`ollama/`](ollama) | Her character and model settings (`Modelfile`), and an example Ollama setup that keeps her loaded |
 | [`home-assistant/`](home-assistant) | The **Lena** integration: her feelings, shared memory and tools, in one folder |
 | [`open-webui/`](open-webui) | A filter and a tool that bring her feelings and memory into Open WebUI and the app |
-| [`android/`](android) | The **Lena** app for Android 16 (and Android TV from Android 11), built and signed by the release workflows |
+| [`android/`](android) | The **Lena** app for Android 15 and later, phones, tablets and Android TV, built and signed by the release workflows |
 | [`voice/`](voice) | An example Piper container, and the bridge that gives Open WebUI your Piper and Whisper voices |
 | [`tools/`](tools) | `check.py`, offline checks to run before committing |
 | [`docs/`](docs) | Everything in detail (see below) |

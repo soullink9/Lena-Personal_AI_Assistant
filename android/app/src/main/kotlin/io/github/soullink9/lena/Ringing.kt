@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -201,12 +200,11 @@ class RingService : Service() {
             this, code, Intent(this, RingService::class.java).setAction(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        return NotificationCompat.Builder(this, Ringing.CHANNEL)
+        return Notification.Builder(this, Ringing.CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_lena)
             .setContentTitle(title(item.kind))
             .setContentText(item.name(this))
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(Notification.CATEGORY_ALARM)
             .setOngoing(true)
             .setFullScreenIntent(open, true)
             .setContentIntent(open)

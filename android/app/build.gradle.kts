@@ -12,15 +12,15 @@ android {
 
     defaultConfig {
         applicationId = "io.github.soullink9.lena"
-        // Android 11, for Android TV boxes like the Nvidia Shield (docs/app/Android-TV.md); phones and
-        // tablets are Android 16. Anything newer than Android 11 is used only where it's there (Build.VERSION
-        // checks), and the lint block below fails the build on any call that isn't.
-        minSdk = 30
+        // Android 15, on phones, tablets and Android TV alike (the owner's choice): no code for older Android.
+        // Anything newer than Android 15 is used only where it's there (a Build.VERSION check), and the lint
+        // block below fails the build on any call that isn't.
+        minSdk = 35
         targetSdk = 36
         versionCode = 69
         versionName = "0.6.35"
-        // Phones and tablets are 64-bit; many Android TV boxes run 32-bit Android on 64-bit chips, so the wake
-        // word's native code (LiteRT) comes for 32-bit ARM too.
+        // Phones and tablets are 64-bit; Android TVs and boxes may still run 32-bit Android on 64-bit chips, so
+        // the wake word's native code (LiteRT) comes for 32-bit ARM too.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
@@ -53,9 +53,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // A call to anything newer than Android 11 (minSdk) without a Build.VERSION check would crash on an
-    // Android TV box, and no phone would ever show it: make it fail every release build instead. (Release
-    // builds run lint's "vital" checks; this adds NewApi to them.)
+    // A call to anything newer than Android 15 (minSdk) without a Build.VERSION check would crash on an
+    // Android 15 device, and an Android 16 phone would never show it: make it fail every release build
+    // instead. (Release builds run lint's "vital" checks; this adds NewApi to them.)
     lint {
         fatal += "NewApi"
         checkReleaseBuilds = true

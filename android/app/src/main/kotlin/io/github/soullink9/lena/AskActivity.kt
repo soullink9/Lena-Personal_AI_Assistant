@@ -344,8 +344,8 @@ class AskActivity : ComponentActivity() {
             ?.let { it to intent.getBooleanExtra(EXTRA_LISTEN, false) }
 
         style = Prefs.askStyle(this)
-        // The orb blurs whatever's behind it, where the phone supports it (Android 12; otherwise it just darkens).
-        if (style == AskStyle.ORB && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        // The orb blurs whatever's behind it (where the phone has blur turned on; otherwise it just darkens).
+        if (style == AskStyle.ORB) {
             window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
             window.attributes = window.attributes.also { it.blurBehindRadius = 64 }
         }
@@ -459,7 +459,7 @@ class AskActivity : ComponentActivity() {
         super.onStop()
         val started = running
         if (working && started != null && Prefs.notifyReplies(this) &&
-            Compat.notificationsAllowed(this)
+            notificationsAllowed()
         ) {
             ReplyWorker.enqueue(applicationContext, started.chatId)
         }
@@ -1474,13 +1474,9 @@ class AskActivity : ComponentActivity() {
     private fun GlowLook(a: AskUi) {
         val view = LocalView.current
         val density = LocalDensity.current
-        // Follow the screen's own rounded corners, so the glow hugs the glass (Android 12 can say what they are).
+        // Follow the screen's own rounded corners, so the glow hugs the glass (36 dp where Android doesn't say).
         val corner = remember(view) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat()
-            } else {
-                null
-            }
+            view.rootWindowInsets?.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius?.toFloat()
         } ?: with(density) { 36.dp.toPx() }
         val spin = rememberInfiniteTransition(label = "spin")
         val turn by spin.animateFloat(

@@ -14,6 +14,7 @@ import android.text.format.DateFormat
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.WindowInsetsController
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -89,9 +90,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.drawable.toBitmap
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -311,14 +309,14 @@ class DashboardActivity : ComponentActivity() {
         wallDisplay.value = dashboardMode
         // The page's Apps row in Home Assistant's menu follows the same rule (assets/js/home_assistant.js).
         if (::web.isInitialized) callPage("apps", if (dashboardMode) "on" else "off")
-        WindowCompat.getInsetsController(window, window.decorView).apply {
+        window.insetsController?.apply {
             if (dashboardMode) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                hide(WindowInsetsCompat.Type.systemBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(android.view.WindowInsets.Type.systemBars())
+                systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                show(WindowInsetsCompat.Type.systemBars())
+                show(android.view.WindowInsets.Type.systemBars())
                 if (dimmed.value) wakeUp()
             }
         }
@@ -844,7 +842,7 @@ class DashboardActivity : ComponentActivity() {
                     onSettings = { startActivity(Intent(this@DashboardActivity, SettingsActivity::class.java)) },
                 )
             } else Column(
-                // The whole screen, a TV's too: today's TVs and boxes like the Shield show the picture's edges,
+                // The whole screen, a TV's too: today's TVs and boxes show the picture's edges,
                 // so the dashboard runs edge to edge and only the bar's text keeps off the very edge (Strip).
                 Modifier.fillMaxSize().navigationBarsPadding()
             ) {

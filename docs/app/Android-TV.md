@@ -1,8 +1,8 @@
 # Lena on Android TV
 
-Lena runs on Android TV and Google TV boxes, such as the **Nvidia Shield**, and on TVs with Android TV built in. There she's the wall display only: your Home Assistant dashboards with her bar, the screensaver and photo frame, timers and alarms, announcements, and talking to her with the remote. There's no chat, since a TV has no keyboard to type with.
+Lena runs on Android TV and Google TV boxes, and on TVs with Android TV or Google TV built in. There she's the wall display only: your Home Assistant dashboards with her bar, the screensaver and photo frame, timers and alarms, announcements, and talking to her with the remote. There's no chat, since a TV has no keyboard to type with.
 
-It's the same app as on a phone, from the same releases. It needs Android 11 or newer, which every Shield on current software has.
+It's the same app as on a phone, from the same releases. It needs **Android 15** or newer (Settings → Device Preferences → About → Android TV OS version). The Nvidia Shield is on Android 11, so it can't install Lena from 0.6.36 on: 0.6.35 is the last release it runs.
 
 ## Install
 
@@ -67,7 +67,7 @@ The arrows move along the rows. On a Home Assistant dashboard, down and right go
 
 **The remote's microphone button** opens Google Assistant: Android keeps that button for its own assistant, so no app can have it. Two ways round it:
 
-- **A button of its own.** Lena has a second entry in the TV's apps, **Talk to Lena**, which opens her listening. Put it on a button the remote lets you customize: on a Shield, **Settings → Remotes & Accessories**, then the remote's customizable button (the menu button's double press, or the Netflix button on remotes that have one), and choose **Talk to Lena**. It works from any app, not only Lena's home.
+- **A button of its own.** Lena has a second entry in the TV's apps, **Talk to Lena**, which opens her listening. Put it on a button the remote lets you customize (on Google TV, **Settings → Remotes & Accessories** or the remote maker's app; remotes with a programmable button, such as the Google TV Streamer's star button, have one) and choose **Talk to Lena**. It works from any app, not only Lena's home.
 - **Hold OK**, on Lena's screens.
 
 Either way she listens through **The TV's voice search**. Some remotes send their microphone button as "search", and then Lena takes it directly. To see what your remote's buttons send, press them and look in **Settings → Logs** for lines from **Remote**.
@@ -77,14 +77,13 @@ Either way she listens through **The TV's voice search**. Some remotes send thei
 - **No chat** and no typing: talk to her. A chat link (from a notification, say) opens the wall display.
 - **Hearing**: **The TV's voice search** uses the remote's microphone. **Your server** and **Home Assistant** record the sound themselves, which needs a microphone plugged into the TV box: Android doesn't give apps the remote's.
 - **Wake word**: needs a microphone plugged into the TV box (USB), as the remote's microphone is only on while you hold its button.
-- **Android 11** (Shield): her words don't appear as you speak on every TV (it depends on the TV's voice search), and after her name the microphone briefly changes hands, as on phones before Android 13.
 - **Her volume**: the TV box's volume is the volume of everything on the TV, so Lena keeps her own changes to it (quieter in the morning and at night, "speak more quietly") at 40% or more of it. Settings → Talking to Lena → **Her quietest** and **Her loudest** change that.
 - Settings that only make sense on a phone (the assistant gesture, widgets, the chat screen) aren't shown.
 
 ## Not yet checked on a real TV
 
-This was built without a Shield to try it on. If something here doesn't work on yours, the log (**Settings → Logs**) says what happened; send it along.
+This was built without a TV to try it on. If something here doesn't work on yours, the log (**Settings → Logs**) says what happened; send it along.
 
-- Whether the Shield's voice search hears through the remote when Lena asks, from a customized button or OK held (it does for other apps' voice search).
-- The Shield's settings for customizing a remote button (they differ between remotes and Shield versions).
+- Whether the TV's voice search hears through the remote when Lena asks, from a customized button or OK held (it does for other apps' voice search).
+- The TV's settings for customizing a remote button (they differ between remotes and TVs).
 - Moving around a Home Assistant dashboard with the arrows, and up from its first card to Lena's bar.

@@ -283,7 +283,7 @@ class SettingsActivity : ComponentActivity() {
                 ),
             )
             val wantsNotifications = n.notifyReplies || n.schedules.any { it.enabled }
-            if (wantsNotifications && !Compat.notificationsAllowed(this@SettingsActivity)) {
+            if (wantsNotifications && !this@SettingsActivity.notificationsAllowed()) {
                 notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -1300,7 +1300,7 @@ class SettingsActivity : ComponentActivity() {
             SwitchItem(Icons.Outlined.NotificationImportant, "Alerts on ${Tv.thisDevice(this@SettingsActivity)}",
                 "Checks every 15 minutes and tells you when she's worried about something at home. Needs Home Assistant.", s.alerts) {
                 set(s.copy(alerts = it))
-                if (it && !Compat.notificationsAllowed(this@SettingsActivity)) {
+                if (it && !this@SettingsActivity.notificationsAllowed()) {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
                 }
             }
@@ -1716,10 +1716,7 @@ class SettingsActivity : ComponentActivity() {
         }
         Group {
             Item(Icons.AutoMirrored.Outlined.AddToHomeScreen, "Add the widget", "Talk, type, new chat and your quick prompts") { addWidget() }
-            // Android 13 can add it from here; before that, Quick Settings' own edit button adds it.
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
-            }
+            Item(Icons.Outlined.TouchApp, "Add the Quick Settings tile", "Talk to Lena from the notification shade") { addTile() }
         }
     }
 
@@ -2131,8 +2128,7 @@ class SettingsActivity : ComponentActivity() {
         if (DateFormat.is24HourFormat(this)) "%02d:%02d".format(h, m)
         else "%d:%02d %s".format(if (h % 12 == 0) 12 else h % 12, m, if (h < 12) "AM" else "PM")
 
-    /** Asks Android to add the Talk to Lena tile to Quick Settings; Android shows its own confirmation (Android 13). */
-    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
+    /** Asks Android to add the Talk to Lena tile to Quick Settings; Android shows its own confirmation. */
     private fun addTile() {
         getSystemService(StatusBarManager::class.java).requestAddTileService(
             ComponentName(this, LenaTile::class.java),

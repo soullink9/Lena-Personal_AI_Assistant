@@ -55,7 +55,7 @@ object Notify {
      * replaces the older one. On the lock screen only "Lena replied" shows, not the text.
      */
     fun show(c: Context, channel: String, title: String, text: String, chatId: String?) {
-        if (!Compat.notificationsAllowed(c)) return
+        if (!c.notificationsAllowed()) return
         channels(c)
         val id = (chatId ?: title).hashCode()
         val open = Intent(c, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_CHAT)

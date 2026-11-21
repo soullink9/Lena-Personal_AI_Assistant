@@ -15,8 +15,6 @@
     <!-- Lena's own timers and alarms: exact alarm clock times, the ringing as a foreground service that
          plays sound, and the ringing screen over the lock screen. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <!-- The same on Android 12, before USE_EXACT_ALARM existed (Android TV boxes; Android 11 needs neither). -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />

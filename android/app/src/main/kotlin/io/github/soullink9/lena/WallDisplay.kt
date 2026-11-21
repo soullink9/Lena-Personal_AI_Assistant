@@ -5,8 +5,6 @@ import android.content.Intent
 import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -46,7 +44,7 @@ object WallDisplay {
 
     /** Whether the keyboard is up on this screen; typing counts as someone being there. */
     fun typing(a: Activity): Boolean =
-        ViewCompat.getRootWindowInsets(a.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        a.window.decorView.rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) == true
 
     /** In dashboard mode the display stays on; otherwise it sleeps as usual. */
     fun keepScreenOn(a: Activity, on: Boolean) {

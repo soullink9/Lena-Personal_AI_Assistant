@@ -169,6 +169,6 @@ To change the logo, run it with the new file (`python3 tools/make_images.py new-
 
 - Every file should make sense to someone seeing it for the first time. Write comments that explain why.
 - Nothing in Home Assistant is set up in YAML: the integration creates its own entities and is configured in the UI.
-- The app targets Android 16 (`targetSdk` and `compileSdk` 36) and installs on Android 11 and later (`minSdk` 30), for Android TV boxes like the Nvidia Shield ([Android TV](app/Android-TV.md)). Newer calls go behind a version check (`Compat.kt`); lint's NewApi check fails the build otherwise.
+- The app targets Android 16 (`targetSdk` and `compileSdk` 36) and installs on Android 15 and later (`minSdk` 35), phones, tablets and [Android TV](app/Android-TV.md) alike. There's no code for older Android. Calls newer than Android 15 go behind a version check; lint's NewApi check fails the build otherwise.
 - Keep personal details out: names, addresses, IP addresses, tokens, and the contents of a real memory list. Use `Alex` and `Sam` in examples.
 - Docs live in `docs/` and are reviewed with the code. The README stays short and links here.

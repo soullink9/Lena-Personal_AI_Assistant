@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.service.dreams.DreamService
 import android.text.format.DateFormat
 import android.view.WindowManager
+import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -65,9 +66,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -290,15 +288,13 @@ class DisplayActivity : ComponentActivity() {
         val locked = screensaver && getSystemService(KeyguardManager::class.java).isKeyguardLocked
         if (screensaver) {
             setShowWhenLocked(true)
-            androidx.core.content.ContextCompat.registerReceiver(
-                this, unplugged, android.content.IntentFilter(Intent.ACTION_POWER_DISCONNECTED), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
-            )
+            registerReceiver(unplugged, android.content.IntentFilter(Intent.ACTION_POWER_DISCONNECTED), RECEIVER_NOT_EXPORTED)
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        window.insetsController?.apply {
+            hide(android.view.WindowInsets.Type.systemBars())
+            systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         if (Prefs.wakeWord(this) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             askMicrophone.launch(Manifest.permission.RECORD_AUDIO)

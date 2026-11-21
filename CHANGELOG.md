@@ -2,6 +2,17 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The app now needs **Android 15** or newer, on phones, tablets and Android TV. **Update the app.** Nothing else changes.
+
+### Android app
+
+- **Android 15 is the minimum** (`minSdk` 35). Everything kept only for older Android is gone: the version checks and `Compat.kt`, the theme folders for before Android 12, the exact-alarm permission for Android 12, and the `.local` hint for before Android 12.
+- **The Nvidia Shield can't install it any more**: it runs Android 11, so 0.6.35 is the last release for it. Android TV and Google TV devices on Android 15 or newer keep working ([Lena on Android TV](docs/app/Android-TV.md)).
+- Always on now, where some devices skipped them before: the wallpaper's colours, the orb's blur, the Glow look following the screen's real corners, listening through the wake word's microphone without it changing hands, the on-device recognizer starting its model's download, the **Add the Quick Settings tile** button, and the tile opening the sheet the current way.
+- Uses Android's own calls where AndroidX only wrapped them for older Android: notifications, hiding the system bars, the keyboard check, the screensaver's unplugged receiver, and the updater's package checks (no deprecated calls left).
+
 ## [0.6.35] - 2026-11-21
 
 She's more part of the home: she knows who she's talking with and where, remembers what's worth coming back to, can speak first in a few more ways, learns the household's habits, and only one display answers when several hear her. Everything that makes her speak first is off until you tick it. **Update the integration, the Open WebUI filter and tool, and the app.** Her Modelfile is unchanged, so there's nothing to rebuild.

@@ -59,7 +59,6 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 | `HaSocket.kt` | A Home Assistant WebSocket connection that stays open (camera mode): calls, subscriptions and pings, on `MiniWebSocket`. |
 | `TvHome.kt`, `TalkActivity.kt` | The TV home's rows (and the Apps row's order and Choose apps), and the Talk to Lena entry for a remote button. |
 | `Tv.kt` | Android TV: whether this is a TV, its screens always dark (`darkOnTv`), and the remote's buttons (OK held or search to talk, Menu for Settings). |
-| `Compat.kt` | What differs between Android 11 (TV boxes) and Android 16: each newer feature checked once. |
 | `Logs.kt`, `LogsActivity.kt` | Lena's own log file and Settings → Software version → Logs. |
 | `Widgets.kt` | The Quick Settings tile (Talk to Lena) and the home screen widget. |
 | `Markdown.kt` | The small Markdown renderer for the Ask sheet and notifications. |

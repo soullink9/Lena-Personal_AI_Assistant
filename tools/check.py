@@ -500,12 +500,17 @@ for kt in sorted((ROOT / "android/app/src/main/kotlin").rglob("*.kt")):
 check(not text_problems, "the app's text follows docs/app/Writing.md" + (f" ({'; '.join(text_problems[:12])})" if text_problems else ""))
 
 # ---- 14b. Android TV ---------------------------------------------------------------------------------
-# The app installs on Android 11 TV boxes (minSdk 30) while phones use Android 16's features, so every
-# newer call must be behind a version check: the build's lint fails on any that isn't (NewApi, made fatal
-# in build.gradle.kts). tools/android-tv-home.sh, which makes Lena a TV's home screen, must parse.
+# The app installs on Android 15 and later (minSdk 35), TVs included, and targets Android 16, so every
+# call newer than Android 15 must be behind a version check: the build's lint fails on any that isn't
+# (NewApi, made fatal in build.gradle.kts). Nothing is kept for older Android: no values-v31 style folders
+# or Compat.kt shims. tools/android-tv-home.sh, which makes Lena a TV's home screen, must parse.
 
 gradle_text = (ROOT / "android/app/build.gradle.kts").read_text()
-check(re.search(r"^\s*minSdk = 30\b", gradle_text, re.M) is not None, "the app's minSdk is 30 (Android 11, for Android TV boxes)")
+check(re.search(r"^\s*minSdk = 35\b", gradle_text, re.M) is not None, "the app's minSdk is 35 (Android 15)")
+res_dir = ROOT / "android/app/src/main/res"
+old_folders = sorted(p.name for p in res_dir.iterdir() if p.is_dir() and re.search(r"-v(\d+)$", p.name) and int(re.search(r"-v(\d+)$", p.name).group(1)) <= 35)
+check(not old_folders, "no resource folders for older Android than the minSdk" + (f" ({', '.join(old_folders)})" if old_folders else ""))
+check(not (ROOT / "android/app/src/main/kotlin/io/github/soullink9/lena/Compat.kt").exists(), "no Compat.kt: nothing older than Android 15 to check for")
 check('fatal += "NewApi"' in gradle_text, "release builds fail on a newer-Android call without a version check (lint NewApi is fatal)")
 manifest_text = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text()
 check("android.intent.category.LEANBACK_LAUNCHER" in manifest_text and 'android:banner="@drawable/tv_banner"' in manifest_text,

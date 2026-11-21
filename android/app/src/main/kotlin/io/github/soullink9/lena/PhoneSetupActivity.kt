@@ -431,8 +431,6 @@ object HaSignIn {
     private fun unreachable(base: String, e: IOException): String {
         val host = runCatching { URL(base).host }.getOrDefault(base)
         return when {
-            e is java.net.UnknownHostException && host.endsWith(".local") && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S ->
-                "This device can't look up $host: Android before 12 doesn't find .local names. Use the address you use away from home, or one your router's DNS knows."
             e is java.net.UnknownHostException -> "This device can't look up $host. Check the address, and that this device uses the same network and DNS as your phone."
             e is javax.net.ssl.SSLException || e.cause is java.security.cert.CertificateException ->
                 "This device doesn't trust $host's certificate (${e.message}). A certificate from your own authority has to be installed on this device too; one from Let's Encrypt or Nabu Casa just works."

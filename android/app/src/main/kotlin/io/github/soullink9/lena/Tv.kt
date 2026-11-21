@@ -7,7 +7,7 @@ import android.view.ContextThemeWrapper
 import android.view.KeyEvent
 
 /**
- * Lena on Android TV (an Nvidia Shield, a TV with Android TV or Google TV built in): she's the wall display
+ * Lena on Android TV (a Google TV or Android TV box, or a TV with either built in, on Android 15 or newer): she's the wall display
  * only, on the big screen, driven by the remote. There's no keyboard to type with, so there's no chat;
  * you talk to her with the remote instead (see [Remote]). See docs/app/Android-TV.md.
  */

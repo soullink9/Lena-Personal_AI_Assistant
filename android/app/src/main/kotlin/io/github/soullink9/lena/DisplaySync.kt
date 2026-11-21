@@ -1,9 +1,9 @@
 package io.github.soullink9.lena
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import androidx.activity.ComponentActivity
-import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -205,11 +205,11 @@ object DisplaySync {
             return
         }
         Ringing.channel(c)
-        val notification = NotificationCompat.Builder(c, Ringing.CHANNEL)
+        val notification = Notification.Builder(c, Ringing.CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_lena)
             .setContentTitle("Lena")
             .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setStyle(Notification.BigTextStyle().bigText(message))
             .setAutoCancel(true)
             .setContentIntent(android.app.PendingIntent.getActivity(
                 c, 0, AskActivity.announce(c, message, listen, from),

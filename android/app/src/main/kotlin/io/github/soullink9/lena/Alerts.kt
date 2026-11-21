@@ -17,6 +17,10 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
+/** Whether Lena may show notifications: Android asks you for that permission. */
+fun Context.notificationsAllowed(): Boolean =
+    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
 /**
  * The backup for house alerts: every 15 minutes (Android's shortest background interval for an
  * app without Google's push service) this phone asks the Lena integration whether she's worried,
@@ -69,7 +73,7 @@ object Alerts {
      * stay quiet. Tapping it opens Lena listening.
      */
     private fun show(c: Context, title: String, text: String, urgent: Boolean) {
-        if (!Compat.notificationsAllowed(c)) return
+        if (!c.notificationsAllowed()) return
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "House alerts", NotificationManager.IMPORTANCE_HIGH)
