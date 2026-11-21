@@ -698,10 +698,17 @@ class Api(server: String, private val context: Context? = null) {
             .put("tool_ids", JSONArray(model.toolIds))
             .put("features", features)
             // Which Lena display this is (its Home Assistant device), so her tools set timers, reminders and the
-            // volume here (Open WebUI hands it to the tools as the variable {{LENA_DISPLAY}}).
+            // volume here (Open WebUI hands it to the tools as the variable {{LENA_DISPLAY}}). A wall display is
+            // shared ({{LENA_SHARED}}): whoever is signed in there isn't necessarily who's talking, so Lena's
+            // filter doesn't tell her it's them.
             .apply {
-                val display = context?.let { Room.info(it).value?.deviceId }
-                if (display != null) put("variables", JSONObject().put("{{LENA_DISPLAY}}", display))
+                val c = context
+                val display = c?.let { Room.info(it).value?.deviceId }
+                if (c != null && display != null) {
+                    val variables = JSONObject().put("{{LENA_DISPLAY}}", display)
+                    if (DashboardActivity.isWallDisplay(c)) variables.put("{{LENA_SHARED}}", "1")
+                    put("variables", variables)
+                }
             }
             // Title generation is only mentioned when it's wanted: Open WebUI treats "title_generation: false"
             // on a chat's first answer as "title it after the first message", which renamed chats Lena

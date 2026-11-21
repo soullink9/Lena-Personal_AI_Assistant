@@ -398,6 +398,16 @@ class HomeAssistant(
         JSONObject(call("POST", "/api/lena/display/briefing", JSONObject().put("id", displayId), readTimeoutMs = 120_000))
             .optString("text")
 
+    /**
+     * This display heard her name: claims the turn, so only the display that heard best answers (the
+     * integration's wake.py). True to answer. Asked once, never again on a dropped connection: it's only
+     * worth asking within a second or so ([WakeClaim] answers anyway after that).
+     */
+    suspend fun wakeClaim(displayId: String, level: Double, score: Float, handheld: Boolean): Boolean {
+        val body = JSONObject().put("id", displayId).put("level", level).put("score", score.toDouble()).put("handheld", handheld)
+        return JSONObject(callOnce("POST", "/api/lena/display/wake", body, readTimeoutMs = 2_000)).optBoolean("answer", true)
+    }
+
     /** Every media player in Home Assistant, by name, for choosing where music plays. */
     suspend fun speakers(): List<Speaker> {
         val states = JSONArray(call("GET", "/api/states"))

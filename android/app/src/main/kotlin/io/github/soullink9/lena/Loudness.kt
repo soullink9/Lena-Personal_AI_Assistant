@@ -18,8 +18,11 @@ object RoomNoise {
     @Volatile private var level = -70.0
     @Volatile private var measured = 0L
 
-    /** Takes 80 ms of sound into the average (from the wake word's listening loop). */
-    fun hear(chunk: ShortArray) {
+    /**
+     * Takes 80 ms of sound into the average (from the wake word's listening loop), and returns that piece's
+     * own level, for [WakeLevel].
+     */
+    fun hear(chunk: ShortArray): Double {
         var sum = 0.0
         for (s in chunk) sum += s.toDouble() * s
         val rms = sqrt(sum / chunk.size).coerceAtLeast(1.0)
@@ -27,6 +30,7 @@ object RoomNoise {
         // Rises quickly with noise, falls slowly, so a pause in the TV doesn't count as quiet.
         level += (db - level) * if (db > level) 0.05 else 0.01
         measured = SystemClock.elapsedRealtime()
+        return db
     }
 
     /** The room's level, or null if the wake word hasn't listened lately. */
@@ -105,10 +109,19 @@ object Loudness {
     /** A step quieter or louder. */
     fun change(c: Context, louder: Boolean) = set(c, level(c) + if (louder) STEP else -STEP)
 
-    /** Whether it's early morning or late night, when she speaks more quietly (before 8 AM, from 10 PM). */
+    /**
+     * Whether the Lena integration says this display's room wants quiet now (a bedroom at night, Configure
+     * → Rooms and household), from the last sync.
+     */
+    @Volatile var roomWantsQuiet = false
+
+    /**
+     * Whether it's early morning or late night, when she speaks more quietly (before 8 AM, from 10 PM), or
+     * the display is in a bedroom at night.
+     */
     private fun quietHours(): Boolean {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        return hour < 8 || hour >= 22
+        return hour < 8 || hour >= 22 || roomWantsQuiet
     }
 
     /**

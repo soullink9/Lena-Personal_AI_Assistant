@@ -334,6 +334,9 @@ class OpenWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wak
  * [onScore] about 12 times a second, [onHeard] once when it hears the phrase (and then stops,
  * freeing the mic for Lena), and [onSilenced] if Android gives it only silence, which is what
  * happens when the phone doesn't let an app listen from where it is (the screen saver, on some phones).
+ *
+ * Her name's listeners first claim the turn ([WakeClaim]), so when several displays hear her only the one
+ * that heard best answers; the others go back to listening. The sound is kept meanwhile.
  */
 class WakeListener(
     private val context: Context,
@@ -344,6 +347,8 @@ class WakeListener(
     private val model: String? = null,
     /** What it listens for, for the log. */
     private val label: String? = null,
+    /** A phone or tablet in someone's hand (not a wall display): it always wins the turn ([WakeClaim]). */
+    private val handheld: Boolean = false,
     /**
      * When it hears her name, keep the microphone and pass it on to the sheet ([MicRelay]) instead of
      * closing it, so there's no gap before she listens. Her name's listeners do; "stop" doesn't.
@@ -437,7 +442,34 @@ class WakeListener(
             var silent = 0
             var lastIgnored = 0L
             var handOff: HandOff? = null
+            val loudness = WakeLevel()
+            var claim: WakeClaim? = null // asking whether this display answers
+            var deafUntil = 0L // after another display answered, her name is ignored for a moment
             while (listening() || handOff?.open == true) {
+                // The claim is decided: answer here, or let the sound go and listen again.
+                when (claim?.verdict) {
+                    true -> {
+                        claim = null
+                        if (listening()) {
+                            running = false
+                            main.post(onHeard)
+                        } else {
+                            // Stopped while deciding (the screen went away): no sheet is coming for the sound.
+                            handOff?.finish()
+                            handOff = null
+                            MicRelay.drop()
+                        }
+                    }
+                    false -> {
+                        claim = null
+                        Logs.i("Wake word", "Another display heard \u201C$phrase\u201D better and answers")
+                        handOff?.finish()
+                        handOff = null
+                        MicRelay.drop() // the sound kept for this display's sheet isn't needed
+                        deafUntil = System.currentTimeMillis() + 2_000
+                    }
+                    null -> Unit
+                }
                 var read = 0
                 while (read < chunk.size && (listening() || handOff?.open == true)) {
                     val n = mic.read(chunk, read, chunk.size - read)
@@ -450,6 +482,7 @@ class WakeListener(
                     handOff.send(chunk)
                     continue
                 }
+                if (claim != null) continue // still deciding, without a hand-off to keep the sound
                 // A blocked microphone delivers exact zeros; real rooms never do.
                 if (chunk.all { it.toInt() == 0 }) {
                     if (++silent == 40) { // about 3 seconds
@@ -459,20 +492,26 @@ class WakeListener(
                         break
                     }
                 } else silent = 0
-                RoomNoise.hear(chunk)
+                loudness.hear(RoomNoise.hear(chunk), RoomNoise.now() ?: -70.0)
                 val r = model.listen(chunk)
                 main.post { onScore(r.score) }
                 if (r.notSpeech && System.currentTimeMillis() - lastIgnored > 60_000) {
                     lastIgnored = System.currentTimeMillis()
                     Logs.i("Wake word", "Something sounded like \u201C$phrase\u201D (%.2f) but wasn't a voice; ignored".format(r.score))
                 }
+                if (r.heard && System.currentTimeMillis() < deafUntil) continue
                 if (r.heard) {
                     Logs.i("Wake word", "Heard \u201C$phrase\u201D (%.2f, needs %.2f)".format(r.score, model.threshold))
-                    running = false
                     if (relay) handOff = runCatching { HandOff() }.onFailure {
                         Logs.w("Wake word", "Couldn't pass the microphone on; the sheet opens it itself", it)
                     }.getOrNull()
-                    main.post(onHeard)
+                    if (relay) {
+                        // Her name: claim the turn, and keep listening (and recording) until it's decided.
+                        claim = WakeClaim.start(context, loudness.aboveNoise(), r.score, handheld)
+                    } else {
+                        running = false
+                        main.post(onHeard)
+                    }
                 }
             }
             handOff?.finish()

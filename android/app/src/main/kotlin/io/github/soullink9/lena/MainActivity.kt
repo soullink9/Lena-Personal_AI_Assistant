@@ -732,7 +732,7 @@ class MainActivity : ComponentActivity() {
         val listener = wake ?: WakeListener(this, onHeard = {
             wake?.stop()
             startActivity(AskActivity.intent(this, talk = true))
-        }).also { wake = it }
+        }, handheld = !DashboardActivity.isWallDisplay(this)).also { wake = it }
         listener.start() // false without the microphone permission or the model; then it simply doesn't listen
     }
 

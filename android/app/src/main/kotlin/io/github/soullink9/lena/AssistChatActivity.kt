@@ -133,6 +133,7 @@ class AssistChatActivity : ComponentActivity() {
     /** Gone: no longer busy. */
     override fun onDestroy() {
         Busy.set(this, false)
+        DisplayPhase.set(this, DisplayPhase.Phase.IDLE)
         super.onDestroy()
     }
 
@@ -150,7 +151,7 @@ class AssistChatActivity : ComponentActivity() {
             val listener = wake ?: WakeListener(this, onHeard = {
                 wake?.stop()
                 startActivity(AskActivity.intent(this, talk = true))
-            }).also { wake = it }
+            }, handheld = !DashboardActivity.isWallDisplay(this)).also { wake = it }
             listener.start()
         } else {
             wake?.stop()
@@ -179,7 +180,10 @@ class AssistChatActivity : ComponentActivity() {
         var text by remember { mutableStateOf("") }
         var waiting by remember { mutableStateOf<String?>(null) } // a typed question still being answered
         // Waiting for Assist counts as her being busy, so the screensaver doesn't come on mid-answer.
-        SideEffect { Busy.set(this@AssistChatActivity, waiting != null) }
+        SideEffect {
+            Busy.set(this@AssistChatActivity, waiting != null)
+            DisplayPhase.set(this@AssistChatActivity, if (waiting != null) DisplayPhase.Phase.PROCESSING else DisplayPhase.Phase.IDLE)
+        }
         val list = rememberLazyListState()
 
         LaunchedEffect(changed) { turns = AssistLog.all(this@AssistChatActivity) }

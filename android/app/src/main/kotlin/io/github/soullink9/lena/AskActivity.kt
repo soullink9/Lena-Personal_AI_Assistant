@@ -473,6 +473,7 @@ class AskActivity : ComponentActivity() {
     override fun onDestroy() {
         MicRelay.drop()
         Busy.set(this, false)
+        DisplayPhase.set(this, DisplayPhase.Phase.IDLE)
         WallDisplay.touched()
         ear?.release()
         mouth?.release()
@@ -496,6 +497,13 @@ class AskActivity : ComponentActivity() {
         SideEffect {
             view.keepScreenOn = phase != Phase.IDLE
             Busy.set(this@AskActivity, phase != Phase.IDLE)
+            // And Home Assistant: the display's Assist satellite shows it (a light can pulse while she thinks).
+            DisplayPhase.set(this@AskActivity, when (phase) {
+                Phase.IDLE -> DisplayPhase.Phase.IDLE
+                Phase.LISTENING -> DisplayPhase.Phase.LISTENING
+                Phase.THINKING -> DisplayPhase.Phase.PROCESSING
+                Phase.SPEAKING -> DisplayPhase.Phase.RESPONDING
+            })
         }
         var heard by remember { mutableStateOf("") }
         var level by remember { mutableStateOf(0f) }

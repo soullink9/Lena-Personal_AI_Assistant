@@ -7,8 +7,9 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -41,11 +42,19 @@ object DisplaySync {
         a.lifecycleScope.launch {
             a.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 if (!DashboardActivity.isWallDisplay(a)) return@repeatOnLifecycle
-                var sensorWas: Boolean? = null
-                while (true) {
-                    val ok = runCatching { sync(a, from) }.isSuccess
-                    sensorWas = runCatching { watchSensor(a, sensorWas) }.getOrDefault(sensorWas)
-                    delay(if (ok) POLL_MS else AFTER_FAILURE_MS)
+                // A change in what it's doing (listening, thinking, speaking) is reported at once, not at the
+                // next poll, so a light following its Assist satellite keeps up with her.
+                val changed = Channel<Unit>(Channel.CONFLATED)
+                val stop = DisplayPhase.listen { changed.trySend(Unit) }
+                try {
+                    var sensorWas: Boolean? = null
+                    while (true) {
+                        val ok = runCatching { sync(a, from) }.isSuccess
+                        sensorWas = runCatching { watchSensor(a, sensorWas) }.getOrDefault(sensorWas)
+                        withTimeoutOrNull(if (ok) POLL_MS else AFTER_FAILURE_MS) { changed.receive() }
+                    }
+                } finally {
+                    stop()
                 }
             }
         }
@@ -77,12 +86,15 @@ object DisplaySync {
             .put("volume", runCatching { Loudness.level(c) }.getOrNull() ?: JSONObject.NULL)
             // For its Assist satellite's wake word choice in Home Assistant.
             .put("wake_word", if (Prefs.wakeWord(c)) Prefs.wakePhrase(c).name else JSONObject.NULL)
+            // What it's doing (idle, listening, processing, responding), which its Assist satellite shows.
+            .put("phase", DisplayPhase.now.ha)
         val reply = try {
             ha.syncDisplay(body)
         } catch (e: HaHttpException) {
             if (e.code == 404) return@withLock // not registered yet, or an older integration
             throw e
         }
+        Loudness.roomWantsQuiet = reply.optBoolean("quiet")
         val commands = reply.optJSONArray("commands") ?: JSONArray()
         val boot = reply.optString("boot")
         for (i in 0 until commands.length()) {
