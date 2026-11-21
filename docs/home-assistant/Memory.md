@@ -14,6 +14,12 @@ Lena has one memory, shared everywhere she lives: the **Lena Memory** to-do list
 
 When someone asks her to remember something, or tells her a lasting fact that clearly matters, she adds one short third-person line, like "Alex likes the office at seventy degrees." She's told not to save passing moods, one-off requests, duplicates or secrets, and to confirm only once it's saved.
 
+A memory can carry a little more, and she fills it in when it fits:
+
+- **Who it's about**: a person in Home Assistant, or someone under Configure → Rooms and household → **Also in the household** ("Yuki (dog)"). When she's talking with someone, their memories come first. It shows in the item's description.
+- **When to come back to it**: "Alex has a job interview on Thursday" can carry Friday as its follow-up day (the item's due date). On that day she asks how it went, once, naturally if the moment fits; with Speaking first → **Asking how something went** ticked, a display may ask when only Alex is home. After two days it's dropped quietly. Change or clear the due date on the list to change it.
+- **Hers**: her own opinions and running jokes ("Lena thinks the hallway light is too blue"). She has one of them in mind each day (none comes back sooner than Configure → Personality → **Bring one up again after**, 4 days), which keeps her her own person without repeating herself. They're never mixed with facts about the household when she tidies.
+
 If she says she saved something and it isn't on the list, she didn't have the tool: in Open WebUI, Tool Search hides it (see [Turn Tool Search off](../open-webui/Setup.md#turn-tool-search-off)). Check the list after your first few tries.
 
 ## Forgetting and tidying
@@ -31,6 +37,8 @@ Every 7 days by default, at bedtime, Lena tidies her own memory with Home Assist
 - **Retires** lines that are outdated (a date that has passed, a fact a newer line replaces) or were only for a moment, by **ticking them off**: they stay on the list, out of her prompt, as when you tick one off yourself.
 
 She never touches lines you've ticked off, never retires more than half of what she remembers at once, and changes nothing if the model's answer doesn't add up. Afterwards a notification says exactly what changed; the action **Lena: Undo memory tidy** (`lena.undo_memory_tidy`) puts it all back. **Lena: Tidy memory** (`lena.tidy_memory`) runs it now, and so does **Optimize memory** in the Lena app (Settings → tap Software version → Development), which shows what changed with Undo. Set Configure → **She tidies her memory every** to 0 to turn it off.
+
+Who told her is noted too, from the Home Assistant user (Assist) or the Open WebUI user, so a follow-up goes to the right person.
 
 ## Privacy
 

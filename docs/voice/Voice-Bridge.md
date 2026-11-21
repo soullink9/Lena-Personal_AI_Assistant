@@ -60,7 +60,14 @@ Save, then try the speaker icon on any reply in Open WebUI. In the Lena app, **S
 | `POST /v1/audio/speech` | Sends the text to Piper over Wyoming and converts the audio to MP3 (or WAV, Opus, AAC or FLAC if asked) with ffmpeg. Open WebUI's default voice names, such as `alloy`, mean your default Piper voice. An unknown voice falls back to Piper's default. |
 | `POST /v1/audio/transcriptions` | Converts your recording (WebM or Ogg from call mode, WAV from the Lena app, and others) to 16 kHz audio with ffmpeg and sends it to Whisper over Wyoming. |
 | `GET /v1/audio/voices` | Lists the Piper voices you've installed, for Open WebUI's voice list. |
+| (with `HA_URL` and `HA_TOKEN`) | Asks the Lena integration how she feels and lets her voice follow it. See below. |
 | `GET /health` | Answers `ok`, for Docker's health check. |
+
+## Her voice follows her mood (optional)
+
+Add `HA_URL` (your Home Assistant URL, as the bridge's container reaches it) and `HA_TOKEN` (a long-lived access token from any Home Assistant user; no admin rights needed) to the bridge's environment. Before speaking, the bridge asks the Lena integration how she feels (`GET /api/lena/context`, at most once a minute) and adjusts Piper's audio with ffmpeg: a little slower and lower when she's tired or low, a little quicker and brighter when she's cheerful. The changes are small, a few percent. If Home Assistant can't be reached she sounds as usual, and `docker logs lena-voice` says why.
+
+The Lena app's **Her voice follows her mood** setting does the same for the app's own speech. If the app speaks through this bridge, use one or the other, so her mood isn't applied twice.
 
 ## Troubleshooting
 

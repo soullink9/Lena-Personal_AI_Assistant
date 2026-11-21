@@ -29,12 +29,16 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── history.py                 the house's history from the recorder (house_history, lena.history)
 │   ├── displays.py, hub.py        displays registering and syncing: what's asked of each, what each reports
 │   ├── assist_satellite.py        each display as an Assist satellite: announcements, conversations, timers, wake word
-│   ├── briefing.py                speaking first: the morning briefing and worries, once each
+│   ├── briefing.py                speaking first: worries, welcome home, the morning briefing, heading out, follow-ups, late habits
+│   ├── routines.py                the household's habits, learned each night from the recorder
+│   ├── wake.py                    one display answers: the wake word claims and who heard best
+│   ├── sensor.py, switch.py       Lena Spoke first, Lena Routines, and Do not disturb
 │   ├── tidy.py                    her memory tidy: the request, checking the answer, the changes
 │   ├── view.py                    GET /api/lena/context for Open WebUI and the app
 │   ├── select.py, todo.py         her dropdowns and her memory list
 │   ├── config_flow.py             adding and configuring her in the UI
 │   └── brand/                     her icon and logo in Home Assistant (made by make_images.py)
+├── blueprints/automation/lena/     Home Assistant blueprints (a light that pulses while she's thinking)
 ├── home-assistant/
 │   ├── tests/                     runs the integration in a real Home Assistant
 │   ├── startup_check.py           starts the newest Home Assistant with Lena, before its test harness is out
@@ -60,6 +64,7 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── frontend_check/            the wake word front end against the original C
 │   ├── camera_check/              camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes
 │   ├── connection_check/          which failed requests are tried again, and how an answer being written is followed
+│   ├── presence_check/            how loud the wake word was above the room, and what each display says it's doing
 │   ├── commands_check/            what she understands on her own, on example sentences
 │   └── pairing_check/             Set up from your phone: QR codes, the page used as a phone would, its cipher (in Node) against Java's
 ├── scripts/                       what the workflows run, on Gitea and GitHub alike

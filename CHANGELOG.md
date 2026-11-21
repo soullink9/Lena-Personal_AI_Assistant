@@ -2,6 +2,41 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+She's more part of the home: she knows who she's talking with and where, remembers what's worth coming back to, can speak first in a few more ways, learns the household's habits, and only one display answers when several hear her. Everything that makes her speak first is off until you tick it. **Update the integration, the Open WebUI filter and tool, and the app.** Her Modelfile is unchanged, so there's nothing to rebuild.
+
+### Home Assistant integration
+
+- **Who and where.** She's told who she's talking with (the Home Assistant person of the user asking; in Open WebUI, the user's name, which should match their person's name) and when they last talked ("earlier today", "three days ago"), who else is in the household, and which room she's in. New in Configure → **Rooms and household**: **Bedrooms** (at night she answers softly and briefly there, never speaks first there, and the display speaks more quietly), **By the door**, and **Also in the household** for pets and anyone who isn't a Home Assistant person. No voice recognition: a shared wall display talks to the household.
+- **Memory with more to it.** A memory can say who it's about, when to come back to it, and whether it's hers. "Alex has an interview on Thursday" can carry Friday as its follow-up day: on that day she asks how it went, once. Memories about whoever she's talking with come first. Her own opinions and running jokes are saved as **hers**, and she has one in mind each day (Configure → Personality). The memory list shows the follow-up as the item's due date and who it's about in its description. New action `lena.remember`. Her tools are the same tools with optional fields, so their descriptions aren't longer ([Memory](docs/home-assistant/Memory.md)).
+- **Afterglow.** When a moment passes, it doesn't vanish at once: for a few hours she's told it's still with her, and it pulls gently on her mood.
+- **More ways to speak first,** each off until ticked under Configure → **Speaking first**: **Welcome home**, **Before you head out** (rain or snow today, on a display by the door), **Asking how something went** (only when the person who told her is the only one home; optionally listening for the answer), and **A routine that's late**. At most 6 times a day besides worries, never in a bedroom at night, never while the display is busy, and never while the new **Do not disturb** switch is on. `sensor.lena_spoke_first` counts what she said. **Check these when everyone leaves** tells the alert phones when everyone's been out 5 minutes and a door or lock you chose is still open ([Speaking first](docs/home-assistant/Integration.md#speaking-first)).
+- **Routines.** Choose things that happen at about the same time most days (Configure → **Routines**). Every night she learns their usual time from the last four weeks of history, weekdays and weekends apart, and knows when one is late. For the first 14 days she only learns, shown on `sensor.lena_routines`, so a wrong guess can be spotted before she says anything ([Routines](docs/home-assistant/Integration.md#routines)).
+- **One display answers.** When several displays hear "Hey Lena" at once, the one that heard best (her name's loudness above that room's own noise) answers, and the others go back to listening. On by default; a display that gets no answer in time answers anyway. Configure → **Wake word** ([One display answers](docs/home-assistant/Integration.md#one-display-answers)).
+- **Listening, thinking, speaking.** Each display's Assist satellite shows what it's doing, like a Voice Preview Edition, and a new blueprint pulses a light while she thinks (`blueprints/automation/lena/thinking_light.yaml`).
+- `/api/lena/context` also returns `person`, `quiet` and `voice` (how her voice follows her feelings), and takes `user`, `device` and `talking`.
+
+### Open WebUI
+
+- **The filter** has a new **who_and_where** setting (on): it sends the user's name and, from the Lena app, the display, so she knows who and where. Its cache is kept per user and display.
+- **The tool's** `remember` takes optional `about`, `follow_up` and `kind`, and notes who told her.
+
+### Android app
+
+- **One display answers.** When the wake word fires, the display keeps recording and asks the integration whether it answers; a phone in your hand always does. Nothing you say is lost while it waits.
+- **The display says what it's doing.** Listening, thinking and speaking are sent to Home Assistant as they change, as the display's satellite state.
+- A wall display tells Open WebUI's filter it's shared, so she doesn't assume who's there.
+- With **Adjust her volume**, a display in a bedroom speaks more quietly at night, as in quiet hours.
+
+### Voice bridge
+
+- **Her voice follows her mood**, optionally: with `HA_URL` and `HA_TOKEN` set, the bridge asks the integration how she feels and speaks a little slower and lower when she's tired or low, a little brighter when she's cheerful ([Voice bridge](docs/voice/Voice-Bridge.md#her-voice-follows-her-mood-optional)).
+
+### Tools
+
+- **`tools/presence_check`** checks the wake word's loudness above the room and the display's state, on every build; `tools/check.py` covers the new rules in `brain.py`.
+
 ## [0.6.34] - 2026-11-21
 
 ### Docs

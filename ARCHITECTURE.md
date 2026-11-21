@@ -46,7 +46,7 @@ flowchart LR
 | Lena integration | `custom_components/lena/` | Her feelings, her memory list, her context text, her tools for Home Assistant's agents (including adding calendar events, which Home Assistant's own tools can't), alerts, and two HTTP views for the other clients. |
 | Open WebUI filter and tool | `open-webui/` | Bringing her context into chats, and letting her remember, forget and react there. |
 | Android app | `android/` | The phone and tablet experience, and on Android TV the wall display only, driven by the remote (`Tv.kt`). Holds no server state of its own beyond settings. |
-| Voice bridge | `voice/bridge/` | Making Home Assistant's Piper and Whisper available to Open WebUI through an OpenAI-shaped API. |
+| Voice bridge | `voice/bridge/` | Making Home Assistant's Piper and Whisper available to Open WebUI through an OpenAI-shaped API; optionally, her voice follows her mood (from `/api/lena/context`). |
 
 ## The Home Assistant integration
 
@@ -55,8 +55,11 @@ flowchart TB
     Events["Home Assistant events<br/>time, people, weather, worry sensors, sun"] --> Core
     Core["core.py — LenaCore<br/>listens, timers, saves, alerts"] -- "Feelings + event" --> Brain["brain.py<br/>pure functions"]
     Brain -- "Change" --> Core
-    Core --> Store[(".storage<br/>feelings + memory")]
-    Core --> Entities["select.py, todo.py<br/>Mood, Energy, Moment, Memory"]
+    Core --> Store[(".storage<br/>feelings + memory, presence, routines")]
+    Core --> Entities["select.py, todo.py, sensor.py, switch.py<br/>Mood, Energy, Moment, Memory,<br/>Spoke first, Routines, Do not disturb"]
+    Core --> Briefing["briefing.py<br/>speaking first, gated by brain.may_speak"]
+    Routines["routines.py<br/>habits from the recorder"] --> Core
+    Wake["wake.py<br/>one display answers"] -- "claims" --> Brain
     Core --> Context["context(): time, home, feelings,<br/>memory, devices"]
     Context --> LLM["llm_api.py<br/>for HA's conversation agents"]
     Context --> View["view.py<br/>GET /api/lena/context"]
@@ -69,12 +72,18 @@ flowchart TB
 - **Everything is configured in the UI** (a config and options flow). Nothing needs YAML.
 - **Context is text.** `context()` renders the time (with part of day and light/dark), who's home, her feelings and her memory as prompt-ready Markdown. Home Assistant's agents get it through the LLM API; Open WebUI and the app fetch it over HTTP. With `?devices=1` it adds the exact names of exposed devices, because Home Assistant's tools match names exactly.
 - **Two views, both read-only and token-protected:** `/api/lena/context` and `/api/lena/media` (Home Assistant's media browser, for the app's photo frame, with Immich photos at preview size).
+- **Who and where, not voice ID.** She knows who she's talking with from the signed-in user (Assist's user, or the Open WebUI user's name matched to a Home Assistant person) and which room from the display's area; a shared wall display talks to the household. Bedrooms at night get soft, short answers and no speaking first.
+- **One display answers** (`wake.py`). Each display that hears her name keeps recording and claims the turn with how clearly it heard (its level above its own room's noise, and the wake word's score); claims within a short window are one "Hey Lena", and `brain.wake_winner` picks one. It fails open: a display that gets no answer in time answers anyway, because two answers are better than none.
+- **Speaking first is gated in one place.** `briefing.py` gathers what she might say (worries, welcome home, the morning briefing, heading out, follow-ups, late habits) and `brain.may_speak` decides, with a daily cap, a quiet half hour per display, bedrooms at night, the display's own state (never while it's listening, thinking or speaking) and the Do not disturb switch. Everything beyond worries and the briefing is off until chosen.
+- **Habits are learned, then watched before they're used.** `routines.py` reads four weeks of the recorder every night and `brain.learn_routine` keeps only regular habits (medians, by weekday and weekend). For the first two weeks she only shows what she believes on a sensor, so a wrong guess is caught before she says it.
+- **Afterglow and her own opinions live in the context, not the Modelfile.** A moment that ends leaves a fading afterglow (in her context for a few hours, and a gentle pull on her hourly mood), and one of the memories saved as **hers** is put in mind each day. No new tools: memory gained optional `about`, `kind` and `follow_up` fields instead, so Open WebUI's tool descriptions stay as they were.
 
 ## Open WebUI
 
 - **The filter** (`inlet`) runs before every request to the `lena` model: it fetches `/api/lena/context` (cached for a minute) and appends it to the system message. If Home Assistant is down she simply chats without it.
 - **Time passing.** A model reads every message as if it came a moment ago. Wherever 30 minutes or more passed between two messages, she gets a system note there, and before the new message one saying how long it's been and that the earlier conversation is over; the Modelfile tells her not to pick an old topic back up. The filter adds them for Open WebUI's own page, from the times in the saved chat; the app adds them itself (`TimePassing.kt`, the same words) and the filter leaves its requests alone. Home Assistant's own Assist conversations need none: Home Assistant forgets one after a few minutes without a message.
-- **The tool** exposes `remember`, `forget`, `feel` and `add_calendar_event` to the model; each calls a Home Assistant action over REST (`lena.add_event` for events, sharing `events.py` with her voice tool), so the memory list, feelings and calendar rules stay in one place.
+- **Who and where.** The filter sends the Open WebUI user's name (and, from the Lena app, the display) so the context says who she's talking with and which room; the app marks a shared wall display so no one person is assumed.
+- **The tool** exposes `remember` (with optional who it's about, a follow-up day and whether it's her own opinion), `forget`, `feel` and `add_calendar_event` to the model; each calls a Home Assistant action over REST (`lena.add_event` for events, sharing `events.py` with her voice tool), so the memory list, feelings and calendar rules stay in one place.
 - Open WebUI keeps your chats, memories, notes, tools, knowledge and speech settings. The app reuses all of that through Open WebUI's own API rather than reimplementing it.
 
 ## The Android app
@@ -122,6 +131,7 @@ Design choices worth knowing before changing anything:
 - **One chat for talking to Lena.** The Ask screen always continues the pinned "Assistant Lena" chat, found by id and, failing that, by name, so it's the same conversation on every device. Half the model's context is given to it, newest first.
 - **Notes for one request only.** The phone's time, "this will be read aloud", the lock-screen caution and a scheduled prompt's real text go in a system message with that request and are never saved into the chat. So do the notes on how much time passed (see Time passing above), each placed between the messages it's about.
 - **The wall display signs Home Assistant in like the companion app.** It opens dashboards with `?external_auth=1` and answers the frontend's token requests through a message channel limited to your Home Assistant's origin. `assets/js/home_assistant.js` also hides Home Assistant's header and reports its views so Lena's bar can show them. Home Assistant's frontend isn't an API, so this is written to fail safe: if it breaks, the page just shows its own header.
+- **One display answers, and each says what it's doing.** When the wake word fires with the integration, `WakeWord.kt` keeps the microphone handed off and recording while `WakeClaim.kt` asks the integration whether this display answers (with its level above the room's noise from `WakeLevel`); no answer within 1.5 seconds means answer. `DisplayPhase` (listening, thinking, speaking) is sent by `DisplaySync` the moment it changes and becomes the Assist satellite's state.
 - **The wake word runs entirely on the device.** `MicroFrontend.java` is a bit-exact port of the audio front end Home Assistant's voice satellites use (the build checks it against the C), feeding microWakeWord models through LiteRT. Detection follows ESPHome: settle for a second, average over a window, and require ESPHome's voice activity model to agree. Nothing is recorded or sent until she hears her name.
 - **Background work is WorkManager plus inexact alarms**, so no special permissions are needed: scheduled prompts, following unfinished replies, the alert check and the widget refresh.
 - **Settings and secrets stay on the device.** Settings are a private preferences file; tokens and passwords are AES-GCM encrypted with a keystore key; backups and device transfers are disabled for all app data.
@@ -171,7 +181,7 @@ sequenceDiagram
 |---|---|
 | The rules, configuration consistency, versions, private data, the release scripts | `python3 tools/check.py` (offline, seconds; runs `tests/test_release.py`) |
 | The integration in a real Home Assistant | `scripts/test_home_assistant.sh` (pytest-homeassistant-custom-component, oldest supported and latest) and `scripts/start_home_assistant.sh` (the newest release) |
-| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works, camera mode chooses right, failed requests are tried again only when safe | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh`, `tools/pairing_check/run.sh`, `tools/camera_check/run.sh`, `tools/connection_check/run.sh` |
+| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works, camera mode chooses right, failed requests are tried again only when safe, wake word loudness and display state | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh`, `tools/pairing_check/run.sh`, `tools/camera_check/run.sh`, `tools/connection_check/run.sh`, `tools/presence_check/run.sh` |
 | Everything with real voices, models and devices | By hand; see the test steps in each setup guide |
 
 ## Building and releasing

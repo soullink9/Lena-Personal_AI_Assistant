@@ -11,7 +11,11 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Dropdown | `select.lena_mood` | Her mood. Attributes: `reason`, `since`. Set it by hand and the old reason is cleared. |
 | Dropdown | `select.lena_energy` | Her energy. |
 | Dropdown | `select.lena_moment` | Her reaction to something that just happened, or **Nothing**. Attributes: `reason`, `since`. Fades on its own. |
-| To-do list | `todo.lena_memory` | Her memory. Add, edit, reorder and delete items like any to-do list. Tick one off to retire it; she only uses open items. |
+| To-do list | `todo.lena_memory` | Her memory. Add, edit, reorder and delete items like any to-do list. Tick one off to retire it; she only uses open items. An item's due date is when she asks how it went; its description says who it's about. |
+| Sensor | `sensor.lena_spoke_first` | How many times she's spoken first today. Attribute `recent`: what she last said, where and when. |
+| Sensor | `sensor.lena_routines` | The habits she's learned (Configure → Routines), each with its usual time, or "not regular yet". |
+| Switch | `switch.lena_do_not_disturb` | While on, she doesn't speak first (worries still reach the alert phones). |
+| Action | `lena.remember` | Saves a memory: the fact, and optionally who it's `about` (a person or someone in the household), a `follow_up` date to ask how it went, its `kind` (fact, plan, or hers: her own opinion or running joke) and `by` (who told her). Used by Open WebUI's Lena tool. |
 | Action | `lena.feel` | Sets her moment, with a reason. For your own automations, and used by Open WebUI. |
 | Action | `lena.add_event` | Adds an event to a calendar with Home Assistant's `calendar.create_event`: a calendar's name, a title, a start (`2026-11-14` for all day, `2026-11-14T15:30` at a time), and optionally an end, a location and a description. Returns what was added. Used by Open WebUI's Lena tool. |
 | Action | `lena.announce` | Says a message on Lena's displays, like Home Assistant Voice's announcements: choose displays (all of them if none), the message, and **Listen for an answer** to have her listen afterwards. |
@@ -22,6 +26,8 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
 | Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
 | Address | `POST /api/lena/display` | Where each Lena app registers as a display and learns its room, the room's speakers and its Assist satellite. |
+| Address | `POST /api/lena/display/wake` | Where a display that heard her name asks whether it should answer (One display answers). |
+| Blueprint | `blueprints/automation/lena/thinking_light.yaml` | A light that pulses while a display is thinking, then goes back as it was. Import it from the repository's blueprints folder. |
 
 Her feelings and memory are saved, so they survive restarts.
 
@@ -34,9 +40,11 @@ With **Assist** and **Lena** ticked, each request to the model carries, in this 
 3. **Assist's part**: the devices and areas she can see, and how to control them.
 4. **Lena's part**:
    - that her replies are usually spoken;
-   - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), and who's home;
-   - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason;
-   - what she remembers, and when to remember or forget something;
+   - the date and time, said so it can't be misread (the part of the day, and whether it's light or dark out, with the next sunrise or sunset from Home Assistant's sun), who's home, and who else is in the household;
+   - who she's talking with (the Home Assistant person of the user asking) and when they last talked ("this morning", "three days ago"), and which room she's in, with "keep it soft and short" in a bedroom at night;
+   - how she feels right now: only her current mood, energy and moment, each with its description from `feelings.yaml` and the reason, and what's still with her from a moment that's passed (an afterglow: a few hours after something made her proud, it still shows a little);
+   - habits that are late today (Configure → Routines);
+   - what she remembers, the memories about whoever she's talking with first, then anything due to come back to ("ask how the interview went", once), one of her own opinions or running jokes for the day, and when to remember or forget something;
    - last of all, a three-line reminder (**Before you answer**): nothing in the house happens unless she calls the tool for it, she asks before opening the house, and she does all of it as herself. Her house rules are in the Modelfile, a long way from the tools, and without the reminder she would sometimes say "turning on the lamp now" without doing it. It has to stay last and as worded: see `HOUSE_REMINDER` in `brain.py`.
 5. **Tools**: Assist's device tools, plus `remember_fact`, `forget_fact`, `record_feeling` and, when there's a calendar she can write to, `add_calendar_event`.
 
@@ -98,9 +106,46 @@ Her tools in Assist (and the same ones in the Open WebUI tool) act on a display:
 
 Displays collect what's asked of them from `POST /api/lena/display/sync` (a wall display every few seconds, any display right after an answer), and report their timers, alarms, reminders and volume there. Anything not collected within 15 minutes is dropped.
 
+## Rooms and household
+
+Under **Configure → Rooms and household**:
+
+- **Bedrooms:** at night (from her wind-down time to her wake-up time) a display in one of these rooms gets soft, short answers, she never speaks first there, and its voice is quieter.
+- **By the door:** displays in these rooms may tell you to take an umbrella (Speaking first: Before you head out).
+- **Also in the household:** pets and anyone who isn't a Home Assistant person, one per line (`Yuki (dog)`). She knows they live here, and memories can be about them.
+
+She knows who she's talking with from the Home Assistant user who's asking (Assist), or the Open WebUI user's name, which should match their Home Assistant person's name. She doesn't recognize voices: a shared wall display talks to the household, not to one person.
+
 ## Speaking first
 
-A display with a **Speaking first** sensor (chosen in the app) asks `POST /api/lena/display/briefing` when someone comes in. The answer is usually nothing; it's the morning briefing once a day per display (from her morning time until noon), or a worry she hasn't mentioned there yet, and never within half an hour of the last time. The briefing is written in her words by the conversation agent chosen for alerts (Configure), or Home Assistant's AI Task, from the facts: today, your weather station, the forecast, today's calendar events, sensors named for trash or recycling, and anything that needs attention. What's been said is kept across restarts.
+A display with a **Speaking first** sensor (chosen in the app) asks `POST /api/lena/display/briefing` when someone comes in. The answer is usually nothing. In order, it may be:
+
+1. a worry she hasn't mentioned there yet (always on);
+2. **Welcome home**, for whoever arrived in the last half hour;
+3. the morning briefing, once a day per display (from her morning time until noon; always on);
+4. **Before you head out**, on a display by the door, when rain or snow is forecast today;
+5. **Asking how something went**: a memory whose follow-up day has come ("How did the interview go?"), only when the person who told her is the only one home, once. With **Ask and listen for the answer** the display then listens;
+6. **A routine that's late**: "The coffee machine hasn't gone on yet; it usually does around 7:05."
+
+Items 2, 4, 5 and 6 are off until ticked under **Configure → Speaking first**. Except for worries, she speaks first at most **6** times a day, never twice within half an hour on the same display, never in a bedroom at night, never while the display is listening, thinking or speaking, and never while **Do not disturb** is on. `sensor.lena_spoke_first` counts it.
+
+The briefing is written in her words by the conversation agent chosen for alerts (Configure), or Home Assistant's AI Task, from the facts: today, your weather station, the forecast, today's calendar events, sensors named for trash or recycling, and anything that needs attention. What's been said is kept across restarts.
+
+**Check these when everyone leaves** (same section): doors, windows, the garage or locks that may be open while someone's home. When everyone's been out for 5 minutes and one is still open or unlocked, the alert phones get "Everyone's out and the garage door is open."
+
+## Routines
+
+Under **Configure → Routines**, choose things that happen at about the same time most days: the coffee machine's plug, the back door for the dog's walk. Every night she reads the last four weeks of each from the recorder and learns when it usually first happens, separately for weekdays and weekends. A habit counts only when it's regular (it happened on at least 4 days and 70% of them, mostly within an hour of its usual time). When a regular habit is well past its usual time today, she knows, and with **A routine that's late** ticked she may mention it.
+
+For the first **14** days after you choose something (**Just watch for**) she only learns: `sensor.lena_routines` shows what she believes, but she never mentions it, so a wrong guess can be spotted first.
+
+## One display answers
+
+When several displays hear "Hey Lena" at once, each keeps recording and asks `POST /api/lena/display/wake` with how clearly it heard (her name's loudness above that room's own noise, and how sure the wake word was). Claims within **350 ms** are one "Hey Lena": the display that heard best answers, and the others go back to listening. A phone in your hand always answers at once. A display that gets no answer in time (Home Assistant restarting, a slow network) answers anyway, since two answers are better than none. Turn it off, or change the window, under **Configure → Wake word**. Home Assistant Voice devices aren't part of it.
+
+## Listening, thinking, speaking
+
+Each display's `assist_satellite` entity shows what it's doing: **idle**, **listening**, **processing** (thinking) or **responding** (speaking), like a Voice Preview Edition. Use it in automations, or import the **Lena thinking light** blueprint.
 
 ```yaml
 action: lena.announce
@@ -127,7 +172,7 @@ Returns:
 }
 ```
 
-Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. With the devices comes the same **Before you answer** reminder Home Assistant's own conversations get, at the very end. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
+`voice` is how her voice follows her feelings (`{"speed", "pitch", "volume"}`, 1 for unchanged), for the voice bridge, and `quiet` whether the display's room wants quiet now. Add `?user=<name>` (an Open WebUI user's name) to say who she's talking with, `&talking=1` when it's for a message they just sent, and `?device=<a display's device id>` for the room she's in. Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. With the devices comes the same **Before you answer** reminder Home Assistant's own conversations get, at the very end. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
 
 ## /api/lena/display
 

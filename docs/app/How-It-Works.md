@@ -152,6 +152,10 @@ They're set on Android's alarm clock, like a clock app's, so they ring on time w
 
 **When the conversation's over she goes back by herself** to the dashboard (dimmed, if it was), or to the screen saver: when you say nothing after her answer, when she's answered and isn't listening for more, or straight away when you say something like "thanks", "that's all", "never mind" or "stop" on its own. Touch the screen and she stays until you close her. Then the wake word is listening again.
 
+**When several displays hear her** at once, with the Lena integration only one answers: each display keeps recording and asks Home Assistant, which picks the one that heard her name most clearly above its own room's noise. The others go back to listening. A phone in your hand always answers. If Home Assistant doesn't answer in time, the display answers anyway. See [One display answers](../home-assistant/Integration.md#one-display-answers).
+
+**What the display is doing** (listening, thinking, speaking) is its Assist satellite's state in Home Assistant, so an automation can, say, pulse a light while she thinks.
+
 It runs entirely on the device: the sound is scored a few times a second and thrown away, and nothing is recorded or sent until she hears her name; then the microphone is handed to Lena as if you'd tapped. **Try it** shows how close each try gets, so you can check it hears you from where you'll stand. It only listens while the wall display or the screen saver is showing (or, set to listen whenever Lena is open, while Lena is on screen), and Android's microphone indicator stays on while it does. Some phones don't let an app use the microphone from the screen saver; when that happens it says so and you tap to talk.
 
 ### Rooms, music and announcements
@@ -169,7 +173,7 @@ With the Lena integration, she can do more than answer, in Assist and Open WebUI
 
 - **Timers, alarms and reminders:** "put a 5 minute timer on for the pasta and remind me to flip the chicken in 20 seconds", "remind me at 7 to take the trash out", "how long is left on the pasta?", "cancel the pasta timer". Timers are Home Assistant's own; alarms and reminders are hers (Home Assistant has none). They ring on the display you asked, or the room you name. A reminder is said out loud after a chime (or shown with one chime when Lena isn't on screen).
 - **Home Assistant's own voice features:** each display is an Assist satellite, so `assist_satellite.announce`, `start_conversation` and Assist's broadcast reach it, and its wake word can be chosen on the satellite's page in Home Assistant.
-- **Her volume:** "speak more quietly", "louder". With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM, and louder when the room is noisy (the wake word hears how noisy it is), then puts the volume back. Her changes stay between **Her quietest** and **Her loudest** (just under Adjust her volume): each kind of device has its own (on a phone or tablet 20% to 100%, on a TV 40% to 100%, since a TV box's volume is the whole TV's sound), or choose your own. If you change the volume while she's speaking, yours stays.
+- **Her volume:** "speak more quietly", "louder". With **Adjust her volume** (Settings → Talking to Lena → How she looks and sounds, on by default) she also speaks more quietly before 8 AM and after 10 PM (and in a room the integration counts as a bedroom, at night), and louder when the room is noisy (the wake word hears how noisy it is), then puts the volume back. Her changes stay between **Her quietest** and **Her loudest** (just under Adjust her volume): each kind of device has its own (on a phone or tablet 20% to 100%, on a TV 40% to 100%, since a TV box's volume is the whole TV's sound), or choose your own. If you change the volume while she's speaking, yours stays.
 - **Correcting what she remembers:** "Alex works nights now" changes the old memory instead of adding a second one.
 - **The house's history:** "when did the garage door last open?", "how long was the back door open?", "what did I miss today?" (people coming and going, doors, windows, locks, the garage, alarms and leaks; not lights or motion). Only what's exposed to Assist.
 
@@ -181,6 +185,8 @@ Pick a motion sensor under Settings → Wall display → Screensaver → **Speak
 - **When something at home needs attention** that she hasn't mentioned on that display yet: once.
 
 Never more than once every half hour on the same display.
+
+In the integration (Configure → Speaking first) she can also welcome you home, tell you to take an umbrella on a display by the door, ask how something went, or mention a habit that's late. Those are off until you tick them, and never in a bedroom at night or while **Do not disturb** is on. See [Speaking first](../home-assistant/Integration.md#speaking-first).
 
 ## House alerts
 
