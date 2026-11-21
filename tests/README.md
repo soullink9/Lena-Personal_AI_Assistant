@@ -1,19 +1,20 @@
 # Tests
 
-Lena's tests live next to what they test; this folder holds the release scripts' tests. Run everything from the
-repository root. Each suite prints `PASS` or `FAIL` per check and exits non-zero if anything failed.
+All of Lena's tests are here: `home-assistant/` runs the integration in a real Home Assistant, `app/` holds the
+app's checks (plain Kotlin and Java, run without a device) and `release/` the release scripts' tests. Run everything
+from the repository root. Each suite prints `PASS` or `FAIL` per check and exits non-zero if anything failed.
 
 | Command | What it checks |
 |---|---|
-| `python3 tools/check.py` | Offline, in seconds: versions, feelings, defaults, private data, approved dependencies, and `tests/test_release.py` |
-| `python3 tests/test_release.py` | The release scripts in `scripts/`, including publishing to a fake Gitea server |
-| `scripts/test_home_assistant.sh latest` (or `2026.11`) | The integration in a real Home Assistant (`home-assistant/tests`); it pip installs, so use a virtualenv |
+| `python3 tools/check.py` | Offline, in seconds: versions, feelings, defaults, private data, approved dependencies, and `tests/release/test_release.py` |
+| `python3 tests/release/test_release.py` | The release scripts in `scripts/`, including publishing to a fake Gitea server |
+| `scripts/test_home_assistant.sh latest` (or `2026.11`) | The integration in a real Home Assistant (`tests/home-assistant/tests`); it pip installs, so use a virtualenv |
 | `scripts/start_home_assistant.sh` | The newest Home Assistant on PyPI starting with Lena |
-| `tools/commands_check/run.sh` | What she understands on her own (timers, alarms, "stop") on example sentences |
-| `tools/pairing_check/run.sh` | Set up from your phone: Lena's QR codes against ones a QR reader read back, the page the device serves used as a phone would, and the page's cipher (in Node, when it's installed) against Java's; and the WebSocket client, with a message of several megabytes and one in two parts |
-| `tools/camera_check/run.sh` | Camera mode: the cameras and sensors it finds in UniFi Protect's entities, and what each view shows as motion comes and goes |
-| `tools/connection_check/run.sh` | Connections: which failed requests are tried again (never a POST that may have reached the server), when a question that got no reply is looked for instead of failing, and how an answer being written is followed |
-| `tools/frontend_check/run.sh` | The app's wake word front end against the original C, bit for bit |
+| `tests/app/commands_check/run.sh` | What she understands on her own (timers, alarms, "stop") on example sentences |
+| `tests/app/pairing_check/run.sh` | Set up from your phone: Lena's QR codes against ones a QR reader read back, the page the device serves used as a phone would, and the page's cipher (in Node, when it's installed) against Java's; and the WebSocket client, with a message of several megabytes and one in two parts |
+| `tests/app/camera_check/run.sh` | Camera mode: the cameras and sensors it finds in UniFi Protect's entities, and what each view shows as motion comes and goes |
+| `tests/app/connection_check/run.sh` | Connections: which failed requests are tried again (never a POST that may have reached the server), when a question that got no reply is looked for instead of failing, and how an answer being written is followed |
+| `tests/app/frontend_check/run.sh` | The app's wake word front end against the original C, bit for bit |
 
 `test_release.py` covers:
 

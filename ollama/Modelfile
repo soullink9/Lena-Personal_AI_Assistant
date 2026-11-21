@@ -7,7 +7,7 @@
 #
 # What does NOT live here is anything that changes: her current mood, energy
 # and reactions, the time, who's home and what she remembers. Home Assistant
-# works those out and sends them with each request (home-assistant/), and
+# works those out and sends them with each request (custom_components/lena/), and
 # Open WebUI picks them up from Home Assistant (open-webui/).
 #
 # Build it:

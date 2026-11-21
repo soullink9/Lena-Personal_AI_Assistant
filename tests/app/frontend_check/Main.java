@@ -1,4 +1,4 @@
-// The Java side of tools/frontend_check: prints MicroFrontend.java's features for raw audio on stdin.
+// The Java side of tests/app/frontend_check: prints MicroFrontend.java's features for raw audio on stdin.
 import io.github.soullink9.lena.MicroFrontend;
 import java.io.*;
 import java.nio.*;

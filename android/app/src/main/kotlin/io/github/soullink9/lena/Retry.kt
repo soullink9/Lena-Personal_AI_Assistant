@@ -10,7 +10,7 @@ import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 
 // The ways a request to Open WebUI or Home Assistant can fail, and which of them are worth trying again.
-// Plain Kotlin, so tools/connection_check can check the rules away from Android.
+// Plain Kotlin, so tests/app/connection_check can check the rules away from Android.
 
 /** Signed out, or the session expired: open Lena and sign in again. */
 class AuthException : IOException("Signed out")

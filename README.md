@@ -25,11 +25,12 @@ Lena is a Jarvis-style assistant that runs entirely on your own servers. She's o
 | Folder | What it is |
 |---|---|
 | [`ollama/`](ollama) | Her character and model settings (`Modelfile`), and an example Ollama setup that keeps her loaded |
-| [`home-assistant/`](home-assistant) | The **Lena** integration: her feelings, shared memory and tools, in one folder |
+| [`custom_components/lena/`](custom_components/lena) | The **Lena** integration: her feelings, shared memory and tools, in one folder |
 | [`open-webui/`](open-webui) | A filter and a tool that bring her feelings and memory into Open WebUI and the app |
 | [`android/`](android) | The **Lena** app for Android 15 and later, phones, tablets and Android TV, built and signed by the release workflows |
 | [`voice/`](voice) | An example Piper container, and the bridge that gives Open WebUI your Piper and Whisper voices |
-| [`tools/`](tools) | `check.py`, offline checks to run before committing |
+| [`tools/`](tools) | `check.py`, offline checks to run before committing, and scripts for a wall display tablet or TV (`tools/devices/`) |
+| [`tests/`](tests) | The tests: the integration in a real Home Assistant, the app's checks and the release scripts' |
 | [`docs/`](docs) | Everything in detail (see below) |
 
 ## Get started
@@ -52,9 +53,9 @@ Start with the [Overview](docs/Overview.md): how the pieces connect and which pa
 | **Setup** | [Getting started](docs/Getting-Started.md) · [Lena in Open WebUI](docs/open-webui/Setup.md) · [Home Assistant installation](docs/home-assistant/Installation.md) · [App installation](docs/app/Installation.md) |
 | **Her personality** | [Personality](docs/personality/Personality.md) · [Feelings](docs/personality/Moods.md) · [Memory](docs/home-assistant/Memory.md) |
 | **Home Assistant** | [The Lena integration](docs/home-assistant/Integration.md) · [Performance tuning](docs/home-assistant/Performance-Tuning.md) · [Troubleshooting](docs/home-assistant/Troubleshooting.md) |
-| **Android app** | [Open WebUI setup](docs/app/Open-WebUI-Setup.md) · [How it works](docs/app/How-It-Works.md) · [Wall display tablet](docs/app/Wall-Display-Tablet.md) · [Android TV](docs/app/Android-TV.md) · [Cameras](docs/app/Cameras.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
+| **Android app** | [Open WebUI setup](docs/open-webui/App-Settings.md) · [How it works](docs/app/How-It-Works.md) · [Wall display tablet](docs/app/Wall-Display-Tablet.md) · [Android TV](docs/app/Android-TV.md) · [Cameras](docs/app/Cameras.md) · [Privacy and security](docs/app/Privacy-and-Security.md) · [Troubleshooting](docs/app/Troubleshooting.md) |
 | **Voice** | [Piper](docs/voice/Piper.md) · [Voice bridge](docs/voice/Voice-Bridge.md) |
-| **Development** | [Architecture](ARCHITECTURE.md) · [Repository guide](docs/Development.md) · [App development](docs/app/Development.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) |
+| **Development** | [Architecture](ARCHITECTURE.md) · [Repository guide](docs/development/Development.md) · [App development](docs/development/App.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) |
 
 ## Privacy
 

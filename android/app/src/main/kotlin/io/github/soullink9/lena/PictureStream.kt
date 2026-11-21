@@ -11,7 +11,7 @@ import java.io.InputStream
  *
  * Each part's `Content-Length` says how long its picture is (Home Assistant's own stream always sends it).
  * A part without one (a camera's own MJPEG passed through) is read up to the JPEG's end marker instead.
- * Plain Kotlin with no Android in it, so tools/camera_check checks it away from a device.
+ * Plain Kotlin with no Android in it, so tests/app/camera_check checks it away from a device.
  */
 class PictureStream(private val input: InputStream) {
     companion object {

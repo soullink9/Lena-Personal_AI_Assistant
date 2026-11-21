@@ -3,7 +3,7 @@ publishing on Gitea (scripts/publish_gitea_release.py) against a fake Gitea serv
 missing (scripts/missing_releases.py). These run in both release
 workflows, so a mistake here would stop or spoil a release.
 
-Run from the repository root:  python3 tests/test_release.py   (tools/check.py runs it too)
+Run from the repository root:  python3 tests/release/test_release.py   (tools/check.py runs it too)
 Python's standard library only; nothing is built, downloaded or published for real.
 """
 import hashlib
@@ -19,7 +19,7 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import check_apk  # noqa: E402 - the scripts folder, added just above
 import publish_gitea_release as publish  # noqa: E402,F401 - imported so a syntax error fails here too

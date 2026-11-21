@@ -5,13 +5,13 @@
 ## The page won't load
 
 - **Check the address** in Lena's settings (long-press the icon → Settings). It must start with `https://` and match how you reach Open WebUI in a browser, including any port.
-- **Certificate errors** show as a blank page. Make sure the certificate is valid for that name, or that your certificate authority is installed on the phone. See [Open WebUI Setup](Open-WebUI-Setup.md#https).
+- **Certificate errors** show as a blank page. Make sure the certificate is valid for that name, or that your certificate authority is installed on the phone. See [Open WebUI Setup](../open-webui/App-Settings.md#https).
 - **Away from home**, the phone needs a route to your server, such as your VPN or Tailscale.
 
 ## Talking to Lena doesn't hear me (with Your server)
 
 - **Microphone permission:** Settings → Apps → Lena → Permissions → Microphone → Allow while using the app.
-- **Speech-to-text engine:** must be a server engine, not "Web API". See [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines).
+- **Speech-to-text engine:** must be a server engine, not "Web API". See [Open WebUI Setup](../open-webui/App-Settings.md#speech-engines).
 - **Another app has the microphone**, such as a phone call or a voice recorder. Close it and try again.
 
 ## She doesn't answer out loud (with Your server's voice)
@@ -99,7 +99,7 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 - Allow the microphone when asked, or in **Settings → Apps → Lena → Permissions**.
 - With **Hearing you: On this phone**, Android may need to download its speech model first; Lena uses your server or Home Assistant meanwhile. You can also switch to **Your server** or **Home Assistant** in Lena's settings.
 - **"Couldn't hear you (error 11)"**, after a few seconds with the microphone off: the phone's recognizer never got ready (some tablets', like the Galaxy Tab A9+, never answer). Lena now hears you another way straight away (your server's speech-to-text, or else Home Assistant's) and keeps doing so for a day. For a wall display, set **Hearing you** to **Home Assistant**: Home Assistant's own speech-to-text (Whisper, Speech-to-Phrase or Cloud, under Settings → Voice assistants there), the way a Home Assistant Voice satellite hears.
-- With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](Open-WebUI-Setup.md#speech-engines)). Lena also uses it whenever the phone's recognizer can't listen, so it's worth setting up either way.
+- With **Your server**, Open WebUI's speech-to-text must be set up (see [Open WebUI Setup](../open-webui/App-Settings.md#speech-engines)). Lena also uses it whenever the phone's recognizer can't listen, so it's worth setting up either way.
 - The warning says what went wrong, for example that the microphone is in use by another app.
 - **"Couldn't hear you (error 10)"** (or "still busy with the last time") means Android's speech service hadn't finished with the previous turn. Lena now waits for the service and tries again by herself, so this should be rare; if it still shows, check that no other app is listening (a voice assistant's wake word, for example).
 - If the mic doesn't open again after Lena replies, check **Keep listening** in Lena's settings.
@@ -131,7 +131,7 @@ Use **Settings → Wake word → Try it** from where you'll stand and watch the 
 
 ## Sign-in opens my browser
 
-You sign in through another website, such as Authentik. Add its address under **Sign-in address** in Lena's settings (long-press the icon → Settings), for example `https://auth.example.com`, and sign in again. If a different address still opens in the browser, add that one too. See [Open WebUI Setup](Open-WebUI-Setup.md#sign-in).
+You sign in through another website, such as Authentik. Add its address under **Sign-in address** in Lena's settings (long-press the icon → Settings), for example `https://auth.example.com`, and sign in again. If a different address still opens in the browser, add that one too. See [Open WebUI Setup](../open-webui/App-Settings.md#sign-in).
 
 ## Sign-in stops at a passkey or security key
 

@@ -3,10 +3,10 @@
 # front end, copied into vendor/) on test audio. Every feature must match exactly,
 # because the "Lena" wake word model was trained on the C's output.
 #
-#   tools/frontend_check/run.sh        (needs g++, python3 and a JDK; nothing is downloaded)
+#   tests/app/frontend_check/run.sh        (needs g++, python3 and a JDK; nothing is downloaded)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-repo="$(cd "$here/../.." && pwd)"
+repo="$(cd "$here/../../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

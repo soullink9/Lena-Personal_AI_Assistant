@@ -396,9 +396,9 @@ class SettingsActivity : ComponentActivity() {
         Section(Area.WALL.title) {
             val home = remember { DashboardActivity.isHomeScreen(this@SettingsActivity) }
             if (tv) {
-                // Android TV has no setting for the home app: tools/android-tv-home.sh sets it once.
+                // Android TV has no setting for the home app: tools/devices/android-tv-home.sh sets it once.
                 Item(Icons.Outlined.Home, "The TV's home screen",
-                    if (home) "It is: the Home button opens the wall display" else "Open it from the TV's apps, or make it the home screen once with tools/android-tv-home.sh") {}
+                    if (home) "It is: the Home button opens the wall display" else "Open it from the TV's apps, or make it the home screen once with tools/devices/android-tv-home.sh") {}
             } else Item(Icons.Outlined.Home, "Make it this device's home screen",
                 if (home) "It is: the wall display, full screen, with the screensaver" else "Makes the wall display full screen, with the screensaver",
                 trailing = { OpenInAndroid() }) { openHomeSettings() }

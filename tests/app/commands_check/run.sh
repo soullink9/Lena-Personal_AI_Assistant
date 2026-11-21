@@ -2,14 +2,14 @@
 # Checks what Lena understands on her own (android/.../Commands.kt: timers, alarms, "stop") against
 # example sentences, with the rest of the app replaced by the stand-ins in Stubs.kt.
 #
-#   tools/commands_check/run.sh        (needs kotlinc, or Gradle; nothing is downloaded)
+#   tests/app/commands_check/run.sh        (needs kotlinc, or Gradle; nothing is downloaded)
 #
 # kotlinc is on GitHub's Ubuntu runners. Elsewhere (the Gitea runner's gradle image, a computer with Gradle) it
 # uses the Kotlin compiler that comes inside Gradle itself, in Gradle's lib folder: older than the app's Kotlin,
 # but Commands.kt is plain Kotlin, and it saves downloading a compiler.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-repo="$(cd "$here/../.." && pwd)"
+repo="$(cd "$here/../../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

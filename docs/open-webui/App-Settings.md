@@ -12,7 +12,7 @@ Any of these work:
 
 - **A reverse proxy** (Caddy, Nginx Proxy Manager, Traefik and so on) with a public certificate, such as Let's Encrypt.
 - **Tailscale** with HTTPS certificates turned on, using your machine's `.ts.net` name.
-- **Your own certificate authority.** Install its certificate on the phone first: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate** (the exact menu varies by phone). Lena trusts certificates you install yourself; see [Privacy and Security](Privacy-and-Security.md#certificates) if you'd rather it didn't.
+- **Your own certificate authority.** Install its certificate on the phone first: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate** (the exact menu varies by phone). Lena trusts certificates you install yourself; see [Privacy and Security](../app/Privacy-and-Security.md#certificates) if you'd rather it didn't.
 
 Self-signed certificates that aren't from an installed authority are rejected.
 
@@ -39,7 +39,7 @@ Open WebUI has a built-in Whisper for speech-to-text (**Whisper (Local)**), but 
 
 You can still start a chat with any model by tapping the title in the top bar.
 
-To talk to Lena herself, pick the `lena` model. Her personality, feelings and shared memory then work in the app exactly as in Open WebUI, because the app goes through Open WebUI: set them up once in [Lena in Open WebUI](../open-webui/Setup.md).
+To talk to Lena herself, pick the `lena` model. Her personality, feelings and shared memory then work in the app exactly as in Open WebUI, because the app goes through Open WebUI: set them up once in [Lena in Open WebUI](Setup.md).
 
 ## Tools
 

@@ -11,7 +11,7 @@ enum class CameraView(val label: String, val detail: String) {
 
 /**
  * What camera mode shows, from moment to moment: a grid of still pictures, or one camera live (the
- * spotlight). Plain Kotlin, with the time passed in, so tools/camera_check can play it through.
+ * spotlight). Plain Kotlin, with the time passed in, so tests/app/camera_check can play it through.
  *
  * - **Show all** / **Selected only**: a grid of every included camera, or of the selected ones (all of
  *   them when none are selected).
@@ -190,7 +190,7 @@ class CameraDirector(
 
 /**
  * How camera mode's grid fills the screen, as UniFi Protect's live view does: no margins and no empty
- * cells. Plain Kotlin, so tools/camera_check can check it.
+ * cells. Plain Kotlin, so tests/app/camera_check can check it.
  */
 object CameraGrid {
     /** A camera's picture: 16:9, as most cameras' streams are. */

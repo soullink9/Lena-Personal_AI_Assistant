@@ -14,13 +14,13 @@ export PIP_ROOT_USER_ACTION=ignore PIP_DISABLE_PIP_VERSION_CHECK=1
 pip install -q homeassistant
 # Without its frontend Home Assistant starts in recovery mode, which leaves custom integrations out; her tools
 # need the conversation integration, and each display is an Assist satellite. All at the versions it pins.
-reqs=$(python "$repo/home-assistant/requirements.py" frontend conversation assist_satellite intent)
+reqs=$(python "$repo/tests/home-assistant/requirements.py" frontend conversation assist_satellite intent)
 echo "Installing: $reqs"
 # shellcheck disable=SC2086 # one word per requirement
 pip install -q $reqs
 
 ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
-if ! python "$repo/home-assistant/startup_check.py" "$work/config" 2>&1 | tee "$work/startup.log"; then
+if ! python "$repo/tests/home-assistant/startup_check.py" "$work/config" 2>&1 | tee "$work/startup.log"; then
   echo "::error title=Home Assistant $ha::$(grep -E "^(ERROR|CRITICAL|Home Assistant|Her context)" "$work/startup.log" | head -20 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
   exit 1
 fi

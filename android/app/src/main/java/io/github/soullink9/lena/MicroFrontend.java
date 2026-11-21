@@ -5,7 +5,7 @@ package io.github.soullink9.lena;
  * "audio_microfrontend" (window, fixed-point FFT, mel filterbank, noise reduction, PCAN gain
  * control, log scale), with the settings Home Assistant's voice satellites use. Ported line for
  * line from the C (Apache License 2.0, The TensorFlow Authors; the FFT is KISS FFT, BSD,
- * Mark Borgerding) so it produces the same numbers bit for bit; tools/frontend_check compares
+ * Mark Borgerding) so it produces the same numbers bit for bit; tests/app/frontend_check compares
  * the two.
  *
  * Feed it 16 kHz mono 16-bit audio with {@link #process}; every 10 ms of audio it produces 40

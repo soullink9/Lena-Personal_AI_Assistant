@@ -1,4 +1,4 @@
-"""Lists every title and detail in Lena's Settings, for reading them against docs/app/Writing.md.
+"""Lists every title and detail in Lena's Settings, for reading them against docs/development/Settings-Text.md.
 
     python3 tools/settings_text.py           every item: line, title, detail
     python3 tools/settings_text.py --look    only the ones worth a look

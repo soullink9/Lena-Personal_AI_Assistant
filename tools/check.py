@@ -18,7 +18,7 @@ are easy to make when editing:
   - the integration's brand images missing or the wrong size;
   - the parts' versions disagreeing, or reaching 1.0 before that's approved;
   - a library or Python package that hasn't been approved;
-  - the release scripts in scripts/ going wrong (tests/test_release.py).
+  - the release scripts in scripts/ going wrong (tests/release/test_release.py).
 
 Exit code 0 means every check passed.
 """
@@ -305,7 +305,7 @@ check(_loaded("lena_brain_reminder", ROOT / "custom_components" / "lena" / "brai
       "tools/personality_check.py sends the same reminder as the integration (HOUSE_REMINDER in brain.py)")
 
 # ---- 7. Python files compile ---------------------------------------------------------------------
-for path in [BRIDGE, OWUI_FILTER, OWUI_TOOLS, *sorted(LENA.glob("*.py")), *sorted((ROOT / "home-assistant" / "tests").glob("*.py"))]:
+for path in [BRIDGE, OWUI_FILTER, OWUI_TOOLS, *sorted(LENA.glob("*.py")), *sorted((ROOT / "tests" / "home-assistant" / "tests").glob("*.py"))]:
     out = ROOT / ".check.pyc"
     try:
         py_compile.compile(str(path), cfile=str(out), doraise=True)
@@ -460,26 +460,27 @@ for workflow in (".github/workflows/home-assistant.yml", ".github/workflows/rele
           f"hacs.json's minimum Home Assistant is the release {workflow} tests on last")
 
 # ---- 14. The wall display debloat script ------------------------------------------------------------
-# tools/wall-display-debloat.sh must parse, and its lists (written by tools/debloat_lists.py) must never
+# tools/devices/wall-display-debloat.sh must parse, and its lists (written by tools/devices/debloat_lists.py) must never
 # remove a package it protects.
 
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 
-debloat = ROOT / "tools/wall-display-debloat.sh"
+debloat = ROOT / "tools/devices/wall-display-debloat.sh"
 if shutil.which("bash"):
     parsed = subprocess.run(["bash", "-n", str(debloat)], capture_output=True, text=True)
-    check(parsed.returncode == 0, f"tools/wall-display-debloat.sh parses ({parsed.stderr.strip() or 'bash -n'})")
-import debloat_lists  # noqa: E402 - the tools folder, added above
+    check(parsed.returncode == 0, f"tools/devices/wall-display-debloat.sh parses ({parsed.stderr.strip() or 'bash -n'})")
+sys.path.insert(0, str(ROOT / "tools" / "devices"))
+import debloat_lists  # noqa: E402 - from tools/devices, added just above
 
 debloat_text = debloat.read_text(encoding="utf-8")
 removing = set(re.findall(r"^([A-Za-z][\w.]*)\|", debloat_text, re.M))
-check(len(removing) > 100, "tools/wall-display-debloat.sh has its package lists")
+check(len(removing) > 100, "tools/devices/wall-display-debloat.sh has its package lists")
 overlap = sorted(removing & debloat_lists.protected())
 check(not overlap, f"the debloat script never removes a protected package ({', '.join(overlap) or 'none'})")
 
 # ---- 14a. Settings text ------------------------------------------------------------------------------
-# docs/app/Writing.md: one name per thing in the words people read. The mechanical rules are checked here,
+# docs/development/Settings-Text.md: one name per thing in the words people read. The mechanical rules are checked here,
 # in every string of the app's code (comments aside): US spelling, no "&" between words, "sign in" not
 # "log in", and Lena's screensaver as one word (Android's own menu, quoted as "Screen saver →", is fine).
 
@@ -497,13 +498,13 @@ for kt in sorted((ROOT / "android/app/src/main/kotlin").rglob("*.kt")):
             for pattern, instead in NOT_WRITTEN:
                 if re.search(pattern, literal):
                     text_problems.append(f"{kt.name}:{number} \"{literal[:40]}\" (write {instead})")
-check(not text_problems, "the app's text follows docs/app/Writing.md" + (f" ({'; '.join(text_problems[:12])})" if text_problems else ""))
+check(not text_problems, "the app's text follows docs/development/Settings-Text.md" + (f" ({'; '.join(text_problems[:12])})" if text_problems else ""))
 
 # ---- 14b. Android TV ---------------------------------------------------------------------------------
 # The app installs on Android 15 and later (minSdk 35), TVs included, and targets Android 16, so every
 # call newer than Android 15 must be behind a version check: the build's lint fails on any that isn't
 # (NewApi, made fatal in build.gradle.kts). Nothing is kept for older Android: no values-v31 style folders
-# or Compat.kt shims. tools/android-tv-home.sh, which makes Lena a TV's home screen, must parse.
+# or Compat.kt shims. tools/devices/android-tv-home.sh, which makes Lena a TV's home screen, must parse.
 
 gradle_text = (ROOT / "android/app/build.gradle.kts").read_text()
 check(re.search(r"^\s*minSdk = 35\b", gradle_text, re.M) is not None, "the app's minSdk is 35 (Android 15)")
@@ -516,19 +517,19 @@ manifest_text = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text()
 check("android.intent.category.LEANBACK_LAUNCHER" in manifest_text and 'android:banner="@drawable/tv_banner"' in manifest_text,
       "the app shows in Android TV's apps, with its banner")
 if shutil.which("bash"):
-    parsed = subprocess.run(["bash", "-n", str(ROOT / "tools/android-tv-home.sh")], capture_output=True, text=True)
-    check(parsed.returncode == 0, f"tools/android-tv-home.sh parses ({parsed.stderr.strip() or 'bash -n'})")
+    parsed = subprocess.run(["bash", "-n", str(ROOT / "tools/devices/android-tv-home.sh")], capture_output=True, text=True)
+    check(parsed.returncode == 0, f"tools/devices/android-tv-home.sh parses ({parsed.stderr.strip() or 'bash -n'})")
 
 # ---- 15. The release scripts ---------------------------------------------------------------------
 # scripts/ checks the version, writes the notes, checks the APK and publishes on Gitea, in both release
-# workflows; tests/test_release.py tries each of them (against a fake Gitea), so a mistake shows up here
+# workflows; tests/release/test_release.py tries each of them (against a fake Gitea), so a mistake shows up here
 # rather than halfway through a release.
 
-released = subprocess.run([sys.executable, str(ROOT / "tests/test_release.py")], capture_output=True, text=True)
+released = subprocess.run([sys.executable, str(ROOT / "tests/release/test_release.py")], capture_output=True, text=True)
 for line in released.stdout.splitlines():
     if line.startswith("FAIL"):
-        check(False, f"tests/test_release.py: {line[5:]}")
-check(released.returncode == 0, f"tests/test_release.py passes ({released.stdout.strip().splitlines()[-1] if released.stdout.strip() else released.stderr.strip()[-200:]})")
+        check(False, f"tests/release/test_release.py: {line[5:]}")
+check(released.returncode == 0, f"tests/release/test_release.py passes ({released.stdout.strip().splitlines()[-1] if released.stdout.strip() else released.stderr.strip()[-200:]})")
 
 print()
 if failures:

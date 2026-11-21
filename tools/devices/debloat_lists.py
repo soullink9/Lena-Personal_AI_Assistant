@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Rebuilds the package lists at the end of tools/wall-display-debloat.sh.
+"""Rebuilds the package lists at the end of tools/devices/wall-display-debloat.sh.
 
 The lists come from the Universal Android Debloater Next Generation project (GPL-3.0):
 https://github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation
 Download its resources/assets/uad_lists.json yourself (nothing here goes online), then:
 
-    python3 tools/debloat_lists.py path/to/uad_lists.json
+    python3 tools/devices/debloat_lists.py path/to/uad_lists.json
 
 Which of its packages the script removes (the REMOVE list):
 
@@ -100,7 +100,7 @@ def summary(description: str) -> str:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        sys.exit("Usage: python3 tools/debloat_lists.py path/to/uad_lists.json")
+        sys.exit("Usage: python3 tools/devices/debloat_lists.py path/to/uad_lists.json")
     uad = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     keep = protected()
 

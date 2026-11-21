@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests the Lena integration in a real Home Assistant: installs Home Assistant's test harness for one release,
-# and what Lena loads at the versions that release pins, then runs home-assistant/tests.
+# and what Lena loads at the versions that release pins, then runs tests/home-assistant/tests.
 #
 #   scripts/test_home_assistant.sh latest     the newest release the harness supports
 #   scripts/test_home_assistant.sh 2026.11    the newest harness for that release (the one Lena targets, hacs.json)
@@ -61,14 +61,14 @@ echo "Test harness $harness (Home Assistant $harness_ha)"
 pip install -q "pytest-homeassistant-custom-component==$harness"
 # Her tools are called through the conversation integration, and each display is an Assist satellite with
 # Home Assistant's timers: install what those load, at the versions this Home Assistant pins.
-reqs=$(python "$repo/home-assistant/requirements.py" conversation assist_satellite intent)
+reqs=$(python "$repo/tests/home-assistant/requirements.py" conversation assist_satellite intent)
 echo "Installing: $reqs"
 # shellcheck disable=SC2086 # one word per requirement
 pip install -q $reqs
 ha=$(python -c "import homeassistant.const as c; print(c.__version__)")
 echo "Home Assistant $ha"
 
-cd "$repo/home-assistant"
+cd "$repo/tests/home-assistant"
 # Warnings are logged as they happen, so Home Assistant's notes about Lena using something deprecated (they
 # name "custom integration 'lena'") can be picked out below.
 if ! python -m pytest -q -p no:cacheprovider -W default -o log_cli=true --log-cli-level=WARNING 2>&1 | tee "$log"; then

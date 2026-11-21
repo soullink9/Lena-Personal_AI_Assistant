@@ -196,7 +196,7 @@ Photos are paths on this Home Assistant (fetch them with the same token). Immich
 
 ## Tests
 
-`home-assistant/tests` runs the integration in a real Home Assistant on every change (`scripts/test_home_assistant.sh`, run by `.gitea/workflows/test.yml` and `.github/workflows/home-assistant.yml`), against the newest release its test harness supports and 2026.11, the release Lena targets (until the harness for it is out, they're skipped with a warning and the start-up check below covers her). To run them yourself:
+`tests/home-assistant/tests` runs the integration in a real Home Assistant on every change (`scripts/test_home_assistant.sh`, run by `.gitea/workflows/test.yml` and `.github/workflows/home-assistant.yml`), against the newest release its test harness supports and 2026.11, the release Lena targets (until the harness for it is out, they're skipped with a warning and the start-up check below covers her). To run them yourself:
 
 ```
 pip install pytest-homeassistant-custom-component
@@ -206,6 +206,6 @@ python -m pytest
 
 The same workflow also:
 
-- starts the newest Home Assistant on PyPI with Lena added (`home-assistant/startup_check.py`), so a new release is tried the day it's out, before its test harness is published: she must load, `/api/lena/context` must answer with a token, one of her tools must answer, renaming one of her entity IDs must happen in place, she must unload cleanly, and nothing Home Assistant logs about her may be an error;
+- starts the newest Home Assistant on PyPI with Lena added (`tests/home-assistant/startup_check.py`), so a new release is tried the day it's out, before its test harness is published: she must load, `/api/lena/context` must answer with a token, one of her tools must answer, renaming one of her entity IDs must happen in place, she must unload cleanly, and nothing Home Assistant logs about her may be an error;
 - runs Home Assistant's own integration checks (hassfest) and the Marketplace's (the HACS action);
 - lists anything Home Assistant says Lena uses that's deprecated, as warnings on the run.

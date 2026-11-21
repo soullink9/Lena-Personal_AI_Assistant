@@ -39,7 +39,7 @@ import javax.net.ssl.SSLSocketFactory
  *   over the network. The page encrypts what you type with it (ChaCha20-Poly1305, [PHONE_CIPHER_JS]) and
  *   this device decrypts it ([decrypt]): someone listening on the Wi-Fi sees only ciphertext. (A phone
  *   browser only has its own crypto on https pages, and this one is plain http on your network, hence the
- *   page's own small cipher, checked against Java's in tools/pairing_check.)
+ *   page's own small cipher, checked against Java's in tests/app/pairing_check.)
  * - **Confirmed on the device.** Nothing the phone sends is saved until someone presses OK on this device
  *   ([Handler.propose]). Signing in with Home Assistant is the exception: that needs your Home Assistant
  *   password, typed on Home Assistant's own https page.
@@ -471,7 +471,7 @@ private const val PHONE_PAGE_JS = """
 /**
  * ChaCha20-Poly1305 (RFC 8439) in plain JavaScript, for the phone page: a phone browser only offers its own
  * crypto on https pages, and this page is plain http on your network. Encrypt only (the device decrypts with
- * Android's). tools/pairing_check runs it in Node against Java's ChaCha20-Poly1305 on the same inputs.
+ * Android's). tests/app/pairing_check runs it in Node against Java's ChaCha20-Poly1305 on the same inputs.
  */
 const val PHONE_CIPHER_JS = """
 var LenaCipher = (function () {

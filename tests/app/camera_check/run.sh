@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Checks "Set up from your phone" (Qr.kt, Pairing.kt) away from Android: QR codes against ones a QR reader
-# read back, and the page the device serves, used as a phone would. Plain Kotlin and java.net, so it runs on
-# any computer with kotlinc or Gradle (Gradle's own Kotlin compiler, as tools/commands_check/run.sh does).
+# Checks camera mode away from Android (CameraFinder.kt, CameraDirector.kt, PictureStream.kt): which cameras
+# and sensors it finds in UniFi Protect's entities, what it shows from moment to moment, against made-up
+# motion, and how it reads Home Assistant's picture stream.
+# Plain Kotlin, so it runs on any computer with kotlinc or Gradle (Gradle's own Kotlin compiler, as commands_check does).
 #
-#   tools/pairing_check/run.sh        (nothing is downloaded)
+#   tests/app/camera_check/run.sh        (nothing is downloaded)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-repo="$(cd "$here/../.." && pwd)"
+repo="$(cd "$here/../../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 src="$repo/android/app/src/main/kotlin/io/github/soullink9/lena"
-sources=("$src/Qr.kt" "$src/Pairing.kt" "$here/PairingCheck.kt")
+sources=("$src/CameraFinder.kt" "$src/CameraDirector.kt" "$src/PictureStream.kt" "$here/CameraCheck.kt")
 
 if command -v kotlinc >/dev/null; then
   kotlinc -nowarn "${sources[@]}" -include-runtime -d "$work/check.jar" 2>&1 | grep -v "^warning" || true
@@ -23,7 +24,7 @@ elif command -v gradle >/dev/null; then
   compiler="$compiler:$(lib_jar kotlin-daemon-embeddable):$(lib_jar trove4j):$(lib_jar annotations):$(lib_jar kotlinx-coroutines-core-jvm)"
   java -cp "$compiler" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -nowarn -no-stdlib -no-reflect \
     -classpath "$stdlib" "${sources[@]}" -d "$work/classes" 2>&1 | grep -v "^warning" || true
-  java -cp "$work/classes:$stdlib" PairingCheckKt
+  java -cp "$work/classes:$stdlib" CameraCheckKt
 else
   echo "Neither kotlinc nor Gradle is installed here; skipping the pairing check (CI runs it)." >&2
   exit 0

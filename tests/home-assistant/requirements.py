@@ -1,7 +1,7 @@
 """Prints the Python packages Home Assistant pins for the integrations Lena loads (and what they load),
 read from this Home Assistant's own manifests, so CI installs exactly those versions.
 
-    python home-assistant/requirements.py conversation assist_satellite intent
+    python tests/home-assistant/requirements.py conversation assist_satellite intent
 """
 
 import json

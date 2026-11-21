@@ -46,7 +46,7 @@ Full details, including the filter and tool settings: [Lena in Open WebUI](open-
 
 ## 3. The Lena app
 
-Full details: [App installation](app/Installation.md) and [Open WebUI setup for the app](app/Open-WebUI-Setup.md).
+Full details: [App installation](app/Installation.md) and [Open WebUI setup for the app](open-webui/App-Settings.md).
 
 1. Install `lena-<version>.apk` from the [latest release](../../../releases/latest) (Android 15 or newer; on a TV, see [Lena on Android TV](app/Android-TV.md)).
 2. Enter your `https://` Open WebUI address (and your sign-in page, if you use Authentik or similar) and sign in.

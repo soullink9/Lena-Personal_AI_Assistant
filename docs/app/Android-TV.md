@@ -26,15 +26,15 @@ For anything the phone page doesn't cover, the **Google TV** app's remote on you
 
 ## Make her the TV's home screen
 
-Android TV has no setting to choose another home screen. Without one, Lena opens from the TV's apps, and the Home button still goes to the TV's own home screen. To make the Home button open Lena, run [`tools/android-tv-home.sh`](../../tools/android-tv-home.sh) once from a computer with adb:
+Android TV has no setting to choose another home screen. Without one, Lena opens from the TV's apps, and the Home button still goes to the TV's own home screen. To make the Home button open Lena, run [`tools/devices/android-tv-home.sh`](../../tools/devices/android-tv-home.sh) once from a computer with adb:
 
 1. On the TV: **Settings → Device Preferences → About**, click **Build** 7 times, then turn on **Network debugging** (Shield) or **USB debugging** in **Developer options**.
-2. On the computer: `./tools/android-tv-home.sh --connect <the TV's IP address>` shows what it would change, and accept the "Allow network debugging?" prompt on the TV.
-3. `./tools/android-tv-home.sh --connect <the TV's IP address> --apply` makes the change.
+2. On the computer: `./tools/devices/android-tv-home.sh --connect <the TV's IP address>` shows what it would change, and accept the "Allow network debugging?" prompt on the TV.
+3. `./tools/devices/android-tv-home.sh --connect <the TV's IP address> --apply` makes the change.
 
 It turns off the TV's own launcher and its setup app (nothing is uninstalled) and makes Lena the home app. The setup app is a home screen too: with only the launcher off, Android falls back to it whenever Lena is briefly gone, which is every time she updates, and it then sits on **Completing setup** for good. With it off as well, the TV just waits for Lena to come back. `--restore` turns both back on, as does a factory reset. A system update may turn the launcher back on; run `--apply` again if the Home button stops opening Lena.
 
-To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV and Lena need), [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) works over the network the same way: see [On an Nvidia Shield or Android TV](Wall-Display-Tablet.md#on-an-nvidia-shield-or-android-tv).
+To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV and Lena need), [`tools/devices/wall-display-debloat.sh`](../../tools/devices/wall-display-debloat.sh) works over the network the same way: see [On an Nvidia Shield or Android TV](Wall-Display-Tablet.md#on-an-nvidia-shield-or-android-tv).
 
 ## The TV home
 

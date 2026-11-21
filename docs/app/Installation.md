@@ -47,7 +47,7 @@ Without these, builds still work but are debug-signed with a throwaway key, and 
 Every push to `main` builds the app. To build by hand: **Actions → Build APK → Run workflow**.
 
 - **Test builds** (pushes to `main`) appear under the run's **Artifacts** as `lena-apk`, a zip holding `lena-<commit>.apk` and `SHA256SUMS`.
-- **Releases** are built when you run **Actions → Release → Run workflow** with the version (or push a version tag). They appear under **Releases** with the APK attached directly. See [Development](Development.md#making-a-release).
+- **Releases** are built when you run **Actions → Release → Run workflow** with the version (or push a version tag). They appear under **Releases** with the APK attached directly. See [Development](../development/App.md#making-a-release).
 
 If you keep your copy on your own Gitea and push-mirror it to GitHub, add the same two secrets to the Gitea repository too (**Settings → Actions → Secrets**): its release workflow signs the APK as well. See [CONTRIBUTING](../../CONTRIBUTING.md#releasing).
 
@@ -64,7 +64,7 @@ Lena needs **Android 15** or newer, on a phone, a tablet or Android TV. On a TV 
 Lena opens on its settings screen.
 
 1. Enter your **Open WebUI address**, starting with `https://`.
-2. If you sign in through Authentik or another single sign-on, enter its **sign-in address** (see [Open WebUI Setup](Open-WebUI-Setup.md#sign-in)).
+2. If you sign in through Authentik or another single sign-on, enter its **sign-in address** (see [Open WebUI Setup](../open-webui/App-Settings.md#sign-in)).
 3. Tap **Save** and sign in to Open WebUI. You stay signed in from then on.
 4. Allow notifications when asked, if you want "Lena finished" and scheduled prompt notifications.
 

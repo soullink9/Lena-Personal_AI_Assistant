@@ -36,16 +36,16 @@ These apply to every change, by people and by AI assistants alike.
 
 ## How the repository is laid out
 
-The full map is in [Development](docs/Development.md#layout); in short:
+The full map is in [Development](docs/development/Development.md#layout); in short:
 
 | Folder | What's in it |
 |---|---|
 | `android/` | The app (Gradle project) |
-| `custom_components/lena/`, `home-assistant/` | The Home Assistant integration, and its tests in a real Home Assistant |
+| `custom_components/lena/` | The Home Assistant integration |
 | `open-webui/`, `ollama/`, `voice/` | The Open WebUI filter and tool, her model, the voice bridge |
-| `tools/` | Checks and helpers you run yourself (`check.py`, `defaults.py`, the wake word and voice command checks) |
+| `tools/` | Checks and helpers you run yourself (`check.py`, `defaults.py`), and in `tools/devices/` the scripts for a wall display tablet or TV |
 | `scripts/` | What the workflows run, on Gitea and GitHub alike: the release scripts and the build and test steps |
-| `tests/` | Tests of the release scripts ([tests/README.md](tests/README.md)) |
+| `tests/` | Every test: `home-assistant/` (the integration in a real Home Assistant), `app/` (the app's checks) and `release/` (the release scripts) ([tests/README.md](tests/README.md)) |
 | `.gitea/workflows/` | Testing and releasing on the Gitea runner, where the project lives |
 | `.github/workflows/` | The same on GitHub, the public mirror, plus Home Assistant's and the Marketplace's own checks |
 
@@ -53,13 +53,13 @@ The full map is in [Development](docs/Development.md#layout); in short:
 
 ```sh
 pip install pyyaml
-python3 tools/check.py                 # offline, seconds; also runs tests/test_release.py
-tools/commands_check/run.sh            # timers and alarms by voice (needs kotlinc or Gradle)
-tools/camera_check/run.sh              # camera mode's choices (needs kotlinc or Gradle)
-tools/connection_check/run.sh          # when failed requests are tried again (needs kotlinc or Gradle)
-tools/presence_check/run.sh            # wake word loudness and display state (needs kotlinc or Gradle)
-tools/pairing_check/run.sh             # Set up from your phone: QR codes, the page, its cipher (kotlinc or Gradle; Node for the cipher)
-tools/frontend_check/run.sh            # the wake word front end against the original C (needs g++ and a JDK)
+python3 tools/check.py                 # offline, seconds; also runs tests/release/test_release.py
+tests/app/commands_check/run.sh            # timers and alarms by voice (needs kotlinc or Gradle)
+tests/app/camera_check/run.sh              # camera mode's choices (needs kotlinc or Gradle)
+tests/app/connection_check/run.sh          # when failed requests are tried again (needs kotlinc or Gradle)
+tests/app/presence_check/run.sh            # wake word loudness and display state (needs kotlinc or Gradle)
+tests/app/pairing_check/run.sh             # Set up from your phone: QR codes, the page, its cipher (kotlinc or Gradle; Node for the cipher)
+tests/app/frontend_check/run.sh            # the wake word front end against the original C (needs g++ and a JDK)
 scripts/test_home_assistant.sh latest  # the integration in a real Home Assistant (in a virtualenv: it pip installs)
 ```
 
@@ -69,7 +69,7 @@ Every push runs all of these, plus the app build, on the Gitea runner (`.gitea/w
 
 The project lives on Gitea, which push-mirrors to GitHub. GitHub is the public copy: people install from its releases, and the app updates itself from them. Releasing works the same when GitHub can't be reached; GitHub catches up when the mirror next pushes.
 
-1. Set the new version everywhere (see [Development](docs/Development.md#things-that-must-stay-in-step); `tools/check.py` catches a mismatch) and rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.6.12] - <date>`. Apply any waiting default changes (`python3 tools/defaults.py apply`). Commit and push.
+1. Set the new version everywhere (see [Development](docs/development/Development.md#things-that-must-stay-in-step); `tools/check.py` catches a mismatch) and rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.6.12] - <date>`. Apply any waiting default changes (`python3 tools/defaults.py apply`). Commit and push.
 2. On Gitea: **Actions → Release → Run workflow**, and enter the version without the v (`0.6.12`). Or push a tag: `git tag v0.6.12 && git push origin v0.6.12`.
 3. Gitea's release workflow (`.gitea/workflows/release.yml`) checks the version against every part and the changelog, runs every test, builds and signs the APK, checks it (`scripts/check_apk.py`) and publishes the Gitea release with the APK and `SHA256SUMS`. It creates the tag when you used the button.
 4. The push mirror takes the tag to GitHub, where `.github/workflows/release.yml` does the same and publishes the GitHub release. It has its own **Run workflow** button with the same version box, for releasing from GitHub alone.
@@ -81,7 +81,7 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 
 ## Changing things
 
-- Read [ARCHITECTURE.md](ARCHITECTURE.md) for how the parts fit together, then the [Development](docs/Development.md) page: the layout, what must stay in step and the checks to run. For the app, also read [App development](docs/app/Development.md).
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) for how the parts fit together, then the [Development](docs/development/Development.md) page: the layout, what must stay in step and the checks to run. For the app, also read [App development](docs/development/App.md).
 - Run `python3 tools/check.py` before committing (see [Checking a change](#checking-a-change)).
 - Keep comments readable by someone new to the project. Every function and class gets a short comment, and it explains why (the reason for a choice, the trap it avoids), not just what the code already says. Prefer plain, step-by-step code over clever one-liners.
 - Add a line to the next release's section of `CHANGELOG.md` (one changelog for the whole project), saying which parts people need to update.

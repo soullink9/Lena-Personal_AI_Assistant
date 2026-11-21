@@ -79,7 +79,7 @@
 
         <!-- Dashboard mode: your Home Assistant dashboards in a Lena frame. It can be a tablet's
              home screen (Android settings > Apps > Default apps > Home app > Lena), and a TV's
-             (tools/android-tv-home.sh).
+             (tools/devices/android-tv-home.sh).
              In the same task as the chat screen (one app in Recents). Its web view outlives the screen
              (DashboardWeb.kt), so coming back to Home doesn't load Home Assistant again. -->
         <activity

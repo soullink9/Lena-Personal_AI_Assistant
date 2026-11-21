@@ -39,7 +39,7 @@ data class FoundCamera(
 
 /**
  * Finds the cameras in Home Assistant's entities and pairs each with its own motion sensors and events.
- * Plain Kotlin, so tools/camera_check can check it on UniFi Protect's entity names.
+ * Plain Kotlin, so tests/app/camera_check can check it on UniFi Protect's entity names.
  */
 object CameraFinder {
     /** Words in a camera entity's ID that say which stream it is, lightest first. */

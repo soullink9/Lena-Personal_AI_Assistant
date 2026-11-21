@@ -12,7 +12,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * new one opens never resets the new one. When two screens are doing something, the later stage wins
  * (speaking over thinking over listening).
  *
- * Plain Kotlin, checked by tools/presence_check.
+ * Plain Kotlin, checked by tests/app/presence_check.
  */
 object DisplayPhase {
     enum class Phase(val ha: String) { IDLE("idle"), LISTENING("listening"), PROCESSING("processing"), RESPONDING("responding") }
@@ -47,7 +47,7 @@ object DisplayPhase {
  * room's background noise as it was just before. So a display near the person wins over one across the
  * house, and a display next to a TV doesn't win by being noisy.
  *
- * Fed every 80 ms by the wake word's listening loop ([hear]). Plain Kotlin, checked by tools/presence_check.
+ * Fed every 80 ms by the wake word's listening loop ([hear]). Plain Kotlin, checked by tests/app/presence_check.
  */
 class WakeLevel {
     private companion object {

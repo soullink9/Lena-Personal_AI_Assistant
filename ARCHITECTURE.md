@@ -1,6 +1,6 @@
 # Architecture
 
-How Lena is put together and how data moves through it, for developers new to the project. For setting it up, start with the [README](README.md); for the repository layout and what must stay in step, see [Development](docs/Development.md); for the app's files, [App development](docs/app/Development.md).
+How Lena is put together and how data moves through it, for developers new to the project. For setting it up, start with the [README](README.md); for the repository layout and what must stay in step, see [Development](docs/development/Development.md); for the app's files, [App development](docs/development/App.md).
 
 ## The idea in one paragraph
 
@@ -179,9 +179,9 @@ sequenceDiagram
 
 | What | How |
 |---|---|
-| The rules, configuration consistency, versions, private data, the release scripts | `python3 tools/check.py` (offline, seconds; runs `tests/test_release.py`) |
+| The rules, configuration consistency, versions, private data, the release scripts | `python3 tools/check.py` (offline, seconds; runs `tests/release/test_release.py`) |
 | The integration in a real Home Assistant | `scripts/test_home_assistant.sh` (pytest-homeassistant-custom-component, oldest supported and latest) and `scripts/start_home_assistant.sh` (the newest release) |
-| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works, camera mode chooses right, failed requests are tried again only when safe, wake word loudness and display state | `scripts/build_apk.sh`, `tools/frontend_check/run.sh`, `tools/commands_check/run.sh`, `tools/pairing_check/run.sh`, `tools/camera_check/run.sh`, `tools/connection_check/run.sh`, `tools/presence_check/run.sh` |
+| The app compiles, the wake word front end matches the C, she understands timers and alarms, Set up from your phone works, camera mode chooses right, failed requests are tried again only when safe, wake word loudness and display state | `scripts/build_apk.sh`, `tests/app/frontend_check/run.sh`, `tests/app/commands_check/run.sh`, `tests/app/pairing_check/run.sh`, `tests/app/camera_check/run.sh`, `tests/app/connection_check/run.sh`, `tests/app/presence_check/run.sh` |
 | Everything with real voices, models and devices | By hand; see the test steps in each setup guide |
 
 ## Building and releasing
@@ -203,4 +203,4 @@ The project lives on Gitea, which push-mirrors to GitHub, the public copy people
 | `scripts/build_apk.sh` | Builds and names the APK and writes `SHA256SUMS` |
 | `scripts/android_sdk.sh` | The Android SDK from Google, for the Gitea runner's Gradle image |
 | `scripts/test_home_assistant.sh`, `scripts/start_home_assistant.sh` | The Home Assistant tests, from PyPI |
-| `tests/test_release.py` | Tests for the release scripts, including publishing to a fake Gitea |
+| `tests/release/test_release.py` | Tests for the release scripts, including publishing to a fake Gitea |

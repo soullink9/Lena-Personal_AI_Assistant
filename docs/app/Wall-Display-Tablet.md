@@ -1,6 +1,6 @@
 # Preparing a tablet for the wall display
 
-A tablet that only runs Lena's wall display doesn't need most of what came on it. [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) strips a Samsung tablet down to Lena and a few apps you choose, so nothing else runs in the background, nags with notifications or updates itself overnight.
+A tablet that only runs Lena's wall display doesn't need most of what came on it. [`tools/devices/wall-display-debloat.sh`](../../tools/devices/wall-display-debloat.sh) strips a Samsung tablet down to Lena and a few apps you choose, so nothing else runs in the background, nags with notifications or updates itself overnight.
 
 It's optional and fully reversible. It's written for Samsung tablets (One UI), and works on other Android devices too, but there it removes only the Google, AOSP and preinstalled packages it knows. It also knows the **Nvidia Shield** and other Android TV boxes: see [On an Nvidia Shield or Android TV](#on-an-nvidia-shield-or-android-tv).
 
@@ -43,7 +43,7 @@ Make Lena the home screen first (**Settings → Wall display → Make it this de
 1. **Preview** (changes nothing):
 
    ```
-   ./tools/wall-display-debloat.sh
+   ./tools/devices/wall-display-debloat.sh
    ```
 
    It lists what it would remove with a line about each, what it's keeping for this tablet and why, and any system packages the list doesn't know.
@@ -51,7 +51,7 @@ Make Lena the home screen first (**Settings → Wall display → Make it this de
 2. **Apply:**
 
    ```
-   ./tools/wall-display-debloat.sh --apply
+   ./tools/devices/wall-display-debloat.sh --apply
    ```
 
    It asks you to type `REMOVE`, removes everything from the preview, writes a log named `debloat-<serial>-<date>.log` in the current folder, and offers to restart the tablet. Keep the log.
@@ -64,17 +64,17 @@ With more than one device connected, add `-s <serial>` (see `adb devices`). It r
 
 The script recognises an Android TV (a Shield, a TV with Android TV or Google TV) and changes three things:
 
-- **More is kept** (`TV_PROTECT` in the script): the TV's voice search and its speech parts (Lena hears you through the remote with them), the TV's keyboard, the Android TV Remote Service (the Google TV app's remote and keyboard on your phone), TV Settings, the TV's own launcher (so [`tools/android-tv-home.sh`](../../tools/android-tv-home.sh) can turn it back on), the device keys streaming apps' copy protection may check, and on a Shield, Shield Accessories (the remote and controllers), its button hooks and its system updates.
+- **More is kept** (`TV_PROTECT` in the script): the TV's voice search and its speech parts (Lena hears you through the remote with them), the TV's keyboard, the Android TV Remote Service (the Google TV app's remote and keyboard on your phone), TV Settings, the TV's own launcher (so [`tools/devices/android-tv-home.sh`](../../tools/devices/android-tv-home.sh) can turn it back on), the device keys streaming apps' copy protection may check, and on a Shield, Shield Accessories (the remote and controllers), its button hooks and its system updates.
 - **Apps installed on top stay** (Netflix, Plex and the like): a Shield is often still the TV's media box. Add `--apps` to uninstall them too, as on a tablet.
-- **The home screen isn't required:** the TV's launcher stays until you run `tools/android-tv-home.sh --apply` (see [Lena on Android TV](Android-TV.md)).
+- **The home screen isn't required:** the TV's launcher stays until you run `tools/devices/android-tv-home.sh --apply` (see [Lena on Android TV](Android-TV.md)).
 
 Nvidia's own apps (NVIDIA Games and the like) aren't on the list the script uses, so they're shown under "Not in the list" and left alone; add the ones you want gone to `EXTRA_REMOVE`.
 
 Over the network: on the TV, **Settings → Device Preferences → About**, click **Build** seven times, then **Device Preferences → Developer options → Network debugging**. Then:
 
 ```
-./tools/wall-display-debloat.sh --connect <the TV's IP address>
-./tools/wall-display-debloat.sh --connect <the TV's IP address> --apply
+./tools/devices/wall-display-debloat.sh --connect <the TV's IP address>
+./tools/devices/wall-display-debloat.sh --connect <the TV's IP address> --apply
 ```
 
 The port is 5555 unless you give another. Accept the "Allow network debugging?" prompt on the TV the first time; the script waits for it.
@@ -86,7 +86,7 @@ The last part of the preview lists the system packages nobody has rated yet. Mos
 ## Undoing it
 
 ```
-./tools/wall-display-debloat.sh --restore debloat-<serial>-<date>.log
+./tools/devices/wall-display-debloat.sh --restore debloat-<serial>-<date>.log
 ```
 
 That puts back everything the log removed, then restart the tablet.
@@ -100,7 +100,7 @@ That puts back everything the log removed, then restart the tablet.
 The package lists at the end of the script come from the Universal Android Debloater Next Generation project (GPL-3.0). To update them, download its [`resources/assets/uad_lists.json`](https://github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation/blob/main/resources/assets/uad_lists.json), then run:
 
 ```
-python3 tools/debloat_lists.py path/to/uad_lists.json
+python3 tools/devices/debloat_lists.py path/to/uad_lists.json
 ```
 
-Check the changes with `git diff`, and run a preview on a tablet before committing. Which tiers it takes, and the hand-picked "Expert" packages, are at the top of `tools/debloat_lists.py`. It never adds a package that's in the script's `PROTECT` list.
+Check the changes with `git diff`, and run a preview on a tablet before committing. Which tiers it takes, and the hand-picked "Expert" packages, are at the top of `tools/devices/debloat_lists.py`. It never adds a package that's in the script's `PROTECT` list.

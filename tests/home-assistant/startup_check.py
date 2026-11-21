@@ -30,7 +30,7 @@ from homeassistant.helpers import entity_registry as er, llm
 from homeassistant.helpers.entity import _entity_class_requires_readd
 from homeassistant.helpers.entity_platform import async_get_platforms
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 
 CONFIGURATION = """\
 homeassistant:

@@ -67,7 +67,7 @@ jobs:
       - name: Install the checks' one package (PyYAML, from PyPI)
         run: pip install -q --root-user-action=ignore --disable-pip-version-check pyyaml
 
-      # Versions, defaults, private data, approved dependencies... and tests/test_release.py.
+      # Versions, defaults, private data, approved dependencies... and tests/release/test_release.py.
       - name: Offline checks and the release scripts
         run: python3 tools/check.py
 
@@ -244,28 +244,28 @@ jobs:
           fi
 
       - name: Check the wake word front end against the original C
-        run: tools/frontend_check/run.sh
+        run: tests/app/frontend_check/run.sh
 
       - name: Check timers and alarms by voice
-        run: tools/commands_check/run.sh
+        run: tests/app/commands_check/run.sh
 
       # Set up from your phone: the QR code, the page it serves used as a phone would, and the page's cipher.
       - name: Check setting up from a phone
-        run: tools/pairing_check/run.sh
+        run: tests/app/pairing_check/run.sh
 
       # Camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes.
       - name: Check camera mode
-        run: tools/camera_check/run.sh
+        run: tests/app/camera_check/run.sh
 
       # Connections: which failed requests are tried again (never a POST that may have reached the server),
       # and how an answer being written is followed.
       - name: Check connection rules
-        run: tools/connection_check/run.sh
+        run: tests/app/connection_check/run.sh
 
       # One display answers: how loud the wake word was above the room's noise, and what each display says
       # it's doing (listening, thinking, speaking) for Home Assistant.
       - name: Check wake word claims and display state
-        run: tools/presence_check/run.sh
+        run: tests/app/presence_check/run.sh
 
       - name: Install the Android SDK (from Google)
         run: scripts/android_sdk.sh

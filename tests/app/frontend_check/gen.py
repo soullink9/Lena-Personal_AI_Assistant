@@ -1,4 +1,4 @@
-# Test audio for tools/frontend_check (raw 16 kHz 16-bit mono on stdout).
+# Test audio for tests/app/frontend_check (raw 16 kHz 16-bit mono on stdout).
 # Test audio: silence, quiet noise, speech-like tones, sweeps, loud bursts, clipping, and odd extremes.
 import math, random, struct, sys
 random.seed(int(sys.argv[2]) if len(sys.argv) > 2 else 1)

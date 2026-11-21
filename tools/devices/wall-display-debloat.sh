@@ -41,7 +41,7 @@
 # (Wi-Fi, Bluetooth, navigation bar, media storage, share sheet, the Samsung launcher and software
 # updates are among those). Packages it doesn't know are listed at the end of the preview for you to
 # review, never removed on their own; add any you want gone to EXTRA_REMOVE. To bring the lists up to
-# date with a newer UAD release: python3 tools/debloat_lists.py path/to/uad_lists.json
+# date with a newer UAD release: python3 tools/devices/debloat_lists.py path/to/uad_lists.json
 # More in docs/app/Wall-Display-Tablet.md.
 #
 # Works with the bash that comes with macOS (3.2), Linux, and Git Bash or WSL on Windows.
@@ -117,7 +117,7 @@ TV_PROTECT=(
     com.android.tv.frameworkpackagestubs
     com.android.remoteprovisioner                  # device keys streaming apps' copy protection (DRM) may check
 
-    # The TV's own home screen and setup: tools/android-tv-home.sh turns the launcher off (and back on with
+    # The TV's own home screen and setup: tools/devices/android-tv-home.sh turns the launcher off (and back on with
     # --restore), so it stays installed
     com.google.android.tvlauncher                  # Android TV's home screen (Shield)
     com.google.android.tvrecommendations          # its rows
@@ -363,7 +363,7 @@ note_kept "$home" "the home app"
 if [ "$home" != "io.github.soullink9.lena" ]; then
     if [ -n "$IS_TV" ]; then
         echo "Note: Lena isn't the TV's home screen yet (it's: ${home:-none chosen}). That's fine: the TV's launcher"
-        echo "stays. To make the Home button open Lena: tools/android-tv-home.sh --apply$AGAIN"
+        echo "stays. To make the Home button open Lena: tools/devices/android-tv-home.sh --apply$AGAIN"
     else
         echo "Note: Lena isn't the home app yet (it's: ${home:-none chosen}). Make it the home app in Lena's"
         echo "Settings → Wall display before you remove things, so there's always a home screen."
@@ -516,7 +516,7 @@ esac
 exit 0
 
 # ---- The lists ----------------------------------------------------------------------------------------
-# Written by tools/debloat_lists.py from UAD's list; don't edit by hand (use PROTECT and EXTRA_REMOVE).
+# Written by tools/devices/debloat_lists.py from UAD's list; don't edit by hand (use PROTECT and EXTRA_REMOVE).
 # REMOVE: package|UAD tier|what it is. KNOWN: rated by UAD and left alone on purpose.
 : <<'__END__'
 __REMOVE__

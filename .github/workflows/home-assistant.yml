@@ -7,7 +7,7 @@ name: Home Assistant integration
 on:
   push:
     branches: [main]
-    paths: ["custom_components/**", "home-assistant/**", "hacs.json", "scripts/*home_assistant.sh", ".github/workflows/home-assistant.yml"]
+    paths: ["custom_components/**", "tests/home-assistant/**", "hacs.json", "scripts/*home_assistant.sh", ".github/workflows/home-assistant.yml"]
   workflow_dispatch:
 
 permissions:
