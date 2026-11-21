@@ -14,7 +14,7 @@ Lena has one memory, shared everywhere she lives: the **Lena Memory** to-do list
 
 When someone asks her to remember something, or tells her a lasting fact that clearly matters, she adds one short third-person line, like "Alex likes the office at seventy degrees." She's told not to save passing moods, one-off requests, duplicates or secrets, and to confirm only once it's saved.
 
-Some small models say they saved something without actually doing it. Check the list after your first few tries.
+If she says she saved something and it isn't on the list, she didn't have the tool: in Open WebUI, Tool Search hides it (see [Turn Tool Search off](../open-webui/Setup.md#turn-tool-search-off)). Check the list after your first few tries.
 
 ## Forgetting and tidying
 

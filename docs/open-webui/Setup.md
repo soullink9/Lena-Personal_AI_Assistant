@@ -67,6 +67,18 @@ Its `add_calendar_event` runs the `lena.add_event` action in Home Assistant, so 
 
 The Lena app uses the model's tools and filters automatically, so there's nothing to set in the app.
 
+### Turn Tool Search off
+
+Open WebUI's **Tool Search** (Admin Panel → Settings → Interface, off unless you turned it on) hands the model only short tools. Any tool whose definition is longer than **Tool Search Defer Threshold** (400 characters unless changed) is hidden behind `search_tools` until she searches for it, and she rarely does. Most of her tools are longer than that, because their descriptions tell her when and how to use them: with Tool Search on she can't save a memory (`remember`) or record a feeling (`feel`), and says she did anyway. Leave Tool Search **off**.
+
+If you need it on for other models, put her tools in **Always Loaded** instead, so she always has them:
+
+```
+remember,forget,update_fact,feel,home-assistant_*
+```
+
+`home-assistant_` is the ID you gave Home Assistant's MCP server in Open WebUI; change it if yours differs.
+
 ## 6. Open WebUI's own memory
 
 Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory and knowledge** screen shows both: connect Home Assistant in the app's settings and a **Hers** tab shows her shared list next to Open WebUI's memories and your knowledge.
@@ -85,5 +97,6 @@ A change in Home Assistant can take up to a minute (`cache_seconds`) to reach he
 - **No feelings or memory in chats:** check the filter is switched on and ticked on the `lena` model, and that `ha_url` works from inside the Open WebUI container (`curl` it from there). Open WebUI's log shows `Lena filter: Home Assistant request failed` with the reason.
 - **Nothing from Home Assistant at all:** open `<ha_url>/api/lena/context` with the token (for example with `curl -H "Authorization: Bearer <token>"`). A 404 means the Lena integration isn't set up; a 401 means the token is wrong.
 - **She never uses the tool:** check Function Calling is **Native** and the tool is ticked on the model.
+- **She says she saved something, but Lena Memory doesn't have it:** she didn't have the tool to save it. Open her reasoning ("Thought for…"): if `remember` isn't in the tools she lists, Tool Search hid it. See [Turn Tool Search off](#turn-tool-search-off).
 - **"Thought for 3 minutes" and she goes in circles** (the same sentence drafted over and over): thinking is on. Turn off **Think (Ollama)** on the `lena` model and the **Think** button in the chat box, and rebuild her from the current Modelfile, which tells her not to draft replies while thinking and stops a runaway reply at 4096 tokens.
 - More in [Troubleshooting](../home-assistant/Troubleshooting.md).

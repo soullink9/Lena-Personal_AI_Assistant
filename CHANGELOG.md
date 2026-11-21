@@ -2,6 +2,12 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Docs
+
+- **Turn Open WebUI's Tool Search off for Lena.** Tool Search (Admin Panel → Settings → Interface) only gives the model tools whose definition is under 400 characters and hides the rest behind `search_tools`. Most of her tools are longer, because their descriptions tell her when and how to use them, so with it on she had `forget` but not `remember`; asked to remember something, she didn't search for it and said she'd saved it anyway. [Setup](docs/open-webui/Setup.md#turn-tool-search-off) now says to leave Tool Search off, or to keep her tools loaded with **Always Loaded**, and Troubleshooting covers "she says she saved it, but it isn't on the list". No code changed; nothing to update.
+
 ## [0.6.33] - 2026-11-17
 
 ### Gitea workflows
