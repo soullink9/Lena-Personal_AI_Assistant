@@ -46,12 +46,15 @@ import java.net.HttpURLConnection
  *
  * Only a picture actually drawn counts as live: the page says [Bridge.playing] once a frame is on screen, not
  * when the stream merely opens (a WebRTC or HLS stream can open and never draw a frame, which used to show
- * Live over a black screen). WebRTC and HLS each get [WEBRTC_MS] (HLS twice that, it starts slower) to draw one.
+ * Live over a black screen). WebRTC gets [WEBRTC_MS] to draw one, HLS [HLS_MS]: Home Assistant answers the
+ * first HLS request only once its stream from the camera has two segments ready, which takes a while.
  *
  * To start sooner: each camera's ICE servers are asked for once per player ([iceConfigs]), not on every
- * switch, and a camera remembers the way that worked for a day, on this device ([Cameras.liveWay]), so neither
- * Rotate nor opening camera mode again waits through the ways that failed (behind a reverse proxy, WebRTC's
- * video can't reach the device at all). After a day it tries them again, in case the network changed.
+ * switch, and a camera starts at the way that last drew a picture for it, on this device ([Cameras.liveWay]),
+ * so neither Rotate nor opening camera mode again waits through the ways that failed (behind a reverse proxy,
+ * WebRTC's video can't reach the device at all). Only a way that drew a picture is remembered: one that fails
+ * is never a reason to skip the others. When the remembered way fails, the others are tried after it, WebRTC
+ * included, and when none gives a picture the camera is forgotten, so the next time starts from the top.
  *
  * Only the camera in the spotlight plays, and only while camera mode is on screen ([show], [stop]).
  */
@@ -80,6 +83,7 @@ class CameraLive(
     companion object {
         private const val TAG = "Cameras"
         private const val WEBRTC_MS = 12_000L
+        private const val HLS_MS = 45_000L
         private const val PICTURES_MS = 15_000L
         private const val ASSETS = "appassets.androidplatform.net"
         private const val PAGE = "https://$ASSETS/assets/camera/live.html"
@@ -94,6 +98,9 @@ class CameraLive(
     private val pending = mutableListOf<JSONObject>()
     /** The way being tried for the camera now. */
     private var way = Way.WEBRTC
+
+    /** The ways still to try for the camera now, after [way], in order. */
+    private val waysLeft = ArrayDeque<Way>()
     private var timeout: Job? = null
     private var pictures: Job? = null
 
@@ -161,14 +168,34 @@ class CameraLive(
         entity = camera ?: return
         val mine = ++generation
         onState(State.CONNECTING)
-        when (Cameras.liveWay(appContext, camera)) {
-            Way.HLS -> playHls(mine, "WebRTC didn't give $camera a picture last time")
-            Way.PICTURES -> playPictures(mine, "WebRTC and HLS didn't give $camera a picture last time")
-            else -> playWebRtc(mine, camera)
+        // The way that last drew a picture first, then the rest in their usual order.
+        val first = Cameras.liveWay(appContext, camera) ?: Way.WEBRTC
+        waysLeft.clear()
+        waysLeft.addAll(Way.entries.filter { it != first })
+        play(mine, first, if (first == Way.WEBRTC) "Starting" else "$first drew $camera's picture last time")
+    }
+
+    /** Tries [next] for the camera now. */
+    private fun play(mine: Int, next: Way, why: String) {
+        val camera = entity ?: return
+        when (next) {
+            Way.WEBRTC -> playWebRtc(mine, camera)
+            Way.HLS -> playHls(mine, why)
+            Way.PICTURES -> playPictures(mine, why)
         }
     }
 
-    /** Starts WebRTC in the page; [giveUp] moves on to HLS if no picture is drawn within [WEBRTC_MS]. */
+    /**
+     * The way being tried drew a picture: the camera starts with it from now on, on this device. Saved only
+     * when it's a different way, so the day counts from when it first worked: then the camera tries the ways
+     * before it again, and a camera that fell back to the picture stream doesn't stay on it for good.
+     */
+    private fun worked() {
+        val camera = entity ?: return
+        if (Cameras.liveWay(appContext, camera) != way) Cameras.setLiveWay(appContext, camera, way)
+    }
+
+    /** Starts WebRTC in the page; [giveUp] moves on to the next way if no picture is drawn within [WEBRTC_MS]. */
     private fun playWebRtc(mine: Int, camera: String) {
         way = Way.WEBRTC
         scope.launch {
@@ -206,6 +233,7 @@ class CameraLive(
         session = null
         pending.clear()
         way = Way.WEBRTC
+        waysLeft.clear()
         entity = null
         startWhenReady = null
         if (pageReady) js("lenaStop()")
@@ -223,9 +251,10 @@ class CameraLive(
     }
 
     /**
-     * The way being tried didn't give a picture: the next one (WebRTC, then HLS, then the picture stream), and
-     * still pictures after the last. A way that failed once for a camera (a stream WebRTC can't carry, such as
-     * H.265; HLS this web view can't play) fails every time, so the camera starts past it from now on.
+     * The way being tried didn't give a picture: the next one left ([waysLeft]), and still pictures after the
+     * last. Each failure is logged with its reason, so a camera that shows no live picture can be traced in
+     * the app's log. When none worked, the camera's remembered way is forgotten: a way that worked once and
+     * then failed (the camera was offline, Home Assistant restarted) mustn't keep the camera from the others.
      */
     private fun giveUp(mine: Int, why: String) {
         if (mine != generation) return
@@ -233,21 +262,17 @@ class CameraLive(
         timeout?.cancel()
         subscription?.let { socket.unsubscribe(it) }
         subscription = null
-        when (way) {
-            Way.WEBRTC -> {
-                Cameras.setLiveWay(appContext, camera, Way.HLS)
-                playHls(mine, why)
-            }
-            Way.HLS -> {
-                Cameras.setLiveWay(appContext, camera, Way.PICTURES)
-                playPictures(mine, why)
-            }
-            Way.PICTURES -> {
-                stopPictures()
-                Logs.w(TAG, "No live picture for $camera ($why); showing still pictures")
-                onState(State.STILL)
-            }
+        Logs.w(TAG, "$way gave $camera no picture: $why")
+        if (way == Way.PICTURES) stopPictures()
+        val next = waysLeft.removeFirstOrNull()
+        if (next != null) {
+            play(mine, next, why)
+            return
         }
+        Cameras.forgetLiveWay(appContext, camera)
+        if (pageReady) js("lenaStop()")
+        Logs.w(TAG, "No live picture for $camera; showing still pictures")
+        onState(State.STILL)
     }
 
     /**
@@ -270,8 +295,8 @@ class CameraLive(
                 val start = { js("lenaHls($throughApp, $direct, $sound)") }
                 if (pageReady) start() else startWhenReady = start
                 timeout = scope.launch {
-                    delay(WEBRTC_MS * 2)
-                    if (mine == generation) giveUp(mine, "HLS didn't draw a picture")
+                    delay(HLS_MS)
+                    if (mine == generation) giveUp(mine, "HLS didn't draw a picture within ${HLS_MS / 1000} s")
                 }
             } catch (e: Exception) {
                 if (mine == generation) giveUp(mine, "HLS isn't offered: ${e.message}")
@@ -342,6 +367,7 @@ class CameraLive(
                             onPicture(camera, picture)
                             if (first) {
                                 timeout?.cancel()
+                                worked()
                                 onState(State.PICTURES)
                             }
                         }
@@ -374,7 +400,8 @@ class CameraLive(
         val path = url.encodedPath.orEmpty().removePrefix("/ha") + (url.encodedQuery?.let { "?$it" } ?: "")
         if (path.contains("..")) return failure(400)
         return try {
-            val conn = ha.openStream(path)
+            // Home Assistant holds the first playlist until its stream has two segments: allow for a slow start.
+            val conn = ha.openStream(path, readTimeoutMs = HLS_MS.toInt())
             val type = conn.contentType?.substringBefore(';')?.trim()?.ifBlank { null } ?: "application/octet-stream"
             WebResourceResponse(type, null, 200, "OK", mapOf("Cache-Control" to "no-store"), Disconnecting(conn))
         } catch (e: HaHttpException) {
@@ -383,6 +410,10 @@ class CameraLive(
             failure(403)
         } catch (e: HaAuthException) {
             failure(401)
+        } catch (e: java.net.SocketTimeoutException) {
+            // Connected, but no answer: Home Assistant's stream from the camera didn't start in time.
+            Logs.w(TAG, "HLS: Home Assistant didn't send ${path.substringAfterLast('/').substringBefore('?')} in time (${e.message})")
+            failure(504)
         } catch (e: Exception) {
             Logs.w(TAG, "HLS: couldn't reach Home Assistant: ${e.message}")
             failure(502)
@@ -441,6 +472,7 @@ class CameraLive(
             scope.launch {
                 if (entity == null || way == Way.PICTURES) return@launch
                 timeout?.cancel()
+                worked()
                 onState(State.PLAYING)
             }
         }

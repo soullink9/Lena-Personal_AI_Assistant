@@ -172,15 +172,16 @@ class HomeAssistant(
      * A stream from Home Assistant itself (only paths on it, so the token never goes elsewhere), open and
      * ready to read as it comes: camera mode's moving pictures ([CameraLive]). Blocking; call it off the main
      * thread. The caller reads it and disconnects it; disconnecting from another thread ends a read under way.
-     * Not tried again: a stream that ends is the caller's to start again or give up on.
+     * Not tried again: a stream that ends is the caller's to start again or give up on. [readTimeoutMs]: how
+     * long it may go without sending anything (the first answer included) before it's taken for dead.
      */
-    fun openStream(path: String): HttpURLConnection {
+    fun openStream(path: String, readTimeoutMs: Int = 30_000): HttpURLConnection {
         require(path.startsWith("/") && !path.startsWith("//")) { "Not a Home Assistant path" }
         val conn = URL(base + path).openConnection() as HttpURLConnection
         try {
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 8_000
-            conn.readTimeout = 30_000 // a picture at least every 30 seconds, or the stream is taken for dead
+            conn.readTimeout = readTimeoutMs
             conn.setRequestProperty("Authorization", "Bearer $token")
             val code = conn.responseCode
             if (code == 403) throw HaForbiddenException()

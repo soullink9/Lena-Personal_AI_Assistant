@@ -37,13 +37,13 @@ object Cameras {
         edit.apply()
     }
 
-    /** How long a camera's live picture starts at the way that last worked, before trying the earlier ways again. */
+    /** How long a camera's live picture starts at the way that last drew it, before starting from the top again. */
     private const val LIVE_WAY_MS = 24 * 60 * 60 * 1000L
 
     /**
-     * The way [camera]'s live picture (a stream entity) starts with on this device: past the ways that gave it
-     * no picture in the last day ([CameraLive.Way]), so camera mode doesn't wait through them every time it
-     * opens. Null to start with WebRTC.
+     * The way [camera]'s live picture (a stream entity) starts with on this device: the one that last drew it,
+     * in the last day ([CameraLive.Way]), so camera mode doesn't wait through the ones that fail every time it
+     * opens. Only a way that worked is saved, never one that failed. Null to start with WebRTC.
      */
     fun liveWay(c: Context, camera: String): CameraLive.Way? {
         val saved = p(c).getString("way:$camera", null) ?: return null
@@ -55,6 +55,9 @@ object Cameras {
 
     fun setLiveWay(c: Context, camera: String, way: CameraLive.Way) =
         p(c).edit().putString("way:$camera", "${way.name}@${System.currentTimeMillis()}").apply()
+
+    /** No way gave [camera] a picture: it starts from WebRTC again next time. */
+    fun forgetLiveWay(c: Context, camera: String) = p(c).edit().remove("way:$camera").apply()
 
     /** Whether camera mode is on here (Settings → Cameras → Camera mode), with Home Assistant connected. */
     fun available(c: Context): Boolean = Prefs.cameras(c).on && Prefs.haServer(c) != null && Secrets.has(c, Secrets.HA_TOKEN)

@@ -4,9 +4,13 @@ Everything in this repository (the Android app, the Home Assistant integration, 
 
 ## [Unreleased]
 
-A tidy-up: leftovers nobody uses any more are gone. Nothing you use changes, so updating is optional.
+A camera that once failed to play live no longer stays on a black screen. Also the tidy-up below: leftovers nobody uses any more are gone. **Update the app.** Nothing else changes.
 
 ### Android app
+
+- **Fixed: a camera stuck on a black screen.** When a camera's live picture failed once (the camera offline for a moment, Home Assistant restarting, its stream slow to start), camera mode remembered the next way for a day and skipped the ones before it, even after the camera worked again. With its still pictures also failing, the spotlight stayed black. Now a camera remembers only a way that actually drew its picture; when that way fails, the others are tried after it, WebRTC included, and when none works the camera starts from the top next time ([Camera mode](docs/app/Cameras.md#how-it-plays)).
+- **HLS gets longer to start**: 45 seconds instead of 24. Home Assistant answers the first HLS request only once its stream from the camera has two pieces of video ready, which for a stream that isn't preloaded could take longer than the app waited, so it gave up just before the picture came.
+- **Clearer camera log lines.** Each way that gives a camera no picture is logged with its reason, and an HLS request Home Assistant didn't answer in time says so ("Home Assistant didn't send … in time") instead of "couldn't reach Home Assistant", which sounded like a network problem.
 
 - Removed what nothing used: the "New chat" shortcut's icon and label (the shortcut itself went long ago), an unused settings row (`ChoiceItem`), `Api.chatModel()` and `WakeWord.isRunning`.
 - The updater no longer looks for a GitHub token and repository saved by releases before 7 November; any device that has opened Lena since then has already had them removed.
