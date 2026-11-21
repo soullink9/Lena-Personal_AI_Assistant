@@ -32,8 +32,6 @@ import java.security.MessageDigest
 object Updates {
     const val REPO = UpdateSource.GitHub.REPO
 
-    /** Where a token for a private repository used to be kept, removed by [cleanUp]. */
-    private const val OLD_TOKEN = "github_token"
     private const val TAG = "Updates"
 
     /**
@@ -260,13 +258,6 @@ object Updates {
 
     /** Deletes a downloaded update that's no longer needed (installed, or no longer newer). */
     fun cleanUp(c: Context) {
-        // From when releases could come from another or a private GitHub repository: neither is needed now.
-        // (Your Gitea's address, "gitea", is kept: it needs no token.)
-        if (Secrets.has(c, OLD_TOKEN) || p(c).contains("repo")) {
-            Secrets.put(c, OLD_TOKEN, null)
-            p(c).edit().remove("repo").apply()
-            Logs.i(TAG, "Removed the saved GitHub token and repository: updates come from Lena's public releases")
-        }
         val version = p(c).getString("pending_version", null)
         if (version != null && pending(c) == null) {
             dir(c).deleteRecursively()

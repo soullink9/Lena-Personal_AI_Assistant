@@ -62,4 +62,3 @@ SIGNAL_PHASE = "lena_phase"
 # Moments she can set herself with the feel tool; the rest come from the house.
 HOUSE_MOMENTS = {"Worried", "Relieved"}
 
-LLM_API_ID = "lena"

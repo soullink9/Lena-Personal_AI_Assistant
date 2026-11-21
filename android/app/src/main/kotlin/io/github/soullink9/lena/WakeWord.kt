@@ -382,8 +382,6 @@ class WakeListener(
      */
     @Volatile private var generation = 0
 
-    val isRunning: Boolean get() = running
-
     /**
      * Starts listening on its own thread. False if this build lacks the model or there's no microphone
      * permission.

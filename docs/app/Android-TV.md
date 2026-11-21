@@ -34,8 +34,6 @@ Android TV has no setting to choose another home screen. Without one, Lena opens
 
 It turns off the TV's own launcher and its setup app (nothing is uninstalled) and makes Lena the home app. The setup app is a home screen too: with only the launcher off, Android falls back to it whenever Lena is briefly gone, which is every time she updates, and it then sits on **Completing setup** for good. With it off as well, the TV just waits for Lena to come back. `--restore` turns both back on, as does a factory reset. A system update may turn the launcher back on; run `--apply` again if the Home button stops opening Lena.
 
-**Stuck on "Completing setup"** (from an earlier version of the script): run `./tools/android-tv-home.sh --connect <the TV's IP address> --apply` again. It turns the setup app off and goes to Lena's home screen.
-
 To strip the TV down as well (Nvidia's and Google's extras, keeping what the TV and Lena need), [`tools/wall-display-debloat.sh`](../../tools/wall-display-debloat.sh) works over the network the same way: see [On an Nvidia Shield or Android TV](Wall-Display-Tablet.md#on-an-nvidia-shield-or-android-tv).
 
 ## The TV home

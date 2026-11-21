@@ -770,7 +770,6 @@ def afterglow_pull(glows: list[dict], now: datetime) -> list[str]:
 # ---- Speaking first ------------------------------------------------------------------------------
 # Every time she speaks up without being asked goes through one gate, so the house never feels nagged.
 
-SPEAK_KINDS = ("worry", "welcome", "morning", "heading_out", "follow_up", "routine")
 SPEAK_OPTIONAL = ("welcome", "heading_out", "follow_up", "routine")  # each switched on in Configure
 SPEAK_QUIET_MINUTES = 30  # never twice within this long on the same display
 

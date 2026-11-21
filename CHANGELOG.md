@@ -2,6 +2,24 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+A tidy-up: leftovers nobody uses any more are gone. Nothing you use changes, so updating is optional.
+
+### Android app
+
+- Removed what nothing used: the "New chat" shortcut's icon and label (the shortcut itself went long ago), an unused settings row (`ChoiceItem`), `Api.chatModel()` and `WakeWord.isRunning`.
+- The updater no longer looks for a GitHub token and repository saved by releases before 7 November; any device that has opened Lena since then has already had them removed.
+
+### Home Assistant integration
+
+- Removed two unused constants (`LLM_API_ID`, `SPEAK_KINDS`).
+
+### Tools and docs
+
+- `tools/personality_check.py` no longer checks for a Lena built from 0.6.28 to 0.6.30, whose house rules weren't in her Modelfile.
+- Troubleshooting: dropped the "volume ended up at 0" note, fixed in 0.6.17. Android TV: dropped the "Stuck on Completing setup" note for an old version of `tools/android-tv-home.sh`.
+
 ## [0.6.36] - 2026-11-21
 
 The app now needs **Android 15** or newer, on phones, tablets and Android TV. **Update the app.** Nothing else changes.

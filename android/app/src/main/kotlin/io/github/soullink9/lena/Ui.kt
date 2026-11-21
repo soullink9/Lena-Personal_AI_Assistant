@@ -131,21 +131,6 @@ fun SwitchItem(icon: ImageVector?, title: String, summary: String?, checked: Boo
     }
 }
 
-/** One of several choices, with a radio button; tapping anywhere on the row picks it. */
-@Composable
-fun ChoiceItem(title: String, summary: String?, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = rowModifier().clickable(onClick = onSelect).padding(horizontal = 20.dp, vertical = 12.dp),
-    ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            if (summary != null) Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        RadioButton(selected = selected, onClick = null)
-    }
-}
-
 /** A row holding a text field or other free-form content. */
 @Composable
 fun FieldItem(content: @Composable () -> Unit) {

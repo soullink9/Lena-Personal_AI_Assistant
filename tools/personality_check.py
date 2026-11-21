@@ -17,9 +17,7 @@ answer, to see how she reports a failure) and writes down what she asked for.
 It also sends, last, the short reminder the Lena integration sends (call the tool before saying
 something's done; ask before opening the house), unless you pass --no-reminder.
 
-Her rules for running the house are in her Modelfile, so the script sends none. (In 0.6.28 to
-0.6.30 they were sent with the tools instead; a Lena built from one of those Modelfiles is asked
-without them, and the report says so.)
+Her rules for running the house are in her Modelfile, so the script sends none.
 
 Needs only Python's standard library and an Ollama it can reach. Her answers vary from run to run,
 the way a person's do: asked the same thing twice she may use a tool once and not the other time.
@@ -206,10 +204,6 @@ def main() -> int:
     except (urllib.error.URLError, OSError) as error:
         print(f"Couldn't reach Ollama at {base}, or it has no model named {args.model}: {error}", file=sys.stderr)
         return 1
-    # Her character as the model carries it: Ollama gives the Modelfile back as text, and its MESSAGE
-    # lines as a list too.
-    character = (shown.get("modelfile") or "") + json.dumps(shown.get("messages") or [])
-    built_in = "## Running the house" in character
     out = Path(args.out or f"personality-{datetime.now().strftime('%Y%m%d-%H%M%S')}.md")
     lines = [
         f"# Lena's answers, {datetime.now().strftime('%Y-%m-%d %H:%M')}",
@@ -217,9 +211,6 @@ def main() -> int:
         f"- Model: `{args.model}` at {base}",
         f"- Built from: {(shown.get('details') or {}).get('parent_model') or 'unknown'}",
         f"- Modified: {shown.get('modified_at', 'unknown')}",
-        "- Her rules for running the house: "
-        + ("in her Modelfile" if built_in
-           else "NOT in her Modelfile (a Lena from 0.6.28 to 0.6.30); she was asked without them"),
         "- The integration's reminder (Before you answer): " + ("left out" if args.no_reminder else "sent, last"),
         "",
     ]

@@ -467,10 +467,6 @@ class Api(server: String, private val context: Context? = null) {
         return pairs.takeLast(count)
     }
 
-    /** The first model of a chat, for the title bar. */
-    suspend fun chatModel(id: String): String? =
-        chat(id).optJSONObject("chat")?.optJSONArray("models")?.optString(0)?.ifBlank { null }
-
     /** How many answers are still being written in this chat. */
     suspend fun runningTasks(chatId: String): Int =
         JSONObject(request("GET", "/api/tasks/chat/${enc(chatId)}")).optJSONArray("task_ids")?.length() ?: 0
