@@ -13,6 +13,9 @@ So Home Assistant's own voice features reach the tablets, rather than Lena copyi
 
 The display does its own listening (wake word and speech), so Home Assistant's own voice pipeline isn't
 run for it; the app asks Assist through the conversation API with this device, which makes it room-aware.
+The display reports what it's doing (hub.py), and the satellite's state follows it, as a Voice Preview
+Edition's does: idle, listening, processing (she's thinking) and responding (she's speaking). So a light can
+pulse while she thinks with an ordinary automation (blueprints/automation/lena/thinking_light.yaml).
 """
 
 from __future__ import annotations
@@ -27,13 +30,14 @@ from homeassistant.components.assist_satellite import (
     AssistSatelliteEntityFeature,
     AssistSatelliteWakeWord,
 )
+from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 from homeassistant.components.intent import TimerEventType, TimerInfo, async_register_timer_handler
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_PHASE
 from .displays import SIGNAL_NEW_DISPLAY, display_id_of, display_info, displays
 
 # The app's wake words (its WakePhrase names), as a satellite's wake word choices.
@@ -87,9 +91,21 @@ class LenaSatellite(AssistSatelliteEntity):
         return device
 
     async def async_added_to_hass(self) -> None:
-        """Home Assistant's timers asked through this display are shown and rung on it."""
+        """Home Assistant's timers asked through this display are shown and rung on it, and its state follows
+        what the display reports it's doing.
+        """
         await super().async_added_to_hass()
         self.async_on_remove(async_register_timer_handler(self.hass, self._device_id, self._on_timer))
+        self.async_on_remove(async_dispatcher_connect(self.hass, SIGNAL_PHASE, self._on_phase))
+
+    @callback
+    def _on_phase(self, device_id: str, phase: str) -> None:
+        """The display started listening, thinking, speaking, or went back to idle. While Home Assistant
+        is announcing through it, the announcement keeps the state (responding) until it's done.
+        """
+        if device_id != self._device_id or self._is_announcing:
+            return
+        self._set_state(AssistSatelliteState(phase))
 
     @callback
     def async_entity_id_changed(self, old_entity_id: str) -> None:

@@ -54,12 +54,21 @@ class RememberTool(llm.Tool):
     )
     parameters = vol.Schema({
         vol.Required("fact", description="One short third-person statement saying who it's about, under fifteen words"): cv.string,
+        vol.Optional("about", description="Optional. Who it's about: a person's or pet's name"): cv.string,
+        vol.Optional("follow_up", description="Optional. YYYY-MM-DD to ask how it went"): cv.string,
+        vol.Optional("kind", description="Optional. hers for your own opinion or running joke"): vol.In(list(brain.KINDS)),
     })
 
     async def async_call(self, hass, tool_input, llm_context):
-        """Saves the fact and tells her what was saved."""
-        item = _core(hass).remember(tool_input.tool_args["fact"])
-        return llm.ToolResult(data={"saved": item["summary"]})
+        """Saves the fact (with who it's about, a day to come back to it, and who said it, when known)
+        and tells her what was saved.
+        """
+        core = _core(hass)
+        args = tool_input.tool_args
+        user = llm_context.context.user_id if llm_context.context else None
+        item = core.remember(args["fact"], args.get("about"), args.get("kind"), args.get("follow_up"),
+                             core.person_for(user_id=user) if user else None)
+        return llm.ToolResult(data={"saved": item["summary"], **{k: item[k] for k in ("about", "follow_up", "kind") if k in item}})
 
 
 class ForgetTool(llm.Tool):
@@ -331,6 +340,12 @@ class LenaAPI(llm.API):
         calendars = sorted(events.writable_calendars(self.hass))
         if calendars:
             tools.append(AddEventTool(calendars))
+        # Who's talking (the Home Assistant user, when they're a household person) and through which device
+        # (a display or any voice satellite), for who and where in her context.
+        user = llm_context.context.user_id if llm_context.context else None
+        person = core.person_for(user_id=user) if user else None
+        core.talked(person)
+        context = core.context(person=person, device_id=llm_context.device_id)
         # The reminder goes last: it only works there (see HOUSE_REMINDER in brain.py).
-        prompt = "\n\n".join([SPOKEN, core.context(), brain.MEMORY_RULES, brain.HOUSE_REMINDER])
+        prompt = "\n\n".join([SPOKEN, context, brain.MEMORY_RULES, brain.HOUSE_REMINDER])
         return llm.APIInstance(api=self, api_prompt=prompt, llm_context=llm_context, tools=tools)

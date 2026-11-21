@@ -1,11 +1,15 @@
 """Her memory, as a to-do list (todo.lena_memory) you can read and edit like any other.
 
-Ticking an item off retires it: she only uses the open ones.
+Ticking an item off retires it: she only uses the open ones. A memory's due date is the day she comes back
+to it ("ask how the vet went"), and its description says who it's about, who told her, and whether it's
+one of her own opinions. Changing the due date in Home Assistant changes when she asks.
 """
 
 from __future__ import annotations
 
 from homeassistant.components.todo import TodoItem, TodoItemStatus, TodoListEntity, TodoListEntityFeature
+from datetime import date
+
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -34,6 +38,7 @@ class LenaMemory(TodoListEntity):
         | TodoListEntityFeature.UPDATE_TODO_ITEM
         | TodoListEntityFeature.DELETE_TODO_ITEM
         | TodoListEntityFeature.MOVE_TODO_ITEM
+        | TodoListEntityFeature.SET_DUE_DATE_ON_ITEM
     )
 
     def __init__(self, core: LenaCore) -> None:
@@ -45,13 +50,16 @@ class LenaMemory(TodoListEntity):
     def _refresh(self) -> None:
         """Copies the core's list into the entity's items."""
         self._attr_todo_items = [
-            TodoItem(summary=m["summary"], uid=m["uid"], status=TodoItemStatus(m.get("status", "needs_action")))
+            TodoItem(
+                summary=m["summary"], uid=m["uid"], status=TodoItemStatus(m.get("status", "needs_action")),
+                due=_day(m.get("follow_up")), description=_details(m),
+            )
             for m in self._core.memory
         ]
 
     async def async_create_todo_item(self, item: TodoItem) -> None:
-        """Adding an item is telling her to remember it."""
-        self._core.remember(item.summary or "")
+        """Adding an item is telling her to remember it (with its due date as the day to come back to it)."""
+        self._core.remember(item.summary or "", follow_up=item.due.isoformat() if isinstance(item.due, date) else None)
 
     async def async_update_todo_item(self, item: TodoItem) -> None:
         """Editing an item: its text, or ticking it off (which retires it from her prompt)."""
@@ -61,6 +69,12 @@ class LenaMemory(TodoListEntity):
                     m["summary"] = item.summary
                 if item.status is not None:
                     m["status"] = str(item.status)
+                if isinstance(item.due, date):
+                    if m.get("follow_up") != item.due.isoformat():
+                        m["follow_up"] = item.due.isoformat()
+                        m.pop("asked", None)  # a new day to come back to it: she asks again
+                elif item.due is None:
+                    m.pop("follow_up", None)
         self._core.memory_changed()
 
     async def async_delete_todo_items(self, uids: list[str]) -> None:
@@ -93,3 +107,25 @@ class LenaMemory(TodoListEntity):
         """The memory changed (she remembered or forgot something): refresh and write the state."""
         self._refresh()
         self.async_write_ha_state()
+
+
+def _day(value: str | None) -> date | None:
+    """A memory's follow-up day as a date, or None."""
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _details(m: dict) -> str | None:
+    """Who a memory is about and who told her, and whether it's her own opinion, as its description."""
+    parts = []
+    if m.get("about"):
+        parts.append(f"About {m['about']}")
+    if m.get("by"):
+        parts.append(f"told by {m['by']}" if parts else f"Told by {m['by']}")
+    if m.get("kind") == "hers":
+        parts.append("her own opinion or running joke")
+    if m.get("asked"):
+        parts.append("she's asked about it")
+    return ", ".join(parts) or None

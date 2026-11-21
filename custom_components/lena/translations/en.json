@@ -48,6 +48,72 @@
           "memory_tidy_days": "She combines lines about the same thing, makes vague ones clear and ticks off outdated ones, at bedtime, then tells you what changed (Lena: Undo memory tidy puts it back). 0 never.",
           "memory_tidy_task": "An AI Task entity, such as your Ollama's. Empty: Home Assistant's default (Settings > System > General > AI suggestions).",
           "local_weather": "Your own weather sensors (an Ecowitt in the backyard: temperature, humidity, wind, rain). She uses them for what it's like outside right now, before any forecast service, in conversations and her morning briefing."
+        },
+        "sections": {
+          "rooms": {
+            "name": "Rooms and household",
+            "description": "Which rooms are bedrooms and which are by the door, and who else lives here.",
+            "data": {
+              "bedrooms": "Bedrooms",
+              "entrances": "By the door",
+              "household": "Also in the household"
+            },
+            "data_description": {
+              "bedrooms": "At night (from her wind-down time to her wake-up time) she answers softly and briefly here, and doesn't speak first.",
+              "entrances": "A display in one of these rooms can tell you to take an umbrella in the morning (Speaking first: Before you head out).",
+              "household": "Pets and anyone who isn't a person in Home Assistant, one per line, like Yuki (dog). Her memories can be about them."
+            }
+          },
+          "speaking_first": {
+            "name": "Speaking first",
+            "description": "What she may say without being asked when a display's Speaking first sensor sees someone come in. Worries and the morning briefing are always on.",
+            "data": {
+              "speak_first": "Also speak first for",
+              "speak_daily": "At most this many times a day",
+              "follow_up_listen": "Ask and listen for the answer",
+              "leave_checks": "Check these when everyone leaves"
+            },
+            "data_description": {
+              "speak_first": "Each is off until it's ticked.",
+              "speak_daily": "Worries don't count. Never twice within half an hour on the same display, never in a bedroom at night, never while Do not disturb is on.",
+              "follow_up_listen": "When she asks how something went, the display listens for the answer and she replies.",
+              "leave_checks": "Doors, windows, the garage and locks that are fine open while someone's home: when everyone's been out for 5 minutes and one is still open or unlocked, the alert phones are told."
+            }
+          },
+          "wake_word": {
+            "name": "Wake word",
+            "description": "When several displays hear her name at once.",
+            "data": {
+              "wake_one_answers": "Only one display answers",
+              "wake_window": "Listen for other displays for"
+            },
+            "data_description": {
+              "wake_one_answers": "The display that heard you most clearly (above its own room's noise) answers; the others go back to listening. A phone in your hand always answers.",
+              "wake_window": "How long to wait for the other displays' claims. Longer copes with a slow network; every answer starts this much later."
+            }
+          },
+          "routines": {
+            "name": "Routines",
+            "description": "Habits she learns from Home Assistant's history, and notices when they're late.",
+            "data": {
+              "routines": "Watch these",
+              "routine_watch_days": "Just watch for"
+            },
+            "data_description": {
+              "routines": "Things that turn on or open at about the same time most days: the coffee machine's plug, the back door for the dog's walk. What she's learned is on the Lena Routines sensor.",
+              "routine_watch_days": "After you choose something, she only learns for this long before she mentions anything."
+            }
+          },
+          "personality": {
+            "name": "Personality",
+            "description": "Her own opinions and running jokes (memories she saved as hers).",
+            "data": {
+              "hers_days": "Bring one up again after"
+            },
+            "data_description": {
+              "hers_days": "She has one of them in mind a day, and none comes back sooner than this."
+            }
+          }
         }
       }
     }
@@ -67,6 +133,19 @@
     "todo": {
       "memory": {
         "name": "Memory"
+      }
+    },
+    "sensor": {
+      "spoke_first": {
+        "name": "Spoke first"
+      },
+      "routines": {
+        "name": "Routines"
+      }
+    },
+    "switch": {
+      "do_not_disturb": {
+        "name": "Do not disturb"
       }
     }
   },
@@ -319,6 +398,42 @@
           "name": "Hours",
           "description": "How far back."
         }
+      }
+    },
+    "remember": {
+      "name": "Remember",
+      "description": "Saves something to Lena's memory, optionally with who it's about and a day to ask how it went. Open WebUI's Lena tool uses it.",
+      "fields": {
+        "fact": {
+          "name": "Fact",
+          "description": "One short third-person statement."
+        },
+        "about": {
+          "name": "About",
+          "description": "A person or household member's name (Configure: Also in the household)."
+        },
+        "follow_up": {
+          "name": "Follow up on",
+          "description": "The day she asks how it went."
+        },
+        "kind": {
+          "name": "Kind",
+          "description": "fact, plan, or hers: her own opinion or running joke."
+        },
+        "by": {
+          "name": "Told by",
+          "description": "Who told her, by name."
+        }
+      }
+    }
+  },
+  "selector": {
+    "speak_first": {
+      "options": {
+        "welcome": "Welcome home",
+        "heading_out": "Before you head out (rain or snow today)",
+        "follow_up": "Asking how something went",
+        "routine": "A routine that's late"
       }
     }
   }

@@ -1,6 +1,7 @@
 """The lena.* actions behind her newer tools, for Open WebUI (her tools there call these over Home
 Assistant's REST API) and for automations: timers (Home Assistant's own, through its timer intents),
-alarms, reminders, volume, the intercom, correcting a memory, and the house's history. Her tools in Assist
+alarms, reminders, volume, the intercom, remembering (with who it's about and a day to come back to it),
+correcting a memory, and the house's history. Her tools in Assist
 call the same code directly (llm_api.py), except timers, which Assist has as its own tools.
 
 device_id is the display she was asked through (the Lena app sends it to Open WebUI with each question);
@@ -17,7 +18,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 import probatio as vol
 
-from . import abilities, history
+from . import abilities, brain, history
 from .const import DOMAIN
 
 TARGET = {
@@ -62,12 +63,26 @@ def register(hass: HomeAssistant, entry) -> None:
     add("set_volume", {vol.Optional("level"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
                        vol.Optional("change"): vol.In(["quieter", "louder"]), **TARGET},
         lambda d: abilities.set_volume(core, d.get("level"), d.get("change"), **where(d)), optional)
+    add("remember", {vol.Required("fact"): cv.string, vol.Optional("about"): cv.string, vol.Optional("follow_up"): cv.string,
+                     vol.Optional("kind"): vol.In(list(brain.KINDS)), vol.Optional("by"): cv.string},
+        lambda d: remembered(core, d), optional)
     add("update_fact", {vol.Required("old"): cv.string, vol.Required("new"): cv.string},
         lambda d: abilities.update_fact(core, d["old"], d["new"]), optional)
     add("history", {vol.Required("question"): vol.In(["last_change", "how_long", "what_happened"]),
                     vol.Optional("name"): cv.string, vol.Optional("state"): cv.string,
                     vol.Optional("hours"): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=24 * 30))},
         lambda d: ask_history(hass, d), SupportsResponse.ONLY)
+
+
+def remembered(core, d: dict[str, Any]) -> dict[str, Any]:
+    """Saves a memory with its details (who it's about, a day to come back to it, its kind, who said it;
+    by name, the Open WebUI user for "by") and says what was saved.
+    """
+    if not str(d.get("fact") or "").strip():
+        raise abilities.AbilityError("Say what to remember")
+    by = core.person_for(name=d["by"]) if d.get("by") else None
+    item = core.remember(d["fact"], d.get("about"), d.get("kind"), d.get("follow_up"), by)
+    return {"saved": item["summary"], **{k: item[k] for k in ("about", "follow_up", "kind", "by") if k in item}}
 
 
 async def ask_history(hass: HomeAssistant, d: dict[str, Any]) -> dict[str, Any]:

@@ -162,6 +162,102 @@ items = ["Alex likes the office at seventy degrees.", "Sam is allergic to cats."
 check(brain.best_match("office temperature", items) == items[0] and brain.best_match("Sam allergy", items) == items[1]
       and brain.best_match("quantum physics", items) is None, "forgetting finds the memory meant, and only that")
 
+# ---- 3b. Who and where, one display answering, memory, speaking first, routines, afterglow, voice ------
+# The newer rules are plain functions in brain.py too, so they're tried here with fixed times.
+from datetime import date  # noqa: E402
+
+evening = datetime(2026, 11, 21, 19, 30)
+check(brain.when_words(datetime(2026, 11, 20, 18, 0), evening) == "yesterday evening"
+      and brain.when_words(datetime(2026, 11, 21, 2, 0), evening) == "last night"
+      and brain.when_words(datetime(2026, 11, 17, 9, 0), evening) == "on Tuesday"
+      and brain.when_words(datetime(2026, 11, 21, 19, 0), evening) == "less than an hour ago",
+      "she says when something happened the way a person would")
+talk = brain.record_talk({"last": datetime(2026, 11, 20, 18, 0).isoformat()}, evening)
+check(brain.talk_line("Soul", talk, evening) == "You're talking with Soul. Before this, you last talked yesterday evening."
+      and brain.talk_line("Soul", brain.record_talk(talk, evening + timedelta(minutes=5)), evening + timedelta(minutes=5))
+      == "You're talking with Soul. Before this, you last talked yesterday evening."
+      and brain.talk_line("Sam", None, evening) == "You're talking with Sam.",
+      "who she's talking with, and when they last talked before this conversation")
+late = datetime(2026, 11, 21, 23, 45)
+check("bedroom" in brain.room_manner("Bedroom", True, late, time(6, 30), time(22, 30))
+      and brain.room_manner("Kitchen", False, evening, time(6, 30), time(22, 30)) == ""
+      and brain.quiet_now(True, late, time(6, 30), time(22, 30))
+      and not brain.quiet_now(False, late, time(6, 30), time(22, 30)),
+      "a bedroom at night makes her quiet; the evening doesn't")
+claims = [{"id": "kitchen", "level": 18, "score": 0.9, "order": 0}, {"id": "living", "level": 9, "score": 0.99, "order": 1}]
+check(brain.wake_winner(claims) == "kitchen"
+      and brain.wake_winner(claims + [{"id": "phone", "level": 2, "score": 0.6, "handheld": True, "order": 2}]) == "phone"
+      and brain.wake_winner([{"id": "a", "level": 10, "score": 0.9, "order": 0}, {"id": "b", "level": 10, "score": 0.9, "order": 1}]) == "a"
+      and brain.wake_winner([]) is None,
+      "the display that heard best answers the wake word (a phone in the hand always does)")
+names = ["Soul", "Alex Smith", "Yuki (dog)"]
+check(brain.match_name("yuki", names) == "Yuki (dog)" and brain.match_name("Alex", names) == "Alex Smith"
+      and brain.match_name("Bob", names) is None and brain.match_name("", names) is None,
+      "a memory is only about someone she knows")
+today = date(2026, 11, 21)
+memory = [
+    {"summary": "Yuki has a vet visit on Friday.", "about": "Yuki (dog)", "by": "Soul", "follow_up": "2026-11-20", "status": "needs_action"},
+    {"summary": "Alex likes jazz.", "about": "Alex Smith", "status": "needs_action"},
+    {"summary": "The wifi password is on the fridge.", "status": "needs_action"},
+    {"summary": "Soul takes coffee black.", "about": "Soul", "status": "needs_action"},
+    {"summary": "Pineapple on pizza is a crime.", "kind": "hers", "status": "needs_action"},
+]
+section = brain.remembered_items(memory, ["Soul"], today)
+check(section.index("Soul takes coffee") < section.index("wifi") < section.index("Alex likes")
+      and "Due to come back to" in section and section.count("vet visit") == 1 and "Pineapple" not in section,
+      "her memory puts who's here first, lists a due follow-up once, and keeps her own opinions apart")
+check("Due to come back to" not in brain.remembered_items(memory, ["Alex Smith"], today)
+      and not brain.follow_up_due({**memory[0], "asked": "yes"}, today)
+      and not brain.follow_up_due(memory[0], date(2026, 11, 30)),
+      "a follow-up is only for whoever told her, once, and not long after its day")
+hers = [{"summary": "a", "kind": "hers", "offered": "2026-11-20", "status": "needs_action"},
+        {"summary": "b", "kind": "hers", "offered": "2026-11-10", "status": "needs_action"}]
+check(brain.pick_hers(hers, today)["summary"] == "b" and brain.pick_hers(hers[:1], today) is None
+      and brain.pick_hers([{**hers[0], "offered": "2026-11-21"}], today)["summary"] == "a",
+      "one of her own opinions a day, never one offered in the last few days")
+glow = brain.afterglow_of("Delighted", "Alex just got home after 30 hours away.", evening - timedelta(hours=6), evening)
+check(glow is not None and brain.afterglow_of("Worried", "x", evening, evening) is None
+      and "Still with you from" in brain.afterglow_line([glow], evening)
+      and brain.afterglow_line([glow], evening + timedelta(hours=20)) == ""
+      and brain.lingering([glow], evening + timedelta(days=2)) == []
+      and "Fond" in brain.afterglow_pull([glow], evening),
+      "a good moment lingers for a day, fades, and pulls her mood its way meanwhile")
+unknown = [m for m in set(sum(brain.AFTERGLOW_PULL.values(), [])) if m not in catalog.moods] \
+    + [m for m in brain.AFTERGLOW_HOURS if m not in catalog.moments]
+check(not unknown, "every feeling an afterglow uses is in feelings.yaml" + (f" (missing: {unknown})" if unknown else ""))
+f_lingering = brain.Feelings(mood="Wistful", mood_since=now - timedelta(hours=5))
+ok(brain.hourly(f_lingering, catalog, now, time(6, 30), time(22, 30), None, 1, 2, 3, 100, rng, True, ["Fond"]), "hourly (lingering)")
+check(not problems, "drifting with an afterglow chooses only defined feelings")
+noon = datetime(2026, 11, 21, 12, 0)
+check(brain.may_speak("worry", noon, None, 99, 6, True, False, True)
+      and not brain.may_speak("welcome", noon, None, 0, 6, True, False, False)
+      and not brain.may_speak("welcome", noon, None, 6, 6, False, False, False)
+      and not brain.may_speak("worry", noon, noon - timedelta(minutes=10), 0, 6, False, False, False)
+      and not brain.may_speak("morning", noon, None, 0, 6, False, True, False)
+      and not brain.may_speak("follow_up", noon, None, 0, 6, False, False, True)
+      and brain.may_speak("follow_up", noon, None, 0, 6, False, False, False),
+      "speaking first: worries always, the rest within the day's budget, never in a quiet room or Do not disturb")
+weekdays = {date(2026, 11, 2) + timedelta(days=i): (7 * 60 + 5 + (i % 3)) for i in range(19) if (date(2026, 11, 2) + timedelta(days=i)).weekday() < 5}
+weekdays[date(2026, 11, 4)] = None  # one day without coffee doesn't make it irregular
+learned = brain.learn_routine(weekdays)
+monday = datetime(2026, 11, 23, 8, 0)
+check("weekday" in learned and "weekend" not in learned and abs(learned["weekday"]["usual"] - 426) <= 2
+      and brain.routine_late(learned, monday, False) and not brain.routine_late(learned, monday, True)
+      and not brain.routine_late(learned, monday.replace(hour=7, minute=20), False)
+      and not brain.routine_late(learned, monday.replace(hour=13), False)
+      and "around 7:0" in brain.routine_line("The coffee machine", learned, monday),
+      "routines: a regular habit is learned, and noticed only when it's well past its time")
+check(brain.learn_routine({date(2026, 11, 2) + timedelta(days=i): (i * 97) % 1440 for i in range(10)}) == {},
+      "an irregular habit isn't a routine")
+check(brain.voice_tone(brain.Feelings(mood="Cheerful", energy="Wired")) == {"speed": 1.112, "pitch": 1.061, "volume": 1.0}
+      and brain.voice_tone(brain.Feelings(), quiet=True)["volume"] < 1,
+      "her voice follows her feelings, and softens in a quiet room")
+# The app's VoiceTone (Voice.kt) and the integration's (for the voice bridge) are the same numbers.
+voice_kt = (ROOT / "android/app/src/main/kotlin/io/github/soullink9/lena/Voice.kt").read_text()
+kt_pairs = {name: (float(a), float(b)) for name, a, b in re.findall(r'"(\w+)" to \(([\d.]+)f to ([\d.]+)f\)', voice_kt)}
+check(kt_pairs == {**brain.VOICE_ENERGY, **brain.VOICE_MOOD},
+      "her voice's tones are the same in the app (Voice.kt) and the integration (brain.py)")
+
 # ---- 4. The Open WebUI tool offers the integration's own moments -------------------------------
 const = (LENA / "const.py").read_text()
 house_moments = set(re.findall(r'"(\w+)"', re.search(r"HOUSE_MOMENTS = \{(.*?)\}", const).group(1)))

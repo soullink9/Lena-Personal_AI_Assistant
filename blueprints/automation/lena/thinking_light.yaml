@@ -1,0 +1,92 @@
+# A light that pulses softly while Lena thinks, then goes back to how it was.
+#
+# Import it in Home Assistant: Settings > Automations & scenes > Blueprints > Import blueprint, with this
+# file's address on GitHub. Then make an automation from it for each display.
+#
+# Each Lena display is an Assist satellite whose state follows what it's doing (idle, listening,
+# processing while she thinks, responding while she speaks), so this is an ordinary automation.
+blueprint:
+  name: Lena thinking light
+  description: >-
+    Pulses a light softly while Lena is thinking on a display (its Assist satellite is processing), and puts
+    the light back as it was when she's done.
+  domain: automation
+  source_url: https://github.com/soullink9/Lena-Personal_AI_Assistant/blob/main/blueprints/automation/lena/thinking_light.yaml
+  input:
+    satellite:
+      name: Lena display
+      description: The display's Assist satellite.
+      selector:
+        entity:
+          filter:
+            - domain: assist_satellite
+              integration: lena
+    light:
+      name: Light
+      description: A dimmable light near the display.
+      selector:
+        entity:
+          filter:
+            - domain: light
+    brightest:
+      name: Brightest
+      default: 45
+      selector:
+        number:
+          min: 5
+          max: 100
+          unit_of_measurement: "%"
+    dimmest:
+      name: Dimmest
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input satellite
+    to: processing
+
+actions:
+  - variables:
+      satellite: !input satellite
+      snapshot_id: "lena_thinking_{{ satellite | replace('.', '_') }}"
+  # Remember the light as it is, so it can go back exactly.
+  - action: scene.create
+    data:
+      scene_id: "{{ snapshot_id }}"
+      snapshot_entities: !input light
+  - repeat:
+      while:
+        - condition: state
+          entity_id: !input satellite
+          state: processing
+        # Never longer than two minutes, whatever happens.
+        - condition: template
+          value_template: "{{ repeat.index < 60 }}"
+      sequence:
+        - action: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            brightness_pct: !input brightest
+            transition: 1
+        - delay: 1
+        - action: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            brightness_pct: !input dimmest
+            transition: 1
+        - delay: 1
+  - action: scene.turn_on
+    target:
+      entity_id: "scene.{{ snapshot_id }}"
+    data:
+      transition: 1

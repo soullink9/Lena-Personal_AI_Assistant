@@ -212,3 +212,30 @@ history:
         number:
           min: 0.1
           max: 720
+
+remember:
+  fields:
+    fact:
+      required: true
+      example: Yuki has a vet appointment on Thursday.
+      selector:
+        text:
+    about:
+      example: Yuki
+      selector:
+        text:
+    follow_up:
+      example: "2026-11-27"
+      selector:
+        date:
+    kind:
+      selector:
+        select:
+          options:
+            - fact
+            - plan
+            - hers
+    by:
+      example: Soul
+      selector:
+        text:

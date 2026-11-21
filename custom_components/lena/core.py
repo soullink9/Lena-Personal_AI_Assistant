@@ -1,7 +1,9 @@
 """Lena's state in Home Assistant: her feelings, her memory, and what moves them.
 
 `brain.py` decides; this file listens to Home Assistant (the clock, people, the weather, worry
-sensors), applies what the brain decides, saves it, and tells her entities to update.
+sensors), applies what the brain decides, saves it, and tells her entities to update. It also keeps
+who she last talked with and when, what still lingers from her last day or two, and what she's said
+without being asked (presence: kept between restarts).
 """
 
 from __future__ import annotations
@@ -36,7 +38,12 @@ from . import brain, tidy
 from .const import (
     CONF_ALERT_AGENT,
     CONF_ALERT_ALL_CLEAR,
+    CONF_BEDROOMS,
+    CONF_HERS_DAYS,
+    CONF_HOUSEHOLD,
+    CONF_LEAVE_CHECKS,
     CONF_LOCAL_WEATHER,
+    CONF_SPEAK,
     CONF_TIDY_DAYS,
     CONF_TIDY_TASK,
     CONF_ALERT_PHONES,
@@ -78,6 +85,14 @@ def load_catalog() -> brain.Catalog:
     return catalog
 
 
+LEFT_OPEN_MINUTES = 5  # everyone's been out this long before she checks what was left open
+
+
+def _joined(items: list[str]) -> str:
+    """"a, b and c"."""
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
 def _parse_time(value: str, fallback: str) -> time:
     """A time setting ("06:30:00"), or the default if it's missing or unreadable, so a bad option never
     stops her day from running.
@@ -112,11 +127,18 @@ class LenaCore:
         self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed", "added"}
         self.hub = None  # the displays' commands and reports (hub.Hub), set up with the entry
         self.briefings = None  # what she's said first on each display (briefing.Briefings)
+        self.routines = None  # the habits she's learned (routines.Routines), set up with the entry
+        self.arbiter = None  # which display answers the wake word (wake.Arbiter), set up with the entry
+        self.glows: list[dict[str, Any]] = []  # what lingers from moments that ended (brain.afterglow_of)
+        # Who she's talked with ({person: {"last", "before"}}), what she's said first today, Do not disturb.
+        self.presence: dict[str, Any] = {"talks": {}, "spoken": {}, "do_not_disturb": False}
+        self.welcomes: dict[str, datetime] = {}  # people who just came home, to welcome (briefing.py)
         self.tidied: datetime | None = None  # when she last tidied her memory
         self.memory_backup: dict[str, Any] | None = None  # {"at", "items"}: the list before her last tidy
         self._rng = random.Random()
         self._state_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.feelings")
         self._memory_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.memory")
+        self._presence_store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.presence")
         self._unsubs: list[CALLBACK_TYPE] = []
         self._timers: dict[str, CALLBACK_TYPE] = {}
 
@@ -141,6 +163,23 @@ class LenaCore:
         """The weather entity she notices, if one was chosen."""
         return self.opt(CONF_WEATHER) or None
 
+    @property
+    def household(self) -> list[str]:
+        """Household members who aren't people in Home Assistant, as written in Configure ("Yuki (dog)")."""
+        return [h.strip() for h in self.opt(CONF_HOUSEHOLD) or [] if isinstance(h, str) and h.strip()]
+
+    def names(self) -> list[str]:
+        """Everyone in the household by name: the people she watches (or every person in Home Assistant
+        when none are chosen), then the other household members.
+        """
+        people = self.people or [s.entity_id for s in self.hass.states.async_all("person")]
+        named = [state.name for p in people if (state := self.hass.states.get(p)) is not None]
+        return named + self.household
+
+    def speaks_first(self, kind: str) -> bool:
+        """Whether one of the newer ways of speaking first is switched on (Configure > Speaking first)."""
+        return kind in (self.opt(CONF_SPEAK) or [])
+
     # ---- Starting and stopping -------------------------------------------------------------
 
     async def async_start(self) -> None:
@@ -163,6 +202,13 @@ class LenaCore:
             f.energy = "Steady" if "Steady" in self.catalog.energies else next(iter(self.catalog.energies))
         if f.moment != brain.NOTHING and f.moment not in self.catalog.moments:
             f.moment = brain.NOTHING
+        self.glows = brain.lingering(saved.get("afterglow") or [], dt_util.now())
+        presence = await self._presence_store.async_load() or {}
+        self.presence = {
+            "talks": presence.get("talks") or {},
+            "spoken": presence.get("spoken") or {},
+            "do_not_disturb": bool(presence.get("do_not_disturb")),
+        }
         saved_memory = await self._memory_store.async_load() or {}
         self.memory = saved_memory.get("items", [])
         self.tidied = _dt(saved_memory.get("tidied"))
@@ -210,6 +256,10 @@ class LenaCore:
         elif change.reason is not None:
             f.mood_reason = change.reason
         if change.moment is not None:
+            # A moment that matters leaves an afterglow as it ends, which lingers for a day or so.
+            if f.moment not in (brain.NOTHING, change.moment):
+                if glow := brain.afterglow_of(f.moment, f.moment_reason, f.moment_since, now):
+                    self.glows = brain.lingering([glow, *self.glows], now)
             f.moment = change.moment
             f.moment_reason = change.moment_reason if change.moment != brain.NOTHING else ""
             f.moment_since = now if change.moment != brain.NOTHING else None
@@ -227,7 +277,7 @@ class LenaCore:
             lambda: {
                 "mood": f.mood, "mood_reason": f.mood_reason, "mood_since": _ts(f.mood_since),
                 "energy": f.energy, "moment": f.moment, "moment_reason": f.moment_reason,
-                "moment_since": _ts(f.moment_since),
+                "moment_since": _ts(f.moment_since), "afterglow": self.glows,
             },
             1,
         )
@@ -237,6 +287,7 @@ class LenaCore:
     def set_by_hand(self, kind: str, value: str) -> None:
         """You picked a feeling in a dropdown. The old reason no longer fits, so it's cleared."""
         if kind == "mood":
+            self.glows = []  # a mood picked by hand starts fresh: nothing lingers into it
             self.apply(brain.Change(mood=value), "set by hand")
         elif kind == "energy":
             self.apply(brain.Change(energy=value), "set by hand")
@@ -270,12 +321,41 @@ class LenaCore:
         async_dispatcher_send(self.hass, SIGNAL_UPDATED)
 
     @callback
-    def remember(self, fact: str) -> dict[str, str]:
-        """Adds a fact to her memory and returns the new item."""
-        item = {"uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action", "added": dt_util.now().isoformat()}
+    def remember(self, fact: str, about: str | None = None, kind: str | None = None,
+                 follow_up: str | None = None, by: str | None = None) -> dict[str, Any]:
+        """Adds a fact to her memory and returns the new item. Optionally: who it's [about] (a person or
+        household member she knows; anyone else is left out rather than guessed), its [kind] (fact, plan,
+        or hers: her own opinion or running joke), a [follow_up] day to come back to it (YYYY-MM-DD, from
+        today to a year ahead), and who told her ([by]).
+        """
+        item: dict[str, Any] = {
+            "uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action", "added": dt_util.now().isoformat(),
+        }
+        item.update(self.memory_details(about, kind, follow_up, by))
         self.memory.append(item)
         self.memory_changed()
         return item
+
+    def memory_details(self, about: str | None, kind: str | None, follow_up: str | None,
+                       by: str | None) -> dict[str, Any]:
+        """The optional details of a memory, checked: names she knows, a kind she has, a real date. What
+        doesn't check out is left out, so a model's guess never ends up saved as fact.
+        """
+        details: dict[str, Any] = {}
+        names = self.names()
+        if who := brain.match_name(about, names):
+            details["about"] = who
+        if teller := brain.match_name(by, names):
+            details["by"] = teller
+        if kind in brain.KINDS and kind != "fact":
+            details["kind"] = kind
+        if follow_up:
+            day = dt_util.parse_date(str(follow_up).strip()[:10])
+            today = dt_util.now().date()
+            if day is not None and today <= day <= today + timedelta(days=366):
+                details["follow_up"] = day.isoformat()
+                details.setdefault("kind", "plan")
+        return details
 
     @callback
     def forget(self, fact: str) -> str | None:
@@ -472,28 +552,107 @@ class LenaCore:
         return out
 
     def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False,
-                reminder: bool = False) -> str:
-        """The time, who's home, the weather outside from your own sensors, how she feels and what she
+                reminder: bool = False, person: str | None = None, device_id: str | None = None) -> str:
+        """The time, who's home, the weather outside from your own sensors, who she's talking with and
+        how the room should change how she talks, how she feels (and what still lingers) and what she
         remembers (and, if asked, the home's devices, and last of all the reminder to call a tool before
-        saying something's done).
+        saying something's done). [person] is the person's name, [device_id] the device she's talking
+        through (a display or a voice satellite), when they're known.
         """
+        now = dt_util.now()
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
         right_now = (
             "## Right now\n"
             f"{self.time_of_day()}\n"
             f"At home: {', '.join(home) if home else 'nobody'}."
         )
+        if self.household:
+            right_now += f" Also part of the household: {', '.join(self.household)}."
         if local := self.local_weather():
             right_now += ("\nOutside, from the house's own weather station (more accurate here than any forecast "
                           "service, so use these for what it's like now): " + "; ".join(local) + ".")
-        parts = [right_now, brain.describe(self.feelings, self.catalog, with_reasons)]
+        if person:
+            right_now += "\n" + brain.talk_line(person, self.presence["talks"].get(person), now)
+        area_id, area = self.area_of(device_id)
+        wake, bed = self._wake_bed()
+        if manner := brain.room_manner(area, self.is_bedroom(area_id), now, wake, bed):
+            right_now += "\n" + manner
+        if self.routines is not None:
+            for line in self.routines.late_lines(now):
+                right_now += "\n" + line
+        still = brain.afterglow_line(self.glows, now) if with_reasons else ""
+        parts = [right_now, brain.describe(self.feelings, self.catalog, with_reasons, still)]
         if memory:
-            parts.append(brain.remembered(self.memories()))
+            present = list(dict.fromkeys(home + ([person] if person else [])))
+            text = brain.remembered_items(self.memory, present, now.date())
+            if hers := brain.hers_line(self.todays_hers()):
+                text += "\n" + hers
+            parts.append(text)
         if devices and (index := self.devices()):
             parts.append(index)
         if reminder:
             parts.append(brain.HOUSE_REMINDER)  # last: see brain.py
         return "\n\n".join(parts)
+
+    # ---- Who and where ---------------------------------------------------------------------
+
+    def person_for(self, name: str | None = None, user_id: str | None = None) -> str | None:
+        """The household person someone is: by their Home Assistant user (a person's user), else by
+        name (an Open WebUI user called "Soul" is the person Soul; a first name is enough when it's
+        unique). None when it's no one she knows.
+        """
+        people = self.hass.states.async_all("person")
+        if user_id:
+            for state in people:
+                if state.attributes.get("user_id") == user_id:
+                    return state.name
+        return brain.match_name(name, [state.name for state in people])
+
+    @callback
+    def talked(self, person: str | None) -> None:
+        """Notes that [person] is talking to her now, for "you last talked yesterday evening"."""
+        if not person:
+            return
+        talks = self.presence["talks"]
+        talks[person] = brain.record_talk(talks.get(person), dt_util.now())
+        self.presence_changed()
+
+    @callback
+    def presence_changed(self) -> None:
+        """Saves who she's talked with, what she's said first and Do not disturb, and updates the entities."""
+        self._presence_store.async_delay_save(lambda: self.presence, 2)
+        async_dispatcher_send(self.hass, SIGNAL_UPDATED)
+
+    def area_of(self, device_id: str | None) -> tuple[str | None, str | None]:
+        """The area a device is in (a display, or any voice satellite), as (id, name), or (None, None)."""
+        if not device_id:
+            return None, None
+        device = dr.async_get(self.hass).async_get(device_id)
+        if device is None or not device.area_id:
+            return None, None
+        area = ar.async_get(self.hass).async_get_area(device.area_id)
+        return (area.id, area.name) if area else (None, None)
+
+    def is_bedroom(self, area_id: str | None) -> bool:
+        """Whether an area is one of the bedrooms chosen in Configure."""
+        return bool(area_id) and area_id in (self.opt(CONF_BEDROOMS) or [])
+
+    def quiet(self, device_id: str | None) -> bool:
+        """Whether she should be quiet on this device now: a bedroom, at night."""
+        area_id, _ = self.area_of(device_id)
+        wake, bed = self._wake_bed()
+        return brain.quiet_now(self.is_bedroom(area_id), dt_util.now(), wake, bed)
+
+    def todays_hers(self) -> dict[str, Any] | None:
+        """Today's opinion or running joke of hers (one a day, rotated: brain.pick_hers), marked as offered
+        so it isn't offered again for a few days.
+        """
+        today = dt_util.now().date()
+        item = brain.pick_hers(self.memory, today, int(self.opt(CONF_HERS_DAYS) or brain.HERS_DAYS))
+        if item is not None and item.get("offered") != today.isoformat():
+            item["offered"] = today.isoformat()
+            self.memory_changed()
+        return item
 
     # ---- Events ------------------------------------------------------------------------------
 
@@ -564,8 +723,11 @@ class LenaCore:
         change = brain.hourly(
             self.feelings, self.catalog, dt_util.now(), wake, bed, self._weather(), home, total,
             float(self.opt(CONF_MOOD_HOLD_HOURS)), int(self.opt(CONF_MOOD_CHANGE_CHANCE)), self._rng,
-            self._daylight(),
+            self._daylight(), brain.afterglow_pull(self.glows, dt_util.now()),
         )
+        if len(lasting := brain.lingering(self.glows, dt_util.now())) != len(self.glows):
+            self.glows = lasting
+            self._changed()
         self.apply(change, "hourly")
 
     @callback
@@ -579,6 +741,8 @@ class LenaCore:
         if old is not None and new.state == STATE_HOME and old.state not in (STATE_HOME, STATE_UNKNOWN, STATE_UNAVAILABLE):
             away = (new.last_changed - old.last_changed).total_seconds() / 3600
             self.apply(brain.arrived(self.catalog, new.name, away, float(self.opt(CONF_AWAY_HOURS))), "arrived")
+            if away >= float(self.opt(CONF_AWAY_HOURS)) and self.speaks_first("welcome"):
+                self.welcomes[new.name] = dt_util.now()  # said by the first display that sees them (briefing.py)
         self._check_empty_house()
 
     @callback
@@ -590,8 +754,36 @@ class LenaCore:
                 self._timers["empty"] = async_call_later(
                     self.hass, timedelta(hours=float(self.opt(CONF_EMPTY_HOURS))), self._on_empty
                 )
-        elif cancel := self._timers.pop("empty", None):
-            cancel()
+                if self.opt(CONF_LEAVE_CHECKS) and "left" not in self._timers:
+                    self._timers["left"] = async_call_later(self.hass, timedelta(minutes=LEFT_OPEN_MINUTES), self._on_left)
+        else:
+            for key in ("empty", "left"):
+                if cancel := self._timers.pop(key, None):
+                    cancel()
+
+    def left_open(self) -> list[str]:
+        """What's open or unlocked among the things to check when everyone leaves, said plainly."""
+        found = []
+        for entity_id in self.opt(CONF_LEAVE_CHECKS) or []:
+            state = self.hass.states.get(entity_id)
+            if state is None:
+                continue
+            if state.state in ("open", "opening", "on") and state.domain in ("binary_sensor", "cover"):
+                found.append(f"{state.name} is open")
+            elif state.domain == "lock" and state.state in ("unlocked", "open", "opening", "jammed"):
+                found.append(f"{state.name} is unlocked")
+        return found
+
+    @callback
+    def _on_left(self, now: datetime) -> None:
+        """Everyone's been out for a few minutes: if anything was left open or unlocked, the phones are told
+        (as an alert, in her words), once for this time out.
+        """
+        self._timers.pop("left", None)
+        if self._home_counts()[0] != 0 or not (found := self.left_open()):
+            return
+        reason = "Everyone's out and " + _joined(found) + "."
+        self.hass.async_create_task(self.alert("Worried", reason))
 
     @callback
     def _on_empty(self, now: datetime) -> None:
@@ -683,7 +875,8 @@ class LenaCore:
 
     async def alert(self, moment: str, reason: str) -> None:
         """Tell the chosen phones (through the Home Assistant companion app) that she's worried, or
-        that it's sorted. In her own words when an agent is chosen, otherwise the plain reason."""
+        that it's sorted. In her own words when an agent is chosen, otherwise the plain reason. Do not
+        disturb doesn't hold these back: it's for speaking first in the rooms."""
         phones = [p for p in self.opt(CONF_ALERT_PHONES) or [] if p.startswith("notify.")]
         if not phones or (moment != "Worried" and not self.opt(CONF_ALERT_ALL_CLEAR)):
             return
@@ -712,25 +905,42 @@ class LenaCore:
         Returns None (and the plain reason is used) if no agent is set, it fails, or it takes longer
         than 45 seconds, so an alert is never held up for long.
         """
-        agent = self.opt(CONF_ALERT_AGENT)
-        if not agent:
-            return None
         what = f"Something at home needs attention: {reason}" if moment == "Worried" else f"It's sorted: {reason}"
         prompt = (f"{what} Write the phone notification you'd send the household about it, in your own voice: "
                   "one or two short sentences, no greeting, no emoji. Reply with only the notification.")
+        return await self.in_her_words(prompt, seconds=45, limit=300)
+
+    async def in_her_words(self, prompt: str, seconds: float = 60, limit: int = 600,
+                           task_name: str | None = None) -> str | None:
+        """Something written by her: the conversation agent chosen for alerts (Configure), which knows who
+        she is; or, with [task_name], Home Assistant's AI Task when no agent is chosen. None when neither
+        is set up, it fails or it takes longer than [seconds]; the caller then says it plainly.
+        """
+        agent = self.opt(CONF_ALERT_AGENT)
+        hass = self.hass
         try:
-            async with asyncio.timeout(45):
-                result = await self.hass.services.async_call(
-                    "conversation", "process", {"text": prompt, "agent_id": agent},
-                    blocking=True, return_response=True,
-                )
-            response = (result or {}).get("response", {})
-            if response.get("response_type") == "error":
-                return None
-            text = response.get("speech", {}).get("plain", {}).get("speech", "").strip().strip('"')
-            return text[:300] or None
-        except Exception:  # noqa: BLE001 - the plain reason is a fine fallback
-            _LOGGER.debug("Couldn't write the alert in her words", exc_info=True)
+            async with asyncio.timeout(seconds):
+                if agent:
+                    result = await hass.services.async_call(
+                        "conversation", "process", {"text": prompt, "agent_id": agent},
+                        blocking=True, return_response=True,
+                    )
+                    response = (result or {}).get("response", {})
+                    if response.get("response_type") == "error":
+                        return None
+                    text = response.get("speech", {}).get("plain", {}).get("speech", "")
+                elif task_name and hass.services.has_service("ai_task", "generate_data"):
+                    request = {"task_name": task_name, "instructions": "You are Lena, the household's assistant. " + prompt}
+                    if task := self.opt(CONF_TIDY_TASK):
+                        request["entity_id"] = task
+                    result = await hass.services.async_call("ai_task", "generate_data", request,
+                                                            blocking=True, return_response=True)
+                    text = str((result or {}).get("data") or "")
+                else:
+                    return None
+            return text.strip().strip('"')[:limit] or None
+        except Exception:  # noqa: BLE001 - the caller's plain words are a fine fallback
+            _LOGGER.debug("Couldn't write it in her words", exc_info=True)
             return None
 
     def weather_now(self) -> dict[str, Any] | None:

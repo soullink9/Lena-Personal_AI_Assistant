@@ -2,6 +2,14 @@
 
 Any Home Assistant user's long-lived access token can read it; no admin rights needed.
 Also carries the weather, for the Lena app's display. Add ?memory=0 to leave her memory out, ?reasons=0 to leave out why she feels the way she does, or ?devices=1 to add the exact names of the devices exposed to Assist, by room (for Open WebUI, whose house tools match names exactly), followed by the reminder to call a tool before saying something's done.
+
+Who and where, for Open WebUI's filter: ?user=<the Open WebUI user's name> says who she's talking with (the
+household person of that name) and when they last talked, and ?device=<a Lena display's device id> which
+room she's in, so she keeps it soft in a bedroom at night. Add &talking=1 when it's for a message someone
+just sent, so "when you last talked" moves on.
+
+"voice" is how her voice follows her feelings ({"speed", "pitch", "volume"}, 1 for unchanged), for the voice
+bridge, and "quiet" whether the display's room wants quiet now.
 """
 
 from __future__ import annotations
@@ -12,6 +20,7 @@ from aiohttp import web
 
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
+from . import brain
 from .const import DOMAIN
 
 
@@ -32,6 +41,11 @@ class LenaContextView(HomeAssistantView):
         if core is None:
             return self.json_message("Lena isn't set up", status_code=404)
         f = core.feelings
+        person = core.person_for(name=request.query.get("user")[:100]) if request.query.get("user") else None
+        device = request.query.get("device") or None
+        if person and request.query.get("talking") == "1":
+            core.talked(person)
+        quiet = core.quiet(device)
         return self.json({
             # Ready to add to a chat's system message: the time, who's home, feelings, memory.
             "context": core.context(
@@ -40,6 +54,8 @@ class LenaContextView(HomeAssistantView):
                 devices=request.query.get("devices") == "1",
                 # With the devices comes the reminder to really use the house tools on them.
                 reminder=request.query.get("devices") == "1",
+                person=person,
+                device_id=device,
             ),
             "feelings": {
                 "mood": f.mood,
@@ -50,6 +66,9 @@ class LenaContextView(HomeAssistantView):
             },
             "memory": core.memories(),
             "weather": core.weather_now(),
+            "person": person,
+            "quiet": quiet,
+            "voice": brain.voice_tone(f, quiet),
         })
 
 

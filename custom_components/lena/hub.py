@@ -24,13 +24,16 @@ from aiohttp import web
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_PHASE
 from .displays import display_id_of, displays
 
 KEEP_SECONDS = 15 * 60  # a command no display collected in this long is dropped
 KINDS = ("timer", "alarm", "reminder")
+# What a display can be doing, in the words of Home Assistant's Assist satellite states.
+PHASES = ("idle", "listening", "processing", "responding")
 
 
 class TargetError(ValueError):
@@ -61,6 +64,7 @@ class Reported:
     volume: int | None = None
     seen: float = 0.0
     wake_word: str | None = None  # the phrase it listens for (WakePhrase name), or None when it doesn't listen
+    phase: str | None = None  # what it's doing: idle, listening, processing or responding (PHASES)
 
 
 class Hub:
@@ -156,9 +160,15 @@ class Hub:
     # ---- What displays have ------------------------------------------------------------------
 
     @callback
-    def report(self, device_id: str, countdowns: list[dict[str, Any]], volume: int | None, wake_word: str | None = None) -> None:
-        """A display's own list, volume and wake word, as it just reported them."""
-        self.reported[device_id] = Reported(countdowns, volume, time.time(), wake_word)
+    def report(self, device_id: str, countdowns: list[dict[str, Any]], volume: int | None, wake_word: str | None = None,
+               phase: str | None = None) -> None:
+        """A display's own list, volume, wake word and what it's doing, as it just reported them. A change
+        in what it's doing goes to its Assist satellite at once (SIGNAL_PHASE), so a light can follow it.
+        """
+        before = self.reported.get(device_id)
+        self.reported[device_id] = Reported(countdowns, volume, time.time(), wake_word, phase)
+        if phase is not None and (before is None or before.phase != phase):
+            async_dispatcher_send(self.hass, SIGNAL_PHASE, device_id, phase)
 
     @callback
     def countdowns(self, devices: list[dr.DeviceEntry]) -> list[dict[str, Any]]:
@@ -194,9 +204,9 @@ def find_area(hass: HomeAssistant, room: str) -> ar.AreaEntry | None:
 
 
 class LenaSyncView(HomeAssistantView):
-    """POST /api/lena/display/sync {"id", "after", "boot", "countdowns": [...], "volume": 0-100}: a
-    display reports what it has and collects what it's been asked to do. Answers {"boot", "seq",
-    "commands": [...]}.
+    """POST /api/lena/display/sync {"id", "after", "boot", "countdowns": [...], "volume": 0-100, "wake_word",
+    "phase"}: a display reports what it has and what it's doing, and collects what it's been asked to do.
+    Answers {"boot", "seq", "commands": [...], "quiet"}: quiet is true while it's a bedroom at night.
     """
 
     url = "/api/lena/display/sync"
@@ -230,11 +240,13 @@ class LenaSyncView(HomeAssistantView):
         ]
         volume = body.get("volume")
         wake = body.get("wake_word")
+        phase = body.get("phase")
         core.hub.report(device.id, countdowns, int(volume) if isinstance(volume, (int, float)) else None,
-                        str(wake) if isinstance(wake, str) and wake else None)
+                        str(wake) if isinstance(wake, str) and wake else None,
+                        phase if phase in PHASES else None)
         try:
             after = int(body.get("after") or 0)
         except (TypeError, ValueError):
             after = 0
         commands, seq = core.hub.collect(device.id, after, body.get("boot"))
-        return self.json({"boot": core.hub.boot, "seq": seq, "commands": commands})
+        return self.json({"boot": core.hub.boot, "seq": seq, "commands": commands, "quiet": core.quiet(device.id)})

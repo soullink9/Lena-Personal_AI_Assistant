@@ -67,9 +67,39 @@ def _age(item: dict[str, Any], now: datetime) -> str:
     return f"saved {days} day{'s' if days != 1 else ''} ago"
 
 
+def _notes(item: dict[str, Any], now: datetime) -> str:
+    """What the tidy should know about a line beside its words: its age, who it's about, its follow-up day,
+    and whether it's her own opinion (kept apart from the household's facts).
+    """
+    notes = [_age(item, now)]
+    if item.get("about"):
+        notes.append(f"about {item['about']}")
+    if item.get("follow_up"):
+        notes.append(f"to ask about on {item['follow_up']}" + (", asked" if item.get("asked") else ""))
+    if item.get("kind") == "hers":
+        notes.append("her own opinion")
+    return "; ".join(notes)
+
+
+def _details(originals: list[dict[str, Any]]) -> dict[str, Any]:
+    """The details a combined line keeps: who it's about and who told her when every line agrees, her own
+    opinion only if they all were, and the latest follow-up day.
+    """
+    kept: dict[str, Any] = {}
+    for key in ("about", "by", "kind"):
+        values = {m.get(key) for m in originals}
+        if len(values) == 1 and (value := values.pop()):
+            kept[key] = value
+    if days := sorted(m["follow_up"] for m in originals if m.get("follow_up")):
+        kept["follow_up"] = days[-1]
+    return kept
+
+
 def instructions(items: list[dict[str, Any]], now: datetime) -> str:
-    """The request for the AI Task: her open memory lines, numbered, with their ages, and the rules."""
-    numbered = "\n".join(f"{i}. {m['summary']} ({_age(m, now)})" for i, m in enumerate(items, 1))
+    """The request for the AI Task: her open memory lines, numbered, with their ages and details, and the
+    rules.
+    """
+    numbered = "\n".join(f"{i}. {m['summary']} ({_notes(m, now)})" for i, m in enumerate(items, 1))
     return (
         "You are tidying the memory of Lena, a household assistant. Each line is one thing she remembers "
         "about the people and the home, written in the third person. Today is "
@@ -80,8 +110,9 @@ def instructions(items: list[dict[str, Any]], now: datetime) -> str:
         "it black.\" become \"Alex likes coffee, black.\").\n"
         "- Clarify a vague line into one clear sentence, using only what the lines say. Never invent or "
         "guess facts.\n"
-        "- Leave out lines that are outdated (a date or event that has passed, a fact a newer line replaces) "
-        "or that were only ever for a moment. Keep everything else, even if it's old.\n"
+        "- Leave out lines that are outdated (a date or event that has passed and was already asked about, a fact a "
+        "newer line replaces) or that were only ever for a moment. Keep everything else, even if it's old.\n"
+        "- Never combine her own opinions with facts about the household.\n"
         "- Keep each line short, third person, one fact or a few closely related ones.\n"
         "- Keep lines that are fine as they are word for word.\n\n"
         "Give back the new memory as a list of lines. Start each line with the numbers of the lines it comes "
@@ -179,6 +210,7 @@ def plan(memory: list[dict[str, Any]], answer: Any, now: datetime) -> Plan:
         else:
             replacement[first["uid"]] = {
                 "uid": uuid.uuid4().hex, "summary": text, "status": "needs_action", "added": now.isoformat(),
+                **_details(originals),
             }
             for other in originals[1:]:
                 replacement[other["uid"]] = None

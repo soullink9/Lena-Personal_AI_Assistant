@@ -6,7 +6,10 @@ lena.feel, lena.add_event, lena.announce, lena.tidy_memory and lena.undo_memory_
 the actions behind her newer tools (actions.py: timers, alarms, reminders, volume, correcting a memory,
 the house's history), /api/lena/context for Open WebUI and the Lena app, /api/lena/media for the app's
 photo slideshow, /api/lena/display, where each Lena app registers as a display you can put in a room
-(see displays.py), and /api/lena/display/sync, where displays collect what they're asked to do (hub.py).
+(see displays.py), /api/lena/display/sync, where displays collect what they're asked to do and report what
+they're doing (hub.py), /api/lena/display/briefing, where they ask whether to speak first (briefing.py), and
+/api/lena/display/wake, where displays that heard her name decide which one answers (wake.py). Her Spoke
+first and Routines sensors (routines.py) and her Do not disturb switch come with her.
 """
 
 from __future__ import annotations
@@ -25,9 +28,11 @@ from .displays import LenaDisplayView, display_id_of, displays
 from .briefing import Briefings, LenaBriefingView
 from .hub import Hub, LenaSyncView, TargetError
 from .llm_api import LenaAPI
+from .routines import Routines
 from .view import LenaContextView, LenaMediaView
+from .wake import Arbiter, LenaWakeView
 
-PLATFORMS = [Platform.ASSIST_SATELLITE, Platform.SELECT, Platform.TODO]
+PLATFORMS = [Platform.ASSIST_SATELLITE, Platform.SELECT, Platform.SENSOR, Platform.SWITCH, Platform.TODO]
 
 type LenaConfigEntry = ConfigEntry[LenaCore]
 
@@ -42,7 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None
     core.hub = Hub(hass, entry.entry_id)
     core.briefings = Briefings(hass)
     await core.briefings.async_load()
+    core.arbiter = Arbiter(hass, core)
+    core.routines = Routines(hass, core)
     await core.async_start()
+    await core.routines.async_start()
     # Up to 0.6.9 each display had an Announcement event entity; its Assist satellite does that now.
     entities = er.async_get(hass)
     for old in er.async_entries_for_config_entry(entities, entry.entry_id):
@@ -52,6 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None
     hass.data[DOMAIN] = core
 
     entry.async_on_unload(core.async_stop)
+    entry.async_on_unload(core.routines.async_stop)
     entry.async_on_unload(llm.async_register_api(hass, LenaAPI(hass=hass, id="lena", name="Lena")))
 
     if not hass.data.get(f"{DOMAIN}_view"):
@@ -60,6 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None
         hass.http.register_view(LenaDisplayView())
         hass.http.register_view(LenaSyncView())
         hass.http.register_view(LenaBriefingView())
+        hass.http.register_view(LenaWakeView())
         hass.data[f"{DOMAIN}_view"] = True
 
     async def feel(call: ServiceCall) -> None:
