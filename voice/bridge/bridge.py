@@ -12,6 +12,10 @@ Endpoints (with or without a /v1 prefix):
   GET  /audio/voices          your Piper voices, for Open WebUI's voice list
   GET  /audio/models, /models
   GET  /health
+
+Her voice follows her mood (optional): with HA_URL and HA_TOKEN set, the bridge asks the Lena integration
+how she feels (GET /api/lena/context) and speaks a little slower and lower when she's tired or low, a
+little quicker and brighter when she's cheerful. If Home Assistant can't be reached she sounds as usual.
 """
 
 import base64
@@ -20,7 +24,10 @@ import os
 import socket
 import subprocess
 import tempfile
+import threading
+import time
 import traceback
+import urllib.request
 from email.parser import BytesParser
 from email.policy import default as email_policy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,7 +39,10 @@ DEFAULT_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "").strip()
 API_KEY = os.environ.get("API_KEY", "").strip()
 PORT = int(os.environ.get("PORT", "8000"))
 TIMEOUT = float(os.environ.get("TIMEOUT", "120"))
+HA_URL = os.environ.get("HA_URL", "").strip().rstrip("/")
+HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 MAX_UPLOAD = 50 * 1024 * 1024
+MOOD_CACHE = 60  # seconds: how long one answer about how she feels is used
 
 # Open WebUI's default voice names; these mean "use the bridge's default", not a Piper voice.
 OPENAI_VOICES = {"alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"}
@@ -180,15 +190,72 @@ def ffmpeg(args, stdin=None):
     return p.stdout
 
 
-def encode(pcm, rate, width, channels, response_format):
-    """Piper's raw audio in the format the caller asked for (mp3 unless it said otherwise), and its
-    MIME type.
+_mood = {"at": 0.0, "voice": None}
+_mood_lock = threading.Lock()
+
+
+def mood_voice():
+    """How her voice follows her feelings now, from the Lena integration: {"speed", "pitch", "volume"},
+    or None when it's not set up or Home Assistant can't be reached. Asked at most once a minute.
     """
-    if response_format == "pcm":
+    if not (HA_URL and HA_TOKEN):
+        return None
+    with _mood_lock:
+        if time.monotonic() - _mood["at"] < MOOD_CACHE:
+            return _mood["voice"]
+        voice = None
+        try:
+            req = urllib.request.Request(
+                HA_URL + "/api/lena/context?memory=0&reasons=0",
+                headers={"Authorization": "Bearer " + HA_TOKEN, "User-Agent": Handler.server_version},
+            )
+            with urllib.request.urlopen(req, timeout=3) as r:
+                voice = json.loads(r.read()).get("voice") or None
+        except Exception as e:  # noqa: BLE001 - she just sounds as usual
+            log("Couldn't ask Home Assistant how Lena feels:", e)
+        _mood.update(at=time.monotonic(), voice=voice)
+        return voice
+
+
+def tone_filter(voice, rate):
+    """The ffmpeg filter that gives her voice its speed, pitch and volume, or None when it's unchanged.
+    Pitch is a resample (which also changes speed), then atempo puts the speed where it should be.
+    """
+    if not voice:
+        return None
+    def clamp(key, low, high):
+        try:
+            return min(high, max(low, float(voice.get(key, 1.0))))
+        except (TypeError, ValueError):
+            return 1.0
+    speed, pitch, volume = clamp("speed", 0.8, 1.2), clamp("pitch", 0.9, 1.1), clamp("volume", 0.5, 1.0)
+    parts = []
+    if abs(pitch - 1.0) > 0.001:
+        parts += [f"asetrate={round(rate * pitch)}", f"aresample={rate}"]
+    tempo = speed / pitch
+    if abs(tempo - 1.0) > 0.001:
+        parts.append(f"atempo={tempo:.4f}")
+    if abs(volume - 1.0) > 0.001:
+        parts.append(f"volume={volume:.2f}")
+    return ",".join(parts) or None
+
+
+def encode(pcm, rate, width, channels, response_format, voice=None):
+    """Piper's raw audio in the format the caller asked for (mp3 unless it said otherwise), and its
+    MIME type. With voice ({"speed", "pitch", "volume"}), her voice follows her mood.
+    """
+    tone = tone_filter(voice, rate)
+    if response_format == "pcm" and not tone:
         return pcm, "audio/pcm"
-    out_args, content_type = FORMATS.get(response_format, FORMATS["mp3"])
+    if response_format == "pcm":
+        out_args, content_type = ["-f", {1: "u8", 4: "s32le"}.get(width, "s16le")], "audio/pcm"
+    else:
+        out_args, content_type = FORMATS.get(response_format, FORMATS["mp3"])
     sample = {1: "u8", 2: "s16le", 4: "s32le"}.get(width, "s16le")
-    audio = ffmpeg(["-f", sample, "-ar", str(rate), "-ac", str(channels), "-i", "pipe:0", *out_args, "pipe:1"], pcm)
+    audio = ffmpeg([
+        "-f", sample, "-ar", str(rate), "-ac", str(channels), "-i", "pipe:0",
+        *(["-af", tone] if tone else []), *out_args, "pipe:1",
+    ], pcm)
     return audio, content_type
 
 
@@ -321,8 +388,12 @@ class Handler(BaseHTTPRequestHandler):
                 raise
             log(f"Voice {voice!r} failed; using Piper's default voice")
             pcm, rate, width, channels = synthesize(text, "")
-        audio, content_type = encode(pcm, rate, width, channels, (req.get("response_format") or "mp3").lower())
-        log(f"speech: {len(text)} chars, voice={voice or 'default'}, {len(audio)} bytes")
+        tone = mood_voice()
+        audio, content_type = encode(
+            pcm, rate, width, channels, (req.get("response_format") or "mp3").lower(), tone,
+        )
+        log(f"speech: {len(text)} chars, voice={voice or 'default'}, {len(audio)} bytes"
+            + (f", mood {tone}" if tone_filter(tone, rate) else ""))
         return self._send(200, audio, content_type)
 
     def _transcription(self, body):
@@ -365,7 +436,8 @@ def main():
     speech.
     """
     log(f"Lena voice bridge on :{PORT}  piper={PIPER[0]}:{PIPER[1]}"
-        f"  whisper={'%s:%s' % WHISPER if WHISPER[0] else 'off'}  voice={DEFAULT_VOICE or 'Piper default'}")
+        f"  whisper={'%s:%s' % WHISPER if WHISPER[0] else 'off'}  voice={DEFAULT_VOICE or 'Piper default'}"
+        f"  mood={'from ' + HA_URL if HA_URL and HA_TOKEN else 'off'}")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 

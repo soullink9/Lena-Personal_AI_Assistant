@@ -13,6 +13,10 @@ services:
       WHISPER_HOST: wyoming-whisper
       WHISPER_PORT: "10300"
       WHISPER_LANGUAGE: en
+      # Optional: her voice follows her mood (slower and lower when she's tired, brighter when she's
+      # cheerful). Any Home Assistant user's long-lived access token works; leave these out to turn it off.
+      # HA_URL: http://homeassistant:8123
+      # HA_TOKEN: ${HA_TOKEN}             # a long-lived access token, from an .env file next to this one
     networks:
       - llm
     # No ports: only containers on the network (Open WebUI) can reach it.
