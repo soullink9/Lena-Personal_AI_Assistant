@@ -59,6 +59,7 @@ flowchart TB
     Core --> Entities["select.py, todo.py, sensor.py, switch.py<br/>Mood, Energy, Moment, Memory,<br/>Spoke first, Routines, Do not disturb"]
     Core --> Briefing["briefing.py<br/>speaking first, gated by brain.may_speak"]
     Routines["routines.py<br/>habits from the recorder"] --> Core
+    Around["around.py<br/>goodnight, special days, seasons,<br/>shopping, upkeep, photos, nicknames"] --> Context
     Wake["wake.py<br/>one display answers"] -- "claims" --> Brain
     Core --> Context["context(): time, home, feelings,<br/>memory, devices"]
     Context --> LLM["llm_api.py<br/>for HA's conversation agents"]
@@ -75,6 +76,7 @@ flowchart TB
 - **Who and where, not voice ID.** She knows who she's talking with from the signed-in user (Assist's user, or the Open WebUI user's name matched to a Home Assistant person) and which room from the display's area; a shared wall display talks to the household. Bedrooms at night get soft, short answers and no speaking first.
 - **One display answers** (`wake.py`). Each display that hears her name keeps recording and claims the turn with how clearly it heard (its level above its own room's noise, and the wake word's score); claims within a short window are one "Hey Lena", and `brain.wake_winner` picks one. It fails open: a display that gets no answer in time answers anyway, because two answers are better than none.
 - **Speaking first is gated in one place.** `briefing.py` gathers what she might say (worries, welcome home, the morning briefing, heading out, follow-ups, late habits) and `brain.may_speak` decides, with a daily cap, a quiet half hour per display, bedrooms at night, the display's own state (never while it's listening, thinking or speaking) and the Do not disturb switch. Everything beyond worries and the briefing is off until chosen.
+- **Around the house is context, not new tools.** `around.py` adds a few lines to her context (a Goodnight check in the evening, today's special days and seasonal moments, a getting-to-know-you question now and then, how to pick music, the shopping list, what's running low, the photo on the wall) and lets her house tools do the rest. A nickname goes through her existing remember tool (`kind: nickname`) and becomes an alias in Home Assistant's own registry, so Assist understands it too. The rules (holidays, solstices, the clocks, first frost, upkeep thresholds) are plain functions in `brain.py`.
 - **Habits are learned, then watched before they're used.** `routines.py` reads four weeks of the recorder every night and `brain.learn_routine` keeps only regular habits (medians, by weekday and weekend). For the first two weeks she only shows what she believes on a sensor, so a wrong guess is caught before she says it.
 - **Afterglow and her own opinions live in the context, not the Modelfile.** A moment that ends leaves a fading afterglow (in her context for a few hours, and a gentle pull on her hourly mood), and one of the memories saved as **hers** is put in mind each day. No new tools: memory gained optional `about`, `kind` and `follow_up` fields instead, so Open WebUI's tool descriptions stay as they were.
 

@@ -126,12 +126,33 @@ A display with a **Speaking first** sensor (chosen in the app) asks `POST /api/l
 4. **Before you head out**, on a display by the door, when rain or snow is forecast today;
 5. **Asking how something went**: a memory whose follow-up day has come ("How did the interview go?"), only when the person who told her is the only one home, once. With **Ask and listen for the answer** the display then listens;
 6. **A routine that's late**: "The coffee machine hasn't gone on yet; it usually does around 7:05."
+7. **Birthdays and holidays**: the first display to see someone on a special day greets it ("Merry Christmas!"), unless the morning briefing already did, and runs your **Celebrate with** script or scene (Around the house);
+8. **The seasons**: the winter's first frost or first snow, the shortest or longest day, an equinox, the clocks changing tonight or last night;
+9. **Batteries and filters**: what's running low, at most once a week, or at once when one is about to run out (5% for a battery, 3% for a filter).
 
-Items 2, 4, 5 and 6 are off until ticked under **Configure → Speaking first**. Except for worries, she speaks first at most **6** times a day, never twice within half an hour on the same display, never in a bedroom at night, never while the display is listening, thinking or speaking, and never while **Do not disturb** is on. `sensor.lena_spoke_first` counts it.
+Items 2 and 4 to 9 are off until ticked under **Configure → Speaking first**. Except for worries, she speaks first at most **6** times a day, never twice within half an hour on the same display, never in a bedroom at night, never while the display is listening, thinking or speaking, and never while **Do not disturb** is on. `sensor.lena_spoke_first` counts it.
 
 The briefing is written in her words by the conversation agent chosen for alerts (Configure), or Home Assistant's AI Task, from the facts: today, your weather station, the forecast, today's calendar events, sensors named for trash or recycling, and anything that needs attention. What's been said is kept across restarts.
 
 **Check these when everyone leaves** (same section): doors, windows, the garage or locks that may be open while someone's home. When everyone's been out for 5 minutes and one is still open or unlocked, the alert phones get "Everyone's out and the garage door is open."
+
+## Around the house
+
+Under **Configure → Around the house** (and Personality, for her curiosity). None of it makes her speak first unless you tick it under Speaking first.
+
+- **Goodnight check** (on): from three hours before her bedtime until she wakes, she knows what's still open or unlocked (from **Check these when everyone leaves**) and which lights are on, by room (only lights exposed to Assist). Say "goodnight" and she tells you in a sentence and offers to see to it: "The front door's still unlocked and the kitchen light's on. Want me to sort them?" She uses her normal house tools for that.
+- **Shopping list** and **Shops**: pick a to-do list (expose it to Assist so her tools can add to it) and she adds things you mention in passing ("we're out of milk"). Pick zones for the shops you go to, and when someone's phone arrives at one, their companion app gets "You're at Market Basket. On the list: milk and eggs." from Lena, once per visit (not again within two hours). It goes to the phones that are that person's device trackers.
+- **Batteries and filters** (on): every battery sensor at 20% or below, every low-battery warning and every filter sensor (a percentage, named "filter") at 10% or below, phones and tablets left out. She mentions it if asked ("anything need batteries?"); to have her bring it up, tick **Batteries and filters** under Speaking first.
+- **Celebrate with**: a script or scene that runs when she first greets a birthday or holiday (a light colour, a song).
+- **Asks getting-to-know-you questions** (Personality, on): now and then, in a relaxed chat with someone she knows, she asks one short question about whoever she knows least (them, someone else in the household, a pet) and remembers the answer. At most one per person every 3 days, never in the middle of a task.
+
+Always there, nothing to set:
+
+- **Special days**: today's events on your special days calendars, plus the holidays she knows (New Year's Day and Eve, Valentine's Day, Easter Sunday, Halloween, Christmas Eve and Day, and Thanksgiving in the US and Canada). For your country's own holidays, add Home Assistant's **Holiday** integration and pick its calendar under special days; the same day isn't said twice. She greets each person once, the first time they talk to her that day.
+- **The seasons**: the solstices and equinoxes (for your hemisphere), the clocks changing, and the first frost (from your weather station, else the weather entity, at or below freezing) and first snow (the weather entity says snowy) of each winter. She may remark on it once, if it fits.
+- **Music for the moment**: with a Music Assistant speaker, "put something on for cooking" has her choose the music herself, to suit the moment and her taste, play it in your room, and say what she chose.
+- **Nicknames**: call something by your own name for it ("the big light") and she asks once whether to remember it. Saying yes adds it as an alias of that device or room in Home Assistant, so it works everywhere, Assist included. Remove it in the device's or area's settings like any alias.
+- **The photo on the wall**: when a display's slideshow shows an Immich photo, she knows when and where it was taken and who's in it (from Immich, through the Immich integration's own connection), so "where was this?" gets a real answer, and she notices when it was taken on this day years ago.
 
 ## Routines
 

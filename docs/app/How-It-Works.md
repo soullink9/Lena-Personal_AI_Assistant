@@ -179,6 +179,8 @@ With the Lena integration, she can do more than answer, in Assist and Open WebUI
 
 ### Speaking first
 
+**The photo on the wall:** with the Lena integration, the display tells Home Assistant which photo the slideshow is showing, so with Immich photos she knows when and where it was taken and who's in it. Ask "where was this?".
+
 Pick a motion sensor under Settings → Wall display → Screensaver → **Speaking first**. It can be a different one from the sensor that wakes the screen, so the display can stay a photo frame and still greet you. When it sees someone come in:
 
 - **In the morning** (from her morning time in the integration's Configure until noon), once a day: a short greeting and briefing, the weather from your own weather station, today's calendar, trash or recycling if it's today, anything that needs attention.

@@ -2,6 +2,30 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+More of the small things a person living here would know. Everything that makes her speak first is off until you tick it. **Update the integration, the Open WebUI tool and the app.** Her Modelfile is unchanged, so there's nothing to rebuild.
+
+### Home Assistant integration
+
+- **Goodnight.** From three hours before her bedtime, she knows what's still open or unlocked (Speaking first → Check these when everyone leaves) and which lights are on. Say "goodnight" and she tells you in a sentence and offers to see to it. Configure → **Around the house → Goodnight check** (on).
+- **Nicknames.** Call something by your own name for it ("the big light") and she asks once whether to remember it. Saying yes adds it as an alias of that device or room in Home Assistant, so it works everywhere, Assist included. It goes through her remember tool (`kind: nickname`), so there's no new tool.
+- **Curiosity.** Now and then, in a relaxed chat, she asks one short question about whoever she knows least (you, someone else in the household, a pet) and remembers the answer. At most once per person every 3 days. Configure → Personality → **Asks getting-to-know-you questions** (on).
+- **Birthdays and holidays.** She knows today's special days (your special days calendars, plus New Year's, Valentine's Day, Easter, Halloween, Christmas Eve and Day, and Thanksgiving in the US and Canada; add Home Assistant's Holiday integration's calendar for your country's own) and greets each person once ("Merry Christmas!"). The morning briefing mentions it. Speaking first → **Birthdays and holidays** has the first display to see someone greet it, and **Celebrate with** runs a script or scene of yours.
+- **The seasons.** The shortest and longest day, the equinoxes, the clocks changing tonight or last night, and the first frost and first snow of each winter. She may remark on it once; Speaking first → **The seasons** has a display say it.
+- **Music for the moment.** With a Music Assistant speaker, "put something on for cooking" has her pick the music herself, to suit the moment and her taste, play it in your room and say what she chose.
+- **The shopping list, at the shop.** Pick a to-do list and the zones of your shops (Configure → Around the house). She adds what you mention running out of, and when someone's phone arrives at a shop it gets the list from her, once per visit.
+- **Batteries and filters.** She knows which batteries (20% or less) and filters (10% or less) are running low, phones left out, and tells you if you ask. Speaking first → **Batteries and filters** has her bring it up, at most once a week, or at once when one is about to run out.
+- **The photo on the wall.** When a display's slideshow shows an Immich photo, she knows when and where it was taken and who's in it, so "where was this?" gets a real answer, and she notices when it was taken on this day years ago.
+
+### Open WebUI
+
+- **The tool's** `remember` takes `kind: nickname`, for the house's own words for things.
+
+### Android app
+
+- **The display tells Home Assistant which photo is on the wall**, with each sync, so she can talk about it.
+
 ## [0.6.38] - 2026-11-22
 
 Locks and covers can worry her. **Update the integration.** Nothing else changes.

@@ -20,6 +20,8 @@ A memory can carry a little more, and she fills it in when it fits:
 - **When to come back to it**: "Alex has a job interview on Thursday" can carry Friday as its follow-up day (the item's due date). On that day she asks how it went, once, naturally if the moment fits; with Speaking first → **Asking how something went** ticked, a display may ask when only Alex is home. After two days it's dropped quietly. Change or clear the due date on the list to change it.
 - **Hers**: her own opinions and running jokes ("Lena thinks the hallway light is too blue"). She has one of them in mind each day (none comes back sooner than Configure → Personality → **Bring one up again after**, 4 days), which keeps her her own person without repeating herself. They're never mixed with facts about the household when she tidies.
 
+**Nicknames aren't memories.** "Remember that the big light is the kitchen ceiling light" saves "the big light" as an alias of that light in Home Assistant instead of a line on the list, so it works in every app and in Assist. See [Around the house](Integration.md#around-the-house).
+
 If she says she saved something and it isn't on the list, she didn't have the tool: in Open WebUI, Tool Search hides it (see [Turn Tool Search off](../open-webui/Setup.md#turn-tool-search-off)). Check the list after your first few tries.
 
 ## Forgetting and tidying

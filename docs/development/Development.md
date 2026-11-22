@@ -31,6 +31,7 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── assist_satellite.py        each display as an Assist satellite: announcements, conversations, timers, wake word
 │   ├── briefing.py                speaking first: worries, welcome home, the morning briefing, heading out, follow-ups, late habits
 │   ├── routines.py                the household's habits, learned each night from the recorder
+│   ├── around.py                  goodnight, special days, the seasons, curiosity, music, the shopping list, upkeep, the photo on the wall, nicknames
 │   ├── wake.py                    one display answers: the wake word claims and who heard best
 │   ├── sensor.py, switch.py       Lena Spoke first, Lena Routines, and Do not disturb
 │   ├── tidy.py                    her memory tidy: the request, checking the answer, the changes
