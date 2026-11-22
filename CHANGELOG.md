@@ -2,6 +2,27 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Voice on a phone works again when a tablet or TV hears "Hey Lena" too. **Update the integration and the app.**
+
+### Android app
+
+- **A phone in your hand answers at once.** Since 0.6.35, when several devices heard "Hey Lena", each asked Home Assistant which one should answer. A phone that heard her a moment after a tablet or TV (a quieter microphone, a slower network) was told the other one had already been picked, and it went back to listening without a word. A phone or tablet that isn't a wall display now answers as soon as it hears her name, without waiting, and still tells Home Assistant so the wall displays that heard her too stay quiet.
+
+### Home Assistant integration
+
+- **A phone's late claim still wins.** `POST /api/lena/display/wake` answers yes to a phone in someone's hand even after another display's turn was decided. A wall display that late still loses.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: Need to update
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.40] - 2026-11-22
 
 No change to Lena herself: the changelog now says, at the end of every release, which parts to update and which not. **Nothing to update.**

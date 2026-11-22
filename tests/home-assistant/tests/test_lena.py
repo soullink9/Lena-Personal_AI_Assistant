@@ -644,6 +644,28 @@ async def _sync(client, display_id: str, countdowns=None, after: int = 0, boot: 
     return await response.json()
 
 
+async def test_wake_handheld_phone_answers_late(hass: HomeAssistant, hass_client) -> None:
+    """One display answers "Hey Lena", but a phone in someone's hand always does, even when its claim comes
+    after a tablet's turn was already decided (it heard her a moment later). A wall display that late loses.
+    """
+    await setup(hass)
+    client = await hass_client()
+    await _display(hass, client, "kitchen-tab", "Kitchen tablet", "Kitchen")
+    await _display(hass, client, "hall-tab", "Hall tablet", "Hall")
+    await _display(hass, client, "fold-phone", "Fold phone")
+
+    async def claim(display_id: str, level: float, handheld: bool = False) -> dict:
+        response = await client.post("/api/lena/display/wake", json={
+            "id": display_id, "level": level, "score": 0.9, "handheld": handheld,
+        })
+        assert response.status == 200
+        return await response.json()
+
+    assert (await claim("kitchen-tab", 20.0))["answer"] is True  # alone in its window: it answers
+    assert (await claim("hall-tab", 25.0))["answer"] is False  # the same words heard late
+    assert (await claim("fold-phone", 5.0, handheld=True))["answer"] is True  # in someone's hand: answers anyway
+
+
 async def test_display_tools_timers_reminders_intercom(hass: HomeAssistant, hass_client) -> None:
     """Each display is an Assist satellite with Home Assistant's timers: lena.set_timer starts one of
     Home Assistant's own, and the display gets a copy (with its id) that rings on time. Alarms, reminders,

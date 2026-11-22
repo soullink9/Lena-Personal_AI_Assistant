@@ -6,7 +6,8 @@ Each display that hears her name keeps recording (so nothing you say is lost) an
 background noise, and how sure its wake word was. Claims that arrive within a short window (Configure:
 350 ms) are one "Hey Lena"; then brain.wake_winner picks one, and every display gets its answer on the
 same request. A claim that comes later, but soon enough to be the same words heard late (WAKE_LINGER_MS),
-loses to the one already chosen.
+loses to the one already chosen, unless it's a phone in someone's hand: that one always answers, and its
+app doesn't wait for the answer (a phone that heard her a moment after a tablet used to stay silent).
 
 A display that gets no answer in time (Home Assistant restarting, a slow network) answers anyway: two
 answers are better than none. With Configure's "Only one display answers" off, every claim wins at once.
@@ -59,8 +60,9 @@ class Arbiter:
             current = self._round = _Round(started=now)
             self.hass.loop.call_later(window, self._decide, current)
         if current.decided.is_set():
-            # The same words heard late: the display that already answered keeps the turn.
-            return current.winner == device_id
+            # The same words heard late: the display that already answered keeps the turn, except that a phone
+            # in someone's hand always answers (the app doesn't wait for this answer there anyway).
+            return handheld or current.winner == device_id
         current.claims.append({
             "id": device_id, "level": level, "score": score, "handheld": handheld, "order": len(current.claims),
         })

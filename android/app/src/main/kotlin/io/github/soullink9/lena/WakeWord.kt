@@ -336,7 +336,8 @@ class OpenWakeWord(c: Context, file: String, sensitivity: WakeSensitivity) : Wak
  * happens when the phone doesn't let an app listen from where it is (the screen saver, on some phones).
  *
  * Her name's listeners first claim the turn ([WakeClaim]), so when several displays hear her only the one
- * that heard best answers; the others go back to listening. The sound is kept meanwhile.
+ * that heard best answers; the others go back to listening. The sound is kept meanwhile. A phone or tablet
+ * in someone's hand ([handheld]) doesn't wait: it answers at once.
  */
 class WakeListener(
     private val context: Context,
@@ -347,7 +348,10 @@ class WakeListener(
     private val model: String? = null,
     /** What it listens for, for the log. */
     private val label: String? = null,
-    /** A phone or tablet in someone's hand (not a wall display): it always wins the turn ([WakeClaim]). */
+    /**
+     * A phone or tablet in someone's hand (not a wall display): it answers at once without waiting for
+     * [WakeClaim]'s verdict, and its claim only tells the wall displays to stay quiet.
+     */
     private val handheld: Boolean = false,
     /**
      * When it hears her name, keep the microphone and pass it on to the sheet ([MicRelay]) instead of
@@ -503,10 +507,13 @@ class WakeListener(
                     if (relay) handOff = runCatching { HandOff() }.onFailure {
                         Logs.w("Wake word", "Couldn't pass the microphone on; the sheet opens it itself", it)
                     }.getOrNull()
-                    if (relay) {
+                    if (relay && !handheld) {
                         // Her name: claim the turn, and keep listening (and recording) until it's decided.
                         claim = WakeClaim.start(context, loudness.aboveNoise(), r.score, handheld)
                     } else {
+                        // A phone or tablet in someone's hand answers at once: they're talking to it. It still
+                        // tells Home Assistant, so the wall displays that heard her too stay quiet.
+                        if (relay) WakeClaim.start(context, loudness.aboveNoise(), r.score, handheld)
                         running = false
                         main.post(onHeard)
                     }
