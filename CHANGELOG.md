@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.43] - 2026-11-22
 
 Safer out of the box for anyone who installs Lena, after a security review. **Update everything except the Modelfile, and read the steps below: the voice bridge now needs a key, and Home Assistant users who aren't admins must be allowed before they can use Lena.**
 
