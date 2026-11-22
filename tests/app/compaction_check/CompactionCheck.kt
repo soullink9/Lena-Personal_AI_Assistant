@@ -45,8 +45,8 @@ fun main() {
 
     // A high threshold changes nothing; a low one keeps requests under it.
     check(Compaction.historyTokens(32_768, 80_000) == 16_384, "threshold 80000: still half of 32768")
-    check(Compaction.historyTokens(32_768, 16_000) == 12_000, "threshold 16000: three quarters of it")
-    check(Compaction.historyTokens(32_768, 8_000) == 6_000, "threshold 8000: three quarters of it")
+    check(Compaction.historyTokens(32_768, 16_000) == 16_000 - Compaction.RESERVE, "threshold 16000: room left for tool results")
+    check(Compaction.historyTokens(32_768, 8_000) == 8_000 - Compaction.RESERVE, "threshold 8000: room left for tool results")
 
     // The bug this fixes: a long Assistant Lena chat, threshold below half the context. Every request
     // carried 16384 tokens, over the threshold, so Open WebUI summarized before every answer.
@@ -67,6 +67,26 @@ fun main() {
     val budget = Compaction.historyTokens(32_768, threshold) - summary.length / 4
     val kept = fit(chat, budget)
     check(openWebUiEstimate("$notes\n[CONVERSATION SUMMARY]\n$summary", kept) <= threshold, "with a summary, still under the threshold")
+
+    // Between the rounds of an answer Open WebUI counts the whole prompt the model reported: her character,
+    // context, tool definitions and results. With 11000 tokens of that and a 16000 threshold, a request
+    // carrying 12000 tokens of conversation went over in every round, and Open WebUI summarized each time.
+    check(Compaction.overhead(19_500, 8_500) == 11_000, "overhead: reported prompt less the conversation sent")
+    check(Compaction.overhead(3_000, 8_500) == 0, "overhead is never negative")
+    val withOverhead = Compaction.historyTokens(32_768, 16_000, 11_000)
+    check(withOverhead == Compaction.MIN_HISTORY, "threshold 16000, overhead 11000: only the last few turns")
+    check(Compaction.historyTokens(32_768, 30_000, 11_000) == 30_000 - 11_000 - Compaction.RESERVE,
+        "threshold 30000, overhead 11000: the conversation fits beside the rest")
+    check(11_000 + Compaction.historyTokens(32_768, 30_000, 11_000) + Compaction.RESERVE <= 30_000,
+        "threshold 30000: a whole round, tool results included, stays under it")
+    check(Compaction.historyTokens(32_768, 80_000, 11_000) == 16_384, "a high threshold: half the context as before")
+    check(Compaction.historyTokens(32_768, null, 50_000) == 16_384, "compaction off: overhead doesn't matter")
+    check(Compaction.tooLow(16_000, 11_000), "threshold 16000 is too low for an 11000-token prompt")
+    check(!Compaction.tooLow(30_000, 11_000), "threshold 30000 is enough for it")
+    val suggested = Compaction.suggestedThreshold(11_000)
+    check(suggested == 24_000, "suggested threshold for 11000: 24000 (was $suggested)")
+    check(!Compaction.tooLow(suggested, 11_000), "the suggested threshold is enough")
+    check(Compaction.suggestedThreshold(11_000) % 1000 == 0, "suggested threshold is a round number")
 
     // Compacting while quiet: only once the conversation fills half of what a request carries.
     check(!Compaction.worthCompacting(4 * 2_000, 6_000), "a short chat isn't compacted")

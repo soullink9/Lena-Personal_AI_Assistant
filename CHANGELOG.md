@@ -2,6 +2,32 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Answers that use tools no longer stop to summarize after every tool call. **Update the app, and check Open WebUI's compaction threshold** (see [Context Compaction](docs/open-webui/Setup.md#context-compaction)).
+
+### Android app
+
+- **Room for her tools.** Open WebUI also compacts between the rounds of an answer that uses tools, and there it counts the whole prompt: her character, her context, every tool's definition and the tool results, not just the conversation. 0.6.42 kept the conversation under three quarters of the threshold, which left too little for the rest, so a voice answer that used a tool could still go over in every round. Now the app measures the rest of her prompt from the size the model reported for her last answer, and sends only as much conversation as fits beside it, with 4096 tokens left for tool results.
+- **Says when the threshold is too low.** When her prompt without the conversation already fills the threshold, no app can stop the summaries: the app's log now says so once, with the size it measured and a threshold that fits.
+
+### Docs
+
+- **Context Compaction** in [Lena in Open WebUI](docs/open-webui/Setup.md#context-compaction) explains why "Context compacted" can show up after every tool call, how to read her prompt size from a reply's info, and what to set the threshold to (24000 suits most homes with `num_ctx` 32768), or to turn it off.
+
+### Tests
+
+- `tests/app/compaction_check` checks that a whole round, tool results included, stays under the threshold, and when a threshold is too low.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.44] - 2026-11-22
 
 Asked "any lights on?", Lena answered nothing: she called Home Assistant's tool by a name one character off, and then went in circles. **Update the Open WebUI filter.**

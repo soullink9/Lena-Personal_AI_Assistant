@@ -64,6 +64,13 @@ class Api(server: String, private val context: Context? = null) {
         /** How many chats Open WebUI sends per page of your chat list. */
         const val CHATS_PER_PAGE = 60
 
+        /**
+         * The threshold the too-low warning was last logged for, so it's logged once per threshold, not on
+         * every question (an Api is made for each use, so this lives here).
+         */
+        @Volatile
+        private var warnedThreshold: Int? = null
+
         /** How many chats Open WebUI sends per page of a folder's list. */
         const val FOLDER_CHATS_PER_PAGE = 10
 
@@ -530,7 +537,8 @@ class Api(server: String, private val context: Context? = null) {
         } else {
             id = chatId!!
             val threshold = Compaction.threshold(compactThreshold(existing), model.compactThreshold)
-            val budget = Compaction.historyTokens(contextTokens, threshold)
+            val overhead = threshold?.let { promptOverhead(existing, contextTokens, it) } ?: 0
+            val budget = Compaction.historyTokens(contextTokens, threshold, overhead)
             val continued = continueChat(id, existing, turn, parentId, budget)
             thread = continued.first
             summary = continued.second
@@ -702,6 +710,45 @@ class Api(server: String, private val context: Context? = null) {
      */
     fun compactThreshold(chat: JSONObject): Int? =
         chat.optJSONObject("context_usage")?.optInt("threshold", 0)?.takeIf { it > 0 }
+
+    /**
+     * What the rest of her prompt (her character, her context, the tools' definitions, the tool results)
+     * took on her last answer in [chat], from the prompt size the model reported with it, less the
+     * conversation that was sent along (see [Compaction.overhead]). 0 when no answer reported its size.
+     * Logs a warning once when [threshold] is too low for it ([Compaction.tooLow]).
+     */
+    fun promptOverhead(chat: JSONObject, contextTokens: Int, threshold: Int): Int {
+        val history = chat.optJSONObject("chat")?.optJSONObject("history") ?: return 0
+        val messages = history.optJSONObject("messages") ?: return 0
+        val current = if (history.isNull("currentId")) null else history.optString("currentId")
+        val (walked, summary) = branch(messages, current)
+        val last = walked.indexOfLast { it.optString("role") == "assistant" && reportedPrompt(it) > 0 }
+        if (last < 0) return 0
+        val conversation = walked.subList(0, last).sumOf { (it.optString("content").length + 16) / 4 } +
+            (summary?.length ?: 0) / 4
+        val sent = minOf(conversation, Compaction.historyTokens(contextTokens, threshold))
+        val overhead = Compaction.overhead(reportedPrompt(walked[last]), sent)
+        if (Compaction.tooLow(threshold, overhead) && warnedThreshold != threshold) {
+            warnedThreshold = threshold
+            Logs.w("Open WebUI", "Her prompt without the conversation (her character, her context, the tools and " +
+                "their results) was about $overhead tokens, but Context Compaction starts at $threshold, so Open " +
+                "WebUI summarizes during every answer. Raise the threshold (Admin Settings → Interface, or the " +
+                "model's Context Compaction Threshold) to at least ${Compaction.suggestedThreshold(overhead)}.")
+        }
+        return overhead
+    }
+
+    /**
+     * The prompt size the model reported for a reply, kept with it by Open WebUI ("usage", in Ollama's words
+     * or OpenAI's), or 0 when it has none.
+     */
+    private fun reportedPrompt(reply: JSONObject): Int {
+        val usage = reply.optJSONObject("usage") ?: reply.optJSONObject("info")?.optJSONObject("usage") ?: return 0
+        val prompt = usage.optInt("prompt_tokens", 0).takeIf { it > 0 }
+            ?: usage.optInt("prompt_eval_count", 0).takeIf { it > 0 }
+            ?: usage.optInt("input_tokens", 0).takeIf { it > 0 }
+        return prompt ?: (usage.optInt("prompt_n", 0) + usage.optInt("cache_n", 0))
+    }
 
     /**
      * Asks Open WebUI to compact the chat now: everything but its latest message becomes a summary, saved

@@ -429,7 +429,8 @@ class CompactWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val model = runCatching { api.models().firstOrNull { it.id == modelId } }.getOrNull()
             val threshold = Compaction.threshold(api.compactThreshold(chat), model?.compactThreshold)
                 ?: return Result.success() // compaction is off
-            val budget = Compaction.historyTokens(Prefs.contextTokens(c), threshold)
+            val contextTokens = Prefs.contextTokens(c)
+            val budget = Compaction.historyTokens(contextTokens, threshold, api.promptOverhead(chat, contextTokens, threshold))
             val history = chat.optJSONObject("chat")?.optJSONObject("history") ?: return Result.success()
             val messages = history.optJSONObject("messages") ?: return Result.success()
             val current = if (history.isNull("currentId")) null else history.optString("currentId")
