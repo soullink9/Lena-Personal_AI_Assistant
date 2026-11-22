@@ -91,6 +91,24 @@ WORRY_WORDS = {
     "safety": "is reporting a problem", "tamper": "detected tampering",
 }
 
+# What she can worry about: problem sensors, locks and covers (a garage door). A worry starts in these
+# states and clears in the others listed; anything else (unavailable, still unlocking) changes nothing.
+WORRY_ON = {"binary_sensor": {"on"}, "lock": {"unlocked", "open", "jammed"}, "cover": {"open"}}
+WORRY_OFF = {"binary_sensor": {"off"}, "lock": {"locked"}, "cover": {"closed"}}
+WORRY_DOMAINS = list(WORRY_ON)
+
+
+def worrying(entity_id: str, state: str) -> bool:
+    """Whether a worry entity's state is one that worries her ("on", a lock unlocked or jammed, a cover
+    open)."""
+    return state in WORRY_ON.get(entity_id.split(".", 1)[0], set())
+
+
+def worry_clear(entity_id: str, state: str) -> bool:
+    """Whether a worry entity's state is back to normal ("off", locked, closed)."""
+    return state in WORRY_OFF.get(entity_id.split(".", 1)[0], set())
+
+
 # How often a mood's own moment fades (minutes) is a setting; these are the rest of the dials' defaults.
 DEFAULTS = {
     "morning": "06:30:00",
@@ -380,13 +398,20 @@ def weather_turned(
     return Change(mood=mood, mood_reason=WEATHER_STARTS[now] if mood else "")
 
 
-def worried(cat: Catalog, name: str, device_class: str | None) -> Change:
-    """A worry sensor turned on: she's Worried, and the reason says which sensor and what's wrong in
-    plain words.
+def worried(cat: Catalog, name: str, device_class: str | None, entity_id: str = "", state: str = "on") -> Change:
+    """A worry sensor turned on (or a lock was left unlocked or jammed, a cover open): she's Worried, and
+    the reason says which one and what's wrong in plain words.
     """
     if "Worried" not in cat.moments:
         return Change()
-    return Change(moment="Worried", moment_reason=f"{name} {WORRY_WORDS.get(device_class or '', 'is on')}.")
+    domain = entity_id.split(".", 1)[0]
+    if domain == "lock":
+        what = "is jammed" if state == "jammed" else "is unlocked"
+    elif domain == "cover":
+        what = "is open"
+    else:
+        what = WORRY_WORDS.get(device_class or "", "is on")
+    return Change(moment="Worried", moment_reason=f"{name} {what}.")
 
 
 def worry_cleared(f: Feelings, cat: Catalog, name: str, worries_left: int) -> Change:

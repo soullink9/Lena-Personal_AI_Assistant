@@ -155,7 +155,7 @@ class LenaCore:
 
     @property
     def worries(self) -> list[str]:
-        """The sensors that worry her when they turn on."""
+        """The sensors, locks and covers that worry her when they turn on, unlock or open."""
         return list(self.opt(CONF_WORRIES) or [])
 
     @property
@@ -682,7 +682,7 @@ class LenaCore:
 
     def _worries_on(self) -> int:
         """How many worry sensors are on right now."""
-        return sum(1 for w in self.worries if (s := self.hass.states.get(w)) and s.state == "on")
+        return sum(1 for w in self.worries if (s := self.hass.states.get(w)) and brain.worrying(w, s.state))
 
     async def _on_morning(self, now: datetime) -> None:
         """Her morning: she wakes up, and today's special days from the chosen calendars (birthdays and
@@ -818,29 +818,31 @@ class LenaCore:
 
     @callback
     def _on_worry(self, event: Event[EventStateChangedData]) -> None:
-        """A worry sensor changed. Turning on only counts after two minutes (a door opened and shut
-        again isn't a worry); clearing counts at once.
+        """A worry sensor (or lock, or cover) changed. Turning on, unlocking or opening only counts after
+        two minutes (a door opened and shut again isn't a worry); clearing counts at once.
         """
-        new, entity_id = event.data["new_state"], event.data["entity_id"]
-        if new is None:
-            return
+        new, old, entity_id = event.data["new_state"], event.data["old_state"], event.data["entity_id"]
+        if new is None or (old is not None and old.state == new.state):
+            return  # only an attribute changed: the two minutes keep counting
         key = f"worry:{entity_id}"
         if cancel := self._timers.pop(key, None):
             cancel()
-        if new.state == "on":
+        if brain.worrying(entity_id, new.state):
             @callback
             def still_on(now: datetime) -> None:
                 """Two minutes on: if the sensor is still on, she's worried and the phones are told."""
                 self._timers.pop(key, None)
                 state = self.hass.states.get(entity_id)
-                if state and state.state == "on":
-                    change = brain.worried(self.catalog, state.name, state.attributes.get("device_class"))
+                if state and brain.worrying(entity_id, state.state):
+                    change = brain.worried(
+                        self.catalog, state.name, state.attributes.get("device_class"), entity_id, state.state,
+                    )
                     self.apply(change, "worry")
                     if change:
                         self.hass.async_create_task(self.alert(change.moment, change.moment_reason))
 
             self._timers[key] = async_call_later(self.hass, timedelta(minutes=2), still_on)
-        elif new.state == "off":
+        elif brain.worry_clear(entity_id, new.state):
             change = brain.worry_cleared(self.feelings, self.catalog, new.name, self._worries_on())
             self.apply(change, "worry cleared")
             if change and change.moment != brain.NOTHING:

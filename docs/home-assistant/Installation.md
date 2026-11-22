@@ -56,7 +56,7 @@ Settings → Devices & services → Lena → **Configure**:
 - **Weather:** a weather entity, such as your forecast. Rain, storms, snow and sunshine color her mood.
 - **Your weather station:** your own weather sensors (an Ecowitt in the backyard: temperature, humidity, wind, rain). She uses them for what it's like outside right now, before any forecast, in conversations and her morning briefing.
 - **Special days calendars:** birthdays, anniversaries or holidays. Anything on them today puts her in a good mood, and she knows why.
-- **Things that worry her:** problem sensors like leaks, smoke or a garage door left open. She's worried until they clear, then relieved.
+- **Things that worry her:** problem sensors like leaks, smoke or a door left open, locks left unlocked or jammed, and covers such as a garage door left open, each after two minutes. She's worried until they clear (off, locked, closed), then relieved. A lock that's fine unlocked while someone's home belongs under **Check these when everyone leaves** instead.
 - **Her day:** when she wakes up and winds down.
 - **Alerts:** the phones she tells when something worries her (they need the Home Assistant companion app), and your Lena agent, so she writes each alert herself. Tapping an alert opens the Lena app, listening. See [House alerts](../app/How-It-Works.md#house-alerts).
 - **How quickly her feelings move:** the defaults are a good start. See [Her feelings](../personality/Moods.md).

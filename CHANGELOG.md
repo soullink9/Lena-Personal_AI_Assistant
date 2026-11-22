@@ -2,6 +2,15 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Locks and covers can worry her. **Update the integration.** Nothing else changes.
+
+### Home Assistant integration
+
+- **Things that worry her takes locks and covers.** Configure only offered binary sensors, so a door lock (or a garage door that's a cover) couldn't be chosen. Now a lock left unlocked or jammed for two minutes, or a cover left open, makes her Worried ("Front door is unlocked."), tells the alert phones, and clears with Relieved once it's locked or closed. A lock that's only a worry when nobody's home is better under Speaking first → **Check these when everyone leaves**.
+- **A worry no longer starts over on an attribute change.** A sensor that stayed on but changed an attribute (a battery level, say) restarted her two minutes, and once she was worried could worry her, and alert the phones, a second time.
+
 ## [0.6.37] - 2026-11-21
 
 A camera that once failed to play live no longer stays on a black screen. Also the tidy-up below: leftovers nobody uses any more are gone. **Update the app.** Nothing else changes.

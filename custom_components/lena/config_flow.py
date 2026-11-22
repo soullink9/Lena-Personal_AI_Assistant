@@ -135,7 +135,7 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             vol.Optional(CONF_CALENDARS, description=default(CONF_CALENDARS)):
                 EntitySelector(EntitySelectorConfig(domain="calendar", multiple=True)),
             vol.Optional(CONF_WORRIES, description=default(CONF_WORRIES)):
-                EntitySelector(EntitySelectorConfig(domain="binary_sensor", multiple=True)),
+                EntitySelector(EntitySelectorConfig(domain=brain.WORRY_DOMAINS, multiple=True)),
             vol.Required(CONF_MORNING, description=default(CONF_MORNING)): TimeSelector(),
             vol.Required(CONF_BEDTIME, description=default(CONF_BEDTIME)): TimeSelector(),
             vol.Required(CONF_AWAY_HOURS, description=default(CONF_AWAY_HOURS)): _number(1, 72, "h"),

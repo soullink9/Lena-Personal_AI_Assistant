@@ -150,6 +150,24 @@ ok(brain.worry_cleared(brain.Feelings(moment="Worried"), catalog, "Leak sensor",
 check(not problems, "every feelings event chooses only defined feelings" + (f" ({'; '.join(problems[:5])})" if problems else ""))
 check(special.mood_reason == "It's Sam's Birthday today.", "a special day gives her the reason")
 check(arrival.moment_reason == "Alex just got home after 30 hours away.", "coming home says who and how long")
+check(
+    brain.worrying("binary_sensor.leak", "on") and brain.worrying("lock.front_door", "unlocked")
+    and brain.worrying("lock.front_door", "jammed") and brain.worrying("cover.garage_door", "open")
+    and not brain.worrying("lock.front_door", "locked") and not brain.worrying("lock.front_door", "unavailable")
+    and brain.worry_clear("lock.front_door", "locked") and brain.worry_clear("cover.garage_door", "closed")
+    and not brain.worry_clear("lock.front_door", "unavailable"),
+    "locks and covers can worry her: unlocked, jammed or open, and clear when locked or closed",
+)
+check(
+    brain.worried(catalog, "Front door", "lock", "lock.front_door", "unlocked").moment_reason == "Front door is unlocked."
+    and brain.worried(catalog, "Front door", None, "lock.front_door", "jammed").moment_reason == "Front door is jammed."
+    and brain.worried(catalog, "Garage door", "garage", "cover.garage_door", "open").moment_reason == "Garage door is open.",
+    "a worried lock or cover says what's wrong",
+)
+check(
+    all(d in brain.WORRY_DOMAINS for d in ("binary_sensor", "lock", "cover")),
+    "locks and covers can be chosen as worries",
+)
 check(brain.energy_pool(now.replace(hour=2), time(6, 30), time(22, 30)) == ["Drained"], "she's drained in the night")
 
 text = brain.describe(brain.Feelings(mood="Grumpy", mood_reason="It's raining.", moment="Pleased"), catalog)

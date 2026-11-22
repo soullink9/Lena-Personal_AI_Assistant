@@ -47,7 +47,7 @@ How she acts on it is part of her baseline in the Modelfile: show it, don't anno
 | **Someone comes home** after hours away | Moment: Delighted, with who and how long. After a day or more, her mood turns Fond. |
 | **The house is empty** for hours | Mood: Restless or Wistful. |
 | **The weather turns** (rain, storm, snow, sun, a clear night, fog, wind) and stays that way for a quarter of an hour | She may react: a storm can make her Uneasy, snow Cheerful. After dark, "sunny" counts as a clear night (she checks Home Assistant's sun), and sunset itself isn't news. |
-| **A worry sensor turns on** (leak, smoke, a door left open) for two minutes | Moment: Worried, naming what. It stays until the sensor clears, then she's Relieved. |
+| **A worry sensor turns on** (leak, smoke, a door left open), or a worry lock is unlocked or jammed, or a worry cover is open, for two minutes | Moment: Worried, naming what. It stays until it clears (off, locked, closed), then she's Relieved. |
 | **Someone treats her a certain way** | She records her own moment with her `record_feeling` tool (Pleased, Amused, Proud, Touched, Delighted, Exasperated, Offended), in Home Assistant or Open WebUI. |
 | **Bedtime** | She's Drained. |
 | **A few minutes pass** | A moment fades back to Nothing, unless she's still worried about something. |
