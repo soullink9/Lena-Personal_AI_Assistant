@@ -37,8 +37,15 @@ CONF_WAKE_WINDOW = "wake_window"
 # Routines (Configure > Routines).
 CONF_ROUTINES = "routines"
 CONF_ROUTINE_WATCH_DAYS = "routine_watch_days"
-# Her own opinions (Configure > Personality).
+# Her own opinions, and her curiosity (Configure > Personality).
 CONF_HERS_DAYS = "hers_days"
+CONF_CURIOUS = "curious"
+# Around the house (Configure > Around the house).
+CONF_GOODNIGHT = "goodnight"
+CONF_SHOPPING_LIST = "shopping_list"
+CONF_SHOPS = "shops"
+CONF_UPKEEP = "upkeep"
+CONF_CELEBRATE = "celebrate_with"
 
 # The sections of Configure that group the newer settings. Each section's values are saved flat with
 # the rest (config_flow.py), so every setting is read the same way (LenaCore.opt).
@@ -47,7 +54,8 @@ SECTIONS = {
     "speaking_first": (CONF_SPEAK, CONF_SPEAK_DAILY, CONF_FOLLOW_UP_LISTEN, CONF_LEAVE_CHECKS),
     "wake_word": (CONF_WAKE_ONE, CONF_WAKE_WINDOW),
     "routines": (CONF_ROUTINES, CONF_ROUTINE_WATCH_DAYS),
-    "personality": (CONF_HERS_DAYS,),
+    "personality": (CONF_HERS_DAYS, CONF_CURIOUS),
+    "around_the_house": (CONF_GOODNIGHT, CONF_SHOPPING_LIST, CONF_SHOPS, CONF_UPKEEP, CONF_CELEBRATE),
 }
 
 # Tapping an alert on a phone opens the Lena app, listening (through the Home Assistant companion app).

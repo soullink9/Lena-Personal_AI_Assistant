@@ -51,6 +51,12 @@ from .const import (
     CONF_ENTRANCES,
     CONF_FOLLOW_UP_LISTEN,
     CONF_HERS_DAYS,
+    CONF_CELEBRATE,
+    CONF_CURIOUS,
+    CONF_GOODNIGHT,
+    CONF_SHOPPING_LIST,
+    CONF_SHOPS,
+    CONF_UPKEEP,
     CONF_HOUSEHOLD,
     CONF_LEAVE_CHECKS,
     CONF_ROUTINE_WATCH_DAYS,
@@ -183,6 +189,18 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             # Her own opinions and running jokes.
             vol.Required("personality"): section(vol.Schema({
                 vol.Required(CONF_HERS_DAYS, description=default(CONF_HERS_DAYS)): _number(1, 30, "days"),
+                switch(CONF_CURIOUS): BooleanSelector(),
+            }), {"collapsed": True}),
+            # Goodnight, the shopping list, the house's upkeep and celebrations.
+            vol.Required("around_the_house"): section(vol.Schema({
+                switch(CONF_GOODNIGHT): BooleanSelector(),
+                vol.Optional(CONF_SHOPPING_LIST, description=default(CONF_SHOPPING_LIST)):
+                    EntitySelector(EntitySelectorConfig(domain="todo")),
+                vol.Optional(CONF_SHOPS, description=default(CONF_SHOPS)):
+                    EntitySelector(EntitySelectorConfig(domain="zone", multiple=True)),
+                switch(CONF_UPKEEP): BooleanSelector(),
+                vol.Optional(CONF_CELEBRATE, description=default(CONF_CELEBRATE)):
+                    EntitySelector(EntitySelectorConfig(domain=["script", "scene"])),
             }), {"collapsed": True}),
         })
         return self.async_show_form(step_id="init", data_schema=schema)

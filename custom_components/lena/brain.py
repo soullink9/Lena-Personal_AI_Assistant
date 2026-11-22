@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
+import re
 
 NOTHING = "Nothing"  # the moment when nothing in particular just happened
 
@@ -128,6 +129,9 @@ DEFAULTS = {
     "wake_window": 350,
     "routine_watch_days": 14,
     "hers_days": 4,
+    "curious": True,  # now and then she asks a getting-to-know-you question
+    "goodnight": True,  # in the evening she knows what's still open or on, for "goodnight"
+    "upkeep": True,  # she knows which batteries and filters are running low
 }
 
 
@@ -642,6 +646,8 @@ def wake_winner(claims: list[dict]) -> str | None:
 # told her, and a day to come back to it ("ask how the vet went on Friday").
 
 KINDS = ("fact", "plan", "hers")
+NICKNAME = "nickname"  # not a memory: the house's own word for a device or room, saved as its alias
+TOOL_KINDS = (*KINDS, NICKNAME)  # what her remember tool takes
 FOLLOW_UP_DAYS = 2  # a follow-up stays due this many days past its date, then she lets it go
 HERS_DAYS = DEFAULTS["hers_days"]  # one of her own opinions isn't brought up again for this many days
 
@@ -795,7 +801,9 @@ def afterglow_pull(glows: list[dict], now: datetime) -> list[str]:
 # ---- Speaking first ------------------------------------------------------------------------------
 # Every time she speaks up without being asked goes through one gate, so the house never feels nagged.
 
-SPEAK_OPTIONAL = ("welcome", "heading_out", "follow_up", "routine")  # each switched on in Configure
+SPEAK_OPTIONAL = (  # each switched on in Configure
+    "welcome", "heading_out", "follow_up", "routine", "celebration", "season", "upkeep",
+)
 SPEAK_QUIET_MINUTES = 30  # never twice within this long on the same display
 
 
@@ -898,3 +906,331 @@ def voice_tone(f: Feelings, quiet: bool = False) -> dict[str, float]:
     if quiet:
         speed, volume = max(0.85, speed * 0.95), 0.7
     return {"speed": round(speed, 3), "pitch": round(pitch, 3), "volume": volume}
+
+
+# ---- Around the house -------------------------------------------------------------------------------
+# Goodnight, celebrations and holidays, the seasons, curiosity, music, the shopping list, the house's
+# upkeep and the photo on the wall: each a line or two of her context, worked out here.
+
+GOODNIGHT_BEFORE = timedelta(hours=3)  # the goodnight check starts this long before her bedtime
+
+
+def goodnight_time(now: datetime, wake: time, bed: time) -> bool:
+    """Whether it's the evening or the night, when "goodnight" is likely: from three hours before her
+    bedtime until her wake-up time.
+    """
+    start = (datetime.combine(now.date(), bed) - GOODNIGHT_BEFORE).time()
+    t = now.time()
+    if start <= wake:
+        return start <= t < wake
+    return t >= start or t < wake
+
+
+def goodnight_section(still_open: list[str], lights: dict[str, list[str]]) -> str:
+    """What she tells someone who says goodnight: what's still open or unlocked, and the lights left on by
+    room, or that all's well.
+    """
+    found = list(still_open)
+    if lights:
+        found.append("lights on: " + "; ".join(
+            f"{room}: {', '.join(names)}" if room else ", ".join(names) for room, names in sorted(lights.items())
+        ))
+    now = "; ".join(found) + "." if found else "nothing on the list is open and no lights are on."
+    return (
+        "## Goodnight check\n"
+        "If someone says goodnight or that they're off to bed: in a sentence, tell them what's still open or on, "
+        "and offer to see to it (lock, close, switch off) with your tools; if nothing is, say all's well. "
+        "Only then, not otherwise.\n"
+        f"Right now: {now[0].upper() + now[1:]}"
+    )
+
+
+# Holidays she knows without a calendar. Add Home Assistant's Holiday integration's calendar to her special
+# days (Configure) for your country's own; the two are merged, so nothing is said twice.
+FIXED_HOLIDAYS = {
+    (1, 1): "New Year's Day", (2, 14): "Valentine's Day", (10, 31): "Halloween",
+    (12, 24): "Christmas Eve", (12, 25): "Christmas Day", (12, 31): "New Year's Eve",
+}
+
+
+def easter(year: int) -> date:
+    """Easter Sunday (the Gregorian calendar's, by the anonymous algorithm)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = divmod(b, 4)
+    g = (8 * b + 13) // 25
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 19 * l) // 433
+    month = (h + l - 7 * m + 90) // 25
+    return date(year, month, (h + l - 7 * m + 33 * month + 19) % 32)
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    first = date(year, month, 1)
+    return first + timedelta(days=(weekday - first.weekday()) % 7 + 7 * (n - 1))
+
+
+def holidays(day: date, country: str | None = None) -> list[str]:
+    """The holidays she knows on a day: the fixed ones, Easter Sunday, and Thanksgiving in the US and Canada."""
+    found = [FIXED_HOLIDAYS[(day.month, day.day)]] if (day.month, day.day) in FIXED_HOLIDAYS else []
+    if day == easter(day.year):
+        found.append("Easter Sunday")
+    if (country or "").upper() == "US" and day == _nth_weekday(day.year, 11, 3, 4):
+        found.append("Thanksgiving")
+    if (country or "").upper() == "CA" and day == _nth_weekday(day.year, 10, 0, 2):
+        found.append("Thanksgiving")
+    return found
+
+
+def _special_key(name: str) -> str:
+    return re.sub(r"[^a-z]", "", name.lower().replace("'s", "")).removesuffix("day")
+
+
+def merge_special(calendar: list[str], built_in: list[str]) -> list[str]:
+    """Today's special days from the calendars, then the holidays she knows that aren't already there
+    ("Christmas" from a calendar and her own "Christmas Day" are the same day).
+    """
+    out: list[str] = []
+    for name in [*calendar, *built_in]:
+        if name and _special_key(name) not in {_special_key(n) for n in out}:
+            out.append(name)
+    return out
+
+
+def celebration_line(special: list[str], greet: bool) -> str:
+    """Today's special days as a line of her context; [greet] the first time she talks with someone today."""
+    if not special:
+        return ""
+    line = f"Today is special: {', '.join(special)}."
+    if greet:
+        line += (" This is the first time you're talking today: mention it warmly and naturally, as a person would "
+                 "(Merry Christmas, happy birthday to whoever's birthday it is), once.")
+    return line
+
+
+# The seasons: the solstices and equinoxes (Meeus's mean values, within minutes, years 2000 to 3000), the
+# clocks changing, and the first frost and first snow of each winter.
+_SEASON_TERMS = (  # Julian ephemeris day of each, as a polynomial in thousands of years from 2000
+    ("march", (2451623.80984, 365242.37404, 0.05169, -0.00411, -0.00057)),
+    ("june", (2451716.56767, 365241.62603, 0.00325, 0.00888, -0.00030)),
+    ("september", (2451810.21715, 365242.01767, -0.11575, 0.00337, 0.00078)),
+    ("december", (2451900.05952, 365242.74049, -0.06223, -0.00823, 0.00032)),
+)
+_SEASON_NAMES = {
+    "march": ("the spring equinox", "the autumn equinox"),
+    "june": ("the longest day of the year (the summer solstice)", "the shortest day of the year (the winter solstice)"),
+    "september": ("the autumn equinox", "the spring equinox"),
+    "december": ("the shortest day of the year (the winter solstice)", "the longest day of the year (the summer solstice)"),
+}
+
+
+def solstices(year: int) -> dict[str, datetime]:
+    """The moments of the year's equinoxes and solstices, in UTC, by month."""
+    y = (year - 2000) / 1000
+    out = {}
+    for month, terms in _SEASON_TERMS:
+        jde = sum(c * y ** n for n, c in enumerate(terms))
+        out[month] = datetime(2000, 1, 1, 12) + timedelta(days=jde - 2451545.0)
+    return out
+
+
+def _offset(day: date, tz: tzinfo) -> timedelta | None:
+    return datetime.combine(day, time(12), tz).utcoffset()
+
+
+def season_days(day: date, tz: tzinfo, southern: bool = False) -> list[str]:
+    """What's seasonal about a day: an equinox or solstice, or the clocks changing tonight or last night."""
+    found = []
+    for month, moment in solstices(day.year).items():
+        if moment.replace(tzinfo=timezone.utc).astimezone(tz).date() == day:
+            found.append(_SEASON_NAMES[month][1 if southern else 0])
+    today, tomorrow, yesterday = _offset(day, tz), _offset(day + timedelta(days=1), tz), _offset(day - timedelta(days=1), tz)
+    if today is not None and tomorrow is not None and tomorrow != today:
+        found.append(f"the clocks go {'forward' if tomorrow > today else 'back'} an hour tonight")
+    if today is not None and yesterday is not None and yesterday != today:
+        found.append(f"the clocks went {'forward' if today > yesterday else 'back'} an hour last night")
+    return found
+
+
+SNOWY = {"snowy", "snowy-rainy"}
+FIRSTS = {"frost": "the first frost of the season", "snow": "the first snow of the season"}
+
+
+def winter_of(day: date, southern: bool = False) -> str:
+    """Which winter a day belongs to, so the first frost is the first of this winter: "2026-27" in the
+    north (from July), the year in the south.
+    """
+    if southern:
+        return str(day.year)
+    start = day.year if day.month >= 7 else day.year - 1
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
+def freezing(value: float, unit: str | None) -> bool:
+    """Whether an outdoor temperature is at or below freezing, in either unit."""
+    return (value - 32) * 5 / 9 <= 0 if unit and "F" in unit else value <= 0
+
+
+def seasonal_line(found: list[str]) -> str:
+    """The day's seasonal moments as a line of her context, or ""."""
+    if not found:
+        return ""
+    text = "; ".join(found)
+    return f"Today: {text[0].upper() + text[1:]}. You might remark on it once, if it fits, the way anyone would."
+
+
+# Curiosity: now and then she asks one question to get to know the household, about whoever she knows least.
+CURIOUS_DAYS = 3  # at most one question offered per person in this many days
+
+
+def curious_due(last: str | None, today: date, days: int = CURIOUS_DAYS) -> bool:
+    """Whether a question may be offered to someone today, given when the last one was offered."""
+    try:
+        return (today - date.fromisoformat(str(last))).days >= days
+    except ValueError:
+        return True
+
+
+def curious_subject(person: str, others: list[str], items: list[dict]) -> str:
+    """Who to ask about: whoever she knows least (the person she's talking with, or someone else in the
+    household), by how many open memories are about them; the person themself on a tie.
+    """
+    def known(name: str) -> int:
+        return sum(1 for m in items if m.get("status") != "completed" and m.get("about") == name)
+    return min([person, *[o for o in others if o != person]], key=known)
+
+
+def curious_line(person: str, subject: str) -> str:
+    """The invitation to ask one getting-to-know-you question."""
+    about = "them" if subject == person else subject
+    return (f"If the moment's relaxed (a chat, not a quick request), you might ask {person} one short, warm question "
+            f"to get to know {about} better, something you don't know yet, and remember the answer with who it's "
+            "about. Only one, only if it fits, never in the middle of a task.")
+
+
+NICKNAME_LINE = (
+    "Nicknames: when someone calls a device or room by a name that isn't its own (\"the big light\"), and you can "
+    "tell which they mean, ask once whether to remember it; if they say yes, save it with your remember tool "
+    "(kind nickname: the nickname as the fact, the thing's exact name as about)."
+)
+
+
+def music_line(room: str | None) -> str:
+    """How to pick music for the moment, when there's a Music Assistant speaker."""
+    where = f" on the {room}'s speaker" if room else " on the speaker in the room they're in"
+    return ("Music: asked to put something on for a moment or an activity (cooking, a rainy evening, a party), choose "
+            f"it yourself, a genre, artist or playlist that suits the moment and your own taste, play it{where} with "
+            "your music tool, and say in a few words what you chose.")
+
+
+def shopping_line(list_name: str) -> str:
+    """How to keep the shopping list."""
+    return (f"Shopping list: {list_name}. When someone mentions running out of something or needing to buy it, "
+            "add it to that list with your tool (once, in a word or two), and say so briefly.")
+
+
+SHOPPING_SHOWN = 15  # at most this many items in the message
+
+
+def shopping_message(shop: str, items: list[str]) -> str:
+    """The list for someone who just got to a shop."""
+    shown = items[:SHOPPING_SHOWN]
+    text = ", ".join(shown[:-1]) + (" and " if len(shown) > 1 else "") + shown[-1]
+    more = f", and {len(items) - len(shown)} more" if len(items) > len(shown) else ""
+    return f"You're at {shop}. On the list: {text}{more}."
+
+
+# The house's upkeep: batteries and filters running low.
+BATTERY_LOW, BATTERY_CRITICAL = 20, 5  # percent
+FILTER_LOW, FILTER_CRITICAL = 10, 3  # percent of its life left
+UPKEEP_DAYS = 7  # she brings it up at most this often, unless something's about to run out
+UPKEEP_SHOWN = 6
+
+
+def upkeep_low(readings: list[dict]) -> list[dict]:
+    """What's running low, lowest first: readings are {"id", "name", "kind": battery or filter, "level": percent,
+    or None for a battery that only says it's low}.
+    """
+    low = []
+    for r in readings:
+        level = r.get("level")
+        limit = BATTERY_LOW if r.get("kind") == "battery" else FILTER_LOW
+        if level is None or level <= limit:
+            low.append(r)
+    return sorted(low, key=lambda r: (
+        r["level"] if r.get("level") is not None else (BATTERY_LOW if r.get("kind") == "battery" else FILTER_LOW),
+        r["name"].lower(),
+    ))
+
+
+def upkeep_critical(r: dict) -> bool:
+    """Whether a reading is about to run out."""
+    level = r.get("level")
+    return level is not None and level <= (BATTERY_CRITICAL if r.get("kind") == "battery" else FILTER_CRITICAL)
+
+
+def upkeep_words(r: dict) -> str:
+    """One low reading in plain words: "Hallway smoke alarm battery 10%"."""
+    what = r["name"]
+    if r.get("kind") == "battery" and "batter" not in what.lower():
+        what += " battery"
+    if r.get("kind") == "filter" and "filter" not in what.lower():
+        what += " filter"
+    return f"{what} {round(r['level'])}%" if r.get("level") is not None else f"{what} low"
+
+
+def upkeep_line(low: list[dict]) -> str:
+    """What's running low, as a line of her context, or ""."""
+    if not low:
+        return ""
+    shown = ", ".join(upkeep_words(r) for r in low[:UPKEEP_SHOWN])
+    more = f" (and {len(low) - UPKEEP_SHOWN} more)" if len(low) > UPKEEP_SHOWN else ""
+    return f"Running low around the house: {shown}{more}. Mention it only if asked, or if it fits."
+
+
+def upkeep_due(last: str | None, today: date, low: list[dict], told_critical: list[str]) -> list[dict]:
+    """What to bring up first now, or []: everything low once a week, or something about to run out that she
+    hasn't mentioned yet.
+    """
+    if not low:
+        return []
+    if any(upkeep_critical(r) and r["id"] not in told_critical for r in low):
+        return low
+    try:
+        if (today - date.fromisoformat(str(last))).days < UPKEEP_DAYS:
+            return []
+    except ValueError:
+        pass
+    return low
+
+
+# The photo on the wall display, from Immich.
+
+def photo_line(info: dict | None, today: date) -> str:
+    """What the photo on the display she's speaking through shows, as a line of her context, or "". info is
+    {"taken": "YYYY-MM-DD", "place", "people": [...], "description"}.
+    """
+    if not info:
+        return ""
+    bits = []
+    try:
+        taken = date.fromisoformat(str(info.get("taken") or "")[:10])
+    except ValueError:
+        taken = None
+    if taken:
+        bits.append(f"from {taken.strftime('%B')} {taken.day}, {taken.year}")
+    if info.get("place"):
+        bits.append(f"in {info['place']}")
+    people = [p for p in info.get("people") or [] if p]
+    if people:
+        bits.append("with " + (", ".join(people[:-1]) + " and " + people[-1] if len(people) > 1 else people[0]))
+    if not bits:
+        return ""
+    line = "On this display's screen right now: a photo " + ", ".join(bits) + "."
+    if info.get("description"):
+        line += f" Its caption: {info['description']}."
+    if taken and (taken.month, taken.day) == (today.month, today.day) and taken.year < today.year:
+        years = today.year - taken.year
+        line += f" It was taken on this day {'a year' if years == 1 else f'{years} years'} ago."
+    return line + " If someone asks about it, that's what it is."

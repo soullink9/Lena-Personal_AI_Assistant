@@ -15,6 +15,10 @@ this order, the first that applies:
 - A follow-up: something she was told to come back to ("the vet on Thursday") is due, and the person who
   told her is the only one home. With "Ask and listen" on, she asks and listens for the answer.
 - A routine that's late today (routines.py).
+- Birthdays and holidays (around.py): the first display to see someone that day, unless the morning briefing
+  already said it, and the script or scene chosen to celebrate with runs.
+- The seasons: the first frost or snow of the winter, a solstice or equinox, the clocks changing.
+- Batteries and filters running low: at most once a week, or when one is about to run out.
 
 Every one of them goes through one gate (brain.may_speak): never while someone's talking to her there,
 never twice within half an hour on the same display, and, except for worries, not in a bedroom at night,
@@ -73,6 +77,8 @@ class Briefings:
             reported = core.hub.reported.get(device.id) if core.hub else None
             busy = bool(reported and reported.phase not in (None, "idle"))
             spoken = spoken_today(core, now)
+            around = core.around
+            today = now.date()
 
             def may(kind: str) -> bool:
                 return brain.may_speak(
@@ -98,6 +104,9 @@ class Briefings:
             elif morning and said.get("morning") != now.date().isoformat() and may("morning"):
                 kind, said["morning"] = "morning", now.date().isoformat()
                 text = await morning_briefing(core, device)
+                if text and around.special_days() and around.said("celebration") != today.isoformat():
+                    around.note_said("celebration", today)  # the briefing greeted the day
+                    await around.celebrate()
             elif (morning and core.speaks_first("heading_out") and said.get("heading_out") != now.date().isoformat()
                   and device.area_id in (core.opt(CONF_ENTRANCES) or []) and may("heading_out")):
                 said["heading_out"] = now.date().isoformat()  # looked at once a day, said or not
@@ -112,6 +121,21 @@ class Briefings:
                 kind = "routine"
                 core.routines.mention(late[0])
                 text = await routine_late(core, late[1], late[2], now)
+            elif (core.speaks_first("celebration") and (special := around.special_days())
+                  and around.said("celebration") != today.isoformat() and may("celebration")):
+                kind = "celebration"
+                around.note_said("celebration", today)
+                text = await celebration(core, device, special)
+                await around.celebrate()
+            elif (core.speaks_first("season") and (season := around.season_today(today))
+                  and around.said("season") != today.isoformat() and may("season")):
+                kind = "season"
+                around.note_said("season", today)
+                text = await seasonal(core, season)
+            elif core.speaks_first("upkeep") and (low := around.upkeep_to_mention(today)) and may("upkeep"):
+                kind = "upkeep"
+                around.upkeep_mentioned(low, today)
+                text = await upkeep(core, low)
             if text:
                 said["last"] = now.isoformat()
                 self._save()
@@ -211,6 +235,31 @@ async def routine_late(core, name: str, groups: dict, now: datetime) -> str:
     return await core.in_her_words(prompt, task_name="Lena noticing") or line
 
 
+async def celebration(core, device, special: list[str]) -> str:
+    """Greeting the day: a birthday, a holiday, in her words."""
+    room = _area_name(core, device)
+    prompt = (f"Today is special: {', '.join(special)}. Someone just walked into the {room or 'room'}. Greet them for "
+              "it in one or two short spoken sentences, warmly, in your own voice (Merry Christmas, happy birthday to "
+              "whoever's birthday it is). Nothing made up. Reply with only what you'd say.")
+    return await core.in_her_words(prompt, task_name="Lena's greeting") or f"Happy {special[0]}!"
+
+
+async def seasonal(core, season: list[str]) -> str:
+    """Remarking on the season, once, in her words."""
+    line = "; ".join(season)
+    prompt = (f"Something about today: {line}. Someone just came in. Remark on it in one short, natural spoken sentence, "
+              "the way anyone in the house would, in your own voice. Reply with only what you'd say.")
+    return await core.in_her_words(prompt, task_name="Lena noticing") or f"Today: {line[0].upper() + line[1:]}."
+
+
+async def upkeep(core, low: list[dict[str, Any]]) -> str:
+    """The house's batteries and filters running low, in her words."""
+    what = ", ".join(brain.upkeep_words(r) for r in low[:brain.UPKEEP_SHOWN])
+    prompt = (f"Running low around the house: {what}. Mention it in one or two short spoken sentences, in your own "
+              "voice: helpful, not nagging, the most urgent first. Reply with only what you'd say.")
+    return await core.in_her_words(prompt, task_name="Lena noticing") or f"Running low: {what}."
+
+
 async def todays_forecast(core) -> dict[str, Any]:
     """Today's daily forecast from the weather entity, or {} when there's none."""
     weather = core.weather_entity
@@ -256,6 +305,10 @@ async def facts(core, device) -> list[str]:
         if state.domain in ("sensor", "binary_sensor", "calendar") and any(w in name + " " for w in TRASH_WORDS) \
                 and state.state not in ("unavailable", "unknown"):
             out.append(f"{state.name}: {state.state}{' ' + state.attributes['unit_of_measurement'] if state.attributes.get('unit_of_measurement') else ''}.")
+    if special := core.around.special_days():
+        out.append(f"Today is special: {', '.join(special)}.")
+    if season := core.around.season_today(now.date()):
+        out.append("About today: " + "; ".join(season) + ".")
     if core.feelings.moment == "Worried" and core.feelings.moment_reason:
         out.append(f"Needs attention: {core.feelings.moment_reason}.")
     return out
@@ -297,7 +350,7 @@ async def morning_briefing(core, device) -> str:
         "It's morning and someone just walked into the room where your wall display is. Greet them and give a short "
         "spoken briefing: two to four natural sentences, no lists, no emoji, nothing made up. Mention the weather (use "
         "the house's own weather station for what it's like now), anything on the calendar today, and trash or recycling "
-        "only if it's due today or tonight. Leave out anything unremarkable. Reply with only what you'd say.\n\n"
+        "only if it's due today or tonight. If today is special (a birthday, a holiday), greet them for it first. Leave out anything unremarkable. Reply with only what you'd say.\n\n"
         + "\n".join(lines)
     )
     if text := await core.in_her_words(prompt, task_name="Lena's morning briefing"):

@@ -276,6 +276,69 @@ kt_pairs = {name: (float(a), float(b)) for name, a, b in re.findall(r'"(\w+)" to
 check(kt_pairs == {**brain.VOICE_ENERGY, **brain.VOICE_MOOD},
       "her voice's tones are the same in the app (Voice.kt) and the integration (brain.py)")
 
+# Around the house: goodnight, celebrations and holidays, the seasons, curiosity, shopping, upkeep, photos.
+from zoneinfo import ZoneInfo  # noqa: E402
+check(brain.goodnight_time(datetime(2026, 11, 22, 20, 0), time(6, 30), time(22, 30))
+      and brain.goodnight_time(datetime(2026, 11, 22, 2, 0), time(6, 30), time(22, 30))
+      and not brain.goodnight_time(datetime(2026, 11, 22, 18, 0), time(6, 30), time(22, 30)),
+      "the goodnight check runs from three hours before her bedtime until she wakes")
+check("Front door is unlocked; lights on: Kitchen: Ceiling." in brain.goodnight_section(["Front door is unlocked"], {"Kitchen": ["Ceiling"]})
+      and "Nothing on the list is open" in brain.goodnight_section([], {}),
+      "goodnight says what's still open or on, or that all's well")
+check(brain.easter(2026) == date(2026, 4, 5) and brain.easter(2027) == date(2027, 3, 28)
+      and brain.holidays(date(2026, 11, 26), "US") == ["Thanksgiving"] and brain.holidays(date(2026, 11, 26), "GB") == []
+      and brain.holidays(date(2026, 12, 25)) == ["Christmas Day"],
+      "she knows the holidays: Christmas, Easter, Thanksgiving where it's kept")
+check(brain.merge_special(["Christmas", "Alex's Birthday"], ["Christmas Day"]) == ["Christmas", "Alex's Birthday"],
+      "a holiday on a calendar isn't said twice")
+check("Merry Christmas" in brain.celebration_line(["Christmas Day"], True)
+      and "first time" not in brain.celebration_line(["Christmas Day"], False) and brain.celebration_line([], True) == "",
+      "special days are greeted once per person")
+ny = ZoneInfo("America/New_York")
+check(brain.season_days(date(2026, 12, 21), ny) == ["the shortest day of the year (the winter solstice)"]
+      and brain.season_days(date(2026, 12, 21), ny, southern=True) == ["the longest day of the year (the summer solstice)"]
+      and brain.season_days(date(2026, 6, 21), ny) == ["the longest day of the year (the summer solstice)"]
+      and brain.season_days(date(2026, 3, 20), ny) == ["the spring equinox"]
+      and brain.season_days(date(2026, 9, 22), ny) == ["the autumn equinox"]
+      and brain.season_days(date(2026, 10, 31), ny) == ["the clocks go back an hour tonight"]
+      and brain.season_days(date(2026, 11, 1), ny) == ["the clocks went back an hour last night"]
+      and brain.season_days(date(2027, 3, 14), ny) == ["the clocks went forward an hour last night"]
+      and brain.season_days(date(2026, 11, 22), ny) == [],
+      "the solstices, equinoxes and the clocks changing fall on the right days")
+check(brain.winter_of(date(2026, 11, 1)) == "2026-27" == brain.winter_of(date(2027, 2, 1))
+      and brain.freezing(31, "°F") and not brain.freezing(33, "°F") and brain.freezing(-1, "°C"),
+      "the first frost is the first of each winter, in either unit")
+check(brain.curious_subject("Soul", ["Soul", "Alex", "Yuki (dog)"], [{"about": "Alex"}, {"about": "Soul"}]) == "Yuki (dog)"
+      and brain.curious_subject("Soul", ["Soul"], []) == "Soul"
+      and brain.curious_due(None, date(2026, 11, 22)) and not brain.curious_due("2026-11-21", date(2026, 11, 22))
+      and brain.curious_due("2026-11-19", date(2026, 11, 22)),
+      "she's curious about whoever she knows least, at most every few days")
+check(brain.shopping_message("Market Basket", ["milk", "eggs", "bread"]) == "You're at Market Basket. On the list: milk, eggs and bread."
+      and brain.shopping_message("X", ["milk"]) == "You're at X. On the list: milk.",
+      "the shopping list reads naturally")
+readings = [
+    {"id": "a", "name": "Hallway smoke alarm", "kind": "battery", "level": 10},
+    {"id": "b", "name": "Back door sensor", "kind": "battery", "level": None},
+    {"id": "c", "name": "Purifier", "kind": "filter", "level": 2},
+    {"id": "d", "name": "Kitchen motion", "kind": "battery", "level": 80},
+]
+low = brain.upkeep_low(readings)
+check([r["id"] for r in low] == ["c", "a", "b"]
+      and brain.upkeep_line(low).startswith("Running low around the house: Purifier filter 2%, Hallway smoke alarm battery 10%, Back door sensor battery low.")
+      and brain.upkeep_due("2026-11-20", date(2026, 11, 22), low, []) == low
+      and brain.upkeep_due("2026-11-20", date(2026, 11, 22), low, ["c"]) == []
+      and brain.upkeep_due("2026-11-14", date(2026, 11, 22), low, ["c"]) == low
+      and brain.upkeep_due(None, date(2026, 11, 22), [], []) == [],
+      "batteries and filters: lowest first, weekly, or at once when one's about to run out")
+check(brain.photo_line({"taken": "2025-11-22", "place": "Narragansett, Rhode Island", "people": ["Alex", "Yuki"]}, date(2026, 11, 22))
+      == "On this display's screen right now: a photo from November 22, 2025, in Narragansett, Rhode Island, with Alex and Yuki. "
+         "It was taken on this day a year ago. If someone asks about it, that's what it is."
+      and brain.photo_line({"taken": "", "place": "", "people": []}, date(2026, 11, 22)) == "" and brain.photo_line(None, date(2026, 11, 22)) == "",
+      "the photo on the wall: when, where, who, and its anniversary")
+check(set(brain.SPEAK_OPTIONAL) >= {"celebration", "season", "upkeep"} and brain.DEFAULTS["speak_first"] == []
+      and "nickname" in brain.TOOL_KINDS and "nickname" not in brain.KINDS,
+      "the new ways of speaking first are off until chosen, and a nickname isn't a memory")
+
 # ---- 4. The Open WebUI tool offers the integration's own moments -------------------------------
 const = (LENA / "const.py").read_text()
 house_moments = set(re.findall(r'"(\w+)"', re.search(r"HOUSE_MOMENTS = \{(.*?)\}", const).group(1)))

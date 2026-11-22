@@ -205,7 +205,8 @@ def find_area(hass: HomeAssistant, room: str) -> ar.AreaEntry | None:
 
 class LenaSyncView(HomeAssistantView):
     """POST /api/lena/display/sync {"id", "after", "boot", "countdowns": [...], "volume": 0-100, "wake_word",
-    "phase"}: a display reports what it has and what it's doing, and collects what it's been asked to do.
+    "phase", "photo"}: a display reports what it has and what it's doing (and the photo its slideshow shows, as
+    its address on Home Assistant), and collects what it's been asked to do.
     Answers {"boot", "seq", "commands": [...], "quiet"}: quiet is true while it's a bedroom at night.
     """
 
@@ -244,6 +245,9 @@ class LenaSyncView(HomeAssistantView):
         core.hub.report(device.id, countdowns, int(volume) if isinstance(volume, (int, float)) else None,
                         str(wake) if isinstance(wake, str) and wake else None,
                         phase if phase in PHASES else None)
+        if core.around is not None:
+            photo = body.get("photo")
+            core.around.photo_shown(device.id, photo[:500] if isinstance(photo, str) and photo.startswith("/") else None)
         try:
             after = int(body.get("after") or 0)
         except (TypeError, ValueError):

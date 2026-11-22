@@ -64,7 +64,7 @@ def register(hass: HomeAssistant, entry) -> None:
                        vol.Optional("change"): vol.In(["quieter", "louder"]), **TARGET},
         lambda d: abilities.set_volume(core, d.get("level"), d.get("change"), **where(d)), optional)
     add("remember", {vol.Required("fact"): cv.string, vol.Optional("about"): cv.string, vol.Optional("follow_up"): cv.string,
-                     vol.Optional("kind"): vol.In(list(brain.KINDS)), vol.Optional("by"): cv.string},
+                     vol.Optional("kind"): vol.In(list(brain.TOOL_KINDS)), vol.Optional("by"): cv.string},
         lambda d: remembered(core, d), optional)
     add("update_fact", {vol.Required("old"): cv.string, vol.Required("new"): cv.string},
         lambda d: abilities.update_fact(core, d["old"], d["new"]), optional)

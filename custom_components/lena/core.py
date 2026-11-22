@@ -49,7 +49,6 @@ from .const import (
     CONF_ALERT_PHONES,
     CONF_AWAY_HOURS,
     CONF_BEDTIME,
-    CONF_CALENDARS,
     CONF_EMPTY_HOURS,
     CONF_MOMENT_MINUTES,
     CONF_MOOD_CHANGE_CHANCE,
@@ -129,6 +128,7 @@ class LenaCore:
         self.briefings = None  # what she's said first on each display (briefing.Briefings)
         self.routines = None  # the habits she's learned (routines.Routines), set up with the entry
         self.arbiter = None  # which display answers the wake word (wake.Arbiter), set up with the entry
+        self.around = None  # goodnight, celebrations, seasons, shopping, upkeep, photos (around.AroundTheHouse)
         self.glows: list[dict[str, Any]] = []  # what lingers from moments that ended (brain.afterglow_of)
         # Who she's talked with ({person: {"last", "before"}}), what she's said first today, Do not disturb.
         self.presence: dict[str, Any] = {"talks": {}, "spoken": {}, "do_not_disturb": False}
@@ -327,7 +327,13 @@ class LenaCore:
         household member she knows; anyone else is left out rather than guessed), its [kind] (fact, plan,
         or hers: her own opinion or running joke), a [follow_up] day to come back to it (YYYY-MM-DD, from
         today to a year ahead), and who told her ([by]).
+
+        With kind nickname it isn't a memory: [fact] is the house's own word for the device or room named
+        in [about], saved as its alias in Home Assistant (around.add_nickname, which raises when it can't).
         """
+        if kind == brain.NICKNAME:
+            name = self.around.add_nickname(about or "", fact)
+            return {"summary": f"\"{fact.strip()}\" now means {name}", "kind": brain.NICKNAME, "about": name}
         item: dict[str, Any] = {
             "uid": uuid.uuid4().hex, "summary": fact.strip(), "status": "needs_action", "added": dt_util.now().isoformat(),
         }
@@ -552,12 +558,14 @@ class LenaCore:
         return out
 
     def context(self, with_reasons: bool = True, memory: bool = True, devices: bool = False,
-                reminder: bool = False, person: str | None = None, device_id: str | None = None) -> str:
+                reminder: bool = False, person: str | None = None, device_id: str | None = None,
+                talking: bool = False) -> str:
         """The time, who's home, the weather outside from your own sensors, who she's talking with and
         how the room should change how she talks, how she feels (and what still lingers) and what she
         remembers (and, if asked, the home's devices, and last of all the reminder to call a tool before
         saying something's done). [person] is the person's name, [device_id] the device she's talking
-        through (a display or a voice satellite), when they're known.
+        through (a display or a voice satellite), when they're known. [talking] when it's for a message
+        someone just sent (around.py: a greeting or a question is then counted as offered).
         """
         now = dt_util.now()
         home = [s.name for s in self.hass.states.async_all("person") if s.state == STATE_HOME]
@@ -588,6 +596,8 @@ class LenaCore:
             if hers := brain.hers_line(self.todays_hers()):
                 text += "\n" + hers
             parts.append(text)
+        if self.around is not None:
+            parts += self.around.context(person, device_id, talking)
         if devices and (index := self.devices()):
             parts.append(index)
         if reminder:
@@ -688,22 +698,7 @@ class LenaCore:
         """Her morning: she wakes up, and today's special days from the chosen calendars (birthdays and
         the like) can set her mood and its reason.
         """
-        special: list[str] = []
-        calendars = list(self.opt(CONF_CALENDARS) or [])
-        if calendars:
-            start = dt_util.start_of_local_day()
-            try:
-                found = await self.hass.services.async_call(
-                    "calendar", "get_events",
-                    {"entity_id": calendars, "start_date_time": start, "end_date_time": start + timedelta(days=1)},
-                    blocking=True, return_response=True,
-                )
-                for cal in (found or {}).values():
-                    for event in cal.get("events", []):
-                        if (summary := event.get("summary")) and summary not in special:
-                            special.append(summary)
-            except Exception:  # noqa: BLE001 - a calendar problem shouldn't stop her waking up
-                _LOGGER.warning("Couldn't read the special days calendars", exc_info=True)
+        special = await self.around.async_refresh_special() if self.around is not None else []
         self.apply(brain.morning(self.feelings, self.catalog, special, self._weather(), self._rng, self._daylight()),
                    "morning")
 

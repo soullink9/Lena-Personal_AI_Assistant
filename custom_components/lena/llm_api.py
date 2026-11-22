@@ -56,7 +56,7 @@ class RememberTool(llm.Tool):
         vol.Required("fact", description="One short third-person statement saying who it's about, under fifteen words"): cv.string,
         vol.Optional("about", description="Optional. Who it's about: a person's or pet's name"): cv.string,
         vol.Optional("follow_up", description="Optional. YYYY-MM-DD to ask how it went"): cv.string,
-        vol.Optional("kind", description="Optional. hers for your own opinion or running joke"): vol.In(list(brain.KINDS)),
+        vol.Optional("kind", description="Optional. hers for your own opinion or running joke; nickname to name a device or room (fact: the nickname, about: its exact name)"): vol.In(list(brain.TOOL_KINDS)),
     })
 
     async def async_call(self, hass, tool_input, llm_context):
@@ -345,7 +345,7 @@ class LenaAPI(llm.API):
         user = llm_context.context.user_id if llm_context.context else None
         person = core.person_for(user_id=user) if user else None
         core.talked(person)
-        context = core.context(person=person, device_id=llm_context.device_id)
+        context = core.context(person=person, device_id=llm_context.device_id, talking=True)
         # The reminder goes last: it only works there (see HOUSE_REMINDER in brain.py).
         prompt = "\n\n".join([SPOKEN, context, brain.MEMORY_RULES, brain.HOUSE_REMINDER])
         return llm.APIInstance(api=self, api_prompt=prompt, llm_context=llm_context, tools=tools)

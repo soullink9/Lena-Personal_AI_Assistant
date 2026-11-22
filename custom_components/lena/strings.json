@@ -106,12 +106,32 @@
           },
           "personality": {
             "name": "Personality",
-            "description": "Her own opinions and running jokes (memories she saved as hers).",
+            "description": "Her own opinions and running jokes (memories she saved as hers), and her curiosity.",
             "data": {
-              "hers_days": "Bring one up again after"
+              "hers_days": "Bring one up again after",
+              "curious": "Asks getting-to-know-you questions"
             },
             "data_description": {
-              "hers_days": "She has one of them in mind a day, and none comes back sooner than this."
+              "hers_days": "She has one of them in mind a day, and none comes back sooner than this.",
+              "curious": "Now and then, in a relaxed chat, she asks one short question about whoever she knows least (you, someone in the household, a pet) and remembers the answer. At most one per person every 3 days."
+            }
+          },
+          "around_the_house": {
+            "name": "Around the house",
+            "description": "Goodnight, the shopping list, the house's batteries and filters, and celebrations.",
+            "data": {
+              "goodnight": "Goodnight check",
+              "shopping_list": "Shopping list",
+              "shops": "Shops",
+              "upkeep": "Batteries and filters",
+              "celebrate_with": "Celebrate with"
+            },
+            "data_description": {
+              "goodnight": "From three hours before her bedtime, when someone says goodnight she tells them what's still open or unlocked (Speaking first: Check these when everyone leaves) and which lights are on, and offers to see to it.",
+              "shopping_list": "The to-do list she adds to when someone mentions running out of something. Expose it to Assist so her tools can add to it.",
+              "shops": "Zones for the shops you go to. When someone's phone arrives at one, it gets the list (their companion app, as a notification from Lena). Needs a shopping list.",
+              "upkeep": "She knows which batteries and filters are running low (20% for batteries, 10% for filters; phones left out), and mentions it if asked. To have her bring it up, tick Speaking first: Batteries and filters.",
+              "celebrate_with": "A script or scene to run when she first greets a birthday or holiday, such as a light colour or a song."
             }
           }
         }
@@ -410,7 +430,7 @@
         },
         "about": {
           "name": "About",
-          "description": "A person or household member's name (Configure: Also in the household)."
+          "description": "A person or household member's name (Configure: Also in the household); for a nickname, the device or room."
         },
         "follow_up": {
           "name": "Follow up on",
@@ -418,7 +438,7 @@
         },
         "kind": {
           "name": "Kind",
-          "description": "fact, plan, or hers: her own opinion or running joke."
+          "description": "fact, plan, hers (her own opinion or running joke), or nickname: the fact is a nickname for the device or room named in About, saved as its alias."
         },
         "by": {
           "name": "Told by",
@@ -433,7 +453,10 @@
         "welcome": "Welcome home",
         "heading_out": "Before you head out (rain or snow today)",
         "follow_up": "Asking how something went",
-        "routine": "A routine that's late"
+        "routine": "A routine that's late",
+        "celebration": "Birthdays and holidays (Merry Christmas)",
+        "season": "The seasons (first frost, first snow, the shortest day, the clocks changing)",
+        "upkeep": "Batteries and filters running low (at most once a week)"
       }
     }
   }

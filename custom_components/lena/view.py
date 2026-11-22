@@ -43,7 +43,8 @@ class LenaContextView(HomeAssistantView):
         f = core.feelings
         person = core.person_for(name=request.query.get("user")[:100]) if request.query.get("user") else None
         device = request.query.get("device") or None
-        if person and request.query.get("talking") == "1":
+        talking = request.query.get("talking") == "1"
+        if person and talking:
             core.talked(person)
         quiet = core.quiet(device)
         return self.json({
@@ -56,6 +57,7 @@ class LenaContextView(HomeAssistantView):
                 reminder=request.query.get("devices") == "1",
                 person=person,
                 device_id=device,
+                talking=talking,
             ),
             "feelings": {
                 "mood": f.mood,

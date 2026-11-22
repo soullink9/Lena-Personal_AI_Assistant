@@ -9,7 +9,9 @@ photo slideshow, /api/lena/display, where each Lena app registers as a display y
 (see displays.py), /api/lena/display/sync, where displays collect what they're asked to do and report what
 they're doing (hub.py), /api/lena/display/briefing, where they ask whether to speak first (briefing.py), and
 /api/lena/display/wake, where displays that heard her name decide which one answers (wake.py). Her Spoke
-first and Routines sensors (routines.py) and her Do not disturb switch come with her.
+first and Routines sensors (routines.py) and her Do not disturb switch come with her, and what she knows
+around the house (around.py: goodnight, celebrations, the seasons, the shopping list, upkeep, the photo on
+the wall, nicknames).
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 import probatio as vol
 
 from . import actions, events, tidy
+from .around import AroundTheHouse
 from .const import DOMAIN
 from .core import LenaCore, load_catalog
 from .displays import LenaDisplayView, display_id_of, displays
@@ -49,6 +52,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None
     await core.briefings.async_load()
     core.arbiter = Arbiter(hass, core)
     core.routines = Routines(hass, core)
+    core.around = AroundTheHouse(hass, core)
+    await core.around.async_start()
     await core.async_start()
     await core.routines.async_start()
     # Up to 0.6.9 each display had an Announcement event entity; its Assist satellite does that now.
@@ -61,6 +66,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: LenaConfigEntry) -> None
 
     entry.async_on_unload(core.async_stop)
     entry.async_on_unload(core.routines.async_stop)
+    entry.async_on_unload(core.around.async_stop)
     entry.async_on_unload(llm.async_register_api(hass, LenaAPI(hass=hass, id="lena", name="Lena")))
 
     if not hass.data.get(f"{DOMAIN}_view"):
