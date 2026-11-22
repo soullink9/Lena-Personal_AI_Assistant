@@ -2,6 +2,38 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Asked "any lights on?", Lena answered nothing: she called Home Assistant's tool by a name one character off, and then went in circles. **Update the Open WebUI filter.**
+
+### Open WebUI
+
+- **Filter: tool names she misspells are put right.** Open WebUI names an MCP server's tools after the server's ID (`<ID>_<tool>`), so with Home Assistant's MCP server added as `home-assistant`, its live-state tool is `home-assistant_homeassistant__GetLiveContext`. She wrote `home_assistant_…`, Open WebUI answered "Tool not found", and with nothing to answer from, her thinking repeated itself until the 4096-token cap stopped her, after 25 seconds of silence. The filter now checks each tool call as her answer streams in (its new `stream` step) and, when the name differs from a tool she was offered only in case or punctuation, uses that tool's name. Only an offered tool and an unambiguous match are used, so she can never call a tool she wasn't given; each correction is logged as `Lena filter: she called …`.
+
+### Docs
+
+- [Lena in Open WebUI](docs/open-webui/Setup.md): a new **Home Assistant's house tools** part on adding Home Assistant's MCP server, with an ID of letters, digits and underscores only (`home_assistant`); **Always Loaded** now shows `home_assistant_*`; and what `Error: Tool "…" not found.` in her reasoning means.
+- [Architecture](ARCHITECTURE.md): the filter's tool-name step.
+
+### Tests
+
+- `tools/check.py` checks that the filter maps a hyphen written as an underscore to the offered tool, corrects it inside a streamed piece of her answer, and leaves exact, unknown and ambiguous names alone.
+
+### Updating
+
+1. Paste the new `open-webui/lena_filter.py` over the old filter (Admin Panel → Functions); its settings are kept.
+2. Optional: give Home Assistant's MCP server an ID with no hyphen (Admin Panel → Settings → External Tools, for example `home_assistant`), then tick it again under Workspace → Models → `lena` → Tools, and change `home-assistant_*` to `home_assistant_*` if you use Tool Search's Always Loaded.
+3. Keep **Think (Ollama)** off on the `lena` model and the **Think** button in the chat box off: the answer that failed was thinking, which is what let one wrong name turn into 4096 tokens of going in circles.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: No update needed
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: Need to update
+- Voice Bridge: No update needed
+
 ## [0.6.43] - 2026-11-22
 
 Safer out of the box for anyone who installs Lena, after a security review. **Update everything except the Modelfile, and read the steps below: the voice bridge now needs a key, and Home Assistant users who aren't admins must be allowed before they can use Lena.**

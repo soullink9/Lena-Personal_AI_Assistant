@@ -3,7 +3,7 @@ title: Lena (feelings and memory)
 author: soullink9
 version: 0.6.43
 license: GPL-3.0
-description: Adds the time at home, who she's talking with, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant, and tells her how much time passed between messages.
+description: Adds the time at home, who she's talking with, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant, tells her how much time passed between messages, and puts right a tool name she gets wrong only in case or punctuation.
 """
 
 # =============================================================================
@@ -39,6 +39,13 @@ description: Adds the time at home, who she's talking with, Lena's current feeli
 #   Lena app adds the same notes itself (TimePassing.kt, in the same words),
 #   so its requests are left alone here. This works without Home Assistant.
 #
+#   And it checks the names of the tools she calls as her answer streams in:
+#   Open WebUI calls an MCP server's tools "<server ID>_<tool>", and a model
+#   tends to write a hyphen in the ID as an underscore. Open WebUI then
+#   answers "Tool not found" and she has nothing to answer with. A name that
+#   differs from one of the tools she was given only in case or punctuation
+#   is put right; any other name is left alone.
+#
 # THE TOKEN
 #   A Home Assistant admin's long-lived access token, or one of a user allowed
 #   in Lena's options (Who may use Lena), works (Profile >
@@ -51,6 +58,7 @@ import asyncio
 import inspect
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -230,6 +238,67 @@ def with_time_notes(messages: list[dict], earlier: list[dict], now: float, zone)
     return out
 
 
+def _tool_key(name: str) -> str:
+    """A tool name with case and punctuation ignored: "home-assistant_homeassistant__GetLiveContext"
+    and "home_assistant_homeassistant__getlivecontext" give the same key.
+    """
+    return re.sub(r"[^0-9a-z]+", "_", name.casefold()).strip("_")
+
+
+def offered_tool_names(body: Optional[dict], metadata: Optional[dict]) -> set:
+    """The names of the tools this request offered her: those sent to the model, and those Open WebUI
+    resolved for it (which include any Tool Search held back).
+    """
+    names = set()
+    for tool in (body or {}).get("tools") or []:
+        if isinstance(tool, dict):
+            name = (tool.get("function") or tool).get("name")
+            if isinstance(name, str) and name:
+                names.add(name)
+    tools = (metadata or {}).get("tools")
+    if isinstance(tools, dict):
+        names.update(name for name in tools if isinstance(name, str) and name)
+    return names
+
+
+def matching_tool_name(name: str, offered: set) -> Optional[str]:
+    """The offered tool [name] was meant to be, when she misspelt it only in case or punctuation, else None.
+
+    Open WebUI names an MCP server's tools "<server ID>_<tool>", so with Home Assistant's server added
+    under the ID "home-assistant", its GetLiveContext is "home-assistant_homeassistant__GetLiveContext".
+    A model tends to write that "home_assistant_...", and Open WebUI answers "Tool not found" to a name
+    that's off by one character; she then had nothing to answer with. Only a tool she was offered, and
+    only one matching exactly one, is used, so this never gives her a tool she didn't have.
+    """
+    if not name or name in offered:
+        return None
+    key = _tool_key(name)
+    matches = [tool for tool in offered if _tool_key(tool) == key]
+    return matches[0] if len(matches) == 1 else None
+
+
+def fix_tool_names(event: dict, offered: set) -> list:
+    """Puts the right names on the tool calls in one streamed piece of her answer (see
+    matching_tool_name). Returns the (wrong, right) pairs it changed.
+    """
+    changed = []
+    for choice in (event or {}).get("choices") or []:
+        if not isinstance(choice, dict):
+            continue
+        for part in (choice.get("delta"), choice.get("message")):
+            if not isinstance(part, dict):
+                continue
+            for call in part.get("tool_calls") or []:
+                function = call.get("function") if isinstance(call, dict) else None
+                if not isinstance(function, dict) or not isinstance(function.get("name"), str):
+                    continue
+                right = matching_tool_name(function["name"], offered)
+                if right:
+                    changed.append((function["name"], right))
+                    function["name"] = right
+    return changed
+
+
 async def _saved_chat(chat_id: str) -> Optional[dict]:
     """The chat as Open WebUI saved it (with each message's time), or None. Open WebUI's own models are
     only importable inside Open WebUI; some of its versions make this call async.
@@ -244,7 +313,7 @@ async def _saved_chat(chat_id: str) -> Optional[dict]:
 
 class Filter:
     """Open WebUI calls inlet() with every request to the model it's attached to (only lena), before
-    the model sees it.
+    the model sees it, and stream() with each piece of her answer as it comes.
     """
     class Valves(BaseModel):
         """The filter's settings, shown under its gear icon in Open WebUI and kept on the server."""
@@ -368,3 +437,17 @@ class Filter:
             messages.insert(0, {"role": "system", "content": text})
         body["messages"] = messages
         return body
+
+    def stream(self, event: dict, __body__: Optional[dict] = None, __metadata__: Optional[dict] = None) -> dict:
+        """Corrects a tool name she got wrong only in case or punctuation before Open WebUI looks the
+        tool up (see matching_tool_name). Anything unexpected leaves the piece as it was: Open WebUI
+        stops the answer when a stream filter fails.
+        """
+        try:
+            if not isinstance(event, dict) or not event.get("choices"):
+                return event
+            for wrong, right in fix_tool_names(event, offered_tool_names(__body__, __metadata__)):
+                log.info("Lena filter: she called %r; using the tool she was given, %r", wrong, right)
+        except Exception as error:  # noqa: BLE001 - never break her answer over this
+            log.warning("Lena filter: couldn't check a tool name: %s", error)
+        return event

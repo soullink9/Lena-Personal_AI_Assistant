@@ -70,6 +70,12 @@ Its `add_calendar_event` runs the `lena.add_event` action in Home Assistant, so 
 
 The Lena app uses the model's tools and filters automatically, so there's nothing to set in the app.
 
+### Home Assistant's house tools
+
+Lights, covers and everything else in the house reach her through Home Assistant's own MCP server (Home Assistant's **Model Context Protocol Server** integration), added in Open WebUI under Admin Panel → Settings → **External Tools** and ticked under Workspace → Models → `lena` → **Tools**. Open WebUI names each of its tools after the **ID** you give the server there: with the ID `home_assistant`, Home Assistant's `homeassistant__GetLiveContext` reaches her as `home_assistant_homeassistant__GetLiveContext`.
+
+- **ID:** use only letters, digits and underscores, for example `home_assistant`. A model tends to write a hyphen in a tool name as an underscore, and Open WebUI answers "Tool not found" to a name that's off by one character; with `home-assistant` she asked "any lights on?" and couldn't look. The Lena filter puts the right name back when she gets only case or punctuation wrong, so an existing hyphenated ID works too, but a plain one avoids the slip.
+
 ### Turn Tool Search off
 
 Open WebUI's **Tool Search** (Admin Panel → Settings → Interface, off unless you turned it on) hands the model only short tools. Any tool whose definition is longer than **Tool Search Defer Threshold** (400 characters unless changed) is hidden behind `search_tools` until she searches for it, and she rarely does. Most of her tools are longer than that, because their descriptions tell her when and how to use them: with Tool Search on she can't save a memory (`remember`) or record a feeling (`feel`), and says she did anyway. Leave Tool Search **off**.
@@ -77,10 +83,10 @@ Open WebUI's **Tool Search** (Admin Panel → Settings → Interface, off unless
 If you need it on for other models, put her tools in **Always Loaded** instead, so she always has them:
 
 ```
-remember,forget,update_fact,feel,home-assistant_*
+remember,forget,update_fact,feel,home_assistant_*
 ```
 
-`home-assistant_` is the ID you gave Home Assistant's MCP server in Open WebUI; change it if yours differs.
+`home_assistant` is the ID you gave Home Assistant's MCP server in Open WebUI (see [Home Assistant's house tools](#home-assistants-house-tools)); change it if yours differs.
 
 ### Context Compaction
 
@@ -109,5 +115,6 @@ A change in Home Assistant can take up to a minute (`cache_seconds`) to reach he
 - **Nothing from Home Assistant at all:** open `<ha_url>/api/lena/context` with the token (for example with `curl -H "Authorization: Bearer <token>"`). A 404 means the Lena integration isn't set up; a 401 means the token is wrong.
 - **She never uses the tool:** check Function Calling is **Native** and the tool is ticked on the model.
 - **She says she saved something, but Lena Memory doesn't have it:** she didn't have the tool to save it. Open her reasoning ("Thought for…"): if `remember` isn't in the tools she lists, Tool Search hid it. See [Turn Tool Search off](#turn-tool-search-off).
+- **She answers nothing to a house question, and her reasoning shows `Error: Tool "…" not found.`:** the name she used isn't one Open WebUI gave her. Update the Lena filter (it corrects a name that's off only in case or punctuation, such as `home_assistant_…` for `home-assistant_…`), and give Home Assistant's MCP server an ID of letters, digits and underscores only (see [Home Assistant's house tools](#home-assistants-house-tools)). The filter logs each correction as `Lena filter: she called …`.
 - **"Thought for 3 minutes" and she goes in circles** (the same sentence drafted over and over): thinking is on. Turn off **Think (Ollama)** on the `lena` model and the **Think** button in the chat box, and rebuild her from the current Modelfile, which tells her not to draft replies while thinking and stops a runaway reply at 4096 tokens.
 - More in [Troubleshooting](../home-assistant/Troubleshooting.md).

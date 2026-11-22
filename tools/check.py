@@ -28,6 +28,7 @@ import py_compile
 import random
 import re
 import sys
+import types
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
@@ -388,6 +389,27 @@ def _loaded(name: str, path: Path):
 check(_loaded("lena_brain_reminder", ROOT / "custom_components" / "lena" / "brain.py").HOUSE_REMINDER
       == _loaded("lena_personality_check", ROOT / "tools" / "personality_check.py").HOUSE_REMINDER,
       "tools/personality_check.py sends the same reminder as the integration (HOUSE_REMINDER in brain.py)")
+
+# The Open WebUI filter puts right a tool name she gets wrong only in case or punctuation, and never
+# gives her a tool she wasn't offered. Open WebUI's pydantic is stood in for when it isn't installed.
+if importlib.util.find_spec("pydantic") is None:
+    _pydantic = types.ModuleType("pydantic")
+    _pydantic.BaseModel = object
+    _pydantic.Field = lambda default=None, **_: default
+    sys.modules["pydantic"] = _pydantic
+_filter = _loaded("lena_owui_filter", OWUI_FILTER)
+_offered = {"home-assistant_homeassistant__GetLiveContext", "home-assistant_homeassistant__HassTurnOn", "remember"}
+check(_filter.matching_tool_name("home_assistant_homeassistant__GetLiveContext", _offered)
+      == "home-assistant_homeassistant__GetLiveContext",
+      "the filter maps home_assistant_… to the offered home-assistant_… tool")
+check(_filter.matching_tool_name("remember", _offered) is None
+      and _filter.matching_tool_name("delete_everything", _offered) is None
+      and _filter.matching_tool_name("a_b", {"a-b", "a.b"}) is None,
+      "the filter leaves exact, unknown and ambiguous tool names alone")
+_event = {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"name": "Home_Assistant_HomeAssistant__GetLiveContext"}}]}}]}
+_filter.fix_tool_names(_event, _offered)
+check(_event["choices"][0]["delta"]["tool_calls"][0]["function"]["name"] == "home-assistant_homeassistant__GetLiveContext",
+      "the filter corrects a tool call's name in a streamed piece of her answer")
 
 # ---- 7. Python files compile ---------------------------------------------------------------------
 for path in [BRIDGE, OWUI_FILTER, OWUI_TOOLS, *sorted(LENA.glob("*.py")), *sorted((ROOT / "tests" / "home-assistant" / "tests").glob("*.py"))]:
