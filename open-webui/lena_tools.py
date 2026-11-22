@@ -22,7 +22,8 @@ description: Lets Lena save, correct and remove her Home Assistant memories, rec
 #                      the same list she uses in Home Assistant. remember runs
 #                      lena.remember, which keeps who it's about, a day to ask
 #                      how it went, whether it's her own opinion, and who said it
-#                      (your Open WebUI name).
+#                      (your Open WebUI name); or saves a nickname for a device or
+#                      room as its alias in Home Assistant.
 #   feel               runs the lena.feel action, the same way her voice does,
 #                      so her reaction carries everywhere.
 #   add_calendar_event runs the lena.add_event action, which adds the event with
@@ -156,7 +157,7 @@ class Tools:
         fact: str,
         about: str = "",
         follow_up: str = "",
-        kind: Literal["fact", "plan", "hers", ""] = "",
+        kind: Literal["fact", "plan", "hers", "nickname", ""] = "",
         __user__: dict | None = None,
     ) -> str:
         """
@@ -167,7 +168,7 @@ class Tools:
         :param fact: One short statement in the third person, under fifteen words, saying who it's about. For example "Alex likes the office at seventy degrees."
         :param about: Optional. Who it's about: a person's or pet's name.
         :param follow_up: Optional. YYYY-MM-DD to ask how it went.
-        :param kind: Optional. hers for your own opinion or running joke.
+        :param kind: Optional. hers for your own opinion or running joke; nickname to name a device or room (fact: the nickname, about: its exact name).
         """
         if not self.valves.ha_token:
             return "Memory isn't set up: the tool has no Home Assistant token."
