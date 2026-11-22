@@ -40,7 +40,8 @@ description: Adds the time at home, who she's talking with, Lena's current feeli
 #   so its requests are left alone here. This works without Home Assistant.
 #
 # THE TOKEN
-#   Any Home Assistant user's long-lived access token works (Profile >
+#   A Home Assistant admin's long-lived access token, or one of a user allowed
+#   in Lena's options (Who may use Lena), works (Profile >
 #   Security > Long-lived access tokens). A user just for Lena, without admin
 #   rights, is the safer choice. Open WebUI keeps it on your server; only
 #   Open WebUI admins can see function settings.
@@ -51,6 +52,7 @@ import inspect
 import json
 import logging
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -293,6 +295,14 @@ class Filter:
         try:
             body = await asyncio.to_thread(_get, url, self.valves.ha_token, 4)
             return (body.get("context") or "").strip()
+        except urllib.error.HTTPError as error:
+            # A 403 from Lena means the token's user isn't allowed (Who may use Lena); her answer says so.
+            try:
+                reason = json.loads(error.read()).get("message") or error
+            except Exception:  # noqa: BLE001 - not her answer: the plain error says enough
+                reason = error
+            log.warning("Lena filter: Home Assistant request failed: %s", reason)
+            return ""
         except Exception as error:  # noqa: BLE001 - she should still chat if Home Assistant is down
             log.warning("Lena filter: Home Assistant request failed: %s", error)
             return ""

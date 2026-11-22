@@ -72,22 +72,33 @@ class RememberTool(llm.Tool):
 
 
 class ForgetTool(llm.Tool):
-    """forget_fact: removes the saved fact that best matches what she was asked to forget."""
+    """forget_fact: removes the saved fact she was asked to forget, when it's clear which one."""
     name = "forget_fact"
     title = "Forget a fact"
     annotations = CHANGES
     integration = DOMAIN
     description = "Remove something from your memory when someone asks you to forget it."
     parameters = vol.Schema({
-        vol.Required("fact", description="What to forget, in a few words; the closest saved memory is removed"): cv.string,
+        vol.Required("fact", description=(
+            "What to forget, in a few words, or the memory's exact words. It's removed only when it's clear "
+            "which saved memory is meant; otherwise you get the closest ones back to ask which"
+        )): cv.string,
     })
 
     async def async_call(self, hass, tool_input, llm_context):
-        """Forgets the closest match, or says nothing like it was saved, so she doesn't claim to have
-        forgotten something she never knew.
+        """Forgets the memory meant when that's clear; otherwise removes nothing and gives back the
+        closest few, so she asks which one instead of deleting the wrong memory for good. With nothing
+        like it saved she says so, rather than claim to have forgotten something she never knew.
         """
-        removed = _core(hass).forget(tool_input.tool_args["fact"])
-        return llm.ToolResult(data={"forgot": removed} if removed else {"forgot": None, "note": "Nothing like that was saved."})
+        removed, choices = _core(hass).forget(tool_input.tool_args["fact"])
+        if removed:
+            return llm.ToolResult(data={"forgot": removed})
+        if choices:
+            return llm.ToolResult(data={"forgot": None, "closest": choices, "note": (
+                "Nothing was removed: it isn't clear which memory they mean. Ask them which one, "
+                "then call forget_fact again with that memory's exact words."
+            )})
+        return llm.ToolResult(data={"forgot": None, "note": "Nothing like that was saved."})
 
 
 class FeelTool(llm.Tool):

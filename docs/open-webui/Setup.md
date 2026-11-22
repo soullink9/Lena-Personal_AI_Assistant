@@ -31,7 +31,7 @@ Workspace → Models → `lena` (edit it; if it isn't listed, create a model wit
 
 In Home Assistant: your profile (bottom left) → **Security** → **Long-lived access tokens** → Create token. Name it "Open WebUI" and copy it.
 
-Any user's token works; no admin rights are needed. A Home Assistant user just for Lena, without admin rights, is the safer choice. Open WebUI keeps the token on your server, and only Open WebUI admins can see function and tool settings.
+A Home Assistant user just for Lena, without admin rights, is the safer choice: allow it under **Who may use Lena** in Lena's options (Settings → Devices & services → Lena → Configure), or the filter gets "may not use Lena". An admin's token works too. Open WebUI keeps the token on your server, and only Open WebUI admins can see function and tool settings.
 
 ## 4. Add the filter
 

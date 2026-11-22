@@ -42,7 +42,7 @@ from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from . import brain
+from . import access, brain
 from .const import CONF_ENTRANCES, CONF_FOLLOW_UP_LISTEN, CONF_SPEAK_DAILY, DOMAIN
 from .displays import display_id_of, displays
 
@@ -222,7 +222,7 @@ def follow_up_for(core, now: datetime) -> dict[str, Any] | None:
 async def follow_up(core, item: dict[str, Any]) -> str:
     """Asking how something went, in her words."""
     who = item.get("by") or "them"
-    prompt = (f"You remember this: \"{item['summary']}\" It's time to ask {who} how it went. Ask in one short, "
+    prompt = (f"You remember this: {brain.outside(item['summary'])} It's time to ask {who} how it went. Ask in one short, "
               "natural spoken sentence, in your own voice, as someone who remembered. Reply with only what you'd say.")
     return await core.in_her_words(prompt, task_name="Lena's follow-up") or f"You told me: {item['summary']} How did it go?"
 
@@ -230,7 +230,7 @@ async def follow_up(core, item: dict[str, Any]) -> str:
 async def routine_late(core, name: str, groups: dict, now: datetime) -> str:
     """Noticing a habit hasn't happened yet today, gently, in her words."""
     line = brain.routine_line(name, groups, now)
-    prompt = (f"You noticed something about the household's day: {line} Mention it in one short, light spoken "
+    prompt = (f"You noticed something about the household's day: {brain.outside(line)} Mention it in one short, light spoken "
               "sentence, in your own voice: noticing, not nagging. Reply with only what you'd say.")
     return await core.in_her_words(prompt, task_name="Lena noticing") or line
 
@@ -238,7 +238,7 @@ async def routine_late(core, name: str, groups: dict, now: datetime) -> str:
 async def celebration(core, device, special: list[str]) -> str:
     """Greeting the day: a birthday, a holiday, in her words."""
     room = _area_name(core, device)
-    prompt = (f"Today is special: {', '.join(special)}. Someone just walked into the {room or 'room'}. Greet them for "
+    prompt = (f"Today is special: {', '.join(brain.outside(s) for s in special)}. Someone just walked into the {room or 'room'}. Greet them for "
               "it in one or two short spoken sentences, warmly, in your own voice (Merry Christmas, happy birthday to "
               "whoever's birthday it is). Nothing made up. Reply with only what you'd say.")
     return await core.in_her_words(prompt, task_name="Lena's greeting") or f"Happy {special[0]}!"
@@ -247,7 +247,7 @@ async def celebration(core, device, special: list[str]) -> str:
 async def seasonal(core, season: list[str]) -> str:
     """Remarking on the season, once, in her words."""
     line = "; ".join(season)
-    prompt = (f"Something about today: {line}. Someone just came in. Remark on it in one short, natural spoken sentence, "
+    prompt = (f"Something about today: {brain.outside(line)}. Someone just came in. Remark on it in one short, natural spoken sentence, "
               "the way anyone in the house would, in your own voice. Reply with only what you'd say.")
     return await core.in_her_words(prompt, task_name="Lena noticing") or f"Today: {line[0].upper() + line[1:]}."
 
@@ -255,7 +255,7 @@ async def seasonal(core, season: list[str]) -> str:
 async def upkeep(core, low: list[dict[str, Any]]) -> str:
     """The house's batteries and filters running low, in her words."""
     what = ", ".join(brain.upkeep_words(r) for r in low[:brain.UPKEEP_SHOWN])
-    prompt = (f"Running low around the house: {what}. Mention it in one or two short spoken sentences, in your own "
+    prompt = (f"Running low around the house: {brain.outside(what)}. Mention it in one or two short spoken sentences, in your own "
               "voice: helpful, not nagging, the most urgent first. Reply with only what you'd say.")
     return await core.in_her_words(prompt, task_name="Lena noticing") or f"Running low: {what}."
 
@@ -277,7 +277,8 @@ async def todays_forecast(core) -> dict[str, Any]:
 
 async def facts(core, device) -> list[str]:
     """What a morning briefing can mention: today, the weather (your own sensors first), today's calendar,
-    trash and recycling, and any worry.
+    trash and recycling, and any worry. Text from outside the house's control (calendar titles, sensor
+    names and states, special days) is quoted with brain.outside, so her model reads it as data.
     """
     hass = core.hass
     now = dt_util.now()
@@ -299,18 +300,19 @@ async def facts(core, device) -> list[str]:
                     str(day.get("condition") or "").replace("-", " ")]
             out.append("Today's forecast: " + ", ".join(b for b in bits if b) + ".")
     events = await todays_events(hass)
-    out.append(("On the calendar today: " + "; ".join(events) + ".") if events else "Nothing on the calendar today.")
+    out.append(("On the calendar today: " + "; ".join(brain.outside(e) for e in events) + ".") if events else "Nothing on the calendar today.")
     for state in hass.states.async_all():
         name = state.name.lower()
         if state.domain in ("sensor", "binary_sensor", "calendar") and any(w in name + " " for w in TRASH_WORDS) \
                 and state.state not in ("unavailable", "unknown"):
-            out.append(f"{state.name}: {state.state}{' ' + state.attributes['unit_of_measurement'] if state.attributes.get('unit_of_measurement') else ''}.")
+            unit = f" {state.attributes['unit_of_measurement']}" if state.attributes.get("unit_of_measurement") else ""
+            out.append(brain.outside(f"{state.name}: {state.state}{unit}") + ".")
     if special := core.around.special_days():
-        out.append(f"Today is special: {', '.join(special)}.")
+        out.append(f"Today is special: {', '.join(brain.outside(s) for s in special)}.")
     if season := core.around.season_today(now.date()):
         out.append("About today: " + "; ".join(season) + ".")
     if core.feelings.moment == "Worried" and core.feelings.moment_reason:
-        out.append(f"Needs attention: {core.feelings.moment_reason}.")
+        out.append(f"Needs attention: {brain.outside(core.feelings.moment_reason)}.")
     return out
 
 
@@ -355,7 +357,9 @@ async def morning_briefing(core, device) -> str:
     )
     if text := await core.in_her_words(prompt, task_name="Lena's morning briefing"):
         return text
-    return "Good morning. " + " ".join(l for l in lines[1:] if not l.startswith("They just came"))[:600]
+    # Said plainly, the quote marks around outside text aren't wanted.
+    plain = " ".join(l for l in lines[1:] if not l.startswith("They just came")).replace("«", "").replace("»", "")
+    return "Good morning. " + plain[:600]
 
 
 class LenaBriefingView(HomeAssistantView):
@@ -369,6 +373,8 @@ class LenaBriefingView(HomeAssistantView):
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app[KEY_HASS]
+        if denied := access.refused(self, request):  # admins and the users chosen in her options
+            return denied
         core = hass.data.get(DOMAIN)
         if core is None:
             return self.json_message("Lena isn't set up", status_code=404)

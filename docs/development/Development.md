@@ -36,6 +36,7 @@ How the repository is organized and how to change it without breaking things. Th
 │   ├── sensor.py, switch.py       Lena Spoke first, Lena Routines, and Do not disturb
 │   ├── tidy.py                    her memory tidy: the request, checking the answer, the changes
 │   ├── view.py                    GET /api/lena/context for Open WebUI and the app
+│   ├── access.py                  who may use /api/lena/...: admins and the users chosen under Who may use Lena
 │   ├── select.py, todo.py         her dropdowns and her memory list
 │   ├── config_flow.py             adding and configuring her in the UI
 │   └── brand/                     her icon and logo in Home Assistant (made by make_images.py)
@@ -111,7 +112,7 @@ On Gitea every push runs every test (`.gitea/workflows/test.yml`). On GitHub, th
 | A feeling's name (adding, renaming) | `feelings.yaml`; the tables in `brain.py` if her drift uses it; for moments she sets herself, the `Literal` in `open-webui/lena_tools.py`. See [Her feelings](../personality/Moods.md#adding-or-removing-one). |
 | An entity ID the integration creates | The [integration](../home-assistant/Integration.md) and [installation](../home-assistant/Installation.md) pages, the `memory_list` setting of the Open WebUI tool, and `DEFAULT_MEMORY_LIST` in the app's `Prefs.kt` |
 | What `/api/lena/context` returns | `view.py`, `open-webui/lena_filter.py`, `HomeAssistant.kt` in the app, and the [integration](../home-assistant/Integration.md) page |
-| How `forget_fact` picks a memory | `best_match` in `brain.py` and `_best_match` in `open-webui/lena_tools.py` |
+| How `forget_fact` and `update_fact` pick a memory (only when it's clear) | `find_memory` in `brain.py` and `_find_memory` in `open-webui/lena_tools.py` |
 | How calendar events are added | `events.py` (shared by `add_calendar_event` and `lena.add_event`), the `add_calendar_event` method's description in `open-webui/lena_tools.py`, `services.yaml` and `strings.json`, and [Calendars](../home-assistant/Integration.md#calendars) |
 | Lena's look for Open WebUI (`assets/css/open_webui.css`) | The [app guide](../app/How-It-Works.md). It relies on Open WebUI's Tailwind color variables and a few ids (`message-input-container`, `send-message-button`, `response-content-container`); check them against a new Open WebUI release. |
 | `num_ctx` in the Modelfile | Home Assistant's context window advice in [Installation](../home-assistant/Installation.md) and [Performance tuning](../home-assistant/Performance-Tuning.md), and the default of **Her context size** (Settings → Model) in `adjustments/defaults.env` |

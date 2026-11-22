@@ -23,7 +23,7 @@ What the integration creates, what she's told, and what else can use it. Everyth
 | Device | Each Lena display | Every Lena app with Home Assistant set up registers itself as a device under Lena, named after the tablet or phone. Put it in a room (its **Area**) and it's room-aware. Delete one you no longer use. |
 | Assist satellite | `assist_satellite.<display>` | Each display as Home Assistant's own voice-assistant device, like a Voice Preview Edition: `assist_satellite.announce` and `start_conversation`, Home Assistant's broadcast, its timers, and the wake word choice all reach the tablet. |
 | AI choice | **Lena** under *Control Home Assistant* | Adds her context and tools to a conversation agent. Tick it together with **Assist**. |
-| Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Any user's token works. |
+| Address | `GET /api/lena/context` | Her context as text and JSON, for Open WebUI and the Lena app. Admins, and the users chosen under **Who may use Lena**. |
 | Address | `GET /api/lena/media` | Home Assistant's media folders and photos, for the app's slideshow. |
 | Address | `POST /api/lena/display` | Where each Lena app registers as a display and learns its room, the room's speakers and its Assist satellite. |
 | Address | `POST /api/lena/display/wake` | Where a display that heard her name asks whether it should answer (One display answers). |
@@ -61,6 +61,12 @@ You can see exactly what was sent in the voice assistant's debug view (Settings 
 ## Alerts
 
 Under **Configure**, **Tell these phones when she's worried** lists your phones' companion-app notify actions (`notify.mobile_app_…`). When a worry sensor has been on (or a worry lock unlocked or jammed, or a worry cover open) for two minutes, each phone gets a notification titled **Lena**. With an agent chosen under **Write alerts in her words with**, she writes it herself ("Water under the sink. Go look, now."); without one, or if she takes longer than 45 seconds, it's the plain reason ("Leak sensor is detecting water."). When the sensor clears, an all-clear replaces it, unless you turn **Also tell them when it's sorted** off. Tapping either opens the Lena app, listening.
+
+**Choose an agent without house control.** Her alerts, morning briefing and greetings are written from prompts that hold outside text: calendar event titles (anyone can send you an invitation), list items, her memories, sensor names. Nobody is watching when they run, so the agent chosen here must have **Control Home Assistant** turned off (an Ollama conversation agent's options). One that can control the house isn't used: Lena says so in a notification, alerts send the plain reason, and Home Assistant's AI Task (which has no tools) writes the briefings and greetings. The outside text is also quoted in her prompts as information, never instructions.
+
+## Who may use Lena
+
+Lena's web addresses (`/api/lena/...`: her context and memory, the displays, the photo frame) answer Home Assistant **admins**, and the users chosen under **Configure → Who may use Lena**. Any other account gets "This Home Assistant user may not use Lena" (HTTP 403). If the Lena app, Open WebUI's Lena filter or the voice bridge signs in with an account that isn't an admin, choose it there. Leave children's and guests' accounts out: her memory holds what the household told her about each other.
 
 ## Editing her feelings
 
@@ -193,7 +199,7 @@ Returns:
 }
 ```
 
-`voice` is how her voice follows her feelings (`{"speed", "pitch", "volume"}`, 1 for unchanged), for the voice bridge, and `quiet` whether the display's room wants quiet now. Add `?user=<name>` (an Open WebUI user's name) to say who she's talking with, `&talking=1` when it's for a message they just sent, and `?device=<a display's device id>` for the room she's in. Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. With the devices comes the same **Before you answer** reminder Home Assistant's own conversations get, at the very end. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. Any user's token works; no admin rights are needed.
+`voice` is how her voice follows her feelings (`{"speed", "pitch", "volume"}`, 1 for unchanged), for the voice bridge, and `quiet` whether the display's room wants quiet now. Add `?user=<name>` (an Open WebUI user's name) to say who she's talking with, `&talking=1` when it's for a message they just sent, and `?device=<a display's device id>` for the room she's in. Add `?memory=0` to leave her memory out of `context`, `?reasons=0` to leave out the reasons, or `?devices=1` to add **Your home**: the exact names (and aliases) of everything exposed to Assist, by room and kind, without states, for Open WebUI, whose house tools match names exactly. With the devices comes the same **Before you answer** reminder Home Assistant's own conversations get, at the very end. It lists up to 400 (calendars included, since their tool wants the exact name), skipping scripts and to-do lists, which have tools of their own. An admin's token works, or one of a user chosen under **Who may use Lena** in Lena's options.
 
 ## /api/lena/display
 
@@ -201,7 +207,7 @@ Returns:
 POST /api/lena/display   {"id": "<the app's own id>", "name": "Kitchen tablet"}
 ```
 
-Registers the app as a display the first time (and adds its Assist satellite), then just reads it. Returns its `device_id`, `name`, `area` (`{"id", "name"}`, or null), the room's `speakers` (`entity_id`, `name`, `music_assistant`; Music Assistant's first) and its `satellite`. Any user's token works.
+Registers the app as a display the first time (and adds its Assist satellite), then just reads it. Returns its `device_id`, `name`, `area` (`{"id", "name"}`, or null), the room's `speakers` (`entity_id`, `name`, `music_assistant`; Music Assistant's first) and its `satellite`. An admin's token works, or one of a user chosen under **Who may use Lena**.
 
 ## /api/lena/media
 
@@ -213,7 +219,7 @@ GET /api/lena/media?id=media-source://immich/...     a folder: {"title", "childr
 GET /api/lena/media?id=...&photos=1                  its photos: {"title", "photos": ["/immich/.../preview/image/jpeg", ...]}
 ```
 
-Photos are paths on this Home Assistant (fetch them with the same token). Immich photos come at its screen-sized "preview" quality. Folders and photos only; videos and other files are left out. Any user's token works.
+Photos are paths on this Home Assistant (fetch them with the same token). Immich photos come at its screen-sized "preview" quality. Folders and photos only; videos and other files are left out. An admin's token works, or one of a user chosen under **Who may use Lena**.
 
 ## Tests
 

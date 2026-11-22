@@ -176,9 +176,13 @@ check("Mood: Grumpy." in text and "Why: It's raining." in text and "Just now: Pl
       "her prompt describes only the feelings she has right now")
 check("Why:" not in brain.describe(brain.Feelings(mood="Grumpy", mood_reason="x"), catalog, with_reasons=False),
       "reasons can be left out")
-items = ["Alex likes the office at seventy degrees.", "Sam is allergic to cats."]
-check(brain.best_match("office temperature", items) == items[0] and brain.best_match("Sam allergy", items) == items[1]
-      and brain.best_match("quantum physics", items) is None, "forgetting finds the memory meant, and only that")
+items = ["Alex likes the office at seventy degrees.", "Sam is allergic to cats.", "Sam's vet appointment is Friday."]
+check(brain.find_memory("office", items) == (items[0], []) and brain.find_memory("allergy", items) == (items[1], [])
+      and brain.find_memory("quantum physics", items) == (None, []), "forgetting finds the memory meant, and only that")
+check(brain.find_memory("office temperature", items) == (None, [items[0]])
+      and brain.find_memory("dentist appointment", items) == (None, [items[2]])
+      and brain.find_memory("Sam", items)[0] is None,
+      "a memory that's only partly matched, or quoted in several, is offered back instead of removed")
 
 # ---- 3b. Who and where, one display answering, memory, speaking first, routines, afterglow, voice ------
 # The newer rules are plain functions in brain.py too, so they're tried here with fixed times.

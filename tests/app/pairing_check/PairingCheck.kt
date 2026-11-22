@@ -128,6 +128,12 @@ fun main() {
         form.contains("Saved: leave empty to keep it") && !form.contains("hunter2") && phoneArrived,
         "the page fills in addresses, says which secrets are saved without sending them, and the device knows a phone arrived")
     check(cookie != null && title(fetch(page).third) == "Already in use", "the first phone holds the page; another is told it's in use")
+    val headers = (URL(page).openConnection() as HttpURLConnection).run { setRequestProperty("Cookie", "lena_setup=$cookie"); responseCode; headerFields }
+    val policy = headers["Content-Security-Policy"]?.firstOrNull().orEmpty()
+    check(Regex("'sha256-[A-Za-z0-9+/=]+'").findAll(policy.substringAfter("script-src").substringBefore(";")).count() == 2 &&
+        policy.contains("default-src 'none'") && policy.contains("connect-src 'self'") && policy.contains("frame-ancestors 'none'") &&
+        headers["X-Content-Type-Options"]?.firstOrNull() == "nosniff" && headers["Referrer-Policy"]?.firstOrNull() == "no-referrer",
+        "the page runs only its own two scripts, loads nothing from elsewhere and sends only to the device")
 
     val (status, location, _) = fetch("$base/sign-in?ha=https%3A%2F%2Fha.example.com%2F", cookie = cookie)
     val state = location?.substringAfter("state=")

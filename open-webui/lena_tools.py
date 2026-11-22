@@ -77,27 +77,38 @@ def _problem(error: Exception) -> str:
     return str(error)
 
 
-def _best_match(wanted: str, items: list[str]) -> str | None:
-    """The saved memory someone most likely means: a direct quote first, then the one sharing the
-    most meaningful words (compared by their first five letters). Same rule as the integration."""
+MEMORY_CHOICES = 3  # memories offered back when it isn't clear which one was meant
+
+
+def _memory_words(s: str) -> set[str]:
+    """The words that matter, cut to five letters, the same rule as the integration's brain.py, so both
+    pick the same memory to forget.
+    """
+    cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
+    return {w[:5] for w in cleaned if len(w) >= 4}
+
+
+def _find_memory(wanted: str, items: list[str]) -> tuple[str | None, list[str]]:
+    """Which saved memory someone means: (the one, []) when it's clear, or (None, the closest few) when
+    it isn't, so she asks instead of deleting the wrong one for good. Clear is a direct quote found in
+    exactly one memory, or every meaningful word asked for found in exactly one. Same rule as
+    find_memory in the integration's brain.py.
+    """
     text = wanted.strip().lower()
     if not text:
-        return None
-    for item in items:
-        if text in item.lower():
-            return item
-
-    def words(s: str) -> set[str]:
-        """The words that matter, cut to five letters, the same rule as best_match in the integration's
-        brain.py, so both pick the same memory to forget.
-        """
-        cleaned = (w.strip(".,!?'\"") for w in s.lower().split())
-        return {w[:5] for w in cleaned if len(w) >= 4}
-
-    want = words(text)
-    scored = [(len(want & words(item)), item) for item in items]
-    best = max(scored, default=(0, None), key=lambda pair: pair[0])
-    return best[1] if best[0] > 0 else None
+        return None, []
+    quoted = [item for item in items if text in item.lower()]
+    if len(quoted) == 1:
+        return quoted[0], []
+    if quoted:
+        return None, quoted[:MEMORY_CHOICES]
+    want = _memory_words(text)
+    scored = sorted(((len(want & _memory_words(item)), item) for item in items), key=lambda pair: -pair[0])
+    scored = [pair for pair in scored if pair[0] > 0]
+    whole = [item for score, item in scored if score == len(want)]
+    if len(whole) == 1:
+        return whole[0], []
+    return None, [item for _, item in scored[:MEMORY_CHOICES]]
 
 
 class Tools:
@@ -184,7 +195,7 @@ class Tools:
     async def forget(self, fact: str) -> str:
         """
         Remove something from your memory when someone asks you to forget it.
-        :param fact: What to forget, in a few words. The closest saved memory is removed.
+        :param fact: What to forget, in a few words, or the memory's exact words. It's removed only when it's clear which saved memory is meant; otherwise you get the closest ones back to ask which.
         """
         if not self.valves.ha_token:
             return "Memory isn't set up: the tool has no Home Assistant token."
@@ -196,7 +207,11 @@ class Tools:
                 i.get("summary", "")
                 for i in found.get("service_response", {}).get(self.valves.memory_list, {}).get("items", [])
             ]
-            match = _best_match(fact, items)
+            match, choices = _find_memory(fact, items)
+            if match is None and choices:
+                closest = "; ".join(f'"{c}"' for c in choices)
+                return (f"Nothing was removed: it isn't clear which memory they mean. The closest: {closest}. "
+                        "Ask them which one, then call forget again with that memory's exact words.")
             if match is None:
                 return "Nothing like that is saved, so there was nothing to forget."
             await self._call("todo", "remove_item", {"entity_id": self.valves.memory_list, "item": match})

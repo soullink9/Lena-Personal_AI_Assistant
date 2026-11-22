@@ -1,6 +1,6 @@
 """GET /api/lena/context: how Lena feels and what she remembers, for Open WebUI and the Lena app.
 
-Any Home Assistant user's long-lived access token can read it; no admin rights needed.
+An admin's long-lived access token can read it, or one of a user chosen in her options (access.py).
 Also carries the weather, for the Lena app's display. Add ?memory=0 to leave her memory out, ?reasons=0 to leave out why she feels the way she does, or ?devices=1 to add the exact names of the devices exposed to Assist, by room (for Open WebUI, whose house tools match names exactly), followed by the reminder to call a tool before saying something's done.
 
 Who and where, for Open WebUI's filter: ?user=<the Open WebUI user's name> says who she's talking with (the
@@ -20,13 +20,13 @@ from aiohttp import web
 
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
-from . import brain
+from . import access, brain
 from .const import DOMAIN
 
 
 class LenaContextView(HomeAssistantView):
-    """GET /api/lena/context. Any signed-in user may read it (it's what Open WebUI's filter calls with
-    a token).
+    """GET /api/lena/context, for admins and the users chosen in her options (it's what Open WebUI's
+    filter calls with a token).
     """
     url = "/api/lena/context"
     name = "api:lena:context"
@@ -37,6 +37,8 @@ class LenaContextView(HomeAssistantView):
         can tell the integration is missing.
         """
         hass = request.app[KEY_HASS]
+        if denied := access.refused(self, request):  # admins and the users chosen in her options
+            return denied
         core = hass.data.get(DOMAIN)
         if core is None:
             return self.json_message("Lena isn't set up", status_code=404)
@@ -80,7 +82,7 @@ class LenaMediaView(HomeAssistantView):
     ?id=<media-source://...> lists a folder (no id: the top level, such as Immich and My media):
     {"title", "children": [{"id", "title", "folder", "photo"}]}. Add &photos=1 to get the folder's
     photos instead, as addresses on this Home Assistant: {"title", "photos": ["/immich/...", ...]}.
-    Any Home Assistant user's token works, the same as browsing media in Home Assistant itself.
+    An admin's token works, or one of a user chosen in her options (access.py).
     """
 
     url = "/api/lena/media"
@@ -92,6 +94,8 @@ class LenaMediaView(HomeAssistantView):
         photos=1 every photo in it (up to MAX_PHOTOS).
         """
         hass = request.app[KEY_HASS]
+        if denied := access.refused(self, request):  # admins and the users chosen in her options
+            return denied
         if hass.data.get(DOMAIN) is None:
             return self.json_message("Lena isn't set up", status_code=404)
         if "media_source" not in hass.config.components:

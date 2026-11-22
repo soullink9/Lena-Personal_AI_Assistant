@@ -19,6 +19,7 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
     SelectSelector,
+    SelectOptionDict,
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
@@ -29,6 +30,7 @@ import probatio as vol
 
 from . import brain
 from .const import (
+    CONF_ACCESS_USERS,
     CONF_ALERT_AGENT,
     CONF_ALERT_ALL_CLEAR,
     CONF_ALERT_PHONES,
@@ -126,6 +128,12 @@ class LenaOptionsFlow(OptionsFlowWithReload):
             """A yes/no setting, showing its saved value or its default."""
             return vol.Optional(key, default=o.get(key, brain.DEFAULTS.get(key, False)))
 
+        # Who may use her web addresses besides admins (access.py): the other people with an account.
+        users = [
+            SelectOptionDict(value=user.id, label=user.name or user.id)
+            for user in await self.hass.auth.async_get_users()
+            if user.is_active and not user.system_generated and not user.is_admin
+        ]
         phones = sorted(
             f"notify.{name}" for name in self.hass.services.async_services().get("notify", {})
             if name.startswith("mobile_app_")
@@ -201,6 +209,12 @@ class LenaOptionsFlow(OptionsFlowWithReload):
                 switch(CONF_UPKEEP): BooleanSelector(),
                 vol.Optional(CONF_CELEBRATE, description=default(CONF_CELEBRATE)):
                     EntitySelector(EntitySelectorConfig(domain=["script", "scene"])),
+            }), {"collapsed": True}),
+            # Who may use her web addresses (the Lena app, Open WebUI's filter, the voice bridge): admins always.
+            vol.Required("access"): section(vol.Schema({
+                vol.Optional(CONF_ACCESS_USERS, description=default(CONF_ACCESS_USERS)): SelectSelector(SelectSelectorConfig(
+                    options=users, multiple=True, mode=SelectSelectorMode.DROPDOWN,
+                )),
             }), {"collapsed": True}),
         })
         return self.async_show_form(step_id="init", data_schema=schema)

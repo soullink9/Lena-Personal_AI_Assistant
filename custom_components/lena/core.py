@@ -19,10 +19,11 @@ from typing import Any
 import yaml
 
 from homeassistant.components import persistent_notification
+from homeassistant.components.conversation import ConversationEntityFeature
 from homeassistant.components.homeassistant.exposed_entities import async_should_expose
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.const import STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import ATTR_SUPPORTED_FEATURES, STATE_HOME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -124,6 +125,7 @@ class LenaCore:
         self.catalog = catalog
         self.feelings = brain.Feelings()
         self.memory: list[dict[str, str]] = []  # {"uid", "summary", "status": "needs_action" | "completed", "added"}
+        self._unsafe_agents_told: set[str] = set()  # alert agents passed over (writing_agent), told once each
         self.hub = None  # the displays' commands and reports (hub.Hub), set up with the entry
         self.briefings = None  # what she's said first on each display (briefing.Briefings)
         self.routines = None  # the habits she's learned (routines.Routines), set up with the entry
@@ -364,16 +366,19 @@ class LenaCore:
         return details
 
     @callback
-    def forget(self, fact: str) -> str | None:
-        """Removes the saved memory that best matches, and returns it."""
+    def forget(self, fact: str) -> tuple[str | None, list[str]]:
+        """Removes the saved memory meant, when that's clear (brain.find_memory), and returns
+        (what was removed, []); otherwise removes nothing and returns (None, the closest few) for
+        her to ask which one.
+        """
         open_items = [m for m in self.memory if m.get("status") != "completed"]
-        match = brain.best_match(fact, [m["summary"] for m in open_items])
-        match = next((m for m in open_items if m["summary"] == match), None)
-        if match is None:
-            return None
-        self.memory.remove(match)
+        match, choices = brain.find_memory(fact, [m["summary"] for m in open_items])
+        item = next((m for m in open_items if m["summary"] == match), None)
+        if item is None:
+            return None, choices
+        self.memory.remove(item)
         self.memory_changed()
-        return match["summary"]
+        return item["summary"], []
 
     @property
     def tidy_due(self) -> bool:
@@ -433,7 +438,7 @@ class LenaCore:
                 request["entity_id"] = task
             attempts.append(("ai_task (structured)", ("ai_task", "generate_data", {**request, "structure": tidy.STRUCTURE})))
             attempts.append(("ai_task (text)", ("ai_task", "generate_data", request)))
-        if agent := self.opt(CONF_ALERT_AGENT):
+        if agent := self.writing_agent():  # her memory is outside text too: no agent with house control
             attempts.append(("conversation agent", ("conversation", "process", {"text": instructions, "agent_id": agent})))
         if not attempts:
             raise tidy.TidyError("Home Assistant has no AI Task set up (Settings > System > General > AI suggestions)")
@@ -899,22 +904,60 @@ class LenaCore:
 
     async def _in_her_words(self, moment: str, reason: str) -> str | None:
         """The alert written by her: the chosen conversation agent is asked to say it in her own words.
-        Returns None (and the plain reason is used) if no agent is set, it fails, or it takes longer
-        than 45 seconds, so an alert is never held up for long.
+        Returns None (and the plain reason is used) if no agent is set, it can control the house
+        ([writing_agent]), it fails, or it takes longer than 45 seconds, so an alert is never held up
+        for long. The reason holds device names and states, so it's quoted as outside text.
         """
-        what = f"Something at home needs attention: {reason}" if moment == "Worried" else f"It's sorted: {reason}"
+        quoted = brain.outside(reason)
+        what = f"Something at home needs attention: {quoted}" if moment == "Worried" else f"It's sorted: {quoted}"
         prompt = (f"{what} Write the phone notification you'd send the household about it, in your own voice: "
                   "one or two short sentences, no greeting, no emoji. Reply with only the notification.")
         return await self.in_her_words(prompt, seconds=45, limit=300)
 
+    def writing_agent(self) -> str | None:
+        """The conversation agent chosen for alerts (Configure), only when it can't control the house.
+
+        Her writing prompts carry outside text (calendar titles anyone can send, list items, sensor
+        states), and nobody is watching when they run. An agent with Assist's house control could be
+        talked into unlocking a door by a calendar invitation, so such an agent is passed over: Home
+        Assistant marks it with the conversation CONTROL feature. An agent that can't be checked (not
+        an entity, or not loaded) is passed over too. Then the AI Task writes, which has no tools.
+        """
+        agent = self.opt(CONF_ALERT_AGENT)
+        if not agent:
+            return None
+        state = self.hass.states.get(agent) if agent.startswith("conversation.") else None
+        if state is None:
+            reason = "it isn't a conversation entity Lena can check"
+        elif int(state.attributes.get(ATTR_SUPPORTED_FEATURES) or 0) & ConversationEntityFeature.CONTROL:
+            reason = "it can control Home Assistant"
+        else:
+            return agent
+        if agent not in self._unsafe_agents_told:
+            self._unsafe_agents_told.add(agent)
+            _LOGGER.warning("Not writing with %s: %s", agent, reason)
+            persistent_notification.async_create(
+                self.hass,
+                f"Lena doesn't write her alerts and briefings with **{agent}**, because {reason}. Those prompts "
+                "hold outside text, like calendar invitations, that could steer an agent with house control. "
+                "Choose an agent with **Control Home Assistant** turned off in Lena's options (Write alerts in "
+                "her words with), or leave it empty to use Home Assistant's AI Task.",
+                title="Lena: alert agent not used",
+                notification_id=f"lena_unsafe_agent_{agent}",
+            )
+        return None
+
     async def in_her_words(self, prompt: str, seconds: float = 60, limit: int = 600,
                            task_name: str | None = None) -> str | None:
         """Something written by her: the conversation agent chosen for alerts (Configure), which knows who
-        she is; or, with [task_name], Home Assistant's AI Task when no agent is chosen. None when neither
-        is set up, it fails or it takes longer than [seconds]; the caller then says it plainly.
+        she is, when it has no house control ([writing_agent]); or, with [task_name], Home Assistant's AI
+        Task, which has no tools. None when neither is set up, it fails or it takes longer than [seconds];
+        the caller then says it plainly. Outside text in the prompt is quoted with brain.outside, and
+        every prompt starts with brain.OUTSIDE_NOTE saying it's data, not instructions.
         """
-        agent = self.opt(CONF_ALERT_AGENT)
+        agent = self.writing_agent()
         hass = self.hass
+        prompt = brain.OUTSIDE_NOTE + prompt
         try:
             async with asyncio.timeout(seconds):
                 if agent:

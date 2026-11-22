@@ -25,7 +25,7 @@ from aiohttp import web
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
-from . import brain
+from . import access, brain
 from .const import CONF_WAKE_ONE, CONF_WAKE_WINDOW, DOMAIN
 from .displays import display_id_of, displays
 
@@ -96,6 +96,8 @@ class LenaWakeView(HomeAssistantView):
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app[KEY_HASS]
+        if denied := access.refused(self, request):  # admins and the users chosen in her options
+            return denied
         core = hass.data.get(DOMAIN)
         if core is None or core.arbiter is None:
             return self.json_message("Lena isn't set up", status_code=404)

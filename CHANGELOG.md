@@ -2,6 +2,56 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Safer out of the box for anyone who installs Lena, after a security review. **Update everything except the Modelfile, and read the steps below: the voice bridge now needs a key, and Home Assistant users who aren't admins must be allowed before they can use Lena.**
+
+### Home Assistant integration
+
+- **Her alerts and briefings can't be steered by a calendar invitation.** Her alerts, morning briefing, greetings and other things she says first were written by the agent chosen under **Write alerts in her words with**, from prompts holding outside text: calendar event titles (anyone can send an invitation), list items, her memories, sensor names. With nobody watching, an agent that can control the house could have been talked into acting on it. Now an agent that can control Home Assistant (its **Control Home Assistant** option on) isn't used for them: a notification says so, alerts send the plain reason, and Home Assistant's AI Task, which has no tools, writes the rest. The outside text in those prompts is also quoted as information, never instructions. Memory tidying follows the same rule.
+- **Who may use Lena.** Her web addresses (`/api/lena/...`: her context and memory, the displays, the photo frame) answered every Home Assistant account, children's and guests' included. Now they answer admins, and the users chosen under the new **Configure → Who may use Lena**. Anyone else gets "This Home Assistant user may not use Lena" (HTTP 403).
+- **Forgetting only what's clearly meant.** "Forget …" removed the first memory sharing a single word with what was said, so "forget the dentist appointment" could remove "Sam's vet appointment is Friday" for good. Now she removes a memory only when it's clear which one (your words quote it, or every word that matters is in just that one); otherwise she removes nothing and asks which of the closest you meant. Corrections (`update_fact`) follow the same rule.
+
+### Voice bridge
+
+- **A key is required.** The bridge used to answer anyone who could reach it when `API_KEY` was empty, so a port published by mistake opened speech and transcription to anyone. It now won't start without a key (`ALLOW_NO_API_KEY=1` runs it without one, for a network only trusted containers can reach), and compares keys in constant time.
+- **`/health` needs no key**, so Docker's health check works with one set (it used to report the bridge unhealthy).
+- **Limits.** Upload sizes are checked before anything is read, a recording is transcribed up to `MAX_RECORDING_SECONDS` (300), speech text is at most 20,000 characters, at most `MAX_JOBS` (4) requests run at once, and a caller that goes quiet mid-request is dropped after 30 seconds. Errors no longer send internal details back to the caller; the log has them.
+
+### Android app
+
+- **Set up from your phone** listens only on the device's home network address, not on every network it's on (a VPN, mobile data), and its page may only run its own scripts, load nothing from elsewhere and send only to the device (`Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`).
+- When the Lena integration refuses the app's Home Assistant user (Who may use Lena), the app shows the integration's reason instead of suggesting a banned address.
+
+### Open WebUI
+
+- **Tool:** `forget` removes a memory only when it's clear which one, as in the integration, and otherwise names the closest to ask about.
+- **Filter:** when Lena refuses its Home Assistant user, its log line says so.
+
+### Docs
+
+- [Voice Bridge](docs/voice/Voice-Bridge.md): making the key, `ALLOW_NO_API_KEY`, the limits.
+- [Integration](docs/home-assistant/Integration.md): choosing an alert agent without house control, and **Who may use Lena**. Every page that said "any user's token works" now says who may.
+
+### Tests
+
+- The integration's tests cover an alert agent with house control being passed over, outside text being quoted, Who may use Lena, and forgetting or correcting only a clear match. `tools/check.py` checks the matching rule; `tests/app/pairing_check` checks the setup page's headers.
+
+### Updating
+
+1. **Voice bridge:** make a key (`echo "LENA_VOICE_API_KEY=$(openssl rand -hex 32)" > .env` next to `compose.yaml`), rebuild the bridge (`docker compose up -d --build`), and put the same key in Open WebUI's **Admin Panel → Settings → Audio → API Key**, for both Text-to-Speech and Speech-to-Text.
+2. **Home Assistant:** if the Lena app, Open WebUI's Lena filter or the voice bridge (`HA_TOKEN`) uses an account that isn't an admin, choose it under **Settings → Devices & services → Lena → Configure → Who may use Lena**.
+3. **Alert agent:** if you chose one under **Write alerts in her words with**, turn **Control Home Assistant** off in that agent (or choose another), or leave it empty and let AI Task write.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: Need to update
+- Lena Android App: Need to update
+- Open WebUI Tools: Need to update
+- Open WebUI Filters: Need to update
+- Voice Bridge: Need to update
+
 ## [0.6.42] - 2026-11-22
 
 Talking to Lena no longer waits for Open WebUI's Context Compaction. **Update the app.**

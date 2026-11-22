@@ -5,6 +5,7 @@ import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
@@ -46,6 +47,9 @@ import javax.net.ssl.SSLSocketFactory
  * - **One phone, a few tries.** The first phone to open the page holds it (a cookie); any other is told
  *   it's in use. Five requests with a wrong code close it.
  * - **Short-lived.** It stops when the screen closes, once saved, or after [LIFETIME_MS].
+ * - **Only on the home network.** It listens on this device's address on the Wi-Fi or Ethernet ([start]), not on
+ *   every network the device is on (a VPN, a phone's mobile data), and its pages may only run their own scripts
+ *   and talk back to it ([securityHeaders]).
  *
  * What it can't stop: someone already inside your network, actively rewriting the page as it loads, during
  * those minutes. The page says so, and Home Assistant's own sign-in avoids it for that password.
@@ -171,16 +175,18 @@ class PairingServer(private val handler: Handler) : Closeable {
 
     /**
      * Starts serving on [host] (this device's address on the network), on [PORT] if it's free or any
-     * other port if not. Each phone request is answered on a thread of its own.
+     * other port if not. It listens on that address only, so another network the device is on (a VPN, mobile
+     * data) can't reach the page. Each phone request is answered on a thread of its own.
      */
     fun start(host: String) {
         this.host = host
+        val address = InetAddress.getByName(host)
         val server = ServerSocket()
         server.reuseAddress = true
         try {
-            server.bind(InetSocketAddress(PORT))
+            server.bind(InetSocketAddress(address, PORT))
         } catch (e: java.io.IOException) {
-            server.bind(InetSocketAddress(0))
+            server.bind(InetSocketAddress(address, 0))
         }
         server.soTimeout = 1_000 // to notice when it's time to stop
         socket = server
@@ -376,7 +382,7 @@ class PairingServer(private val handler: Handler) : Closeable {
         // Lax, not Strict: Home Assistant's sign-in sends the phone back here from its own site.
         val setCookie = cookie?.let { "Set-Cookie: lena_setup=$it; Path=/$code/; HttpOnly; SameSite=Lax\r\n" } ?: ""
         out.write(("HTTP/1.1 $status $reason\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\n" +
-            setCookie + "Cache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n").toByteArray())
+            setCookie + securityHeaders(html) + "Cache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
         out.write(bytes)
         out.flush()
     }
@@ -386,7 +392,7 @@ class PairingServer(private val handler: Handler) : Closeable {
         val json = "{\"state\":${jsonString(outcome.state)},\"message\":${jsonString(outcome.message)}}"
         val bytes = json.toByteArray(Charsets.UTF_8)
         out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\n" +
-            "Cache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
+            "X-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
         out.write(bytes)
         out.flush()
     }
@@ -396,6 +402,23 @@ class PairingServer(private val handler: Handler) : Closeable {
             "Connection: close\r\n\r\n").toByteArray())
         out.flush()
     }
+}
+
+/**
+ * The headers that keep a page to itself: it runs only its own scripts (each named by its SHA-256 hash, so a
+ * script slipped into a field's value wouldn't run), loads nothing from elsewhere, sends only to this device,
+ * can't be framed by another site, and tells no other site where it came from. They can't stop someone who
+ * rewrites the whole page on the network (the class comment says so), but leave nothing else open.
+ */
+internal fun securityHeaders(html: String): String {
+    val hashes = Regex("<script>(.*?)</script>", RegexOption.DOT_MATCHES_ALL).findAll(html).joinToString("") { script ->
+        val digest = MessageDigest.getInstance("SHA-256").digest(script.groupValues[1].toByteArray(Charsets.UTF_8))
+        " 'sha256-" + Base64.getEncoder().encodeToString(digest) + "'"
+    }
+    val policy = "default-src 'none'; script-src${hashes.ifEmpty { " 'none'" }}; style-src 'unsafe-inline'; " +
+        "connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    return "Content-Security-Policy: $policy\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY\r\n" +
+        "Referrer-Policy: no-referrer\r\n"
 }
 
 /** The fields the phone page can fill in; the names it sends. */

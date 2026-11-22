@@ -26,7 +26,7 @@ If she says she saved something and it isn't on the list, she didn't have the to
 
 ## Forgetting and tidying
 
-- Ask her to forget something. She removes the saved memory that best matches what you said.
+- Ask her to forget something. She removes the saved memory you mean when it's clear which one (your words quote it, or every word that matters is in just that one). When it isn't, she removes nothing and asks which of the closest you meant, because a forgotten memory can't be brought back. Corrections ("Alex moved to the night shift") work the same way.
 - Or edit the list yourself: delete an item, reword it, or **tick it off** to retire it. She only reads open items.
 - Keep it short. It's added to every request.
 

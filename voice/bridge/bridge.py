@@ -11,7 +11,11 @@ Endpoints (with or without a /v1 prefix):
   POST /audio/transcriptions  multipart "file" (+ "language"), or JSON input_audio          -> {"text": ...}
   GET  /audio/voices          your Piper voices, for Open WebUI's voice list
   GET  /audio/models, /models
-  GET  /health
+  GET  /health                  no key needed, for Docker's health check; says only that it's running
+
+Every other request needs API_KEY as a bearer token ("Authorization: Bearer <key>"), and the bridge won't
+start without one, so a port published by mistake doesn't hand speech and transcription to anyone who finds
+it. ALLOW_NO_API_KEY=1 turns that off, for a bridge only trusted containers can reach.
 
 Her voice follows her mood (optional): with HA_URL and HA_TOKEN set, the bridge asks the Lena integration
 how she feels (GET /api/lena/context) and speaks a little slower and lower when she's tired or low, a
@@ -19,10 +23,12 @@ little quicker and brighter when she's cheerful. If Home Assistant can't be reac
 """
 
 import base64
+import hmac
 import json
 import os
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -37,11 +43,16 @@ WHISPER = (os.environ.get("WHISPER_HOST", ""), int(os.environ.get("WHISPER_PORT"
 DEFAULT_VOICE = os.environ.get("PIPER_VOICE", "").strip()
 DEFAULT_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "").strip()
 API_KEY = os.environ.get("API_KEY", "").strip()
+ALLOW_NO_API_KEY = os.environ.get("ALLOW_NO_API_KEY", "").strip() == "1"
 PORT = int(os.environ.get("PORT", "8000"))
 TIMEOUT = float(os.environ.get("TIMEOUT", "120"))
 HA_URL = os.environ.get("HA_URL", "").strip().rstrip("/")
 HA_TOKEN = os.environ.get("HA_TOKEN", "").strip()
 MAX_UPLOAD = 50 * 1024 * 1024
+MAX_TEXT = 20_000  # characters of one speech request; Open WebUI sends a sentence or a paragraph at a time
+MAX_RECORDING = int(os.environ.get("MAX_RECORDING_SECONDS", "300"))  # seconds of a recording transcribed
+MAX_JOBS = int(os.environ.get("MAX_JOBS", "4"))  # speech and transcriptions at once; more wait, then get 503
+_jobs = threading.BoundedSemaphore(MAX_JOBS)
 MOOD_CACHE = 60  # seconds: how long one answer about how she feels is used
 
 # Open WebUI's default voice names; these mean "use the bridge's default", not a Piper voice.
@@ -264,10 +275,12 @@ def to_pcm16k(audio):
     """Any recording (WebM or Ogg from Open WebUI's call mode, WAV from the app, and others) as the 16
     kHz mono 16-bit audio Whisper wants.
     """
+    # Only the first MAX_RECORDING seconds: a small file can hold hours of silence, and decoded it would
+    # fill the memory. At 16 kHz mono 16-bit that's at most about 10 MB for 300 seconds.
     with tempfile.NamedTemporaryFile(suffix=".audio") as f:
         f.write(audio)
         f.flush()
-        return ffmpeg(["-i", f.name, "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1"])
+        return ffmpeg(["-i", f.name, "-t", str(MAX_RECORDING), "-f", "s16le", "-ar", "16000", "-ac", "1", "pipe:1"])
 
 
 # ---- HTTP -----------------------------------------------------------------------------------
@@ -278,6 +291,7 @@ class Handler(BaseHTTPRequestHandler):
     "OpenAI" speech engine.
     """
     server_version = "LenaVoiceBridge/0.6.42"
+    timeout = 30  # seconds a caller may go quiet mid-request before it's dropped, so slow senders can't pile up
 
     def log_message(self, fmt, *args):
         """Request lines go to the same log, with the caller's address."""
@@ -289,10 +303,14 @@ class Handler(BaseHTTPRequestHandler):
         return path[3:] if path.startswith("/v1/") else path
 
     def _authorized(self):
-        """True without an API_KEY, otherwise only with the matching bearer token."""
+        """Only with the matching bearer token (compared in constant time, so the key can't be guessed a
+        letter at a time from how long a refusal takes). Without an API_KEY the bridge only runs when
+        ALLOW_NO_API_KEY=1 says so, and then everyone is let in.
+        """
         if not API_KEY:
-            return True
-        return self.headers.get("Authorization", "") == f"Bearer {API_KEY}"
+            return ALLOW_NO_API_KEY
+        given = self.headers.get("Authorization", "").encode()
+        return hmac.compare_digest(given, f"Bearer {API_KEY}".encode())
 
     def _send(self, status, body, content_type="application/json"):
         """Sends a response: dicts and lists as JSON, text as UTF-8, bytes as they are."""
@@ -311,32 +329,43 @@ class Handler(BaseHTTPRequestHandler):
         self._send(status, {"error": {"message": message, "type": "bridge_error"}})
 
     def _body(self):
-        """Request body, including chunked uploads (Open WebUI streams audio files that way)."""
+        """Request body, including chunked uploads (Open WebUI streams audio files that way). Every size
+        is checked before anything is read, so one huge chunk can't fill the memory first.
+        """
         if "chunked" in self.headers.get("Transfer-Encoding", "").lower():
             out = bytearray()
             while True:
-                size = int(self.rfile.readline().split(b";")[0].strip() or b"0", 16)
+                try:
+                    size = int(self.rfile.readline(64).split(b";")[0].strip() or b"0", 16)
+                except ValueError:
+                    raise ValueError("Bad chunked upload") from None
+                if size < 0 or len(out) + size > MAX_UPLOAD:
+                    raise ValueError("Upload too large")
                 if size == 0:
-                    while self.rfile.readline() not in (b"\r\n", b"\n", b""):
-                        pass  # trailers
+                    for _ in range(100):  # trailers, a few at most
+                        if self.rfile.readline(8192) in (b"\r\n", b"\n", b""):
+                            break
                     return bytes(out)
                 out += self.rfile.read(size)
-                self.rfile.readline()  # CRLF after each chunk
-                if len(out) > MAX_UPLOAD:
-                    raise ValueError("Upload too large")
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_UPLOAD:
+                self.rfile.readline(8)  # CRLF after each chunk
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise ValueError("Bad Content-Length") from None
+        if length < 0 or length > MAX_UPLOAD:
             raise ValueError("Upload too large")
         return self.rfile.read(length) if length else b""
 
     def do_GET(self):
-        """GET: the voice list (and models) Open WebUI asks for when you choose a voice."""
+        """GET: the voice list (and models) Open WebUI asks for when you choose a voice. /health needs no
+        key, so Docker's health check works with one set; it tells nothing but that the bridge runs.
+        """
+        path = self._path()
+        if path in ("/health", ""):
+            return self._send(200, {"status": "ok"})
         if not self._authorized():
             return self._error(401, "Invalid API key")
-        path = self._path()
         try:
-            if path in ("/health", ""):
-                return self._send(200, {"status": "ok"})
             if path == "/audio/voices":
                 voices = [{"id": v["name"], "name": v.get("description") or v["name"]} for v in piper_voices()]
                 return self._send(200, {"voices": voices})
@@ -348,26 +377,32 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(404, "Not found")
         except Exception as e:
             log("GET", path, "failed:", e)
-            return self._error(502, str(e))
+            return self._error(502, "Piper or Whisper couldn't be reached; the bridge's log says why")
 
     def do_POST(self):
         """POST: speech (text to audio) and transcriptions (audio to text)."""
         if not self._authorized():
             return self._error(401, "Invalid API key")
         path = self._path()
+        if path not in ("/audio/speech", "/audio/transcriptions"):
+            return self._error(404, "Not found")
+        # A few jobs at a time: each runs ffmpeg, and a flood of them would starve the rest of the host.
+        if not _jobs.acquire(timeout=TIMEOUT):
+            return self._error(503, "The bridge is busy; try again")
         try:
             body = self._body()
             if path == "/audio/speech":
                 return self._speech(body)
-            if path == "/audio/transcriptions":
-                return self._transcription(body)
-            return self._error(404, "Not found")
-        except ValueError as e:
+            return self._transcription(body)
+        except ValueError as e:  # the caller's mistake, in the bridge's own words
             return self._error(400, str(e))
         except Exception as e:
+            # The details (addresses, ffmpeg's output) go to the log, not to whoever asked.
             log("POST", path, "failed:", e)
             traceback.print_exc()
-            return self._error(502, str(e))
+            return self._error(502, "Speech or transcription failed; the bridge's log says why")
+        finally:
+            _jobs.release()
 
     def _speech(self, body):
         """Text to speech: Open WebUI's request to Piper over Wyoming, and Piper's audio back in the
@@ -377,6 +412,8 @@ class Handler(BaseHTTPRequestHandler):
         text = (req.get("input") or "").strip()
         if not text:
             raise ValueError("input is required")
+        if len(text) > MAX_TEXT:
+            raise ValueError(f"input is too long (at most {MAX_TEXT} characters)")
         voice = (req.get("voice") or "").strip()
         if voice.lower() in OPENAI_VOICES:
             voice = ""
@@ -433,8 +470,17 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     """Serves until stopped; each request on its own thread, so a long transcription doesn't hold up
-    speech.
+    speech. Refuses to start without an API_KEY (unless ALLOW_NO_API_KEY=1), so it's never open by
+    accident. It listens on every address of its container, because Open WebUI reaches it over the
+    Docker network; publishing its port on the host is what would open it to more.
     """
+    if not API_KEY and not ALLOW_NO_API_KEY:
+        log("Set API_KEY (and the same key as the API Key in Open WebUI's audio settings), so only Open WebUI "
+            "can use the bridge. To run without a key, on a network only trusted containers can reach, set "
+            "ALLOW_NO_API_KEY=1.")
+        sys.exit(2)
+    if not API_KEY:
+        log("Running without an API key (ALLOW_NO_API_KEY=1): anyone who can reach port", PORT, "can use it.")
     log(f"Lena voice bridge on :{PORT}  piper={PIPER[0]}:{PIPER[1]}"
         f"  whisper={'%s:%s' % WHISPER if WHISPER[0] else 'off'}  voice={DEFAULT_VOICE or 'Piper default'}"
         f"  mood={'from ' + HA_URL if HA_URL and HA_TOKEN else 'off'}")

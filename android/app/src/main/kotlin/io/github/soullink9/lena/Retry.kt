@@ -28,13 +28,14 @@ open class HaAuthException(message: String = "Home Assistant token rejected") : 
  * Home Assistant won't talk to this device at all (HTTP 403), whatever the token. Most often it has banned
  * the device's address after failed sign-ins (ip_bans.yaml); otherwise a proxy or firewall in front of it
  * refuses the device. A kind of [HaAuthException], so every screen that handles a refused token handles
- * this too, but its message says what's really wrong.
+ * this too, but its message says what's really wrong. [reason] is the Lena integration's own answer when
+ * it was the one refusing (the token's user isn't allowed under Who may use Lena), which says what to do.
  */
-class HaForbiddenException : HaAuthException(
-    "Home Assistant won't talk to this device (HTTP 403), whatever the token. Most likely it banned this " +
+class HaForbiddenException(reason: String? = null) : HaAuthException(
+    reason ?: ("Home Assistant won't talk to this device (HTTP 403), whatever the token. Most likely it banned this " +
         "device's address after failed sign-ins: remove the address from ip_bans.yaml in Home Assistant's " +
         "config folder and restart Home Assistant (its notifications say which address). Otherwise a proxy " +
-        "or firewall in front of Home Assistant is refusing this device."
+        "or firewall in front of Home Assistant is refusing this device.")
 )
 
 /**

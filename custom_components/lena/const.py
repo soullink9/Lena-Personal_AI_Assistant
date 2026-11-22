@@ -18,6 +18,7 @@ CONF_MOOD_CHANGE_CHANCE = "mood_change_chance"
 CONF_MOMENT_MINUTES = "moment_minutes"
 CONF_ALERT_PHONES = "alert_phones"
 CONF_ALERT_AGENT = "alert_agent"
+CONF_ACCESS_USERS = "access_users"  # non-admin users who may use her web addresses (access.py)
 CONF_ALERT_ALL_CLEAR = "alert_all_clear"
 CONF_TIDY_DAYS = "memory_tidy_days"
 CONF_LOCAL_WEATHER = "local_weather"
@@ -56,6 +57,7 @@ SECTIONS = {
     "routines": (CONF_ROUTINES, CONF_ROUTINE_WATCH_DAYS),
     "personality": (CONF_HERS_DAYS, CONF_CURIOUS),
     "around_the_house": (CONF_GOODNIGHT, CONF_SHOPPING_LIST, CONF_SHOPS, CONF_UPKEEP, CONF_CELEBRATE),
+    "access": (CONF_ACCESS_USERS,),
 }
 
 # Tapping an alert on a phone opens the Lena app, listening (through the Home Assistant companion app).

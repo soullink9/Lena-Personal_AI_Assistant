@@ -115,8 +115,15 @@ class HomeAssistant(
                 throw e
             }
             if (code == 403) {
-                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: Home Assistant won't talk to this device (HTTP 403)")
-                throw HaForbiddenException()
+                // The Lena integration refuses a user that isn't allowed to use her (its message says how to
+                // fix it); any other 403 is Home Assistant, or something in front of it, refusing the device.
+                val lena = if (path.startsWith("/api/lena/")) {
+                    runCatching { conn.errorStream?.use { JSONObject(String(it.readBytes())).optString("message") } }
+                        .getOrNull()?.ifBlank { null }
+                } else null
+                Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: " +
+                    (lena ?: "Home Assistant won't talk to this device") + " (HTTP 403)")
+                throw HaForbiddenException(lena)
             }
             if (code == 401) {
                 Logs.w("Home Assistant", "$method ${path.substringBefore('?')}: the token wasn't accepted (HTTP $code)")

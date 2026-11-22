@@ -43,7 +43,7 @@
           "mood_change_chance": "Once a mood has lasted long enough.",
           "moment_minutes": "How long a reaction, like being pleased or exasperated, lasts.",
           "alert_phones": "Phones with the Home Assistant companion app. Tapping the alert opens the Lena app, listening.",
-          "alert_agent": "Your Lena conversation agent. She writes each alert herself; leave empty to send the plain reason instead.",
+          "alert_agent": "Your Lena conversation agent, with Control Home Assistant turned off (her alerts and briefings hold outside text, like calendar invitations, so an agent that can control the house isn't used). Empty: alerts send the plain reason, and Home Assistant's AI Task writes her briefings and greetings.",
           "alert_all_clear": "A second alert when the sensor clears, replacing the first.",
           "memory_tidy_days": "She combines lines about the same thing, makes vague ones clear and ticks off outdated ones, at bedtime, then tells you what changed (Lena: Undo memory tidy puts it back). 0 never.",
           "memory_tidy_task": "An AI Task entity, such as your Ollama's. Empty: Home Assistant's default (Settings > System > General > AI suggestions).",
@@ -132,6 +132,16 @@
               "shops": "Zones for the shops you go to. When someone's phone arrives at one, it gets the list (their companion app, as a notification from Lena). Needs a shopping list.",
               "upkeep": "She knows which batteries and filters are running low (20% for batteries, 10% for filters; phones left out), and mentions it if asked. To have her bring it up, tick Speaking first: Batteries and filters.",
               "celebrate_with": "A script or scene to run when she first greets a birthday or holiday, such as a light colour or a song."
+            }
+          },
+          "access": {
+            "name": "Who may use Lena",
+            "description": "Admins can always use Lena's web addresses, which give out her memory, who's home and the house's photos. Choose anyone else here.",
+            "data": {
+              "access_users": "Also allow"
+            },
+            "data_description": {
+              "access_users": "Home Assistant users who aren't admins but sign in the Lena app, Open WebUI's Lena filter, or the voice bridge (its mood). Leave out children's and guests' accounts."
             }
           }
         }

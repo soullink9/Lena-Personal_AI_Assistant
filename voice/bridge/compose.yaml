@@ -5,6 +5,9 @@ services:
     container_name: lena-voice
     restart: unless-stopped
     environment:
+      # Required: only callers with this key (Open WebUI's audio settings, API Key) can use the bridge.
+      # Put LENA_VOICE_API_KEY=<a long random string> in an .env file next to this one (openssl rand -hex 32).
+      API_KEY: ${LENA_VOICE_API_KEY:?Set LENA_VOICE_API_KEY in an .env file next to compose.yaml}
       PIPER_HOST: wyoming-piper          # your Piper container's name on the network
       PIPER_PORT: "10200"
       PIPER_VOICE: en_US-lessac-medium   # the voice Home Assistant uses (optional)
@@ -14,12 +17,13 @@ services:
       WHISPER_PORT: "10300"
       WHISPER_LANGUAGE: en
       # Optional: her voice follows her mood (slower and lower when she's tired, brighter when she's
-      # cheerful). Any Home Assistant user's long-lived access token works; leave these out to turn it off.
+      # cheerful). A long-lived access token of an admin, or of a user allowed in Lena's options (Who may use
+      # Lena); leave these out to turn it off.
       # HA_URL: http://homeassistant:8123
       # HA_TOKEN: ${HA_TOKEN}             # a long-lived access token, from an .env file next to this one
     networks:
       - llm
-    # No ports: only containers on the network (Open WebUI) can reach it.
+    # No ports: only containers on the network (Open WebUI) can reach it. Don't publish its port on the host.
 
 networks:
   llm:

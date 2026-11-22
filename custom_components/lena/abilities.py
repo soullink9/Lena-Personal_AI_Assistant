@@ -272,11 +272,18 @@ async def announce(core, message: str, listen: bool = False, device_id=None, roo
 
 
 def update_fact(core, old: str, new: str) -> dict[str, Any]:
-    """Corrects a memory: the saved line that best matches [old] becomes [new], in its place."""
+    """Corrects a memory: the saved line [old] means becomes [new], in its place. Only when it's clear
+    which line is meant (brain.find_memory); otherwise the closest few are named, to ask which one.
+    """
     new = (new or "").strip()
     if not new:
         raise AbilityError("Say what the memory should say now")
-    match = brain.best_match(old or "", core.memories())
+    match, choices = brain.find_memory(old or "", core.memories())
+    if match is None and choices:
+        raise AbilityError(
+            "Nothing was changed: it isn't clear which memory is meant. The closest: "
+            + "; ".join(f'"{c}"' for c in choices) + ". Ask which one, then try again with its exact words"
+        )
     if match is None:
         raise AbilityError("Nothing like that is saved; save it as a new memory instead")
     for item in core.memory:

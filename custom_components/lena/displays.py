@@ -24,6 +24,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
+from . import access
 from .const import DOMAIN
 
 # Sent with a display's device id when a new display registers, so its satellite is added.
@@ -118,6 +119,8 @@ class LenaDisplayView(HomeAssistantView):
     async def post(self, request: web.Request) -> web.Response:
         """Registers or looks up the display and says where it is."""
         hass = request.app[KEY_HASS]
+        if denied := access.refused(self, request):  # admins and the users chosen in her options
+            return denied
         core = hass.data.get(DOMAIN)
         if core is None:
             return self.json_message("Lena isn't set up", status_code=404)
