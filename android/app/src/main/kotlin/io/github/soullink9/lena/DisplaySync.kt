@@ -88,6 +88,7 @@ object DisplaySync {
             .put("wake_word", if (Prefs.wakeWord(c)) Prefs.wakePhrase(c).name else JSONObject.NULL)
             // What it's doing (idle, listening, processing, responding), which its Assist satellite shows.
             .put("phase", DisplayPhase.now.ha)
+            .put("photo", OnScreen.photo)
         val reply = try {
             ha.syncDisplay(body)
         } catch (e: HaHttpException) {

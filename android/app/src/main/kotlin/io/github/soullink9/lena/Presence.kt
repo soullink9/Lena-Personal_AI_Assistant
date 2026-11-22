@@ -78,3 +78,12 @@ class WakeLevel {
         return maxOf(0.0, peak - before)
     }
 }
+
+/**
+ * The photo the slideshow is showing now, as its address on Home Assistant ("" when none is), so the Lena
+ * integration can tell her what's on the screen behind her: when, where and who, from Immich.
+ * [DisplaySync] sends it with each sync.
+ */
+object OnScreen {
+    @Volatile var photo: String = ""
+}

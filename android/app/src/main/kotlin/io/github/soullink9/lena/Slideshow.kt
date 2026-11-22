@@ -47,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -138,18 +139,23 @@ fun PhotoFrame(slides: Slides, now: Date, house: HouseNow?, locked: Boolean, lis
                 }
             }
             val started = System.currentTimeMillis()
-            val photo = runCatching { load(context, ha, list[at % list.size]) }
+            val address = list[at % list.size]
+            val photo = runCatching { load(context, ha, address) }
                 .onFailure { Logs.w("Slideshow", "Couldn't show a photo", it) }.getOrNull()
             at++
             if (photo != null) {
                 problem = null
                 shown = Shown(photo.bitmap, n++, photo.fx, photo.fy)
+                OnScreen.photo = address
                 delay((slides.seconds * 1000L - (System.currentTimeMillis() - started)).coerceAtLeast(1_000))
             } else {
                 delay(1_000) // skip a photo that won't load
             }
         }
     }
+
+    // Once the slideshow's gone, no photo is on the screen.
+    DisposableEffect(Unit) { onDispose { OnScreen.photo = "" } }
 
     // Tapping the photos talks to her; without onTalk (behind the TV home's rows) they're only a background,
     // which the remote never lands on.
