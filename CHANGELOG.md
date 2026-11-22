@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.44] - 2026-11-22
 
 Asked "any lights on?", Lena answered nothing: she called Home Assistant's tool by a name one character off, and then went in circles. **Update the Open WebUI filter.**
 
