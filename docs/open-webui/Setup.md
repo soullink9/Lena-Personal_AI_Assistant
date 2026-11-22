@@ -82,6 +82,14 @@ remember,forget,update_fact,feel,home-assistant_*
 
 `home-assistant_` is the ID you gave Home Assistant's MCP server in Open WebUI; change it if yours differs.
 
+### Context Compaction
+
+Open WebUI's **Context Compaction** (Admin Panel → Settings → Interface, off unless you turned it on) has the model summarize the older part of a long chat once it passes a token threshold, and the answer waits for that summary. On a local model that wait is far longer than the answer.
+
+The Lena app keeps it off the path of her answers: it sends each question with no more than three quarters of the threshold of conversation, so Open WebUI never needs to compact while she answers, and it asks Open WebUI to compact the chat itself a few minutes after you stop talking, when the chat is getting long. Her next answer then starts from that summary. Nothing to set; with Context Compaction off, the app simply sends the newest half of her context size, as before.
+
+Chats you type in Open WebUI's own page still compact while you wait once they pass the threshold. If you keep it on, setting **Context Compaction Model** to a small, fast model shortens that wait, and a threshold at least twice the app's **Her context size** keeps the app's chats from being cut short.
+
 ## 6. Open WebUI's own memory
 
 Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory and knowledge** screen shows both: connect Home Assistant in the app's settings and a **Hers** tab shows her shared list next to Open WebUI's memories and your knowledge.

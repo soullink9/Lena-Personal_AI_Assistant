@@ -79,6 +79,7 @@ How the repository is organized and how to change it without breaking things. Th
 │   │   ├── camera_check/          camera mode: the cameras and sensors it finds, and what it shows as motion comes and goes
 │   │   ├── connection_check/      which failed requests are tried again, and how an answer being written is followed
 │   │   ├── presence_check/        how loud the wake word was above the room, and what each display says it's doing
+│   │   ├── compaction_check/      requests stay under Open WebUI's compaction threshold, and when a quiet chat is compacted
 │   │   ├── commands_check/        what she understands on her own, on example sentences
 │   │   └── pairing_check/         Set up from your phone: QR codes, the page used as a phone would, its cipher (in Node) against Java's
 │   └── release/test_release.py    the release scripts in scripts/, against a fake Gitea

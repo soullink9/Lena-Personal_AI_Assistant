@@ -21,7 +21,17 @@ import java.util.UUID
  * A model on your Open WebUI, with the tools and features (web search and the like) its settings turn on by
  * default, which the sheet and scheduled prompts use the same way the page would.
  */
-data class Model(val id: String, val name: String, val toolIds: List<String>, val features: Set<String>)
+/**
+ * A model on your server. compactThreshold is the model's own Context Compaction Threshold in Open WebUI
+ * (Advanced Params), when it has one; see [Compaction].
+ */
+data class Model(
+    val id: String,
+    val name: String,
+    val toolIds: List<String>,
+    val features: Set<String>,
+    val compactThreshold: Int? = null,
+)
 
 /**
  * A chat in a list. active means an answer is still being written; folderId is the folder it's in, when
@@ -64,12 +74,13 @@ class Api(server: String, private val context: Context? = null) {
         fun from(c: Context): Api? = Prefs.server(c)?.let { Api(it, c.applicationContext) }
 
         /**
-         * A conversation that never ends outgrows any model. Lena gives it half of the model's
-         * context, filled from the newest message back; the other half stays free for the system
-         * prompt, tool definitions, tool results and the reply. About 4 characters per token.
+         * A conversation that never ends outgrows any model, so a request carries only its newest
+         * [budgetTokens] of history ([Compaction.historyTokens]: half the model's context, and less when
+         * Open WebUI would otherwise compact), filled from the newest message back. About 4 characters
+         * per token, the same estimate Open WebUI uses.
          */
-        fun fitToBudget(thread: List<JSONObject>, contextTokens: Int): List<JSONObject> {
-            val budgetChars = contextTokens.coerceAtLeast(2048) / 2 * 4
+        fun fitToBudget(thread: List<JSONObject>, budgetTokens: Int): List<JSONObject> {
+            val budgetChars = budgetTokens.coerceAtLeast(256) * 4
             var used = 0
             var start = thread.size
             while (start > 0) {
@@ -282,6 +293,8 @@ class Api(server: String, private val context: Context? = null) {
                 name = m.optString("name").ifBlank { m.getString("id") },
                 toolIds = meta?.optJSONArray("toolIds").strings(),
                 features = meta?.optJSONArray("defaultFeatureIds").strings().toSet(),
+                compactThreshold = m.optJSONObject("info")?.optJSONObject("params")
+                    ?.optInt("compact_token_threshold", 0)?.takeIf { it > 0 },
             )
         }
     }
@@ -510,18 +523,25 @@ class Api(server: String, private val context: Context? = null) {
         val existing = chatId?.let { chatOrNull(it) }
         val id: String
         val thread: List<JSONObject>
+        var summary: String? = null
         if (existing == null) {
             id = startChat(turn, model, newTitle ?: prompt.lineSequence().first().take(60), pinNew)
             thread = listOf(JSONObject().put("role", "user").put("content", prompt))
         } else {
             id = chatId!!
-            thread = continueChat(id, existing, turn, parentId, contextTokens)
+            val threshold = Compaction.threshold(compactThreshold(existing), model.compactThreshold)
+            val budget = Compaction.historyTokens(contextTokens, threshold)
+            val continued = continueChat(id, existing, turn, parentId, budget)
+            thread = continued.first
+            summary = continued.second
         }
 
-        // 2. What the model is sent: notes for this request only, then the thread, with the photo
+        // 2. What the model is sent: notes for this request only (and the summary of what came before
+        //    Open WebUI's last compaction, as its own page sends it), then the thread, with the photo
         //    attached to your message as an image part.
         val conversation = JSONArray()
-        val notes = requestNotes(spoken, locked, instruction)
+        val earlier = summary?.let { "${Compaction.SUMMARY_HEADER}\n$it" }
+        val notes = requestNotes(spoken, locked, instruction) + listOfNotNull(earlier)
         if (notes.isNotEmpty()) conversation.put(JSONObject().put("role", "system").put("content", notes.joinToString("\n")))
         thread.forEachIndexed { i, m ->
             if (i == thread.lastIndex && image != null) {
@@ -542,6 +562,8 @@ class Api(server: String, private val context: Context? = null) {
             if (!Retry.mayBeUnderWay(e) || !answering(id, turn.replyId)) throw e
             Logs.i("Open WebUI", "No reply to the request (${e.javaClass.simpleName}), but she's answering; following it")
         }
+        // Compact once the chat has gone quiet, so the next question doesn't wait for it.
+        context?.let { CompactWorker.schedule(it, id, model.id) }
         return Started(id, turn.replyId)
     }
 
@@ -609,13 +631,15 @@ class Api(server: String, private val context: Context? = null) {
 
     /**
      * Adds this turn to an existing chat after [parentId] (or its latest message), saves it, and
-     * returns the thread the model should see: every question and answer from the start of the
-     * chat down this branch to your new message, trimmed to fit half the model's context, with a note
-     * wherever a long pause came between two messages ([TimePassing]), so she knows what's old.
-     * Open WebUI keeps a chat as a tree (edits and regenerations make branches), so the thread is
-     * found by walking parent links back from the new message rather than by list order.
+     * returns the thread the model should see, with the summary of what came before it if Open WebUI
+     * compacted the chat: every question and answer from the start of the chat (or from its latest
+     * compaction, see [branch]) down this branch to your new message, trimmed to [budgetTokens] less
+     * the summary, with a note wherever a long pause came between two messages ([TimePassing]), so
+     * she knows what's old.
      */
-    private suspend fun continueChat(id: String, existing: JSONObject, turn: ChatTurn, parentId: String?, contextTokens: Int): List<JSONObject> {
+    private suspend fun continueChat(
+        id: String, existing: JSONObject, turn: ChatTurn, parentId: String?, budgetTokens: Int,
+    ): Pair<List<JSONObject>, String?> {
         val chat = existing.optJSONObject("chat") ?: JSONObject()
         val history = chat.optJSONObject("history") ?: JSONObject()
         val messages = history.optJSONObject("messages") ?: JSONObject()
@@ -629,24 +653,64 @@ class Api(server: String, private val context: Context? = null) {
         val list = (chat.optJSONArray("messages") ?: JSONArray()).put(turn.user).put(turn.reply)
         request("POST", "/api/v1/chats/${enc(id)}", JSONObject().put("chat", JSONObject().put("history", history).put("messages", list)))
 
-        val thread = mutableListOf<JSONObject>()
-        var cursor: String? = turn.userId
+        val (walked, compacted) = branch(messages, turn.userId)
+        // A compaction made here ([CompactWorker]) is saved on her last answer, and a thread starts with a
+        // question, so that answer goes along with the summary instead.
+        val first = walked.firstOrNull()
+        val summary = if (compacted != null && first != null && first.optString("role") == "assistant") {
+            "$compacted\n\nYour last answer: ${Markdown.clean(first.optString("content"))}"
+        } else compacted
+        val thread = walked.mapNotNull { m ->
+            val role = m.optString("role")
+            if (role != "user" && role != "assistant") return@mapNotNull null
+            // Her earlier answers go back without the markup Open WebUI adds (tool-call details and the like).
+            val content = m.optString("content")
+            val message = JSONObject().put("role", role).put("content", if (role == "assistant") Markdown.clean(content) else content)
+            // When it was said, for the notes on time passing (taken off again before it's sent).
+            val at = m.optLong("timestamp")
+            if (at > 0) message.put(TimePassing.AT, toMillis(at))
+            message
+        }
+        val budget = budgetTokens - (summary?.length ?: 0) / 4
+        return TimePassing.annotate(fitToBudget(thread, budget)) to summary
+    }
+
+    /**
+     * The messages of a chat's branch, oldest first, ending at [lastId], and the summary Open WebUI
+     * compacted the earlier ones into, if it did. Open WebUI keeps a chat as a tree (edits and
+     * regenerations make branches), so the branch is found by walking parent links back rather than by
+     * list order. A compaction saves its summary on a message ("contextSummary"), which then stands for
+     * everything before it; the walk stops there, as Open WebUI's own does.
+     */
+    fun branch(messages: JSONObject, lastId: String?): Pair<List<JSONObject>, String?> {
+        val found = mutableListOf<JSONObject>()
+        var cursor: String? = lastId
         while (cursor != null) {
             val m = messages.optJSONObject(cursor) ?: break
-            val role = m.optString("role")
-            if (role == "user" || role == "assistant") {
-                // Her earlier answers go back without the markup Open WebUI adds (tool-call details and the like).
-                val content = m.optString("content")
-                val message = JSONObject().put("role", role).put("content", if (role == "assistant") Markdown.clean(content) else content)
-                // When it was said, for the notes on time passing (taken off again before it's sent).
-                val at = m.optLong("timestamp")
-                if (at > 0) message.put(TimePassing.AT, toMillis(at))
-                thread.add(0, message)
-            }
+            found.add(0, m)
+            val summary = listOf("contextSummary", "context_summary")
+                .firstNotNullOfOrNull { key -> (m.opt(key) as? String)?.takeIf { it.isNotBlank() } }
+            if (summary != null) return found to summary
             cursor = if (m.isNull("parentId")) null else m.optString("parentId")
         }
-        return TimePassing.annotate(fitToBudget(thread, contextTokens))
+        return found to null
     }
+
+    /**
+     * The token count at which Open WebUI compacts [chat] (as [chat] returns it), or null when its Context
+     * Compaction is off: Open WebUI then reports no "context_usage".
+     */
+    fun compactThreshold(chat: JSONObject): Int? =
+        chat.optJSONObject("context_usage")?.optInt("threshold", 0)?.takeIf { it > 0 }
+
+    /**
+     * Asks Open WebUI to compact the chat now: everything but its latest message becomes a summary, saved
+     * on that message. Answers with Open WebUI's result ("compacted", and "context_usage" afterwards).
+     * Writing the summary takes the model a while, hence the long wait.
+     */
+    suspend fun compact(chatId: String, modelId: String): JSONObject = JSONObject(
+        request("POST", "/api/v1/chats/${enc(chatId)}/compact", JSONObject().put("model", modelId), readTimeoutMs = 300_000)
+    )
 
     /**
      * Notes for her with this request only (they're never saved in the chat): the phone's time, said

@@ -2,6 +2,33 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Talking to Lena no longer waits for Open WebUI's Context Compaction. **Update the app.**
+
+### Android app
+
+- **No more waiting for compaction.** With Open WebUI's Context Compaction on, a long Assistant Lena chat went over its threshold, and Open WebUI had the model summarize the older half of the conversation before every answer, which took far longer than the answer. Because the app sends the conversation itself, Open WebUI never saw its earlier summary and wrote a new one on every request. Now a request carries at most three quarters of the threshold of conversation (a model's own threshold counts if it's lower), so Open WebUI never compacts while she answers.
+- **Compacted after you stop talking.** Three minutes after the last question, once the chat fills half of what a request carries, the app asks Open WebUI to compact it (`POST /api/v1/chats/{id}/compact`) while nobody is waiting. Her next answer starts from that summary, sent the way Open WebUI's own page sends it, so older talk is summarized instead of cut off. The app's log says when it did and how long it took.
+- With Context Compaction off, nothing changes: the conversation gets half of her context size, as before.
+
+### Docs
+
+- **Context Compaction** in [Lena in Open WebUI](docs/open-webui/Setup.md#context-compaction): what the app does about it, and, for chats typed in Open WebUI's own page, a small Context Compaction Model to shorten the wait.
+
+### Tests
+
+- **`tests/app/compaction_check`** checks that a voice request stays under the compaction threshold, with a summary too, and when a quiet chat is compacted, in Gitea's and GitHub's test and release workflows.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.41] - 2026-11-22
 
 Voice on a phone works again when a tablet or TV hears "Hey Lena" too. **Update the integration and the app.**

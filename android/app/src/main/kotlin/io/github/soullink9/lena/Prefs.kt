@@ -314,7 +314,7 @@ object Prefs {
     fun followUp(c: Context): FollowUp =
         enumPref(c, "follow_up", Defaults.FOLLOW_UP)
 
-    /** The model's context size in tokens; half of it holds the ongoing conversation. */
+    /** The model's context size in tokens; half of it holds the ongoing conversation (see [Compaction.historyTokens]). */
     fun contextTokens(c: Context): Int = p(c).getInt("context_tokens", Defaults.CONTEXT_TOKENS)
 
     /** The chat that conversation lives in, once it exists. */

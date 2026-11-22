@@ -1347,7 +1347,7 @@ class SettingsActivity : ComponentActivity() {
                         text.toIntOrNull()?.let { set(s.copy(contextTokens = it)) }
                     },
                     label = { Text("Her context size (tokens)") },
-                    supportingText = { Text("Half holds the conversation; the rest is for her prompt, tools and reply. Match num_ctx in the Modelfile.") },
+                    supportingText = { Text("Half holds the conversation (less if Open WebUI's Context Compaction would start sooner); the rest is for her prompt, tools and reply. Match num_ctx in the Modelfile.") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
                 )
             }

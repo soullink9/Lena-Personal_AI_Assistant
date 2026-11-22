@@ -58,6 +58,7 @@ tests/app/commands_check/run.sh            # timers and alarms by voice (needs k
 tests/app/camera_check/run.sh              # camera mode's choices (needs kotlinc or Gradle)
 tests/app/connection_check/run.sh          # when failed requests are tried again (needs kotlinc or Gradle)
 tests/app/presence_check/run.sh            # wake word loudness and display state (needs kotlinc or Gradle)
+tests/app/compaction_check/run.sh          # requests stay under Open WebUI's compaction threshold (needs kotlinc or Gradle)
 tests/app/pairing_check/run.sh             # Set up from your phone: QR codes, the page, its cipher (kotlinc or Gradle; Node for the cipher)
 tests/app/frontend_check/run.sh            # the wake word front end against the original C (needs g++ and a JDK)
 scripts/test_home_assistant.sh latest  # the integration in a real Home Assistant (in a virtualenv: it pip installs)

@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.glance.appwidget.updateAll
@@ -26,6 +27,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import kotlinx.coroutines.delay
+import java.io.IOException
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
@@ -385,5 +387,74 @@ object Shortcuts {
                 .build()
         }
         c.getSystemService(ShortcutManager::class.java).dynamicShortcuts = list
+    }
+}
+
+/** Compacts a chat once it has gone quiet, when it's long enough to need it (see [Compaction]). */
+class CompactWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+    companion object {
+        private fun name(chatId: String) = "compact-$chatId"
+
+        /**
+         * Compacts [chatId] [Compaction.QUIET_MINUTES] after now. Each question starts the wait again, so it
+         * only runs once the conversation has stopped.
+         */
+        fun schedule(c: Context, chatId: String, modelId: String) {
+            WorkManager.getInstance(c).enqueueUniqueWork(
+                name(chatId),
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<CompactWorker>()
+                    .setInputData(workDataOf("chat_id" to chatId, "model_id" to modelId))
+                    .setInitialDelay(Compaction.QUIET_MINUTES, TimeUnit.MINUTES)
+                    .setBackoffCriteria(BackoffPolicy.LINEAR, Compaction.QUIET_MINUTES, TimeUnit.MINUTES)
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .build(),
+            )
+        }
+    }
+
+    /**
+     * Looks at the chat and compacts it if it's long enough. An answer still being written (or one
+     * started meanwhile, which Open WebUI refuses to compact during) waits a few minutes more, twice at most.
+     */
+    override suspend fun doWork(): Result {
+        val chatId = inputData.getString("chat_id") ?: return Result.failure()
+        val modelId = inputData.getString("model_id") ?: return Result.failure()
+        val c = applicationContext
+        val api = Api.from(c) ?: return Result.success()
+        return try {
+            if (api.runningTasks(chatId) > 0) return later("an answer is still being written")
+            val chat = api.chatOrNull(chatId) ?: return Result.success()
+            val model = runCatching { api.models().firstOrNull { it.id == modelId } }.getOrNull()
+            val threshold = Compaction.threshold(api.compactThreshold(chat), model?.compactThreshold)
+                ?: return Result.success() // compaction is off
+            val budget = Compaction.historyTokens(Prefs.contextTokens(c), threshold)
+            val history = chat.optJSONObject("chat")?.optJSONObject("history") ?: return Result.success()
+            val messages = history.optJSONObject("messages") ?: return Result.success()
+            val current = if (history.isNull("currentId")) null else history.optString("currentId")
+            val (branch, summary) = api.branch(messages, current)
+            val chars = branch.sumOf { it.optString("content").length + 16 } + (summary?.length ?: 0)
+            if (!Compaction.worthCompacting(chars, budget)) return Result.success()
+            val started = System.currentTimeMillis()
+            val result = api.compact(chatId, modelId)
+            val usage = result.optJSONObject("context_usage")
+            Logs.i("Open WebUI", "Compacted the chat while it was quiet: ${result.optBoolean("compacted")}, " +
+                "${result.optInt("dropped_messages")} messages summarized in ${(System.currentTimeMillis() - started) / 1000} s" +
+                (usage?.let { ", now ${it.optInt("percent")}% of the threshold" } ?: ""))
+            Result.success()
+        } catch (_: AuthException) {
+            Result.success()
+        } catch (_: ConflictException) {
+            later("an answer started meanwhile")
+        } catch (e: IOException) {
+            Logs.w("Open WebUI", "Couldn't compact the chat (try ${runAttemptCount + 1})", e)
+            if (runAttemptCount < 2) Result.retry() else Result.success()
+        }
+    }
+
+    private fun later(why: String): Result {
+        Logs.i("Open WebUI", "Compacting the chat later: $why")
+        return if (runAttemptCount < 2) Result.retry() else Result.success()
     }
 }

@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     # Only the app needs building; docs and Home Assistant files don't.
-    paths: ["android/**", "tests/app/frontend_check/**", "tests/app/commands_check/**", "tests/app/pairing_check/**", "tests/app/camera_check/**", "tests/app/connection_check/**", "tests/app/presence_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
+    paths: ["android/**", "tests/app/frontend_check/**", "tests/app/commands_check/**", "tests/app/pairing_check/**", "tests/app/camera_check/**", "tests/app/connection_check/**", "tests/app/presence_check/**", "tests/app/compaction_check/**", "scripts/build_apk.sh", ".github/workflows/build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -84,6 +84,11 @@ jobs:
       # it's doing (listening, thinking, speaking) for Home Assistant.
       - name: Check wake word claims and display state
         run: tests/app/presence_check/run.sh
+
+      # How much conversation a request to Open WebUI carries, so its Context Compaction never makes her
+      # answer wait, and when a quiet chat is compacted instead.
+      - name: Check context compaction rules
+        run: tests/app/compaction_check/run.sh
 
       # Uses the JDK and Android SDK already on GitHub's Ubuntu runner. A test build is named after its commit.
       - name: Build

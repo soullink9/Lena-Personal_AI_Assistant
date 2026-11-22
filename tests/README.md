@@ -14,6 +14,7 @@ from the repository root. Each suite prints `PASS` or `FAIL` per check and exits
 | `tests/app/pairing_check/run.sh` | Set up from your phone: Lena's QR codes against ones a QR reader read back, the page the device serves used as a phone would, and the page's cipher (in Node, when it's installed) against Java's; and the WebSocket client, with a message of several megabytes and one in two parts |
 | `tests/app/camera_check/run.sh` | Camera mode: the cameras and sensors it finds in UniFi Protect's entities, and what each view shows as motion comes and goes |
 | `tests/app/connection_check/run.sh` | Connections: which failed requests are tried again (never a POST that may have reached the server), when a question that got no reply is looked for instead of failing, and how an answer being written is followed |
+| `tests/app/compaction_check/run.sh` | Context Compaction: a request to Open WebUI stays under its threshold, so her answer never waits for a summary, with a summary too; a quiet chat is compacted only once it's long enough |
 | `tests/app/frontend_check/run.sh` | The app's wake word front end against the original C, bit for bit |
 
 `test_release.py` covers:

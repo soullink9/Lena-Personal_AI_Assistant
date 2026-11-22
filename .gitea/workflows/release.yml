@@ -267,6 +267,11 @@ jobs:
       - name: Check wake word claims and display state
         run: tests/app/presence_check/run.sh
 
+      # How much conversation a request to Open WebUI carries, so its Context Compaction never makes her
+      # answer wait, and when a quiet chat is compacted instead.
+      - name: Check context compaction rules
+        run: tests/app/compaction_check/run.sh
+
       - name: Install the Android SDK (from Google)
         run: scripts/android_sdk.sh
 
