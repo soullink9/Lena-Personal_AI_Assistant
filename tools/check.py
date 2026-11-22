@@ -455,6 +455,12 @@ versions["CHANGELOG.md (newest section)"] = newest.group(1) if newest else None
 for where, v in versions.items():
     check(v == app_version, f"{where} is version {app_version} (got {v})")
 
+# Every release says what to update, part by part, at the end of its changelog section.
+newest_section = release_notes.changelog_section(app_version) or ""
+missing_parts = release_notes.missing_update_lines(newest_section)
+check(not missing_parts, f"CHANGELOG.md's {app_version} section ends with what to update for every part"
+      + (f" (missing: {', '.join(missing_parts)})" if missing_parts else ""))
+
 # No 1.0 until the owner says so: every part stays 0.x.
 check(app_version.split(".")[0] == "0", f"the version stays below 1.0 until it's approved (got {app_version})")
 

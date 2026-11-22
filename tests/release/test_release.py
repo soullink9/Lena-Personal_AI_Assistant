@@ -76,6 +76,14 @@ changelog = "## [Unreleased]\n\n- next\n\n## [0.6.11] - 2026-11-07\n\nEleven.\n\
 check(release_notes.changelog_section("0.6.1", changelog) == "One." and release_notes.changelog_section("0.6.11", changelog) == "Eleven.",
       "the changelog is matched on the whole version: 0.6.1 doesn't take 0.6.11's section")
 check(release_notes.changelog_section("0.6.12", changelog) is None, "a version with no changelog section: none found")
+update_list = ("### What to update\n\n- Modelfile: No update needed\n- Lena HA Integration: Need to update\n"
+               "- Lena Android App: Need to update\n- Open WebUI Tools: No update needed\n"
+               "- Open WebUI Filters: No update needed\n- Voice Bridge: No update needed\n")
+check(release_notes.missing_update_lines("Some change.\n\n" + update_list) == [],
+      "a section that says what to update for every part is complete")
+check(release_notes.missing_update_lines(update_list.replace("- Voice Bridge: No update needed\n", "")) == ["Voice Bridge"]
+      and release_notes.missing_update_lines(update_list.replace("Modelfile: No update needed", "Modelfile: maybe")) == ["Modelfile"],
+      "a part left out, or not said plainly (Need to update / No update needed), is missing")
 check(release_notes.changelog_section("0.5.2", "## 0.5.2 (2026-11-01)\n\nOld style.\n") == "Old style.",
       "a heading without brackets is read too")
 check(release_notes.release_title("0.6.12") == "v0.6.12" and release_notes.apk_name("0.6.12") == "lena-v0.6.12.apk",

@@ -2,6 +2,23 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+No change to Lena herself: the changelog now says, at the end of every release, which parts to update and which not. **Nothing to update.**
+
+### Docs
+
+- **Every release ends with what to update.** Each release's section (and so its release notes) closes with one line per part: the Modelfile, the Lena HA integration, the Lena Android app, the Open WebUI tools, the Open WebUI filters and the voice bridge, each "Need to update" or "No update needed". 0.6.39's section has it too. `tools/check.py` fails when the newest release leaves a part out.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: No update needed
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.39] - 2026-11-22
 
 More of the small things a person living here would know. Everything that makes her speak first is off until you tick it. **Update the integration, the Open WebUI tool and the app.** Her Modelfile is unchanged, so there's nothing to rebuild.
@@ -25,6 +42,15 @@ More of the small things a person living here would know. Everything that makes 
 ### Android app
 
 - **The display tells Home Assistant which photo is on the wall**, with each sync, so she can talk about it.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: Need to update
+- Lena Android App: Need to update
+- Open WebUI Tools: Need to update
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
 
 ## [0.6.38] - 2026-11-22
 

@@ -69,7 +69,7 @@ Every push runs all of these, plus the app build, on the Gitea runner (`.gitea/w
 
 The project lives on Gitea, which push-mirrors to GitHub. GitHub is the public copy: people install from its releases, and the app updates itself from them. Releasing works the same when GitHub can't be reached; GitHub catches up when the mirror next pushes.
 
-1. Set the new version everywhere (see [Development](docs/development/Development.md#things-that-must-stay-in-step); `tools/check.py` catches a mismatch) and rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.6.12] - <date>`. Apply any waiting default changes (`python3 tools/defaults.py apply`). Commit and push.
+1. Set the new version everywhere (see [Development](docs/development/Development.md#things-that-must-stay-in-step); `tools/check.py` catches a mismatch) and rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.6.12] - <date>`; check its **What to update** list at the end. Apply any waiting default changes (`python3 tools/defaults.py apply`). Commit and push.
 2. On Gitea: **Actions → Release → Run workflow**, and enter the version without the v (`0.6.12`). Or push a tag: `git tag v0.6.12 && git push origin v0.6.12`.
 3. Gitea's release workflow (`.gitea/workflows/release.yml`) checks the version against every part and the changelog, runs every test, builds and signs the APK, checks it (`scripts/check_apk.py`) and publishes the Gitea release with the APK and `SHA256SUMS`. It creates the tag when you used the button.
 4. The push mirror takes the tag to GitHub, where `.github/workflows/release.yml` does the same and publishes the GitHub release. It has its own **Run workflow** button with the same version box, for releasing from GitHub alone.
@@ -84,7 +84,20 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 - Read [ARCHITECTURE.md](ARCHITECTURE.md) for how the parts fit together, then the [Development](docs/development/Development.md) page: the layout, what must stay in step and the checks to run. For the app, also read [App development](docs/development/App.md).
 - Run `python3 tools/check.py` before committing (see [Checking a change](#checking-a-change)).
 - Keep comments readable by someone new to the project. Every function and class gets a short comment, and it explains why (the reason for a choice, the trap it avoids), not just what the code already says. Prefer plain, step-by-step code over clever one-liners.
-- Add a line to the next release's section of `CHANGELOG.md` (one changelog for the whole project), saying which parts people need to update.
+- Add a line to the next release's section of `CHANGELOG.md` (one changelog for the whole project), and keep its **What to update** list at the end right: one line per part, each `Need to update` or `No update needed`:
+
+  ```
+  ### What to update
+
+  - Modelfile: No update needed
+  - Lena HA Integration: Need to update
+  - Lena Android App: Need to update
+  - Open WebUI Tools: No update needed
+  - Open WebUI Filters: No update needed
+  - Voice Bridge: No update needed
+  ```
+
+  `tools/check.py` fails while the newest release's section is missing a part.
 - Never put private data in the repository: IP addresses, tokens, signing keys, real names, or the contents of a real memory list. Use `Alex` and `Sam` in examples.
 
 ### Personality and Home Assistant

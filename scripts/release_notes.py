@@ -64,6 +64,26 @@ def changelog_section(version, text=None):
     return text[start.end():end].strip()
 
 
+# Every release's changelog section ends with what to update, one line per part, so people with many
+# moving parts know at a glance what to do: "Modelfile: No update needed", "Lena HA Integration: Need to
+# update". tools/check.py checks the newest section has all of them.
+UPDATE_PARTS = (
+    "Modelfile", "Lena HA Integration", "Lena Android App", "Open WebUI Tools", "Open WebUI Filters", "Voice Bridge",
+)
+UPDATE_ANSWERS = ("Need to update", "No update needed")
+
+
+def missing_update_lines(section):
+    """The parts a changelog section doesn't say whether to update (empty when it says for all of them)."""
+    missing = []
+    for part in UPDATE_PARTS:
+        line = re.compile(rf"^\s*(?:[-*]\s*)?\**{re.escape(part)}\**:\s*\**(.+?)\**\s*$", re.M)
+        found = line.search(section or "")
+        if not found or found.group(1).strip() not in UPDATE_ANSWERS:
+            missing.append(part)
+    return missing
+
+
 def absolute_links(text, repo, tag):
     """Relative links (docs/app/Installation.md, README.md#...) as links to the repository at the tag."""
     def fix(m):
