@@ -290,7 +290,7 @@ class Handler(BaseHTTPRequestHandler):
     """The bridge's HTTP API, shaped like OpenAI's audio endpoints so Open WebUI can use it as an
     "OpenAI" speech engine.
     """
-    server_version = "LenaVoiceBridge/0.6.46"
+    server_version = "LenaVoiceBridge/0.6.47"
     timeout = 30  # seconds a caller may go quiet mid-request before it's dropped, so slow senders can't pile up
 
     def log_message(self, fmt, *args):
