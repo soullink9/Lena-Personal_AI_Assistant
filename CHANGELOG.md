@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.48] - 2026-11-23
 
 The voice bridge comes as a ready-made Docker image. **Nothing to do**: your bridge keeps working as it is. To run the image instead of building it, copy the new `voice/bridge/compose.yaml` over yours (keeping your settings), then `docker compose pull && docker compose up -d`.
 
