@@ -161,7 +161,7 @@ The same scripts build the app everywhere: `scripts/build_apk.sh` builds and sig
 
 - **On Gitea** (where the project lives), `.gitea/workflows/test.yml` builds on every push, in the official `gradle:8.14.3-jdk21` image from Docker Hub. It has Gradle and a JDK but no Android SDK, so `scripts/android_sdk.sh` fetches Google's command-line tools from dl.google.com, checks them against the SHA-256 Google publishes, and installs Android 16's platform. Nothing comes from GitHub, so it builds when GitHub is down. `tests/app/commands_check/run.sh` uses the Kotlin compiler inside Gradle there, as the image has no `kotlinc`.
 - **On GitHub** (the public mirror), `build.yml` builds each change to the app on GitHub's Ubuntu runner, with the JDK and Android SDK already installed there and Gradle downloaded from gradle.org (checked against its published SHA-256), and keeps the APK and `SHA256SUMS` as the run's artifact.
-- **Releases** (`.gitea/workflows/release.yml` and `.github/workflows/release.yml`) load your signing key from the secrets, refuse to go on without it, and publish only after every test has passed. The release step is the only one allowed to write.
+- **Releases** (`.gitea/workflows/release.yml` and `.github/workflows/release.yml`) load your signing key from the secrets, refuse to go on without it, and publish only after every test has passed. The release step is the only one allowed to write, apart from the voice bridge image job after it, which may only publish packages (`scripts/publish_voice_bridge_image.sh`; see CONTRIBUTING).
 
 ## Making a release
 

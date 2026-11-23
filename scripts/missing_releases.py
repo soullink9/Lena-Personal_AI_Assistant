@@ -22,6 +22,11 @@ asks this which releases are missing and starts the release workflow for each of
     don't count), else false:
     release.yml marks only that one Latest, so releases started together in any order leave the newest on top.
 
+    python3 scripts/missing_releases.py --newest-tag <tag> <tags file>
+    Prints true when <tag> is the newest of Lena's versions among the tags (git ls-remote --tags --refs, names
+    only), else false: Gitea's release.yml tags only that voice bridge image latest, so tags pushed together leave
+    the newest as latest whichever run finishes last.
+
 Which tags count: only Lena's versions, the plain numbers release_notes.py accepts (v0.6.17), with a section in
 CHANGELOG.md. That leaves out the old -beta tags and the tags kept from the repositories merged into this one
 (v2.x), which never get a release. Of those, only versions newer than the newest one already released: an old
@@ -120,6 +125,10 @@ def main(args):
     if args[:1] == ["--latest"] and len(args) == 3:
         releases = json.loads(Path(args[2]).read_text(encoding="utf-8") or "[]")
         print("true" if is_latest(args[1], releases, changelog) else "false")
+        return 0
+    if args[:1] == ["--newest-tag"] and len(args) == 3:
+        tags = Path(args[2]).read_text(encoding="utf-8").split()
+        print("true" if is_latest(args[1], [{"tagName": tag} for tag in tags], changelog) else "false")
         return 0
     retry_failed = args[:1] == ["--retry-failed"]
     if retry_failed:

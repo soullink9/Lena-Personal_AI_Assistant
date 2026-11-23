@@ -1,5 +1,6 @@
 # Publishes a GitHub release: Lena's signed APK and its SHA256SUMS, with notes from that version's section of
-# CHANGELOG.md. The app updates itself from these releases. (.gitea/workflows/release.yml does the same on Gitea;
+# CHANGELOG.md. The app updates itself from these releases. Then the voice bridge's Docker image on ghcr.io, which
+# voice/bridge/compose.yaml pulls (the voice-bridge-image job). (.gitea/workflows/release.yml does the same on Gitea;
 # both use the scripts in scripts/.)
 #
 # Two ways to start it:
@@ -114,6 +115,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write # to create the tag and the release
+    outputs:
+      latest: ${{ steps.publish.outputs.latest }}
     env:
       GRADLE_VERSION: "8.14.3"
     steps:
@@ -207,6 +210,7 @@ jobs:
         run: python3 scripts/check_apk.py "android/app/build/outputs/apk/release/$APK" android/app/build/outputs/apk/release/SHA256SUMS
 
       - name: Publish
+        id: publish
         env:
           # The job's own token; a RELEASE_TOKEN secret (a fine-grained token with Contents: read and write on this
           # repository) only if GitHub ever refuses that one.
@@ -221,6 +225,7 @@ jobs:
           # leave the newest on top whichever finishes last; the app updates from the Latest release.
           gh release list --limit 200 --json tagName,isDraft > "$RUNNER_TEMP/releases.json"
           latest=$(python3 .release-tools/scripts/missing_releases.py --latest "$TAG" "$RUNNER_TEMP/releases.json")
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"   # the voice bridge image is latest just the same
           if gh release view "$TAG" > /dev/null 2>&1; then
             # A release made by hand on GitHub: add the files and notes to it.
             gh release upload "$TAG" "$out/$APK" "$out/SHA256SUMS" --clobber
@@ -234,3 +239,40 @@ jobs:
             gh release create "$TAG" "$out/$APK" "$out/SHA256SUMS" --title "$TITLE" --notes-file notes.md \
               --target "$GITHUB_SHA" --latest="$latest"
           fi
+
+  voice-bridge-image:
+    # The voice bridge's Docker image on ghcr.io, once the release is out, for amd64 and arm64 (a Raspberry Pi):
+    # tagged with the version (0.6.48), and latest exactly when the release is Latest. voice/bridge/compose.yaml
+    # pulls it (docs/voice/Voice-Bridge.md). The job's own token publishes it; the first time, make the package
+    # public (CONTRIBUTING.md#releasing).
+    needs: [version, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # to publish the image
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      # This workflow's own scripts, from main: an older version's tag may not have them yet.
+      - uses: actions/checkout@v5
+        with:
+          path: .release-tools
+
+      # QEMU on the runner, so the arm64 image can be built here. tonistiigi/binfmt is what Docker's own
+      # setup-qemu-action installs; run directly, like the rest of this workflow, without a third-party action.
+      - name: Install QEMU for the arm64 image
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Publish the voice bridge image on ghcr.io
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          LATEST: ${{ needs.release.outputs.latest }}
+          PLATFORMS: linux/amd64,linux/arm64
+        run: |
+          export IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lena-voice-bridge"
+          export SOURCE_URL="https://github.com/$GITHUB_REPOSITORY"
+          .release-tools/scripts/publish_voice_bridge_image.sh

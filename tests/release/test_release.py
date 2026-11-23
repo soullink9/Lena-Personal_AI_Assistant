@@ -344,6 +344,14 @@ check(missing_releases.is_latest("v0.6.17", releases, LOG) and not missing_relea
       "Latest only for the newest of Lena's versions released, whichever finishes last (a v2.x release doesn't count)")
 check(not missing_releases.is_latest("v0.6.16", releases + [{"tagName": "v0.6.16", "isDraft": False}], LOG),
       "…an older release published after a newer one isn't Latest")
+with tempfile.TemporaryDirectory() as folder:
+    tags_file = Path(folder) / "tags"
+    tags_file.write_text("v0.6.46\nv0.6.47\nv2.18.1\n0.6.47-beta\n")
+    newest = {tag: subprocess.run([sys.executable, str(ROOT / "scripts" / "missing_releases.py"), "--newest-tag", tag,
+                                   str(tags_file)], capture_output=True, text=True).stdout.strip()
+              for tag in ("v0.6.47", "v0.6.46")}
+check(newest == {"v0.6.47": "true", "v0.6.46": "false"},
+      f"the voice bridge image is latest only for the newest of Lena's version tags (a v2.x tag doesn't count) ({newest})")
 
 print(f"\n{fails} failures")
 sys.exit(1 if fails else 0)

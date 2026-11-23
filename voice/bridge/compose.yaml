@@ -1,6 +1,11 @@
 # Lena voice bridge: put it on the same Docker network as Open WebUI and your Wyoming containers.
 services:
   lena-voice:
+    # The image each release publishes (on ghcr.io, for amd64 and arm64). `docker compose up -d` pulls it, or builds
+    # it from the Dockerfile here when it can't be pulled; `docker compose up -d --build` always builds it here.
+    # To use another image, for example a fixed version or your own Gitea's, set LENA_VOICE_IMAGE in .env:
+    #   LENA_VOICE_IMAGE=ghcr.io/soullink9/lena-voice-bridge:0.6.48
+    image: ${LENA_VOICE_IMAGE:-ghcr.io/soullink9/lena-voice-bridge:latest}
     build: .
     container_name: lena-voice
     restart: unless-stopped

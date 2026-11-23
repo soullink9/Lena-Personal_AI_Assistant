@@ -4,11 +4,11 @@
 
 Open WebUI can't use the Wyoming Piper and Whisper containers Home Assistant uses: Wyoming is Home Assistant's own protocol, and Open WebUI only talks to OpenAI-style speech servers. The voice bridge is a tiny container that sits between them, so Lena speaks with the **same Piper voice** in Open WebUI, call mode, the Lena app and Home Assistant.
 
-It lives in [`voice/bridge/`](../../voice/bridge): one Python file (standard library only), a Dockerfile and a compose file. It has no ports of its own on your host; only containers on the same Docker network can reach it, and only with its API key.
+It lives in [`voice/bridge/`](../../voice/bridge): one Python file (standard library only), a Dockerfile and a compose file. Each release also publishes it as a ready-made image, `ghcr.io/soullink9/lena-voice-bridge`, for amd64 and arm64, which the compose file uses. It has no ports of its own on your host; only containers on the same Docker network can reach it, and only with its API key.
 
 ## 1. Set it up
 
-Copy the `voice/bridge` folder to your Docker host. Next to `compose.yaml`, make an `.env` file with a key only Open WebUI will know:
+Copy the `voice/bridge` folder to your Docker host (the image is pulled from ghcr.io; the folder's Dockerfile and `bridge.py` are only used if you build it yourself). Next to `compose.yaml`, make an `.env` file with a key only Open WebUI will know:
 
 ```sh
 echo "LENA_VOICE_API_KEY=$(openssl rand -hex 32)" > .env
@@ -29,11 +29,22 @@ Then edit `compose.yaml`:
 Then, in that folder:
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 docker logs lena-voice
 ```
 
 The log's first line shows which Piper and Whisper it's using.
+
+### Which image it runs
+
+| You want | Do |
+|---|---|
+| The newest release (the default) | Nothing. `compose.yaml` uses `ghcr.io/soullink9/lena-voice-bridge:latest`. To update later: `docker compose pull && docker compose up -d`. |
+| A fixed version | Add `LENA_VOICE_IMAGE=ghcr.io/soullink9/lena-voice-bridge:0.6.48` to `.env`; change the number when you update. |
+| To build it yourself from this folder | `docker compose up -d --build`. Compose also builds it by itself when the image can't be pulled (no internet, or a registry it can't reach). |
+| The image from your own Gitea | If your copy of the repository is on Gitea, its release workflow publishes the image to Gitea's registry too (see [CONTRIBUTING](../../CONTRIBUTING.md#releasing)): `LENA_VOICE_IMAGE=<your Gitea's host>/<owner>/lena-voice-bridge:latest`, and `docker login <your Gitea's host>` first if the package isn't public. |
+
+`docker compose up -d --build` tags what it builds with the same name, so after building yourself run `docker compose pull` before going back to the published image.
 
 If Open WebUI, Piper and Whisper are on different networks, attach the bridge to each of them.
 
@@ -78,6 +89,7 @@ The Lena app's **Her voice follows her mood** setting does the same for the app'
 
 ## Troubleshooting
 
+- **`docker compose up` says "pull access denied" or "manifest unknown", then builds:** the image named in `LENA_VOICE_IMAGE` (or ghcr.io) couldn't be pulled, so compose built it from the folder instead, which works the same. Check the name and version, or `docker login` to a private registry.
 - **The container stops at once, and its log says "Set API_KEY":** make the `.env` file from step 1 (or set `ALLOW_NO_API_KEY`), then `docker compose up -d`.
 - **Open WebUI says "Invalid API key":** the API Key in Open WebUI's audio settings (both Text-to-Speech and Speech-to-Text) must be the bridge's `LENA_VOICE_API_KEY`.
 

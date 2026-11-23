@@ -1,5 +1,5 @@
 # Publishes a release on Gitea: Lena's signed APK and its SHA256SUMS, with notes from that version's section of
-# CHANGELOG.md.
+# CHANGELOG.md. Then the voice bridge's Docker image, to Gitea's container registry (the voice-bridge-image job).
 #
 # Two ways to start it:
 #   - Actions tab → Release → Run workflow, and enter the version (0.6.12). This also creates the tag (v0.6.12) on
@@ -312,3 +312,77 @@ jobs:
         run: |
           out=android/app/build/outputs/apk/release
           python3 scripts/publish_gitea_release.py "$TAG" "$COMMIT" "$TITLE" notes.md "$PRERELEASE" "$out/$APK" "$out/SHA256SUMS"
+
+  voice-bridge-image:
+    # The voice bridge's Docker image, in this Gitea's container registry, once the release is out: tagged with the
+    # version (0.6.48), and latest when it's the newest version. voice/bridge/compose.yaml can pull it
+    # (docs/voice/Voice-Bridge.md). Built for the runner's own platform, with the runner's Docker: act_runner gives
+    # it to its jobs unless its config.yaml sets container.docker_host to "-".
+    # Gitea's own job token can't write packages, so this needs a PACKAGES_TOKEN secret: an access token with
+    # write:package, of a user who can write the repository's packages (CONTRIBUTING.md#releasing).
+    needs: [release]
+    runs-on: ubuntu-latest
+    container:
+      image: docker:28-cli
+    steps:
+      # The image is Alpine with only sh: bash for the steps below, git to get the code, Python to pick latest.
+      - name: Install bash, git and Python (from Alpine)
+        shell: sh
+        run: apk add --no-cache bash git python3
+
+      - name: Get the code
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          git init -q .
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_SHA" ||
+            git -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" "$GITHUB_REF"
+          git checkout -q FETCH_HEAD
+
+      # Latest only for the newest of Lena's version tags, judged by main's CHANGELOG.md (an older tag's doesn't
+      # know the newer versions), so tags pushed together leave the newest as latest whichever run ends last.
+      - name: Work out the version, and whether it's the newest
+        id: version
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v${INPUT_VERSION#[vV]}"
+          fi
+          auth=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          repo="${GITEA_INTERNAL_URL:-$GITHUB_SERVER_URL}/$GITHUB_REPOSITORY.git"
+          tools="$(mktemp -d)"
+          git -C "$tools" init -q .
+          git -C "$tools" -c http.extraHeader="Authorization: Basic $auth" fetch -q --depth 1 "$repo" main
+          git -C "$tools" checkout -q FETCH_HEAD
+          git -c http.extraHeader="Authorization: Basic $auth" ls-remote --tags --refs "$repo" |
+            sed 's#.*refs/tags/##' > "$tools/tags"
+          # A tag made by the release job (Run workflow) is there by now.
+          grep -qxF "$tag" "$tools/tags" || echo "$tag" >> "$tools/tags"
+          latest=$(python3 "$tools/scripts/missing_releases.py" --newest-tag "$tag" "$tools/tags")
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "$tag, latest: $latest"
+
+      - name: Publish the voice bridge image on Gitea
+        env:
+          REGISTRY_PASSWORD: ${{ secrets.PACKAGES_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          if [ -z "$REGISTRY_PASSWORD" ]; then
+            echo "::error::No PACKAGES_TOKEN secret: add an access token with write:package to the repository's Actions secrets to publish the voice bridge image (CONTRIBUTING.md#releasing). The release itself is published."
+            exit 1
+          fi
+          # Gitea's registry is at its public address (ROOT_URL), which is what docker pull uses too.
+          registry="${GITHUB_SERVER_URL#*://}"
+          registry="${registry%/}"
+          export IMAGE="$registry/${GITHUB_REPOSITORY_OWNER,,}/lena-voice-bridge"
+          export REGISTRY_USER="$GITHUB_REPOSITORY_OWNER"
+          export SOURCE_URL="https://github.com/$PUBLIC_REPOSITORY"
+          scripts/publish_voice_bridge_image.sh

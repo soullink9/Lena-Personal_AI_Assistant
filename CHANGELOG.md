@@ -2,6 +2,24 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The voice bridge comes as a ready-made Docker image. **Nothing to do**: your bridge keeps working as it is. To run the image instead of building it, copy the new `voice/bridge/compose.yaml` over yours (keeping your settings), then `docker compose pull && docker compose up -d`.
+
+### Voice bridge
+
+- **Each release publishes the bridge's image.** `ghcr.io/soullink9/lena-voice-bridge`, for amd64 and arm64 (a Raspberry Pi), tagged with the version and `latest`. `voice/bridge/compose.yaml` now uses it, so `docker compose up -d` pulls it instead of building. `bridge.py` and the Dockerfile are unchanged and still there: `docker compose up -d --build` builds it yourself, and compose builds it by itself when the image can't be pulled. `LENA_VOICE_IMAGE` in `.env` picks another image, such as a fixed version. See [Voice bridge](docs/voice/Voice-Bridge.md#which-image-it-runs).
+- **On Gitea too.** Gitea's release workflow publishes the same image to Gitea's own container registry once the release is out, without anything from GitHub. It needs a `PACKAGES_TOKEN` secret (Gitea's job token can't publish packages) and a runner that gives its jobs Docker; see [CONTRIBUTING](CONTRIBUTING.md#releasing). Only the newest version is tagged `latest`, also when several releases run at once.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: No update needed
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.47] - 2026-11-23
 
 The phone's own speech-to-text hears you again on a Galaxy Z Fold6. **Update the app.**
