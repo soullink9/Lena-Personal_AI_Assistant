@@ -2,6 +2,23 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The Gitea secret for the voice bridge image is now called `REGISTRY_TOKEN`. **Nothing to update** in Lena itself.
+
+### Releasing
+
+- **`REGISTRY_TOKEN`, not `PACKAGES_TOKEN`.** Gitea's release workflow takes the access token it publishes the voice bridge image with from a `REGISTRY_TOKEN` secret, the name other projects use for the same token, so one secret on your user or organisation can serve them all. Rename the secret if you already added `PACKAGES_TOKEN`. See [CONTRIBUTING](CONTRIBUTING.md#releasing).
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: No update needed
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.48] - 2026-11-23
 
 The voice bridge comes as a ready-made Docker image. **Nothing to do**: your bridge keeps working as it is. To run the image instead of building it, copy the new `voice/bridge/compose.yaml` over yours (keeping your settings), then `docker compose pull && docker compose up -d`.

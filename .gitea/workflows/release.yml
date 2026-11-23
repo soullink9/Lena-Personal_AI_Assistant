@@ -318,7 +318,7 @@ jobs:
     # version (0.6.48), and latest when it's the newest version. voice/bridge/compose.yaml can pull it
     # (docs/voice/Voice-Bridge.md). Built for the runner's own platform, with the runner's Docker: act_runner gives
     # it to its jobs unless its config.yaml sets container.docker_host to "-".
-    # Gitea's own job token can't write packages, so this needs a PACKAGES_TOKEN secret: an access token with
+    # Gitea's own job token can't write packages, so this needs a REGISTRY_TOKEN secret: an access token with
     # write:package, of a user who can write the repository's packages (CONTRIBUTING.md#releasing).
     needs: [release]
     runs-on: ubuntu-latest
@@ -371,12 +371,12 @@ jobs:
 
       - name: Publish the voice bridge image on Gitea
         env:
-          REGISTRY_PASSWORD: ${{ secrets.PACKAGES_TOKEN }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
           LATEST: ${{ steps.version.outputs.latest }}
         run: |
           if [ -z "$REGISTRY_PASSWORD" ]; then
-            echo "::error::No PACKAGES_TOKEN secret: add an access token with write:package to the repository's Actions secrets to publish the voice bridge image (CONTRIBUTING.md#releasing). The release itself is published."
+            echo "::error::No REGISTRY_TOKEN secret: add an access token with write:package to the repository's Actions secrets to publish the voice bridge image (CONTRIBUTING.md#releasing). The release itself is published."
             exit 1
           fi
           # Gitea's registry is at its public address (ROOT_URL), which is what docker pull uses too.
