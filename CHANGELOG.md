@@ -2,6 +2,24 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Voice on a phone whose own speech recognizer stopped making words of what it hears (a Galaxy Z Fold6). **Update the app.**
+
+### Android app
+
+- **When the phone's recognizer hears you but makes no words of it, she hears you another way.** With **Hearing you: On this phone**, the recognizer could hear your voice and still come back empty, and the sheet took that as you saying nothing, so the Assist gesture and the dashboard's talk button never heard you (Open WebUI's own mic, which uses your server, still did). Now an empty answer after a voice was heard counts as a failure: the sheet says "Didn't catch that. Say it again." and listens through your server's speech-to-text (or else Home Assistant's), and after twice in a row it uses that way for a day, as it already did for a recognizer that never gets ready.
+- **The log says how she heard you.** Settings → Software version → Logs has a line for which way each sheet hears you, one when the phone's recognizer comes back without words (with how loud it heard you), and one when the microphone gives only silence.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.45] - 2026-11-22
 
 Answers that use tools no longer stop to summarize after every tool call. **Update the app, and check Open WebUI's compaction threshold** (see [Context Compaction](docs/open-webui/Setup.md#context-compaction)).

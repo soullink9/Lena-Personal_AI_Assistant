@@ -53,7 +53,11 @@ interface Ear {
 }
 
 /** The phone's recognizer reported an error. [code] is one of SpeechRecognizer's ERROR_ constants. */
-class EarError(val code: Int) : IOException("Speech recognition error $code") {
+class EarError(
+    val code: Int,
+    /** The recognizer heard a voice but made no words of it: it isn't working, and you weren't silent. */
+    val heardVoice: Boolean = false,
+) : IOException("Speech recognition error $code") {
     /** Errors that usually clear if you just try again. */
     val transient: Boolean
         get() = code in setOf(
@@ -68,7 +72,7 @@ class EarError(val code: Int) : IOException("Speech recognition error $code") {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "no microphone permission"
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "the phone's recognizer was busy"
         SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "the phone's recognizer was still busy with the last time (error 10)"
-        else -> "error $code"
+        else -> if (heardVoice) "it heard you but made no words of it (error $code)" else "error $code"
     }
 }
 
@@ -112,9 +116,26 @@ class PhoneEar(private val context: Context) : Ear {
             c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).edit().remove("phone_unreliable").apply()
         }
 
+        /**
+         * The recognizer heard a voice and made no words of it: true the second time in a row, when it's
+         * taken as not working ([markUnreliable]). Words heard start the count again ([heardWords]).
+         */
+        fun noWordsAgain(c: Context): Boolean {
+            val p = c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE)
+            val times = p.getInt("phone_no_words", 0) + 1
+            p.edit().putInt("phone_no_words", if (times >= 2) 0 else times).apply()
+            return times >= 2
+        }
+
+        /** The recognizer made words of what it heard: it works. */
+        fun heardWords(c: Context) {
+            val p = c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE)
+            if (p.contains("phone_no_words")) p.edit().remove("phone_no_words").apply()
+        }
+
         /** The recognizer never got ready: use another way of hearing for a day (see [available]). */
         fun markUnreliable(c: Context) {
-            Logs.w("Voice", "The phone's recognizer never got ready; using another way of hearing for a day")
+            Logs.w("Voice", "The phone's recognizer isn't working; using another way of hearing for a day")
             c.getSharedPreferences("lena_voice", Context.MODE_PRIVATE).edit().putLong("phone_unreliable", System.currentTimeMillis()).apply()
         }
 
@@ -132,6 +153,12 @@ class PhoneEar(private val context: Context) : Ear {
 
         /** Through the wake word's microphone: the longest a question can be. */
         private const val LONGEST_MS = 30_000L
+
+        /**
+         * The recognizer's level (dB) above which it surely heard something: a quiet room stays near -2 to 2,
+         * a voice close by reaches 6 to 10.
+         */
+        private const val HEARD_DB = 6f
 
         /** After ending the sound, how long to wait for the recognizer's final result. */
         private const val RESULT_WAIT_MS = 2_500L
@@ -230,6 +257,8 @@ class PhoneEar(private val context: Context) : Ear {
             suspendCancellableCoroutine { cont ->
                 var latest = ""
                 var ready = false
+                var speechBegan = false // the recognizer noticed a voice
+                var loudest = -100f // its loudest level (dB, about -2 quiet to 10 loud)
                 lateinit var watchdog: Runnable
                 lateinit var endpointer: Runnable
                 /** Ends this session's bookkeeping, if it's still the current one, and lets go of the relay. */
@@ -282,7 +311,10 @@ class PhoneEar(private val context: Context) : Ear {
                      * The input level for the mic animation: the recognizer's dB value (about -2 to 10)
                      * mapped to 0..1.
                      */
-                    override fun onRmsChanged(rmsdB: Float) = onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                    override fun onRmsChanged(rmsdB: Float) {
+                        loudest = maxOf(loudest, rmsdB)
+                        onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+                    }
 
                     /** The microphone is open: from here on it's only a matter of you speaking. */
                     override fun onReadyForSpeech(params: Bundle?) {
@@ -293,9 +325,13 @@ class PhoneEar(private val context: Context) : Ear {
 
                     // Callbacks the recognizer requires but Lena doesn't need: she only uses readiness,
                     // the level, the partial and final results, and errors.
-                    override fun onBeginningOfSpeech() {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() {}
+
+                    /** A voice started: from here, coming back with no words isn't "you said nothing". */
+                    override fun onBeginningOfSpeech() {
+                        speechBegan = true
+                    }
                     override fun onEvent(eventType: Int, params: Bundle?) {}
 
                     /**
@@ -314,7 +350,24 @@ class PhoneEar(private val context: Context) : Ear {
                     /** The final text, or the last partial one if the recognizer returned nothing better. */
                     override fun onResults(results: Bundle?) {
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                        done(text?.takeIf { it.isNotBlank() } ?: latest)
+                        val heard = text?.takeIf { it.isNotBlank() } ?: latest
+                        if (heard.isBlank()) nothing(null) else {
+                            heardWords(context)
+                            done(heard)
+                        }
+                    }
+
+                    /**
+                     * Came back without a word. If it heard a voice (or a loud sound), the recognizer is
+                     * failing to make words of it, which is what a phone whose recognizer stopped working
+                     * does every time: that's an error, so the sheet hears you another way. Otherwise you
+                     * said nothing.
+                     */
+                    private fun nothing(error: Int?) {
+                        val voice = speechBegan || loudest >= HEARD_DB
+                        Logs.i("Voice", "The phone's recognizer heard no words (%s; a voice: %s; loudest %.1f dB)"
+                            .format(error?.let { "error $it" } ?: "empty result", if (speechBegan) "yes" else "no", loudest))
+                        if (voice) fail(EarError(error ?: SpeechRecognizer.ERROR_NO_MATCH, heardVoice = true)) else done("")
                     }
 
                     /**
@@ -323,8 +376,11 @@ class PhoneEar(private val context: Context) : Ear {
                      */
                     override fun onError(error: Int) {
                         when {
-                            latest.isNotBlank() -> done(latest) // we heard you; use it
-                            error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> done("")
+                            latest.isNotBlank() -> {
+                                heardWords(context)
+                                done(latest) // we heard you; use it
+                            }
+                            error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> nothing(error)
                             error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
                                 error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
                                 // Start the on-device model's download, for next time.
@@ -411,6 +467,7 @@ abstract class RecordingEar : Ear {
         var speaking = false
         var silentMs = 0
         var totalMs = 0
+        var loudest = 0.0
         rec?.startRecording()
         try {
             while (currentCoroutineContext().isActive && !finishNow) {
@@ -424,6 +481,7 @@ abstract class RecordingEar : Ear {
                     out.write((s shr 8) and 0xff)
                 }
                 val rms = sqrt(sum / n)
+                loudest = maxOf(loudest, rms)
                 totalMs += 20
                 frames++
                 if (frames <= 10) { // first 200 ms: learn the room's background noise
@@ -439,7 +497,11 @@ abstract class RecordingEar : Ear {
                     silentMs += 20
                 }
                 if (speaking && silentMs >= 1200) break // you stopped talking
-                if (!speaking && totalMs >= 7000) return ByteArray(0) // nothing said
+                if (!speaking && totalMs >= 7000) {
+                    // Nothing said. A microphone Android keeps from Lena gives exact silence: say so in the log.
+                    if (loudest < 2.0) Logs.w("Voice", "The microphone gave only silence for 7 seconds (another app may hold it)")
+                    return ByteArray(0)
+                }
                 if (totalMs >= 30_000) break
             }
         } finally {
