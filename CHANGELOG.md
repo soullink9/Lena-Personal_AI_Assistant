@@ -2,6 +2,24 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The phone's own speech-to-text hears you again on a Galaxy Z Fold6. **Update the app.**
+
+### Android app
+
+- **Lena opens the microphone herself and hands the sound to the phone's recognizer.** On the Fold6, the phone's recognizer started listening but got only silence from the microphone it opened itself (the orb never moved, and it ended with "Didn't catch that"), while Lena's own recording, the one Open WebUI's mic button uses, still worked. Now, for every question, Lena records and passes the sound straight to the phone's recognizer, as she already did after "Hey Lena". You still get the phone's own speech-to-text, with your words appearing as you speak, and the sound never leaves the phone. The orb follows your voice from Lena's own recording. On a TV, the TV's speech service still opens its own microphone, so it can hear through the remote.
+- **0.6.46's fallback is gone.** A recognizer that comes back without words no longer sends you to your server's speech-to-text, and is no longer passed over for a day.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.46] - 2026-11-23
 
 Voice on a phone whose own speech recognizer stopped making words of what it hears (a Galaxy Z Fold6). **Update the app.**

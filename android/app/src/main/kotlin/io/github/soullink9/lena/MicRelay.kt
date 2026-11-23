@@ -1,10 +1,15 @@
 package io.github.soullink9.lena
 
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import java.io.Closeable
 import java.io.FileInputStream
 import java.io.IOException
+import kotlin.math.sqrt
 
 /**
  * The microphone handed from the wake word straight to the sheet, so it never goes off in between.
@@ -102,5 +107,68 @@ object MicRelay {
             runCatching { input.close() }
             relay.close()
         }
+    }
+}
+
+/**
+ * Lena's own microphone, piped to the phone's recognizer for one question ([PhoneEar]), the same way the
+ * wake word hands its microphone on ([MicRelay]). The recognizer then never opens the microphone itself:
+ * on a Galaxy Z Fold6 it stopped getting any sound that way (the level never moved, and it heard nothing),
+ * while Lena's own recording, the one Open WebUI's mic button uses, still worked. The words still come
+ * from the phone's own speech-to-text, and the sound never leaves the phone.
+ *
+ * [onLevel] gets the loudness of each 20 ms (0 to 1), for the orb: the recognizer may not report a level
+ * for sound it's given. Returns null when the microphone can't be opened; the recognizer then opens its own.
+ */
+object MicFeed {
+    private const val FRAME = MicRelay.RATE / 50 // 20 ms
+    private const val MAX_MS = 45_000L
+
+    @SuppressLint("MissingPermission") // the sheet asks for the microphone before it listens
+    fun open(onLevel: (Float) -> Unit): MicRelay.Relay? {
+        val min = AudioRecord.getMinBufferSize(MicRelay.RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val rec = runCatching {
+            AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, MicRelay.RATE, AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT, maxOf(min, FRAME * 2 * 10))
+        }.getOrNull()
+        if (rec == null || rec.state != AudioRecord.STATE_INITIALIZED) {
+            Logs.w("Voice", "Couldn't open the microphone for the phone's recognizer; it opens its own")
+            rec?.release()
+            return null
+        }
+        val (read, write) = ParcelFileDescriptor.createPipe()
+        val stopped = java.util.concurrent.atomic.AtomicBoolean(false)
+        val relay = MicRelay.Relay(read) { stopped.set(true) }
+        Thread({
+            val out = ParcelFileDescriptor.AutoCloseOutputStream(write)
+            val buf = ShortArray(FRAME)
+            val bytes = ByteArray(FRAME * 2)
+            val until = SystemClock.elapsedRealtime() + MAX_MS
+            try {
+                rec.startRecording()
+                while (!stopped.get() && SystemClock.elapsedRealtime() < until) {
+                    val n = rec.read(buf, 0, FRAME)
+                    if (n <= 0) break
+                    var sum = 0.0
+                    for (i in 0 until n) {
+                        val v = buf[i].toInt()
+                        sum += (v * v).toDouble()
+                        bytes[2 * i] = (v and 0xff).toByte()
+                        bytes[2 * i + 1] = ((v shr 8) and 0xff).toByte()
+                    }
+                    onLevel((sqrt(sum / n) / 3_000.0).toFloat().coerceIn(0f, 1f))
+                    out.write(bytes, 0, n * 2)
+                }
+            } catch (_: IOException) {
+                // The recognizer closed its side: it has what it needs.
+            } catch (e: IllegalStateException) {
+                Logs.w("Voice", "The microphone stopped recording for the phone's recognizer", e)
+            } finally {
+                runCatching { rec.stop() }
+                rec.release()
+                runCatching { out.close() }
+            }
+        }, "lena-mic-feed").start()
+        return relay
     }
 }

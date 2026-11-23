@@ -424,15 +424,10 @@ class AskActivity : ComponentActivity() {
     private fun newEar(): Ear {
         val server = openWebUi
         val ha = HomeAssistant.from(this)
-        val chosen = Prefs.hearing(this)
-        return when (chosen) {
+        return when (Prefs.hearing(this)) {
             Hearing.HOME_ASSISTANT -> if (ha != null) HaEar(ha, Room.sttEngine(this)) else otherEar() ?: PhoneEar(this)
             Hearing.SERVER -> if (server != null) ServerEar(server) else if (PhoneEar.available(this)) PhoneEar(this) else otherEar() ?: PhoneEar(this)
             Hearing.PHONE -> if (PhoneEar.available(this)) PhoneEar(this) else otherEar() ?: PhoneEar(this)
-        }.also {
-            // Which way hears you, for Settings > Logs when she doesn't.
-            val way = when (it) { is PhoneEar -> "the phone's recognizer"; is HaEar -> "Home Assistant"; else -> "your server" }
-            Logs.i("Voice", "Hearing you through $way (Hearing you: ${chosen.name.lowercase()})")
         }
     }
 
@@ -837,16 +832,10 @@ class AskActivity : ComponentActivity() {
                 } else {
                     // Never got ready, even after starting afresh: some tablets' recognizers never answer.
                     // Hear another way from now on (for a day), starting with this time.
-                    // Or it heard you but made no words of it, twice in a row: it has stopped working
-                    // (a Galaxy Fold's did, while every other way of hearing still worked).
-                    if (err.code == android.speech.SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
-                        (err.heardVoice && PhoneEar.noWordsAgain(this@AskActivity))
-                    ) {
+                    if (err.code == android.speech.SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
                         PhoneEar.markUnreliable(this@AskActivity)
                         otherEar()?.let { e.release(); ear = it }
                     }
-                    // What you said is gone with the recognizer's turn: ask for it again.
-                    if (err.heardVoice && otherEar() != null) note = "Didn't catch that. Say it again."
                     // The phone couldn't listen this time; your server can.
                     hearViaServer(onPartial, onLevel).also {
                         if (it.isBlank() && note == null) note = "Couldn't hear you (${err.describe()})."
