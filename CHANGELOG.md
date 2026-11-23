@@ -2,6 +2,23 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Gitea's voice bridge image job reaches the runner's Docker. **Nothing to update** in Lena itself.
+
+### Releasing
+
+- **The image job mounts the runner's Docker socket.** On a runner whose jobs get no Docker of their own (such as act_runner with Docker-in-Docker), the job stopped with "This job can't reach a Docker daemon". It now mounts `/var/run/docker.sock` itself, the way other projects' image jobs do. act_runner allows that only when its `config.yaml` lists `/var/run/docker.sock` under `container.valid_volumes`; see [CONTRIBUTING](CONTRIBUTING.md#releasing).
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: No update needed
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.49] - 2026-11-23
 
 The Gitea secret for the voice bridge image is now called `REGISTRY_TOKEN`. **Nothing to update** in Lena itself.

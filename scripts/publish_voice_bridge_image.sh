@@ -38,7 +38,7 @@ if [ "$bridge_version" != "$version" ]; then
 fi
 
 if ! docker info > /dev/null 2>&1; then
-  echo "::error::This job can't reach a Docker daemon. On Gitea, the runner must give its jobs its Docker: leave container.docker_host empty in act_runner's config.yaml (\"-\" keeps Docker from the jobs). See docs/voice/Voice-Bridge.md."
+  echo "::error::This job can't reach a Docker daemon. On Gitea, the job mounts the runner's /var/run/docker.sock, which act_runner allows only when its config.yaml lists it under container.valid_volumes. See CONTRIBUTING.md#releasing."
   exit 1
 fi
 

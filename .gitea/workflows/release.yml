@@ -316,14 +316,17 @@ jobs:
   voice-bridge-image:
     # The voice bridge's Docker image, in this Gitea's container registry, once the release is out: tagged with the
     # version (0.6.48), and latest when it's the newest version. voice/bridge/compose.yaml can pull it
-    # (docs/voice/Voice-Bridge.md). Built for the runner's own platform, with the runner's Docker: act_runner gives
-    # it to its jobs unless its config.yaml sets container.docker_host to "-".
+    # (docs/voice/Voice-Bridge.md). Built for the runner's own platform, with the runner's Docker: the job mounts its
+    # socket, /var/run/docker.sock, which act_runner allows only when its config.yaml lists it under
+    # container.valid_volumes (a runner in Docker-in-Docker means the dind container's socket).
     # Gitea's own job token can't write packages, so this needs a REGISTRY_TOKEN secret: an access token with
     # write:package, of a user who can write the repository's packages (CONTRIBUTING.md#releasing).
     needs: [release]
     runs-on: ubuntu-latest
     container:
       image: docker:28-cli
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
     steps:
       # The image is Alpine with only sh: bash for the steps below, git to get the code, Python to pick latest.
       - name: Install bash, git and Python (from Alpine)
