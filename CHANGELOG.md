@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.46] - 2026-11-23
 
 Voice on a phone whose own speech recognizer stopped making words of what it hears (a Galaxy Z Fold6). **Update the app.**
 

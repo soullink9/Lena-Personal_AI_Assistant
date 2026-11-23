@@ -1,7 +1,7 @@
 """
 title: Lena (feelings and memory)
 author: soullink9
-version: 0.6.45
+version: 0.6.46
 license: GPL-3.0
 description: Adds the time at home, who she's talking with, Lena's current feelings and her shared memory to every chat with her, from the Lena integration in Home Assistant, tells her how much time passed between messages, and puts right a tool name she gets wrong only in case or punctuation.
 """
