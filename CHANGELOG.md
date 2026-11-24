@@ -2,6 +2,27 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The app's warning about Open WebUI's Context Compaction no longer tells you to raise the threshold past what her context holds. **Update the app.** If its log said her prompt was over 20,000 tokens, also turn off the Open WebUI built-in tools she doesn't need (below).
+
+### App
+
+- **The compaction warning stays inside her context.** When her prompt without the conversation was over 20,000 tokens, the log advised a Context Compaction Threshold of 34000 or 36000, past `num_ctx` (32768): her prompt and reply would then no longer fit, and Ollama would cut the prompt instead of Open WebUI summarizing it. It now never suggests more than her context (Settings → Model) holds beside her reply (28000 for 32768), and when no threshold fits, it says so and that her prompt has to get smaller.
+
+### Docs
+
+- **Making her prompt smaller.** With Native function calling, Open WebUI also offers her its own built-in tools (memory, calendar, automations, notes, chats and more), about 25 of them and 6,000 to 7,000 tokens with its default features on, sent with every request, most of them things she has her own tools for. [Context Compaction](docs/open-webui/Setup.md#context-compaction) lists them with their sizes and where to turn them off (Workspace → Models → lena → Builtin Tools), says to choose only Assist in Home Assistant's MCP server (Lena there too sends her own tools twice), and that the threshold tops out at 28000 with `num_ctx` 32768.
+
+### What to update
+
+- Modelfile: No update needed
+- Lena HA Integration: No update needed
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed
+- Open WebUI Filters: No update needed
+- Voice Bridge: No update needed
+
 ## [0.6.50] - 2026-11-23
 
 Gitea's voice bridge image job reaches the runner's Docker. **Nothing to update** in Lena itself.

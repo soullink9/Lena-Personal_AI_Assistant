@@ -83,10 +83,29 @@ fun main() {
     check(Compaction.historyTokens(32_768, null, 50_000) == 16_384, "compaction off: overhead doesn't matter")
     check(Compaction.tooLow(16_000, 11_000), "threshold 16000 is too low for an 11000-token prompt")
     check(!Compaction.tooLow(30_000, 11_000), "threshold 30000 is enough for it")
-    val suggested = Compaction.suggestedThreshold(11_000)
+    val suggested = Compaction.suggestedThreshold(11_000, 32_768)
     check(suggested == 24_000, "suggested threshold for 11000: 24000 (was $suggested)")
-    check(!Compaction.tooLow(suggested, 11_000), "the suggested threshold is enough")
-    check(Compaction.suggestedThreshold(11_000) % 1000 == 0, "suggested threshold is a round number")
+    check(!Compaction.tooLow(suggested!!, 11_000), "the suggested threshold is enough")
+    check(suggested % 1000 == 0, "suggested threshold is a round number")
+    // Never above what her context holds beside her reply (num_ctx 32768, num_predict 4096).
+    check(Compaction.maxThreshold(32_768) == 28_000, "num_ctx 32768: the threshold tops out at 28000")
+    val capped = Compaction.suggestedThreshold(21_591, 32_768)
+    check(capped == 28_000, "a 21591-token prompt: 28000, not 34000 past num_ctx (was $capped)")
+    check(Compaction.suggestedThreshold(23_498, 32_768) == null, "a 23498-token prompt: no threshold fits in 32768")
+    check(Compaction.suggestedThreshold(23_498, 65_536) == 36_000, "with a 65536 context: 36000 fits")
+    for (overhead in listOf(0, 5_000, 11_000, 21_591, 23_498, 40_000)) {
+        for (context in listOf(8_192, 16_384, 32_768, 65_536)) {
+            val s = Compaction.suggestedThreshold(overhead, context) ?: continue
+            check(s <= context - Compaction.REPLY, "suggestion $s for $overhead fits in num_ctx $context")
+            check(!Compaction.tooLow(s, overhead), "suggestion $s for $overhead is enough")
+        }
+    }
+    val fits = Compaction.tooLowMessage(11_000, 16_000, 32_768)
+    check("to 24000." in fits && "smaller" !in fits, "message: a plain raise when it fits ($fits)")
+    val tight = Compaction.tooLowMessage(21_591, 24_000, 32_768)
+    check("to 28000" in tight && "Builtin Tools" in tight && "34000" !in tight, "message: capped, and make her prompt smaller ($tight)")
+    val none = Compaction.tooLowMessage(23_498, 24_000, 32_768)
+    check("No threshold can fix that" in none && "36000" !in none, "message: no threshold fits ($none)")
 
     // Compacting while quiet: only once the conversation fills half of what a request carries.
     check(!Compaction.worthCompacting(4 * 2_000, 6_000), "a short chat isn't compacted")

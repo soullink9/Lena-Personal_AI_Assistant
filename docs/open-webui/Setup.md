@@ -94,9 +94,25 @@ Open WebUI's **Context Compaction** (Admin Panel → Settings → Interface, off
 
 **The threshold must be well above Lena's prompt without the conversation.** Open WebUI also checks between the rounds of an answer that uses tools, and there it counts everything the model was sent: her character (the Modelfile), her context from Home Assistant (feelings, memory, the Goodnight check, the device names), every tool's definition, and the tool results. That alone is often 10,000 tokens or more. If the threshold is close to it, every round is over, and "Context compacted" shows up after every tool call, with a summary written each time. A smaller conversation can't help then; only a higher threshold can.
 
-To size it, ask her something short that uses a tool ("Any lights on?") in a new chat, then open the reply's info (the **i** under it): **prompt tokens** (prompt_eval_count) is roughly her prompt without the conversation. Set the threshold to that plus about 12,000, and keep it under `num_ctx` (32768) less the longest reply (`num_predict`, 4096): **24000** suits most homes. Set it on the `lena` model (Workspace → Models → lena → Advanced Params → Context Compaction Threshold) or for every model in the Admin Panel; the lower one counts. Setting **Context Compaction Model** to a small, fast model makes each summary quicker. Or turn Context Compaction off: the app already trims her conversation, and Open WebUI's own page then sends whole chats, which Ollama shortens to fit `num_ctx`.
+To size it, ask her something short that uses a tool ("Any lights on?") in a new chat, then open the reply's info (the **i** under it): **prompt tokens** (prompt_eval_count) is roughly her prompt without the conversation. Set the threshold to that plus about 12,000, but never above `num_ctx` (32768) less the longest reply (`num_predict`, 4096), so **28000** at most: past that her prompt and reply no longer fit, and Ollama cuts the prompt instead of Open WebUI summarizing it. **24000** suits most homes. Set it on the `lena` model (Workspace → Models → lena → Advanced Params → Context Compaction Threshold) or for every model in the Admin Panel; the lower one counts. Setting **Context Compaction Model** to a small, fast model makes each summary quicker. Or turn Context Compaction off: the app already trims her conversation, and Open WebUI's own page then sends whole chats, which Ollama shortens to fit `num_ctx`.
 
-The Lena app keeps compaction off the path of her answers as far as it can: it sends each question with only as much conversation as fits under the threshold beside the rest of her prompt (measured from the size the model reported for her last answer), with room left for tool results, and asks Open WebUI to compact the chat a few minutes after you stop talking, when it's getting long. Her next answer then starts from that summary. When the threshold is too low for her prompt, the app's log (Settings → About → Logs) says so and what to raise it to.
+**If her prompt alone is near 20,000 tokens, make it smaller rather than the threshold higher.** With Native function calling, Open WebUI offers her its own built-in tools as well as hers, and sends every one's definition with every request. With its default features on, that's about 25 tools and 6,000 to 7,000 tokens, most of them things she has her own tools for or doesn't use. Turn off the ones she doesn't need under Workspace → Models → `lena` → **Builtin Tools** (approximate sizes, from Open WebUI 0.13):
+
+| Builtin Tools category | Tools | About | Lena's own |
+|---|---|---|---|
+| Memory | 8 | 1,200 tokens | `remember`, `forget`, `update_fact` and her shared memory |
+| Calendar | 4 | 1,000 tokens | `add_calendar_event` |
+| Automations | 5 | 900 tokens | `set_reminder`, `set_alarm`, `set_timer` |
+| Notes | 4 | 800 tokens | |
+| Chats | 3 | 450 tokens | |
+| Skills, Tools (admins only) | 2 | 400 tokens | |
+| Time | 2 | 300 tokens | her context and the app give her the time |
+| Knowledge | 2 | 300 tokens | |
+| Tasks | 2 | 200 tokens | |
+
+Keep **Web Search** if she should search the web. Leave her own tools' descriptions as they are: they're what makes her use them right. The tool results count too: a house question that calls `GetLiveContext` adds the state of everything exposed to Assist, so expose only what she needs (Settings → Voice assistants → Expose). In Home Assistant's **Model Context Protocol Server** options, choose **Assist** only: the Lena tool above already gives her her own tools, and choosing Lena there as well sends a second copy of each (`remember_fact` beside `remember`, and so on).
+
+The Lena app keeps compaction off the path of her answers as far as it can: it sends each question with only as much conversation as fits under the threshold beside the rest of her prompt (measured from the size the model reported for her last answer), with room left for tool results, and asks Open WebUI to compact the chat a few minutes after you stop talking, when it's getting long. Her next answer then starts from that summary. When the threshold is too low for her prompt, the app's log (Settings → About → Logs) says so and what to raise it to, never above what her context (Settings → Model) holds beside her reply; when no threshold fits, it says her prompt has to get smaller.
 
 ## 6. Open WebUI's own memory
 

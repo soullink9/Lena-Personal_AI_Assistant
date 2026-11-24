@@ -730,10 +730,7 @@ class Api(server: String, private val context: Context? = null) {
         val overhead = Compaction.overhead(reportedPrompt(walked[last]), sent)
         if (Compaction.tooLow(threshold, overhead) && warnedThreshold != threshold) {
             warnedThreshold = threshold
-            Logs.w("Open WebUI", "Her prompt without the conversation (her character, her context, the tools and " +
-                "their results) was about $overhead tokens, but Context Compaction starts at $threshold, so Open " +
-                "WebUI summarizes during every answer. Raise the threshold (Admin Settings → Interface, or the " +
-                "model's Context Compaction Threshold) to at least ${Compaction.suggestedThreshold(overhead)}.")
+            Logs.w("Open WebUI", Compaction.tooLowMessage(overhead, threshold, contextTokens))
         }
         return overhead
     }

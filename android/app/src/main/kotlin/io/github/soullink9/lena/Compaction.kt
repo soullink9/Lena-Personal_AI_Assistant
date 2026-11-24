@@ -21,7 +21,8 @@ package io.github.soullink9.lena
  *   beside what the rest of her prompt took last time ([overhead]), with room for this answer's tool
  *   results ([RESERVE]), and never more than three quarters of the threshold ([historyTokens]). When even
  *   that leaves nothing, the threshold is too low for her prompt, and the app's log says what to raise it to
- *   ([suggestedThreshold]): nothing the app sends can fix that.
+ *   ([suggestedThreshold], never above what her context holds beside her reply), or, when no threshold
+ *   fits, that her prompt is too big for her context: nothing the app sends can fix either.
  * - **Uses the summary.** A thread starts at the chat's latest compaction and the summary goes in her
  *   notes, the way Open WebUI's own page sends it ([Api.branch]), so older talk isn't simply cut off.
  * - **Compacts when it's quiet.** A few minutes after the last question ([QUIET_MINUTES]), [CompactWorker]
@@ -88,11 +89,53 @@ object Compaction {
      */
     fun tooLow(threshold: Int, overhead: Int): Boolean = threshold - overhead - RESERVE < MIN_HISTORY
 
+    /** Room kept in the model's context for her reply: the Modelfile's num_predict. */
+    const val REPLY = 4096
+
+    /**
+     * The highest threshold worth having with a [contextTokens] context (num_ctx): above it, her prompt and
+     * her reply no longer fit, and Ollama cuts the prompt instead of Open WebUI summarizing it.
+     */
+    fun maxThreshold(contextTokens: Int): Int = (contextTokens - REPLY) / 1000 * 1000
+
     /**
      * A threshold that fits her prompt: the rest of it ([overhead]), [RESERVE] and room for a real
-     * conversation (8192 tokens), rounded up to a thousand.
+     * conversation (8192 tokens), rounded up to a thousand, but never above [maxThreshold]. Null when even
+     * that leaves no room for [MIN_HISTORY]: then her prompt is too big for her context and no threshold
+     * helps, only a smaller prompt (fewer tools offered) or a larger context.
      */
-    fun suggestedThreshold(overhead: Int): Int = (overhead + RESERVE + 8192 + 999) / 1000 * 1000
+    fun suggestedThreshold(overhead: Int, contextTokens: Int): Int? {
+        val most = maxThreshold(contextTokens)
+        if (tooLow(most, overhead)) return null
+        return minOf(roomy(overhead), most)
+    }
+
+    /** [overhead], [RESERVE] and 8192 tokens of conversation, rounded up to a thousand. */
+    private fun roomy(overhead: Int): Int = (overhead + RESERVE + 8192 + 999) / 1000 * 1000
+
+    /**
+     * What the app's log says when [threshold] is too low for her prompt ([tooLow]): the threshold to set
+     * ([suggestedThreshold]), and when that's all her [contextTokens] context holds, or none fits, that her
+     * prompt itself has to get smaller. Raising the threshold past her context would only swap Open WebUI's
+     * summaries for Ollama cutting her prompt.
+     */
+    fun tooLowMessage(overhead: Int, threshold: Int, contextTokens: Int): String {
+        val start = "Her prompt without the conversation (her character, her context, the tools and their results) " +
+            "was about $overhead tokens, but Context Compaction starts at $threshold, so Open WebUI summarizes " +
+            "during every answer."
+        val smaller = "make her prompt smaller: in Open WebUI, Workspace → Models → lena → Builtin Tools, turn off " +
+            "the built-in tools she has her own of or doesn't use (each one's definition is sent with every " +
+            "request; see Context Compaction in docs/open-webui/Setup.md)"
+        val suggested = suggestedThreshold(overhead, contextTokens)
+            ?: return "$start No threshold can fix that: with her $contextTokens-token context (num_ctx) and " +
+                "$REPLY tokens kept for her reply, that leaves no room for the conversation. To fix it, $smaller, " +
+                "or give her a larger context."
+        val raise = "Raise the threshold (Admin Settings → Interface, or the model's Context Compaction " +
+            "Threshold) to $suggested"
+        return if (suggested >= roomy(overhead)) "$start $raise." else
+            "$start $raise, the most her $contextTokens-token context (num_ctx) holds beside her reply. Even " +
+                "then little of the conversation fits, so also $smaller."
+    }
 
     /**
      * Whether a chat whose conversation since its last compaction is [chars] long is worth compacting:
