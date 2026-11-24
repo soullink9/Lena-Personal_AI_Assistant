@@ -2,7 +2,7 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
-## [Unreleased]
+## [0.6.51] - 2026-11-24
 
 The app's warning about Open WebUI's Context Compaction no longer tells you to raise the threshold past what her context holds. **Update the app.** If its log said her prompt was over 20,000 tokens, also turn off the Open WebUI built-in tools she doesn't need (below).
 
