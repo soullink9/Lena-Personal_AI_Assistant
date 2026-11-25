@@ -200,8 +200,12 @@ class AroundTheHouse:
                         {"entity_id": calendars, "start_date_time": start, "end_date_time": start + timedelta(days=1)},
                         blocking=True, return_response=True,
                     )
+                tz = dt_util.get_default_time_zone()
                 for cal in (reply or {}).values():
                     for event in cal.get("events", []):
+                        # Only what's on today: calendars also give events that merely touch the window.
+                        if not brain.on_day(str(event.get("start")), str(event.get("end")), start.date(), tz):
+                            continue
                         if (summary := event.get("summary")) and summary not in found:
                             found.append(summary)
             except Exception:  # noqa: BLE001 - a calendar problem shouldn't stop her day

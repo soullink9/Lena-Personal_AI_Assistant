@@ -997,6 +997,27 @@ def holidays(day: date, country: str | None = None) -> list[str]:
     return found
 
 
+def on_day(start: str, end: str, day: date, tz: tzinfo) -> bool:
+    """Whether a calendar event, with its start and end as calendar.get_events gives them, is on [day].
+
+    Asking for one day's events isn't enough: calendars decide for themselves what touches a window, and
+    Home Assistant's Holiday calendar also gives the holidays on the window's last date, so asking from
+    midnight to the next midnight brought back tomorrow's holidays (Thanksgiving the day before). An all-day
+    event's end is the day after its last day; the Holiday calendar's start and end are the same day.
+    """
+    if len(start) == 10:  # all day: dates only
+        first, after = date.fromisoformat(start), date.fromisoformat(end)
+        last = after - timedelta(days=1) if after > first else first
+        return first <= day <= last
+    begins, ends = datetime.fromisoformat(start), datetime.fromisoformat(end)
+    begins = begins.astimezone(tz) if begins.tzinfo else begins.replace(tzinfo=tz)
+    ends = ends.astimezone(tz) if ends.tzinfo else ends.replace(tzinfo=tz)
+    midnight = datetime.combine(day, time(), tz)
+    next_midnight = datetime.combine(day + timedelta(days=1), time(), tz)
+    # It began before the day ended, and ended after it began (or, with no length, began on it).
+    return begins < next_midnight and (ends > midnight or begins >= midnight)
+
+
 def _special_key(name: str) -> str:
     return re.sub(r"[^a-z]", "", name.lower().replace("'s", "")).removesuffix("day")
 

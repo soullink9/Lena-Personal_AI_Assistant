@@ -357,6 +357,31 @@ async def test_time_of_day_in_context(hass: HomeAssistant, freezer) -> None:
     assert "8:05 PM: evening, and dark out (the sun rises at 7:16 AM)." in text
 
 
+async def test_special_days_are_today_only(hass: HomeAssistant, freezer) -> None:
+    """Home Assistant's Holiday calendar also gives the holidays on the last date of the window asked for,
+    so the day before Thanksgiving it was in her context as today's. Only what's on today is now.
+    """
+    await hass.config.async_set_time_zone("America/New_York")
+    freezer.move_to("2026-11-25 17:36:00+00:00")  # Wednesday, 12:36 PM in New York
+    hass.states.async_set("calendar.holidays", "off", {"friendly_name": "Holidays"})
+    asked = async_mock_service(
+        hass, "calendar", "get_events", supports_response=SupportsResponse.ONLY,
+        response={"calendar.holidays": {"events": [
+            {"summary": "Sam's Birthday", "start": "2026-11-25", "end": "2026-11-26"},
+            {"summary": "Thanksgiving", "start": "2026-11-26", "end": "2026-11-26"},  # the Holiday calendar's way
+            {"summary": "Black Friday", "start": "2026-11-27", "end": "2026-11-28"},
+        ]}},
+    )
+    await setup(hass, options=dict(OPTIONS, special_days=["calendar.holidays"]))
+    names = await hass.data[DOMAIN].around.async_refresh_special()
+    assert asked, "the special days calendar was read"
+    assert names == ["Sam's Birthday"]
+    assert "Thanksgiving" not in hass.data[DOMAIN].context()
+
+    freezer.move_to("2026-11-26 17:36:00+00:00")  # Thanksgiving itself
+    assert "Thanksgiving" in await hass.data[DOMAIN].around.async_refresh_special()
+
+
 async def test_options_flow(hass: HomeAssistant) -> None:
     """Configure saves the options it's given."""
     entry = await setup(hass, options={})

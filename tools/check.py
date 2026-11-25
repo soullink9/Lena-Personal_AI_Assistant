@@ -296,6 +296,20 @@ check(brain.easter(2026) == date(2026, 4, 5) and brain.easter(2027) == date(2027
       "she knows the holidays: Christmas, Easter, Thanksgiving where it's kept")
 check(brain.merge_special(["Christmas", "Alex's Birthday"], ["Christmas Day"]) == ["Christmas", "Alex's Birthday"],
       "a holiday on a calendar isn't said twice")
+new_york = ZoneInfo("America/New_York")
+check(brain.on_day("2026-11-25", "2026-11-26", date(2026, 11, 25), new_york)
+      and not brain.on_day("2026-11-26", "2026-11-27", date(2026, 11, 25), new_york)
+      and brain.on_day("2026-11-26", "2026-11-26", date(2026, 11, 26), new_york)
+      and not brain.on_day("2026-11-26", "2026-11-26", date(2026, 11, 25), new_york)
+      and brain.on_day("2026-12-24", "2026-12-27", date(2026, 12, 26), new_york)
+      and not brain.on_day("2026-12-24", "2026-12-27", date(2026, 12, 27), new_york),
+      "special days from calendars are today's only: tomorrow's all-day event or holiday isn't")
+check(brain.on_day("2026-11-25T19:00:00-05:00", "2026-11-25T21:00:00-05:00", date(2026, 11, 25), new_york)
+      and brain.on_day("2026-11-25T23:30:00-05:00", "2026-11-26T01:00:00-05:00", date(2026, 11, 26), new_york)
+      and not brain.on_day("2026-11-26T00:00:00-05:00", "2026-11-26T02:00:00-05:00", date(2026, 11, 25), new_york)
+      and not brain.on_day("2026-11-24T22:00:00-05:00", "2026-11-25T00:00:00-05:00", date(2026, 11, 25), new_york)
+      and not brain.on_day("2026-11-26T03:00:00+00:00", "2026-11-26T04:00:00+00:00", date(2026, 11, 26), new_york),
+      "a timed event is on the days it overlaps, in the home's time zone")
 check("Merry Christmas" in brain.celebration_line(["Christmas Day"], True)
       and "first time" not in brain.celebration_line(["Christmas Day"], False) and brain.celebration_line([], True) == "",
       "special days are greeted once per person")
