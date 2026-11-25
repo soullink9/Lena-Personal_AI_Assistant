@@ -17,8 +17,8 @@ android {
         // block below fails the build on any call that isn't.
         minSdk = 35
         targetSdk = 36
-        versionCode = 86
-        versionName = "0.6.52"
+        versionCode = 87
+        versionName = "0.6.53"
         // Phones and tablets are 64-bit; Android TVs and boxes may still run 32-bit Android on 64-bit chips, so
         // the wake word's native code (LiteRT) comes for 32-bit ARM too.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
