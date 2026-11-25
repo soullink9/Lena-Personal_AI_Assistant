@@ -2,6 +2,23 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+The changelog now says, for each part that needs no update, the oldest version of it that still works. **Nothing to update.**
+
+### Docs
+
+- **"No update needed" says since when.** Each release's What to update list now reads, for a part that didn't change, `No update needed (oldest working v0.6.31)`: the last release that changed it, so the oldest copy that still works. You no longer have to read every release since yours to find out whether your Modelfile or Open WebUI files, which you update by hand, are new enough. The lists of 0.6.39 to 0.6.52 say it too. `tools/check.py` checks every version named is the last release that said `Need to update` for that part ([CONTRIBUTING](CONTRIBUTING.md#changing-things)).
+
+### What to update
+
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.52)
+- Lena Android App: No update needed (oldest working v0.6.51)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
+
 ## [0.6.52] - 2026-11-25
 
 Lena no longer wishes you a happy holiday the day before it. **Update the Lena HA Integration.**
@@ -12,12 +29,12 @@ Lena no longer wishes you a happy holiday the day before it. **Update the Lena H
 
 ### What to update
 
-- Modelfile: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
 - Lena HA Integration: Need to update
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Lena Android App: No update needed (oldest working v0.6.51)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.51] - 2026-11-24
 
@@ -33,12 +50,12 @@ The app's warning about Open WebUI's Context Compaction no longer tells you to r
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.50] - 2026-11-23
 
@@ -50,12 +67,12 @@ Gitea's voice bridge image job reaches the runner's Docker. **Nothing to update*
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
+- Lena Android App: No update needed (oldest working v0.6.47)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.49] - 2026-11-23
 
@@ -67,12 +84,12 @@ The Gitea secret for the voice bridge image is now called `REGISTRY_TOKEN`. **No
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
+- Lena Android App: No update needed (oldest working v0.6.47)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.48] - 2026-11-23
 
@@ -85,12 +102,12 @@ The voice bridge comes as a ready-made Docker image. **Nothing to do**: your bri
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
+- Lena Android App: No update needed (oldest working v0.6.47)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.47] - 2026-11-23
 
@@ -103,12 +120,12 @@ The phone's own speech-to-text hears you again on a Galaxy Z Fold6. **Update the
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.46] - 2026-11-23
 
@@ -121,12 +138,12 @@ Voice on a phone whose own speech recognizer stopped making words of what it hea
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.45] - 2026-11-22
 
@@ -147,12 +164,12 @@ Answers that use tools no longer stop to summarize after every tool call. **Upda
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.44] - 2026-11-22
 
@@ -179,12 +196,12 @@ Asked "any lights on?", Lena answered nothing: she called Home Assistant's tool 
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.43)
+- Lena Android App: No update needed (oldest working v0.6.43)
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
 - Open WebUI Filters: Need to update
-- Voice Bridge: No update needed
+- Voice Bridge: No update needed (oldest working v0.6.43)
 
 ## [0.6.43] - 2026-11-22
 
@@ -229,7 +246,7 @@ Safer out of the box for anyone who installs Lena, after a security review. **Up
 
 ### What to update
 
-- Modelfile: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
 - Lena HA Integration: Need to update
 - Lena Android App: Need to update
 - Open WebUI Tools: Need to update
@@ -256,12 +273,12 @@ Talking to Lena no longer waits for Open WebUI's Context Compaction. **Update th
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.41)
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.39)
+- Open WebUI Filters: No update needed (oldest working v0.6.35)
+- Voice Bridge: No update needed (oldest working v0.6.35)
 
 ## [0.6.41] - 2026-11-22
 
@@ -277,12 +294,12 @@ Voice on a phone works again when a tablet or TV hears "Hey Lena" too. **Update 
 
 ### What to update
 
-- Modelfile: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
 - Lena HA Integration: Need to update
 - Lena Android App: Need to update
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Tools: No update needed (oldest working v0.6.39)
+- Open WebUI Filters: No update needed (oldest working v0.6.35)
+- Voice Bridge: No update needed (oldest working v0.6.35)
 
 ## [0.6.40] - 2026-11-22
 
@@ -294,12 +311,12 @@ No change to Lena herself: the changelog now says, at the end of every release, 
 
 ### What to update
 
-- Modelfile: No update needed
-- Lena HA Integration: No update needed
-- Lena Android App: No update needed
-- Open WebUI Tools: No update needed
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.39)
+- Lena Android App: No update needed (oldest working v0.6.39)
+- Open WebUI Tools: No update needed (oldest working v0.6.39)
+- Open WebUI Filters: No update needed (oldest working v0.6.35)
+- Voice Bridge: No update needed (oldest working v0.6.35)
 
 ## [0.6.39] - 2026-11-22
 
@@ -327,12 +344,12 @@ More of the small things a person living here would know. Everything that makes 
 
 ### What to update
 
-- Modelfile: No update needed
+- Modelfile: No update needed (oldest working v0.6.31)
 - Lena HA Integration: Need to update
 - Lena Android App: Need to update
 - Open WebUI Tools: Need to update
-- Open WebUI Filters: No update needed
-- Voice Bridge: No update needed
+- Open WebUI Filters: No update needed (oldest working v0.6.35)
+- Voice Bridge: No update needed (oldest working v0.6.35)
 
 ## [0.6.38] - 2026-11-22
 

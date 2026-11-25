@@ -500,6 +500,12 @@ newest_section = release_notes.changelog_section(app_version) or ""
 missing_parts = release_notes.missing_update_lines(newest_section)
 check(not missing_parts, f"CHANGELOG.md's {app_version} section ends with what to update for every part"
       + (f" (missing: {', '.join(missing_parts)})" if missing_parts else ""))
+# A part that needs no update names the oldest version of it that still works, and that has to be the
+# last release that said "Need to update" for it, in every section, so nobody is told an old Modelfile
+# or Open WebUI file still works when a later release changed it.
+wrong_oldest = release_notes.oldest_working_problems()
+check(not wrong_oldest, "every 'oldest working' version in CHANGELOG.md is the last release that needed that part"
+      + (f" ({'; '.join(wrong_oldest)})" if wrong_oldest else ""))
 
 # No 1.0 until the owner says so: every part stays 0.x.
 check(app_version.split(".")[0] == "0", f"the version stays below 1.0 until it's approved (got {app_version})")

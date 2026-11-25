@@ -65,23 +65,78 @@ def changelog_section(version, text=None):
 
 
 # Every release's changelog section ends with what to update, one line per part, so people with many
-# moving parts know at a glance what to do: "Modelfile: No update needed", "Lena HA Integration: Need to
-# update". tools/check.py checks the newest section has all of them.
+# moving parts know at a glance what to do: "Modelfile: No update needed (oldest working v0.6.31)",
+# "Lena HA Integration: Need to update". A part that needs no update names the oldest version of it
+# that still works: the last release that said "Need to update" for it. The Modelfile and the Open
+# WebUI files are updated by hand, so that saves reading every release since to find out whether yours
+# is new enough. tools/check.py checks the newest section has every line, and that each version named
+# follows from the sections before it.
 UPDATE_PARTS = (
     "Modelfile", "Lena HA Integration", "Lena Android App", "Open WebUI Tools", "Open WebUI Filters", "Voice Bridge",
 )
-UPDATE_ANSWERS = ("Need to update", "No update needed")
+NEED_UPDATE = "Need to update"
+NO_UPDATE = re.compile(r"No update needed \(oldest working v(\d+\.\d+\.\d+)\)")
 
 
-def missing_update_lines(section):
-    """The parts a changelog section doesn't say whether to update (empty when it says for all of them)."""
-    missing = []
+def update_answers(section):
+    """What a changelog section says for each part: "need", a version ("0.6.31", for "No update needed
+    (oldest working v0.6.31)"), or None when the line is missing or says something else, such as a
+    bare "No update needed" without the version."""
+    answers = {}
     for part in UPDATE_PARTS:
         line = re.compile(rf"^\s*(?:[-*]\s*)?\**{re.escape(part)}\**:\s*\**(.+?)\**\s*$", re.M)
         found = line.search(section or "")
-        if not found or found.group(1).strip() not in UPDATE_ANSWERS:
-            missing.append(part)
-    return missing
+        said = found.group(1).strip() if found else ""
+        no_update = NO_UPDATE.fullmatch(said)
+        if said == NEED_UPDATE:
+            answers[part] = "need"
+        elif no_update:
+            answers[part] = no_update.group(1)
+        else:
+            answers[part] = None
+    return answers
+
+
+def missing_update_lines(section):
+    """The parts a changelog section doesn't say plainly whether to update (empty when it says for all)."""
+    return [part for part, said in update_answers(section).items() if said is None]
+
+
+def _version_key(version):
+    """"0.6.9" as (0, 6, 9), so versions compare as numbers: 0.6.9 comes before 0.6.10."""
+    return tuple(int(n) for n in version.split("."))
+
+
+def oldest_working_problems(text=None):
+    """Every "oldest working" version in CHANGELOG.md that doesn't follow from the releases before it,
+    as sentences (empty when they all do). Going from the oldest release up: a part's oldest working
+    version is the last release that said "Need to update" for it, and a release that says "No update
+    needed" must name that one. The oldest section with a What to update list is where it starts, so
+    its versions can only be checked to be older releases that exist. Sections without a list (from
+    before the rule) are skipped. `text` is the changelog to read, for the tests."""
+    if text is None:
+        text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    headings = list(re.finditer(r"^## \[?v?(\d+\.\d+\.\d+)\]?(?=\s|$).*$", text, re.M))
+    versions = [h.group(1) for h in headings]
+    problems = []
+    oldest = {}  # part -> its oldest working version so far
+    for version in sorted(versions, key=_version_key):
+        section = changelog_section(version, text) or ""
+        if "### What to update" not in section:
+            continue
+        for part, said in update_answers(section).items():
+            if said == "need":
+                oldest[part] = version
+            elif said is None:
+                continue  # missing_update_lines reports it for the newest section
+            elif said not in versions or _version_key(said) >= _version_key(version):
+                problems.append(f"{version}: {part} names v{said}, which isn't an earlier release")
+            elif part in oldest and said != oldest[part]:
+                problems.append(f"{version}: {part} names v{said}, but the last release that needed it was "
+                                f"v{oldest[part]}")
+            else:
+                oldest[part] = said
+    return problems
 
 
 def absolute_links(text, repo, tag):

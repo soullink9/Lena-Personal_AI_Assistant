@@ -87,20 +87,22 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 - Read [ARCHITECTURE.md](ARCHITECTURE.md) for how the parts fit together, then the [Development](docs/development/Development.md) page: the layout, what must stay in step and the checks to run. For the app, also read [App development](docs/development/App.md).
 - Run `python3 tools/check.py` before committing (see [Checking a change](#checking-a-change)).
 - Keep comments readable by someone new to the project. Every function and class gets a short comment, and it explains why (the reason for a choice, the trap it avoids), not just what the code already says. Prefer plain, step-by-step code over clever one-liners.
-- Add a line to the next release's section of `CHANGELOG.md` (one changelog for the whole project), and keep its **What to update** list at the end right: one line per part, each `Need to update` or `No update needed`:
+- Add a line to the next release's section of `CHANGELOG.md` (one changelog for the whole project), and keep its **What to update** list at the end right: one line per part, each `Need to update` or `No update needed (oldest working vX.Y.Z)`:
 
   ```
   ### What to update
 
-  - Modelfile: No update needed
+  - Modelfile: No update needed (oldest working v0.6.31)
   - Lena HA Integration: Need to update
   - Lena Android App: Need to update
-  - Open WebUI Tools: No update needed
-  - Open WebUI Filters: No update needed
-  - Voice Bridge: No update needed
+  - Open WebUI Tools: No update needed (oldest working v0.6.43)
+  - Open WebUI Filters: No update needed (oldest working v0.6.44)
+  - Voice Bridge: No update needed (oldest working v0.6.43)
   ```
 
-  `tools/check.py` fails while the newest release's section is missing a part.
+  The oldest working version is the last release whose list said `Need to update` for that part: the oldest copy of it that still works with this release. When your change doesn't touch a part, copy its version from the previous release's line; when it does, say `Need to update`, and later releases name this one. People update the Modelfile and the Open WebUI files by hand, so this tells them whether theirs is new enough without reading every release since.
+
+  `tools/check.py` fails while the newest release's section is missing a part, says a bare `No update needed`, or any section names a version that isn't the last release that needed that part.
 - Never put private data in the repository: IP addresses, tokens, signing keys, real names, or the contents of a real memory list. Use `Alex` and `Sam` in examples.
 
 ### Personality and Home Assistant
