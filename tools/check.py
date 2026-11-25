@@ -521,7 +521,7 @@ APPROVED_GRADLE = {
     "androidx.webkit:webkit", "androidx.work:work-runtime-ktx", "androidx.glance:glance-appwidget",
     "org.jetbrains.kotlinx:kotlinx-coroutines-android", "com.google.ai.edge.litert:litert",
 }
-APPROVED_GRADLE_PLUGINS = {"com.android.application", "org.jetbrains.kotlin.android", "org.jetbrains.kotlin.plugin.compose"}
+APPROVED_GRADLE_PLUGINS = {"com.android.application", "org.jetbrains.kotlin.plugin.compose"}
 # What Home Assistant and Open WebUI already provide to the code that runs inside them.
 APPROVED_PYTHON = {"homeassistant", "aiohttp", "probatio", "yaml", "pydantic"}
 

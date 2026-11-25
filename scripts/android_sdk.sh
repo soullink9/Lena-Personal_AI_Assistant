@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Installs the Android SDK the app's build needs, straight from Google, for a runner that doesn't have one (the
-# Gitea runner's jobs run in the official gradle:8.14.3-jdk21 image, which has Gradle and a JDK but no SDK).
+# Gitea runner's jobs run in the official gradle:9.9.2-jdk21 image, which has Gradle and a JDK but no SDK).
 #
 #   scripts/android_sdk.sh            (installs into $ANDROID_HOME, default /opt/android-sdk)
 #
 # Google's command-line tools are downloaded from dl.google.com and checked against the SHA-256 Google publishes
-# for them (developer.android.com/studio, "Command line tools only"); they then install Android 16's platform
-# (compileSdk 36). Android's build tools come the same way: the Android Gradle Plugin fetches the version it
+# for them (developer.android.com/studio, "Command line tools only"); they then install Android 17's platform
+# (compileSdk 37). Android's build tools come the same way: the Android Gradle Plugin fetches the version it
 # wants by itself once the licences are accepted. Nothing comes from GitHub.
 #
 # To move to newer command-line tools, take the Linux file name and its SHA-256 from that page.
@@ -29,5 +29,5 @@ fi
 # The licences must be accepted once per SDK, or Gradle refuses to build. (yes stops when sdkmanager has read
 # enough, which isn't a failure.)
 { yes || true; } | "$sdkmanager" --sdk_root="$sdk" --licenses > /dev/null
-"$sdkmanager" --sdk_root="$sdk" "platforms;android-36"
+"$sdkmanager" --sdk_root="$sdk" "platforms;android-37"
 echo "Android SDK ready in $sdk"

@@ -79,15 +79,19 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 
 | Item | Version |
 |---|---|
-| Android | 16 (API 36) minimum, target and compile SDK. Don't raise these until the phone runs a newer Android. |
-| Android Gradle Plugin | 8.13.0 |
-| Gradle | 8.14.3 |
-| Kotlin | 2.2.20 |
-| Compose BOM | 2025.10.00 (Material 3) |
-| Other Jetpack | activity-compose 1.11.0, core-ktx 1.17.0, lifecycle 2.9.4, webkit 1.14.0, work 2.10.1, glance-appwidget 1.1.1 |
+| Android | 15 (API 35) minimum SDK, 16 (API 36) target SDK, 17 (API 37) compile SDK. The compile SDK only decides which APIs the build can see, so it follows what the newest Jetpack libraries need; the target SDK changes how the app behaves and stays until the phone runs a newer Android. |
+| Android Gradle Plugin | 9.5.1 (compiles Kotlin itself: no Kotlin Android plugin) |
+| Gradle | 9.9.2 |
+| Kotlin | 2.4.21 (Kotlin Gradle plugin and Compose compiler plugin, same version) |
+| Compose BOM | 2026.09.00 (Compose 1.12, Material 3 1.4); material-icons-extended 1.7.8, its last release |
+| Other Jetpack | activity-compose 1.13.0, core-ktx 1.19.1, lifecycle 2.11.1, webkit 1.18.0, work 2.12.0, glance-appwidget 1.2.0 |
+| Other libraries | kotlinx-coroutines-android 1.11.0, LiteRT 1.4.0 |
 | Java | 17 language level; builds on JDK 17 or 21 |
 
-Newer Jetpack releases may need a newer compile SDK. Check before raising a version.
+Newer Jetpack releases may need a newer compile SDK. Check before raising a version. Held back on purpose:
+
+- **Compose BOM 2026.11 (Compose 1.13, Material 3 1.5)** builds only against compile SDK 37.1, and Android Gradle Plugin 9.5 supports up to 37. Move when an Android Gradle Plugin release supports 37.1.
+- **LiteRT 2** replaces the `Interpreter` API that `WakeWord.kt` uses with its `CompiledModel` API, so moving to it means rewriting how the wake word runs its models and testing it on a phone and a TV.
 
 ## How Lena talks to Open WebUI
 
@@ -141,7 +145,7 @@ All the models are committed in `app/src/main/assets/wakeword/`, so the build do
 
 ## Building locally
 
-There's no Gradle wrapper in the repository. Use Android Studio, or install Gradle 8.14.3, a JDK 17 or 21, and the Android SDK, then:
+There's no Gradle wrapper in the repository. Use Android Studio, or install Gradle 9.9.2, a JDK 17 or 21, and the Android SDK, then:
 
 ```sh
 cd android
@@ -159,7 +163,7 @@ export LENA_KEYSTORE_PASSWORD='your password'
 
 The same scripts build the app everywhere: `scripts/build_apk.sh` builds and signs the release APK, names it `lena-v<version>.apk` (or `lena-<commit>.apk` for test builds) and writes `SHA256SUMS`; for a release, `scripts/check_apk.py` then checks it the way the app's updater and Android will.
 
-- **On Gitea** (where the project lives), `.gitea/workflows/test.yml` builds on every push, in the official `gradle:8.14.3-jdk21` image from Docker Hub. It has Gradle and a JDK but no Android SDK, so `scripts/android_sdk.sh` fetches Google's command-line tools from dl.google.com, checks them against the SHA-256 Google publishes, and installs Android 16's platform. Nothing comes from GitHub, so it builds when GitHub is down. `tests/app/commands_check/run.sh` uses the Kotlin compiler inside Gradle there, as the image has no `kotlinc`.
+- **On Gitea** (where the project lives), `.gitea/workflows/test.yml` builds on every push, in the official `gradle:9.9.2-jdk21` image from Docker Hub. It has Gradle and a JDK but no Android SDK, so `scripts/android_sdk.sh` fetches Google's command-line tools from dl.google.com, checks them against the SHA-256 Google publishes, and installs Android 17's platform (the compile SDK). Nothing comes from GitHub, so it builds when GitHub is down. `tests/app/commands_check/run.sh` uses the Kotlin compiler inside Gradle there, as the image has no `kotlinc`.
 - **On GitHub** (the public mirror), `build.yml` builds each change to the app on GitHub's Ubuntu runner, with the JDK and Android SDK already installed there and Gradle downloaded from gradle.org (checked against its published SHA-256), and keeps the APK and `SHA256SUMS` as the run's artifact.
 - **Releases** (`.gitea/workflows/release.yml` and `.github/workflows/release.yml`) load your signing key from the secrets, refuse to go on without it, and publish only after every test has passed. The release step is the only one allowed to write, apart from the voice bridge image job after it, which may only publish packages (`scripts/publish_voice_bridge_image.sh`; see CONTRIBUTING).
 

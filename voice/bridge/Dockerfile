@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM python:3.15-alpine
 
 # ffmpeg converts Piper's raw audio to mp3, and your recordings to what Whisper reads.
 RUN apk add --no-cache ffmpeg

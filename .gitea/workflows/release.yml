@@ -44,12 +44,12 @@ defaults:
 
 jobs:
   checks:
-    # tools/check.py and the release scripts' tests, on Python 3.13: the voice bridge's Python
+    # tools/check.py and the release scripts' tests, on Python 3.15: the voice bridge's Python
     # (voice/bridge/Dockerfile), and new enough for the integration's code, which only ever runs on Home
     # Assistant's own Python (the jobs below test it there).
     runs-on: ubuntu-latest
     container:
-      image: python:3.13-bookworm
+      image: python:3.15-trixie
     steps:
       - name: Get the code
         env:
@@ -76,7 +76,7 @@ jobs:
     # compile there.
     runs-on: ubuntu-latest
     container:
-      image: python:3.11-bookworm
+      image: python:3.11-trixie
     steps:
       - name: Get the code
         env:
@@ -103,7 +103,7 @@ jobs:
         home-assistant: ["latest", "2026.11"]
     runs-on: ubuntu-latest
     container:
-      image: python:3.14-bookworm
+      image: python:3.14-trixie
     steps:
       - name: Get the code
         env:
@@ -123,7 +123,7 @@ jobs:
     # The newest Home Assistant on PyPI, even before its test harness is out.
     runs-on: ubuntu-latest
     container:
-      image: python:3.14-bookworm
+      image: python:3.14-trixie
     steps:
       - name: Get the code
         env:
@@ -143,7 +143,7 @@ jobs:
     needs: [checks, open-webui, home-assistant, startup]
     runs-on: ubuntu-latest
     container:
-      image: gradle:8.14.3-jdk21
+      image: gradle:9.9.2-jdk21
     env:
       ANDROID_HOME: /opt/android-sdk
     steps:
@@ -324,7 +324,7 @@ jobs:
     needs: [release]
     runs-on: ubuntu-latest
     container:
-      image: docker:28-cli
+      image: docker:29-cli
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     steps:

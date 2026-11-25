@@ -2,6 +2,33 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+Every part's dependencies are on their newest releases where they can be. **Update the app, and pull the voice bridge's new image.**
+
+### App
+
+- **Newest build tools and libraries.** Android Gradle Plugin 9.5.1 (from 8.13.0), which compiles Kotlin itself, so the Kotlin Android plugin is gone; Gradle 9.9.2 (from 8.14.3); Kotlin 2.4.21 (from 2.2.20). Compose BOM 2026.09.00 (Compose 1.12, from 1.9), activity-compose 1.13.0, core-ktx 1.19.1, lifecycle 2.11.1, webkit 1.18.0, work 2.12.0, glance-appwidget 1.2.0 and kotlinx-coroutines 1.11.0.
+- **Compiled against Android 17.** The newest Jetpack libraries build only against it, so `compileSdk` is 37. It only decides which Android APIs the build can see: the app still targets Android 16 and installs on Android 15 and later, and behaves the same.
+- **Held back:** Compose 1.13 and Material 3 1.5 need compile SDK 37.1, newer than Android Gradle Plugin 9.5 supports, and LiteRT 2 drops the `Interpreter` API the wake word runs its models with (moving means rewriting that part and testing it on a phone and a TV). Material icons stay on 1.7.8, their last release. See [App development](docs/development/App.md#versions).
+
+### Voice bridge
+
+- **Python 3.15.** Its image is built on `python:3.15-alpine` (from 3.13). The bridge uses only Python's standard library and starts and answers `/health` on 3.15 as before.
+
+### Build
+
+- **Newest CI images and actions.** Gitea's jobs run in `gradle:9.9.2-jdk21`, `docker:29-cli` and the Python images on Debian 13 (trixie); the checks run on Python 3.15, the voice bridge's. GitHub's workflows use `actions/checkout@v7` and `actions/setup-python@v7`, and install Gradle 9.9.2. The Android SDK script installs Android 17's platform. Open WebUI's files are still checked on Python 3.11 (Open WebUI supports 3.11 and 3.12) and the integration on Python 3.14, Home Assistant's.
+
+### What to update
+
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.52)
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: Need to update
+
 ## [0.6.53] - 2026-11-25
 
 The changelog now says, for each part that needs no update, the oldest version of it that still works. **Nothing to update.**

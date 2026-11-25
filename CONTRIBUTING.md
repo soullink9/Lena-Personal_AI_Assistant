@@ -114,7 +114,7 @@ What Gitea needs, once: Actions enabled for the repository; the `KEYSTORE_B64` a
 
 ### The app
 
-- The app targets Android 16 (`targetSdk` and `compileSdk` 36) and installs on Android 15 and later (`minSdk` 35), TVs included. Don't add code for older Android. Put anything newer than Android 15 behind a version check; release builds fail on a call that isn't.
+- The app targets Android 16 (`targetSdk` 36), compiles against Android 17 (`compileSdk` 37) and installs on Android 15 and later (`minSdk` 35), TVs included. Don't add code for older Android. Put anything newer than Android 15 behind a version check; release builds fail on a call that isn't.
 - Keep it talking only to the user's own Open WebUI and sign-in page. No analytics, no new third-party services, and new libraries only when there's a good reason.
 - Raise `versionCode` and `versionName` in `android/app/build.gradle.kts` for anything you plan to release. `versionCode` must always go up, even if the version name starts again.
 

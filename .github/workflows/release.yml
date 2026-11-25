@@ -67,12 +67,12 @@ jobs:
     needs: version
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.ref }}
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.15"
       - name: Offline checks and the release scripts
         run: |
           pip install -q pyyaml
@@ -87,10 +87,10 @@ jobs:
         home-assistant: ["latest", "2026.11"]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.ref }}
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Test on Home Assistant ${{ matrix.home-assistant }}
@@ -101,10 +101,10 @@ jobs:
     needs: version
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.ref }}
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Start the newest Home Assistant with Lena
@@ -118,14 +118,14 @@ jobs:
     outputs:
       latest: ${{ steps.publish.outputs.latest }}
     env:
-      GRADLE_VERSION: "8.14.3"
+      GRADLE_VERSION: "9.9.2"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.ref }}
 
       # This workflow's own scripts, from main: an older version's tag may not have them yet.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           path: .release-tools
 
@@ -251,12 +251,12 @@ jobs:
       contents: read
       packages: write # to publish the image
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.ref }}
 
       # This workflow's own scripts, from main: an older version's tag may not have them yet.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           path: .release-tools
 

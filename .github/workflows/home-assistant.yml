@@ -25,8 +25,8 @@ jobs:
         home-assistant: ["latest", "2026.11"]
     name: test (Home Assistant ${{ matrix.home-assistant }})
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       # The same script the Gitea runner uses: the harness for this release, what Lena loads, then the tests.
@@ -40,8 +40,8 @@ jobs:
     name: start-up (newest Home Assistant)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Start it with Lena
@@ -51,7 +51,7 @@ jobs:
     # Home Assistant's own checks for an integration: manifest, translations, services.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: home-assistant/actions/hassfest@master
 
   hacs:

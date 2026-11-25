@@ -1,14 +1,13 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "io.github.soullink9.lena"
-    compileSdk = 36 // Android 16; don't raise until the phone runs a newer Android
+    // Android 17: the newest Jetpack libraries build only against it. It decides which APIs the build can see, not
+    // how the app behaves (that's targetSdk, still Android 16).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.soullink9.lena"
@@ -48,6 +47,7 @@ android {
         compose = true
     }
 
+    // Kotlin's JVM target follows targetCompatibility (built-in Kotlin), so this sets both.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -68,27 +68,24 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
-
-// Google's Jetpack libraries only, pinned to versions that build against SDK 36.
+// Google's Jetpack libraries, the newest stable releases that build against compileSdk 37 (Compose 1.13 and
+// Material 3 1.5 need 37.1, newer than the Android Gradle Plugin supports; see docs/development/App.md).
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    // The Material icons aren't released with Compose any more; 1.7.8 is the last version.
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    implementation("androidx.activity:activity-compose:1.11.0")
-    implementation("androidx.core:core-ktx:1.17.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.4")
-    implementation("androidx.webkit:webkit:1.14.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
-    implementation("androidx.glance:glance-appwidget:1.1.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.1")
+    implementation("androidx.webkit:webkit:1.18.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+    implementation("androidx.glance:glance-appwidget:1.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     // Runs the wake word models on the phone (Google's LiteRT, formerly TensorFlow Lite; no Play services).
+    // Stays on 1.x: LiteRT 2 drops the Interpreter API WakeWord.kt uses for its CompiledModel API.
     implementation("com.google.ai.edge.litert:litert:1.4.0")
 }

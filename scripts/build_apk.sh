@@ -6,7 +6,7 @@
 #
 # Signs with your key when LENA_KEYSTORE and LENA_KEYSTORE_PASSWORD are set (the workflows load them from the
 # KEYSTORE_B64 and KEYSTORE_PASSWORD secrets); otherwise it's debug-signed, which scripts/check_apk.py refuses
-# for a release. Needs Gradle 8.14.3, a JDK and the Android SDK (scripts/android_sdk.sh on a runner without one).
+# for a release. Needs Gradle 9.9.2, a JDK and the Android SDK (scripts/android_sdk.sh on a runner without one).
 # Used by every workflow that builds the app, on Gitea and on GitHub.
 #
 # Prints the APK's path last. On failure, the compiler's errors are also printed as one ::error line, which

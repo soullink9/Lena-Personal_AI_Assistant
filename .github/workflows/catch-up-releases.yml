@@ -38,7 +38,7 @@ jobs:
   catch-up:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # A mirror push that brings a tag along with main also starts release.yml for it: give that run time to
       # show up, so it isn't started a second time here.
