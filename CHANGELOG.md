@@ -2,6 +2,23 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [0.6.55] - 2026-11-25
+
+The app builds again: 0.6.54's builds stopped while installing the Android SDK, so 0.6.54 was never published. **Update the app, and pull the voice bridge's new image** (both are 0.6.54's changes, published for the first time).
+
+### Build
+
+- **Android 17's SDK is found.** Google publishes Android 17's platform as `platforms;android-37.0`, with its minor level, and has no `platforms;android-37`, so the SDK script stopped with "Failed to find package 'platforms;android-37'" and both the Test and Release workflows failed. The script now installs `platforms;android-37.0`, and the app's build names the same platform (`compileSdk { version = release(37) { minorApiLevel = 0 } }`), since a bare `compileSdk = 37` makes the Android Gradle Plugin look for `android-37` too. Nothing else changes: still compiled against Android 17, targeting Android 16, installing on Android 15 and later.
+
+### What to update
+
+- Modelfile: No update needed (oldest working v0.6.31)
+- Lena HA Integration: No update needed (oldest working v0.6.52)
+- Lena Android App: Need to update
+- Open WebUI Tools: No update needed (oldest working v0.6.43)
+- Open WebUI Filters: No update needed (oldest working v0.6.44)
+- Voice Bridge: Need to update
+
 ## [0.6.54] - 2026-11-25
 
 Every part's dependencies are on their newest releases where they can be. **Update the app, and pull the voice bridge's new image.**
