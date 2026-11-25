@@ -6,7 +6,9 @@
 #
 # Google's command-line tools are downloaded from dl.google.com and checked against the SHA-256 Google publishes
 # for them (developer.android.com/studio, "Command line tools only"); they then install Android 17's platform
-# (compileSdk 37). Android's build tools come the same way: the Android Gradle Plugin fetches the version it
+# (compileSdk 37.0). From Android 17 on, Google names each platform with its minor level: the package is
+# platforms;android-37.0, and sdkmanager finds no platforms;android-37. The app's build.gradle.kts names the same
+# minor level, so Gradle uses this platform. Android's build tools come the same way: the Android Gradle Plugin fetches the version it
 # wants by itself once the licences are accepted. Nothing comes from GitHub.
 #
 # To move to newer command-line tools, take the Linux file name and its SHA-256 from that page.
@@ -29,5 +31,5 @@ fi
 # The licences must be accepted once per SDK, or Gradle refuses to build. (yes stops when sdkmanager has read
 # enough, which isn't a failure.)
 { yes || true; } | "$sdkmanager" --sdk_root="$sdk" --licenses > /dev/null
-"$sdkmanager" --sdk_root="$sdk" "platforms;android-37"
+"$sdkmanager" --sdk_root="$sdk" "platforms;android-37.0"
 echo "Android SDK ready in $sdk"

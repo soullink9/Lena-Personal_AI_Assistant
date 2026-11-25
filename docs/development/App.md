@@ -79,7 +79,7 @@ The app is the Gradle project in `android/`. All app code is in `android/app/src
 
 | Item | Version |
 |---|---|
-| Android | 15 (API 35) minimum SDK, 16 (API 36) target SDK, 17 (API 37) compile SDK. The compile SDK only decides which APIs the build can see, so it follows what the newest Jetpack libraries need; the target SDK changes how the app behaves and stays until the phone runs a newer Android. |
+| Android | 15 (API 35) minimum SDK, 16 (API 36) target SDK, 17 (API 37.0) compile SDK, written `compileSdk { version = release(37) { minorApiLevel = 0 } }` because Google publishes Android 17 only as `platforms;android-37.0` (a bare `compileSdk = 37` looks for an `android-37` that doesn't exist). The compile SDK only decides which APIs the build can see, so it follows what the newest Jetpack libraries need; the target SDK changes how the app behaves and stays until the phone runs a newer Android. |
 | Android Gradle Plugin | 9.5.1 (compiles Kotlin itself: no Kotlin Android plugin) |
 | Gradle | 9.9.2 |
 | Kotlin | 2.4.21 (Kotlin Gradle plugin and Compose compiler plugin, same version) |

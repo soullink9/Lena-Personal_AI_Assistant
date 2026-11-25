@@ -7,7 +7,15 @@ android {
     namespace = "io.github.soullink9.lena"
     // Android 17: the newest Jetpack libraries build only against it. It decides which APIs the build can see, not
     // how the app behaves (that's targetSdk, still Android 16).
-    compileSdk = 37
+    // From Android 17 on, Google publishes each SDK platform with a minor level (platforms;android-37.0), and there
+    // is no plain android-37. A bare `compileSdk = 37` makes the Android Gradle Plugin look for android-37 ("Failed
+    // to find target with hash string 'android-37'"), so the minor level is named; scripts/android_sdk.sh installs
+    // the same platform.
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
 
     defaultConfig {
         applicationId = "io.github.soullink9.lena"
@@ -16,8 +24,8 @@ android {
         // block below fails the build on any call that isn't.
         minSdk = 35
         targetSdk = 36
-        versionCode = 88
-        versionName = "0.6.54"
+        versionCode = 89
+        versionName = "0.6.55"
         // Phones and tablets are 64-bit; Android TVs and boxes may still run 32-bit Android on 64-bit chips, so
         // the wake word's native code (LiteRT) comes for 32-bit ARM too.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
