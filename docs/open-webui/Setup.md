@@ -114,6 +114,18 @@ Keep **Web Search** if she should search the web. Leave her own tools' descripti
 
 The Lena app keeps compaction off the path of her answers as far as it can: it sends each question with only as much conversation as fits under the threshold beside the rest of her prompt (measured from the size the model reported for her last answer), with room left for tool results, and asks Open WebUI to compact the chat a few minutes after you stop talking, when it's getting long. Her next answer then starts from that summary. When the threshold is too low for her prompt, the app's log (Settings → About → Logs) says so and what to raise it to, never above what her context (Settings → Model) holds beside her reply; when no threshold fits, it says her prompt has to get smaller.
 
+### Turn off its telemetry and update check
+
+Lena never sends telemetry ([Privacy and Security](../app/Privacy-and-Security.md#no-telemetry)), and Open WebUI shouldn't either. Add these to Open WebUI's environment (its Docker container, or the shell you start it from) and restart it:
+
+| Variable | Why |
+|---|---|
+| `ENABLE_VERSION_UPDATE_CHECK=false` | Otherwise every admin's page asks GitHub whether a newer Open WebUI is out. |
+| `HF_HUB_DISABLE_TELEMETRY=1` | Its downloads from Hugging Face (the built-in Whisper and embedding models) then send no usage details. |
+| `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true`, `ANONYMIZED_TELEMETRY=false` | Turn off the libraries' own analytics. The official Docker image sets these already; set them if you installed it with pip. |
+
+Leave `ENABLE_OTEL` off (its default): it sends traces and metrics to a collector.
+
 ## 6. Open WebUI's own memory
 
 Open WebUI has a separate memory feature (Settings → Personalization → Memory) that applies to every model you use. With the filter and tool, Lena's memory is her shared list in Home Assistant instead, so we suggest turning Open WebUI's memory **off**, or she'll have two memories that don't agree. The app follows the same setting. The app's **Memory and knowledge** screen shows both: connect Home Assistant in the app's settings and a **Hers** tab shows her shared list next to Open WebUI's memories and your knowledge.

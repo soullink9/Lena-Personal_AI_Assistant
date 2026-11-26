@@ -11,6 +11,7 @@ Menu names change between Home Assistant versions; if a path doesn't match, look
 - Home Assistant 2026.11 or newer. Lena is built for the newest Home Assistant only: each release of hers may need the Home Assistant release that came out before it, so update Home Assistant first.
 - Lena built in Ollama ([Getting started, part 1](../Getting-Started.md#1-her-model)).
 - For voice: speech-to-text and text-to-speech connected to Home Assistant, for example Whisper and Piper through the Wyoming integration ([Piper](../voice/Piper.md)). Not needed if you only type to her.
+- Home Assistant's analytics off: Settings → System → Analytics, every box unticked. Lena sends no telemetry and her house shouldn't either ([Privacy and Security](../app/Privacy-and-Security.md#no-telemetry)).
 - To install by hand rather than from the Marketplace: a way to copy a folder into your Home Assistant config folder (the File editor or Studio Code Server add-on, a Samba share, or SSH).
 
 ## 1. Install the integration

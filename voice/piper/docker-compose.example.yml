@@ -35,7 +35,7 @@ services:
       # Cadence variability. Above 1 causes stutters and pauses.
       - PIPER_NOISEW=0.333
       # Set to any value to use only voices already downloaded (no internet fetch).
-      # Download the voice once first, then enable this.
+      # Download the voice once first, then enable this. Piper has no telemetry.
       # - LOCAL_ONLY=true
       # Set to any value to turn OFF sentence-by-sentence streaming. Leave it
       # unset: streaming lets speech start before the whole reply is ready.

@@ -2,6 +2,16 @@
 
 Everything in this repository (the Android app, the Home Assistant integration, the Open WebUI filter and tool, the Modelfile and the voice bridge) shares one version. Newest first. Versions follow [Semantic Versioning](https://semver.org/); while it's below 1.0, anything may still change between releases.
 
+## [Unreleased]
+
+### Docs
+
+- **No telemetry, ever.** A rule of the project, now written in CLAUDE.md and CONTRIBUTING: nothing in Lena sends usage data, analytics, crash reports or anything else home, and no library, image or build tool that does is allowed. A check of every part (the app and its Gradle libraries, the integration, the Open WebUI filter and tool, the voice bridge and its image, the workflows) found none. [Privacy and Security](docs/app/Privacy-and-Security.md#no-telemetry) has a new **No telemetry** section.
+- **Turning it off in Open WebUI.** Set `ENABLE_VERSION_UPDATE_CHECK=false` (otherwise admins' pages ask GitHub for new versions) and `HF_HUB_DISABLE_TELEMETRY=1` (its model downloads), plus `SCARF_NO_ANALYTICS`, `DO_NOT_TRACK` and `ANONYMIZED_TELEMETRY` when it isn't installed from its Docker image, which sets those. In [Lena in Open WebUI](docs/open-webui/Setup.md#turn-off-its-telemetry-and-update-check), Getting started and `.env.example`.
+- **Home Assistant's analytics off.** The installation guide says to leave every box under Settings → System → Analytics unticked.
+- **Ollama without its cloud.** The example compose file sets `OLLAMA_NO_CLOUD=1`, which turns off Ollama's cloud models and web search; Lena never uses them. Ollama itself has no telemetry.
+- **When the app looks for updates.** Privacy and Security now says it looks once when you open the Updates page, as well as when you tap Check for updates; still never in the background.
+
 ## [0.6.55] - 2026-11-25
 
 The app builds again: 0.6.54's builds stopped while installing the Android SDK, so 0.6.54 was never published. **Update the app, and pull the voice bridge's new image** (both are 0.6.54's changes, published for the first time).

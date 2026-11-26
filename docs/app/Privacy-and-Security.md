@@ -6,7 +6,7 @@ Lena is built so that your conversations go to your server and nowhere else.
 
 ## What Lena connects to
 
-Your Open WebUI address, any sign-in addresses you add (such as Authentik), your Home Assistant address if you add one, and whatever those pages themselves load. GitHub only when you check for or download an update in Settings → Software version → Updates (never in the background). Nothing else: no analytics, no crash reporting sent anywhere, and no server run by anyone else.
+Your Open WebUI address, any sign-in addresses you add (such as Authentik), your Home Assistant address if you add one, and whatever those pages themselves load. GitHub only for updates: when you open Settings → Software version → Updates (it looks for a newer release once) or tap check or download there, never in the background. Nothing else: no analytics, no crash reporting sent anywhere, and no server run by anyone else.
 
 Links to other sites open in your normal browser, not in Lena, so those sites never see Lena's storage or your sign-in.
 
@@ -57,7 +57,7 @@ Settings → Software version → Logs shows Lena's own log: problems, warnings 
 
 ## Updates
 
-Checking and downloading happen only when you tap them, from Lena's public releases on GitHub (or your own Gitea, if you've given its address), without signing in to anything; the download itself comes from GitHub's file storage (or your Gitea), over https only. Before an update is offered, Lena checks it against the release's SHA-256 file, and that it's Lena, newer, and signed with the same key as the copy you have; Android refuses a different key again when installing. Installing always asks you to confirm.
+Checking happens when you open the Updates page or tap **Check for updates**, and downloading only when you tap it, from Lena's public releases on GitHub (or your own Gitea, if you've given its address), without signing in to anything; the download itself comes from GitHub's file storage (or your Gitea), over https only. Before an update is offered, Lena checks it against the release's SHA-256 file, and that it's Lena, newer, and signed with the same key as the copy you have; Android refuses a different key again when installing. Installing always asks you to confirm.
 
 ## What Lena stores
 
@@ -121,6 +121,17 @@ If you only use public certificates (for example, Let's Encrypt or Tailscale), y
 ## Code from others
 
 Lena uses Google's Android Jetpack libraries, Google's LiteRT (to run the wake word models on the phone) and JetBrains' coroutines library, all open source. The wake word models are openWakeWord's, downloaded and checked against pinned SHA-256 sums when the app is built. There are no ad, analytics or tracking libraries, and nothing that talks to a service of its own.
+
+## No telemetry
+
+Lena never sends usage data, analytics or crash reports, in any of her parts: the app, the Home Assistant integration, the Open WebUI filter and tool, the voice bridge and its image. That's a rule of the project, not a setting. The servers she runs on are other people's software, and some of them have telemetry or outside checks of their own. Turn them off:
+
+| Where | What to set |
+|---|---|
+| Open WebUI | Its Docker image already sets `SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true` and `ANONYMIZED_TELEMETRY=false`; installed with pip, set them yourself. Also set `ENABLE_VERSION_UPDATE_CHECK=false` (otherwise admins' pages ask GitHub for new versions) and `HF_HUB_DISABLE_TELEMETRY=1` (for its downloads of Whisper and embedding models). See [Lena in Open WebUI](../open-webui/Setup.md#turn-off-its-telemetry-and-update-check). |
+| Ollama | No telemetry. `OLLAMA_NO_CLOUD=1` turns off its cloud models and web search, which Lena never uses ([the example compose file](../../ollama/docker-compose.example.yml) sets it). |
+| Home Assistant | Its analytics are off unless you ticked them while setting it up. Check under Settings → System → Analytics and leave every box unticked. |
+| Piper | No telemetry. It downloads its voice once; `LOCAL_ONLY=true` stops it going online afterwards ([Piper](../voice/Piper.md)). |
 
 ## Your signing key
 

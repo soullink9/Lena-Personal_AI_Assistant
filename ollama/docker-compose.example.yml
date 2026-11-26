@@ -38,6 +38,7 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=-1              # never unload models
       - OLLAMA_FLASH_ATTENTION=1          # less VRAM per token of context
+      - OLLAMA_NO_CLOUD=1                 # no cloud models or web search: Lena runs on your hardware only
     deploy:
       resources:
         reservations:

@@ -40,7 +40,8 @@ Full details, including the filter and tool settings: [Lena in Open WebUI](open-
 1. **Connect Ollama:** Admin Panel → Settings → Connections → Ollama API, with your Ollama address. The `lena` model appears in the model list.
 2. **Set up the model:** Workspace → Models → `lena`. Leave **System Prompt** empty (her character is already in the model) and set **Function Calling** to **Native** under Advanced Params.
 3. **Add her feelings and memory:** paste `open-webui/lena_filter.py` as a new function (Admin Panel → Functions) and `open-webui/lena_tools.py` as a new tool (Workspace → Tools), then tick both on the `lena` model. They need your Home Assistant address and a token, so you can come back to this after part 4.
-4. **Optional voice:** to give her the same Piper voice as in your house, set up the [voice bridge](voice/Voice-Bridge.md).
+4. **Turn off its telemetry and update check:** add `ENABLE_VERSION_UPDATE_CHECK=false` and `HF_HUB_DISABLE_TELEMETRY=1` to its environment ([details](open-webui/Setup.md#turn-off-its-telemetry-and-update-check)).
+5. **Optional voice:** to give her the same Piper voice as in your house, set up the [voice bridge](voice/Voice-Bridge.md).
 
 **Test:** start a chat with `lena` and ask who she is.
 

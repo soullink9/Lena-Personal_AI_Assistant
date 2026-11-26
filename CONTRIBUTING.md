@@ -32,6 +32,7 @@ These apply to every change, by people and by AI assistants alike.
 
 **Workflow**
 - [Conventional Commits](https://www.conventionalcommits.org/) for every commit: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `build:`, `ci:`, `chore:`, `perf:`, optionally with a scope such as `feat(app):` or `fix(integration):`. Turn on the check once per clone with `git config core.hooksPath tools/git-hooks`.
+- No telemetry, ever: nothing in Lena may send usage data, analytics, crash reports or anything else home, and no library, image, build tool or example config that does is allowed. Where something Lena uses or documents has telemetry or an automatic outside check, turn it off and say how in the docs ([Privacy and Security](docs/app/Privacy-and-Security.md#no-telemetry)).
 - No new libraries or dependencies without the owner's approval. `tools/check.py` lists the approved ones and fails on anything else; an approved addition goes on that list and in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) in the same change.
 
 ## How the repository is laid out
